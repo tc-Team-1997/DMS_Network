@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target env"
+        required: true
+        default: "dev"
+        type: choice
+        options: [dev, staging, prod]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/dms-python
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+      - uses: docker/build-push-action@v5
+        with:
+          context: python-service
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }}
+      - uses: azure/setup-helm@v4
+        with: {version: "v3.14.0"}
+      - name: Helm upgrade
+        run: |
+          helm upgrade --install dms python-service/helm/nbe-dms \
+            --namespace nbe-dms --create-namespace \
+            --set image.repository=${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
+            --set secrets.API_KEY=${{ secrets.APP_API_KEY }} \
+            --set secrets.JWT_SECRET=${{ secrets.APP_JWT_SECRET }} \
+            --set secrets.DATABASE_URL=${{ secrets.APP_DATABASE_URL }} \
+            --atomic --wait --timeout 10m
+      - name: Verify rollout
+        run: kubectl rollout status deploy/dms-nbe-dms -n nbe-dms --timeout=5m

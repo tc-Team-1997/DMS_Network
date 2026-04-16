@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "NBE DMS Capture",
+    "slug": "nbe-dms-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": { "backgroundColor": "#0a1628" },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "eg.nbe.dms.capture" },
+    "android": {
+      "package": "eg.nbe.dms.capture",
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+    },
+    "extra": {
+      "apiBaseUrl": "https://dms.nbe.local"
+    }
+  }
+}

@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: python-service/requirements.txt
+      - name: Install system deps (tesseract, poppler)
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr poppler-utils
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+      - name: Lint (compileall)
+        run: python -m compileall -q app scripts tests migrations
+      - name: Run tests
+        env:
+          API_KEY: test-key
+          DATABASE_URL: sqlite:///./storage/test.db
+        run: pytest -q
+
+  node-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "20"}
+      - name: Syntax-check proxy route
+        run: node -c routes/py-proxy.js
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-service/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: {terraform_version: "1.8.0"}
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: {version: "v3.14.0"}
+      - run: helm lint python-service/helm/nbe-dms
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: python-test
+    services:
+      dms:
+        image: python:3.11-slim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr poppler-utils
+      - name: Install Python deps
+        working-directory: python-service
+        run: pip install -r requirements.txt
+      - name: Start DMS service
+        working-directory: python-service
+        env:
+          API_KEY: dev-key-change-me
+          DATABASE_URL: sqlite:///./storage/e2e.db
+        run: |
+          mkdir -p storage/documents
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          for i in {1..30}; do curl -sf http://localhost:8000/health && break || sleep 1; done
+      - uses: actions/setup-node@v4
+        with: {node-version: "20"}
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci || npm install
+          npx playwright install --with-deps chromium firefox
+      - name: Run E2E tests
+        working-directory: e2e
+        env:
+          E2E_BASE_URL: http://localhost:8000
+          E2E_API_KEY: dev-key-change-me
+        run: npx playwright test --project=chromium-ltr --project=chromium-rtl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report

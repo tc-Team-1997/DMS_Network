@@ -1,0 +1,59 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Repository</div><div class="page-sub">Document archive</div></div>
+<a href="/documents/capture" class="btn btn-primary">+ Upload</a></div>
+<div style="display:grid;grid-template-columns:220px 1fr;gap:16px">
+  <div class="card" style="padding:12px">
+    <div class="card-header" style="font-size:12px">Folders</div>
+    <a href="/documents" style="display:block;padding:7px 10px;border-radius:6px;color:<%= !folderId?'var(--gold2)':'var(--silver)' %>;<%= !folderId?'background:rgba(201,168,76,.1)':'' %>">All Documents</a>
+    <% folders.forEach(f => { %>
+      <a href="/documents?folder=<%= f.id %>" style="display:block;padding:7px 10px <%= f.parent_id?'7px 26px':'7px 10px' %>;border-radius:6px;color:<%= folderId==f.id?'var(--gold2)':'var(--silver)' %>;<%= folderId==f.id?'background:rgba(201,168,76,.1)':'' %>"><%= f.name %></a>
+    <% }) %>
+  </div>
+  <div class="card">
+    <div class="card-header">Documents (<%= docs.length %>)
+      <div id="bulk-bar" style="display:none;gap:6px;align-items:center">
+        <span id="bulk-count" style="font-size:11px;color:var(--gold2)">0 selected</span>
+        <form method="POST" action="/bulk/documents/bulk" id="bulk-form" style="display:flex;gap:6px;align-items:center">
+          <select name="action" style="padding:5px;font-size:11px;width:auto"><option value="delete">Delete</option><option value="status">Set Status</option><option value="move">Move to folder</option></select>
+          <input type="text" name="status" placeholder="Valid/Expired" style="padding:5px;font-size:11px;width:120px"/>
+          <input type="text" name="folder_id" placeholder="Folder ID" style="padding:5px;font-size:11px;width:90px"/>
+          <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="return confirm('Apply bulk action?')">Apply</button>
+        </form>
+      </div>
+    </div>
+    <table><thead><tr><th><input type="checkbox" id="check-all" style="width:auto"/></th><th>Name</th><th>Type</th><th>Customer</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+    <% docs.forEach(d => { %>
+      <tr>
+        <td><input type="checkbox" class="doc-check" value="<%= d.id %>" style="width:auto"/></td>
+        <td><a href="/documents/viewer/<%= d.id %>" style="color:var(--gold2)"><%= d.original_name %></a></td>
+        <td><%= d.doc_type||'-' %></td>
+        <td><%= d.customer_name||'-' %></td>
+        <td><%= d.expiry_date||'-' %></td>
+        <td><span class="tag tag-<%= d.status==='Valid'?'success':(d.status==='Expired'?'danger':'warn') %>"><%= d.status %></span></td>
+        <td>
+          <a href="/versions/<%= d.id %>" class="btn btn-secondary" style="padding:4px 10px;font-size:11px">Versions</a>
+          <a href="/documents/<%= d.id %>/download" class="btn btn-secondary" style="padding:4px 10px;font-size:11px">Download</a>
+          <form method="POST" action="/documents/<%= d.id %>/delete" style="display:inline" onsubmit="return confirm('Delete?')"><button class="btn btn-danger" style="padding:4px 10px;font-size:11px">Delete</button></form>
+        </td>
+      </tr>
+    <% }) %>
+    <% if (docs.length === 0) { %><tr><td colspan="7" style="text-align:center;color:var(--silver);padding:30px">No documents. <a href="/documents/capture" style="color:var(--gold2)">Upload one</a></td></tr><% } %>
+    </tbody></table>
+  </div>
+<script>
+const checks = document.querySelectorAll('.doc-check');
+const checkAll = document.getElementById('check-all');
+const bar = document.getElementById('bulk-bar');
+const form = document.getElementById('bulk-form');
+function updateBar(){
+  const selected = [...checks].filter(c=>c.checked);
+  bar.style.display = selected.length ? 'flex' : 'none';
+  document.getElementById('bulk-count').textContent = selected.length + ' selected';
+  form.querySelectorAll('input[name=ids]').forEach(i=>i.remove());
+  selected.forEach(c => { const i=document.createElement('input'); i.type='hidden'; i.name='ids'; i.value=c.value; form.appendChild(i); });
+}
+checks.forEach(c => c.addEventListener('change', updateBar));
+checkAll.addEventListener('change', () => { checks.forEach(c => c.checked = checkAll.checked); updateBar(); });
+</script>
+</div>
+<%- include('partials/footer') %>

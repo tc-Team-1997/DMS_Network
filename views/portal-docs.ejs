@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><title>My Documents - NBE Customer Portal</title>
+<link rel="stylesheet" href="/css/app.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=DM+Sans&display=swap" rel="stylesheet"/>
+</head>
+<body style="background:var(--navy);min-height:100vh;padding:40px 20px">
+<div style="max-width:960px;margin:0 auto">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid rgba(201,168,76,.15)">
+    <div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:28px;color:#e8c96b;font-weight:700">My Documents</div>
+      <div style="font-size:12px;color:var(--silver)">CID: <%= cid %><%= customer?' · '+customer.customer_name:'' %></div>
+    </div>
+    <a href="/portal/logout" class="btn btn-secondary">Sign Out</a>
+  </div>
+  <% if (typeof requested !== 'undefined') { %><div class="alert-item success" style="margin-bottom:16px"><div style="flex:1"><strong style="color:var(--success)">✓ Renewal request submitted.</strong> Our staff will contact you within 3 business days.</div></div><% } %>
+  <div class="card">
+    <div class="card-header">Documents on File (<%= docs.length %>)</div>
+    <table>
+      <thead><tr><th>Document</th><th>Type</th><th>Number</th><th>Issued</th><th>Expiry</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        <% docs.forEach(d => { %>
+          <tr>
+            <td><%= d.original_name %></td>
+            <td><%= d.doc_type||'-' %></td>
+            <td><%= d.doc_number||'-' %></td>
+            <td><%= d.issue_date||'-' %></td>
+            <td><%= d.expiry_date||'-' %></td>
+            <td><span class="tag tag-<%= d.status==='Valid'?'success':(d.status==='Expired'?'danger':'warn') %>"><%= d.status %></span></td>
+            <td>
+              <% if (d.status === 'Expired' || d.status === 'Expiring') { %>
+                <form method="POST" action="/portal/renewal-request/<%= d.id %>" style="display:inline"><button class="btn btn-primary" style="padding:4px 10px;font-size:11px">Request Renewal</button></form>
+              <% } else { %>
+                <span style="font-size:11px;color:var(--silver)">No action needed</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div style="text-align:center;margin-top:24px;font-size:11px;color:var(--silver)">
+    For assistance, call 19623 or visit any NBE branch · This portal is a simulated demo
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,47 @@
+# Default-deny + explicit allow: DMS pods can only talk to Postgres, Redis,
+# Elasticsearch, OTel collector, SMTP gateway, and receive traffic from the ingress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dms-default-deny
+  namespace: nbe-dms
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dms-python-allow
+  namespace: nbe-dms
+spec:
+  podSelector:
+    matchLabels: {app: dms-python}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: {matchLabels: {name: ingress-nginx}}
+      ports:
+        - {protocol: TCP, port: 8000}
+    - from:
+        - podSelector: {matchLabels: {app: dms-python-worker}}
+      ports:
+        - {protocol: TCP, port: 8000}
+  egress:
+    - to:
+        - namespaceSelector: {matchLabels: {name: data}}
+      ports:
+        - {protocol: TCP, port: 5432}   # Postgres
+        - {protocol: TCP, port: 6379}   # Redis
+        - {protocol: TCP, port: 9200}   # Elasticsearch
+        - {protocol: TCP, port: 9092}   # Kafka
+    - to:
+        - namespaceSelector: {matchLabels: {name: observability}}
+      ports:
+        - {protocol: TCP, port: 4318}   # OTel HTTP
+    # DNS
+    - to: [{namespaceSelector: {matchLabels: {name: kube-system}}}]
+      ports: [{protocol: UDP, port: 53}]
+    # Outbound HTTPS for CBS/LOS/AML/IFRS9/KMS — tighten with explicit FQDN in prod via egress gateway.
+    - ports:
+        - {protocol: TCP, port: 443}

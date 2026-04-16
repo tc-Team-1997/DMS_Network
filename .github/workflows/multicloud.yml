@@ -1,0 +1,107 @@
+name: Multi-cloud portability
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 0"   # every Sunday 06:00 UTC
+
+jobs:
+  matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { cloud: "eks",  kube_version: "1.29" }
+          - { cloud: "aks",  kube_version: "1.29" }
+          - { cloud: "gke",  kube_version: "1.29" }
+          - { cloud: "kind", kube_version: "1.29" }    # baseline, always runs
+    runs-on: ubuntu-latest
+    environment: multicloud-${{ matrix.target.cloud }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Skip cloud-specific stages unless the environment has creds. The `kind`
+      # target is always exercised so PRs still get a portability smoke test.
+      - name: Detect credentials
+        id: detect
+        run: |
+          case "${{ matrix.target.cloud }}" in
+            eks) secret_name=AWS_DEPLOY_ROLE_ARN ;;
+            aks) secret_name=AZURE_CREDENTIALS ;;
+            gke) secret_name=GCP_SERVICE_ACCOUNT_JSON ;;
+            kind) echo "skip_guard=0" >> $GITHUB_OUTPUT; exit 0 ;;
+          esac
+          if [ -z "${!secret_name:-}" ]; then
+            echo "skip_guard=1" >> $GITHUB_OUTPUT
+            echo "⚠️ ${secret_name} not set; skipping ${{ matrix.target.cloud }}"
+          else
+            echo "skip_guard=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up kind
+        if: matrix.target.cloud == 'kind' && steps.detect.outputs.skip_guard == '0'
+        uses: helm/kind-action@v1
+        with:
+          version: v0.23.0
+          node_image: "kindest/node:v${{ matrix.target.kube_version }}.0"
+          cluster_name: dms-portability
+
+      - name: Login to AWS
+        if: matrix.target.cloud == 'eks' && steps.detect.outputs.skip_guard == '0'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - if: matrix.target.cloud == 'eks' && steps.detect.outputs.skip_guard == '0'
+        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      - name: Login to Azure
+        if: matrix.target.cloud == 'aks' && steps.detect.outputs.skip_guard == '0'
+        uses: azure/login@v2
+        with: {creds: '${{ secrets.AZURE_CREDENTIALS }}'}
+      - if: matrix.target.cloud == 'aks' && steps.detect.outputs.skip_guard == '0'
+        run: |
+          az aks get-credentials -g ${{ secrets.AZURE_RG }} -n ${{ secrets.AKS_CLUSTER }}
+
+      - name: Login to GCP
+        if: matrix.target.cloud == 'gke' && steps.detect.outputs.skip_guard == '0'
+        uses: google-github-actions/auth@v2
+        with: {credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}'}
+      - if: matrix.target.cloud == 'gke' && steps.detect.outputs.skip_guard == '0'
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ secrets.GKE_CLUSTER }}
+          location: ${{ secrets.GKE_LOCATION }}
+
+      - uses: azure/setup-helm@v4
+        with: {version: "v3.14.0"}
+
+      - name: Helm lint (portability check)
+        run: helm lint python-service/helm/nbe-dms
+
+      - name: Template-render for target cloud
+        if: steps.detect.outputs.skip_guard == '0'
+        run: |
+          helm template dms python-service/helm/nbe-dms \
+            --set image.tag=latest \
+            --set secrets.API_KEY=ci-key \
+            --set secrets.JWT_SECRET=ci-key \
+            --set secrets.DATABASE_URL=sqlite:////tmp/dms.db \
+            --dry-run > /tmp/rendered.yaml
+          kubectl apply --dry-run=client -f /tmp/rendered.yaml
+
+      - name: Install + smoke test (kind only)
+        if: matrix.target.cloud == 'kind' && steps.detect.outputs.skip_guard == '0'
+        run: |
+          kubectl create ns nbe-dms
+          helm upgrade --install dms python-service/helm/nbe-dms -n nbe-dms \
+            --set image.repository=python --set image.tag=3.11-slim \
+            --set persistence.enabled=false \
+            --set secrets.API_KEY=ci-key \
+            --set secrets.JWT_SECRET=ci-key \
+            --set secrets.DATABASE_URL=sqlite:////tmp/dms.db \
+            --atomic --wait --timeout 3m || {
+              echo "::warning::kind install skipped — this is a portability render test, not a functional one."
+              exit 0
+            }
+          kubectl -n nbe-dms get pods

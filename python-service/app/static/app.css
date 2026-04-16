@@ -1,0 +1,103 @@
+:root{--navy:#0a1628;--navy2:#0f2044;--gold:#c9a84c;--gold2:#e8c96b;--silver:#8da0b8;--light:#e8eef6;--danger:#e05c5c;--success:#3cb97b;--warn:#f0a440;--info:#4a9fd4}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--light);min-height:100vh;display:flex;flex-direction:column}
+h1,h2,h3{font-family:'Cormorant Garamond',serif}
+#topbar{height:56px;background:var(--navy2);border-bottom:1px solid rgba(201,168,76,.18);display:flex;align-items:center;gap:12px;padding:0 20px}
+.bank-logo{display:flex;align-items:center;gap:10px;margin-right:16px}
+.logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--navy);font-size:12px}
+.bank-name{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:700;color:var(--gold2)}
+.bank-sub{font-size:9px;color:var(--silver);letter-spacing:2px;text-transform:uppercase}
+.search-wrap{flex:1;max-width:440px}
+.search-wrap input,input,select,textarea{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--light);outline:none;font-family:inherit}
+textarea{min-height:80px;resize:vertical}
+.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:14px}
+.upload-btn{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy);border:none;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer}
+#body{display:flex;flex:1}
+#sidebar{width:220px;background:var(--navy2);border-right:1px solid rgba(201,168,76,.12);padding:12px 0}
+.nav-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--silver);padding:12px 18px 8px;opacity:.7}
+.nav-item{padding:9px 18px;cursor:pointer;font-size:13px;color:var(--silver);border-left:2px solid transparent}
+.nav-item:hover{color:var(--light);background:rgba(255,255,255,.04)}
+.nav-item.active{color:var(--gold2);background:rgba(201,168,76,.08);border-left-color:var(--gold)}
+#main{flex:1;padding:24px;overflow-y:auto}
+.screen{display:none}
+.screen.active{display:block}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.page-title{font-size:22px;font-weight:700;color:var(--gold2)}
+.page-sub{font-size:12px;color:var(--silver);margin-top:2px}
+.card{background:var(--navy2);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:20px;margin-bottom:16px}
+.card-header{font-size:13px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.field{margin-bottom:14px}
+label{font-size:12px;color:var(--silver);margin-bottom:4px;display:block}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;margin:4px 4px 4px 0}
+.btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy)}
+.btn-secondary{background:rgba(255,255,255,.07);color:var(--light);border:1px solid rgba(255,255,255,.1)}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.tag-success{background:rgba(60,185,123,.15);color:var(--success)}
+.tag-warn{background:rgba(240,164,64,.15);color:var(--warn)}
+.tag-info{background:rgba(74,159,212,.15);color:var(--info)}
+.kpi{background:var(--navy2);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:18px 20px;border-top:2px solid var(--gold)}
+.kpi.blue-kpi{border-top-color:var(--info)}
+.kpi.red-kpi{border-top-color:var(--danger)}
+.kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--silver);margin-bottom:10px}
+.kpi-val{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:700;color:#fff;line-height:1}
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--silver);text-align:left;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
+td{padding:11px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
+pre{background:rgba(0,0,0,.25);padding:12px;border-radius:6px;font-size:11px;color:var(--light);white-space:pre-wrap;max-height:300px;overflow:auto;margin-top:12px}
+.api-card{background:rgba(255,255,255,.04);border-radius:10px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.api-dot{width:10px;height:10px;border-radius:50%}
+.api-dot.online{background:var(--success)}
+.api-dot.warn{background:var(--warn)}
+.api-dot.offline{background:var(--danger)}
+input[type=file]{padding:6px;background:rgba(255,255,255,.04)}
+
+/* RTL support */
+html[dir="rtl"] body{font-family:'DM Sans','Cairo','Tajawal',sans-serif}
+html[dir="rtl"] #sidebar{border-right:none;border-left:1px solid rgba(201,168,76,.12)}
+html[dir="rtl"] .nav-item{border-left:none;border-right:2px solid transparent;padding:9px 18px}
+html[dir="rtl"] .nav-item.active{border-right-color:var(--gold);border-left:none}
+html[dir="rtl"] .bank-logo{margin-right:0;margin-left:16px}
+html[dir="rtl"] .topbar-actions{margin-left:0;margin-right:auto}
+html[dir="rtl"] .kpi{border-top:2px solid var(--gold)}
+html[dir="rtl"] table th, html[dir="rtl"] table td{text-align:right}
+
+.lang-switch{display:inline-flex;gap:4px;background:rgba(255,255,255,.05);border-radius:8px;padding:3px;margin-right:10px}
+.lang-switch button{background:none;border:none;color:var(--silver);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600}
+.lang-switch button.active{background:rgba(201,168,76,.15);color:var(--gold2)}
+
+/* Accessibility: visible focus rings meet WCAG 2.2 AA (≥3:1 contrast, ≥2px, non-adjacent) */
+:focus-visible{outline:2px solid var(--gold2);outline-offset:2px;border-radius:4px}
+button:focus-visible,.nav-item:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--gold2);outline-offset:2px}
+
+/* Skip link for keyboard users */
+.skip-link{position:absolute;top:-40px;left:12px;background:var(--gold2);color:var(--navy);padding:8px 14px;border-radius:0 0 6px 6px;font-weight:700;z-index:9999;transition:top .15s}
+.skip-link:focus{top:0}
+
+/* Screen-reader-only utility */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Prefers-reduced-motion: disable animations */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:0.01ms !important;transition-duration:0.01ms !important}
+}
+
+/* Guided tour */
+#tour-overlay{display:none;position:fixed;inset:0;z-index:9000;pointer-events:none}
+#tour-dim{position:absolute;inset:0;background:rgba(0,0,0,.55);pointer-events:auto}
+.tour-pop{position:absolute;width:320px;background:var(--navy2);border:1px solid var(--gold);border-radius:12px;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.5);pointer-events:auto;color:var(--light)}
+.tour-pop h3{color:var(--gold2);font-size:18px;margin:6px 0;font-family:'Cormorant Garamond',serif}
+.tour-pop p{font-size:13px;line-height:1.5;color:var(--light);margin:0 0 12px}
+.tour-step{font-size:10px;letter-spacing:1.5px;color:var(--silver);text-transform:uppercase}
+.tour-actions{display:flex;justify-content:flex-end;gap:8px}
+.tour-actions button{background:rgba(255,255,255,.06);color:var(--light);border:1px solid rgba(255,255,255,.15);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer}
+.tour-actions button.primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy);border:none;font-weight:700}
+.tour-actions button:disabled{opacity:.4;cursor:not-allowed}
+.tour-highlight{position:relative;z-index:9001;box-shadow:0 0 0 4px rgba(201,168,76,.4),0 0 0 9999px rgba(0,0,0,.55);border-radius:8px;transition:box-shadow .3s}
+
+/* Prefers-contrast: strengthen borders and text */
+@media (prefers-contrast: more){
+  body{--silver:#b8c7dc}
+  .card,.kpi{border-color:rgba(255,255,255,.2)}
+}

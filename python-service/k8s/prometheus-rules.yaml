@@ -1,0 +1,89 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: dms-slo-burn-rates
+  namespace: nbe-dms
+  labels:
+    prometheus: main
+    role: alert-rules
+spec:
+  groups:
+    - name: dms-availability
+      interval: 30s
+      rules:
+        # Availability error rate (5xx / total).
+        - record: job:dms_error_ratio:ratio_rate1h
+          expr: |
+            sum(rate(dms_http_requests_total{status=~"5..",path!~"/health|/metrics"}[1h]))
+            /
+            sum(rate(dms_http_requests_total{path!~"/health|/metrics"}[1h]))
+        - record: job:dms_error_ratio:ratio_rate6h
+          expr: |
+            sum(rate(dms_http_requests_total{status=~"5..",path!~"/health|/metrics"}[6h]))
+            /
+            sum(rate(dms_http_requests_total{path!~"/health|/metrics"}[6h]))
+
+        # 14.4× burn over 1h (fast) AND 2h averaged burn for noise filtering.
+        - alert: DmsAvailabilityFastBurn
+          expr: |
+            job:dms_error_ratio:ratio_rate1h > (14.4 * 0.001)
+            and
+            job:dms_error_ratio:ratio_rate6h > (14.4 * 0.001)
+          for: 2m
+          labels: {severity: page, slo: availability, burn: fast}
+          annotations:
+            summary: "DMS availability burning 14.4× budget (1h)"
+            runbook_url: "https://nbe.local/runbooks/dms-availability"
+
+        - alert: DmsAvailabilitySlowBurn
+          expr: |
+            job:dms_error_ratio:ratio_rate6h > (6 * 0.001)
+          for: 15m
+          labels: {severity: ticket, slo: availability, burn: slow}
+          annotations:
+            summary: "DMS availability burning 6× budget (6h)"
+            runbook_url: "https://nbe.local/runbooks/dms-availability"
+
+    - name: dms-latency
+      interval: 30s
+      rules:
+        - record: job:dms_p95_latency:seconds
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(dms_http_request_seconds_bucket{path!~"/metrics|/health|/api/v1/ocr.*"}[5m])) by (le))
+        - alert: DmsLatencyP95Breach
+          expr: job:dms_p95_latency:seconds > 0.5
+          for: 10m
+          labels: {severity: page, slo: latency}
+          annotations:
+            summary: "p95 latency > 500ms for 10m"
+            runbook_url: "https://nbe.local/runbooks/dms-latency"
+
+    - name: dms-ocr
+      interval: 1m
+      rules:
+        - alert: DmsOcrFailureBurst
+          expr: |
+            increase(dms_ocr_confidence_count{}[15m]) == 0
+            and increase(dms_documents_uploaded_total[15m]) > 5
+          for: 15m
+          labels: {severity: ticket}
+          annotations:
+            summary: "Uploads arriving but no OCR completions in last 15m"
+
+    - name: dms-security
+      interval: 30s
+      rules:
+        - alert: DmsWafFlood
+          expr: sum(increase(dms_http_requests_total{status="403"}[5m])) > 50
+          for: 5m
+          labels: {severity: ticket}
+          annotations:
+            summary: "WAF is blocking >50 req / 5m — probable attack"
+
+        - alert: DmsAdversarialHighScores
+          expr: sum(increase(dms_http_requests_total{path="/api/v1/adversarial/{doc_id}",status="200"}[1h])) > 20
+          for: 10m
+          labels: {severity: ticket}
+          annotations:
+            summary: "Unusually high adversarial-detection activity"

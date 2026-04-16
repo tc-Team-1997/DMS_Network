@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NBE - Document Management System</title>
+<link rel="stylesheet" href="/css/app.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="topbar">
+  <div class="bank-logo">
+    <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+    <div>
+      <div class="bank-name">National Bank of Egypt</div>
+      <div class="bank-sub">Document Management System</div>
+    </div>
+  </div>
+  <form class="search-wrap" method="GET" action="/search">
+    <input type="text" name="q" placeholder="Search documents, customers, IDs..."/>
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+  </form>
+  <div class="topbar-actions">
+    <a href="/alerts" class="icon-btn" title="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-dot"></span></a>
+    <a href="/admin" class="icon-btn" title="Settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg></a>
+    <a href="/documents/capture" class="upload-btn">+ Quick Upload</a>
+    <div class="user-pill">
+      <div class="avatar"><%= (user.full_name||user.username).split(' ').map(s=>s[0]).join('').substring(0,2).toUpperCase() %></div>
+      <div class="user-info">
+        <div class="user-name"><%= user.full_name || user.username %></div>
+        <div class="user-role"><%= user.role.toUpperCase() %></div>
+      </div>
+      <a href="/logout" style="color:var(--silver);font-size:11px;margin-left:8px">Logout</a>
+    </div>
+  </div>
+</div>
+<div id="body">
+  <div id="sidebar">
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <a href="/" class="nav-item <%= active==='dashboard'?'active':'' %>">Dashboard</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Document Lifecycle</div>
+      <a href="/documents/capture" class="nav-item <%= active==='capture'?'active':'' %>">Capture</a>
+      <a href="/documents/indexing" class="nav-item <%= active==='indexing'?'active':'' %>">Indexing</a>
+      <a href="/import" class="nav-item">Bulk Import</a>
+      <a href="/documents/ai" class="nav-item <%= active==='ai'?'active':'' %>">AI Processing</a>
+      <a href="/documents" class="nav-item <%= active==='repository'?'active':'' %>">Repository</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Discovery</div>
+      <a href="/search" class="nav-item <%= active==='search'?'active':'' %>">Search</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Operations</div>
+      <a href="/workflows" class="nav-item <%= active==='workflow'?'active':'' %>">Workflows</a>
+      <a href="/workflow-templates" class="nav-item">Workflow Templates</a>
+      <a href="/alerts" class="nav-item <%= active==='alerts'?'active':'' %>">Alerts</a>
+      <a href="/reports" class="nav-item <%= active==='reports'?'active':'' %>">Reports</a>
+      <a href="/bi" class="nav-item">BI Dashboard</a>
+      <a href="/audit" class="nav-item">Audit Log</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">System</div>
+      <a href="/admin/integration" class="nav-item <%= active==='integration'?'active':'' %>">Integration</a>
+      <a href="/admin/security" class="nav-item <%= active==='security'?'active':'' %>">Security & Access</a>
+      <a href="/admin" class="nav-item <%= active==='admin'?'active':'' %>">Admin Panel</a>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sys-status"><span class="status-dot"></span> All systems operational</div>
+    </div>
+  </div>
+  <div id="main">

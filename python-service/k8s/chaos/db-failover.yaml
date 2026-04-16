@@ -1,0 +1,20 @@
+# Simulate RDS primary loss: kill the DB pod in a dev cluster's postgres namespace.
+# For prod, trigger real RDS reboot-with-failover via the separate runbook.
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: dms-db-failover
+  namespace: data
+spec:
+  appinfo:
+    appns: data
+    applabel: "app=postgres-primary"
+    appkind: statefulset
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - {name: TOTAL_CHAOS_DURATION, value: "300"}
+            - {name: FORCE,                value: "true"}

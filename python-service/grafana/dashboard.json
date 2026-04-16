@@ -1,0 +1,54 @@
+{
+  "annotations": {"list": []},
+  "title": "NBE DMS — Python Service",
+  "uid": "nbe-dms-python",
+  "schemaVersion": 38,
+  "tags": ["nbe", "dms"],
+  "timezone": "",
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {
+      "type": "stat", "title": "Requests / sec",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "targets": [{"expr": "sum(rate(dms_http_requests_total[1m]))"}]
+    },
+    {
+      "type": "stat", "title": "p95 latency (s)",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(dms_http_request_seconds_bucket[5m])) by (le))"}]
+    },
+    {
+      "type": "stat", "title": "Docs uploaded (1h)",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "targets": [{"expr": "sum(increase(dms_documents_uploaded_total[1h]))"}]
+    },
+    {
+      "type": "stat", "title": "Duplicate matches (24h)",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+      "targets": [{"expr": "sum(increase(dms_duplicate_matches_total[24h]))"}]
+    },
+    {
+      "type": "timeseries", "title": "Request rate by path",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (path) (rate(dms_http_requests_total[1m]))"}]
+    },
+    {
+      "type": "timeseries", "title": "OCR confidence distribution",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [{"expr": "histogram_quantile(0.5, sum(rate(dms_ocr_confidence_bucket[5m])) by (le))", "legendFormat": "p50"},
+                  {"expr": "histogram_quantile(0.9, sum(rate(dms_ocr_confidence_bucket[5m])) by (le))", "legendFormat": "p90"},
+                  {"expr": "histogram_quantile(0.99, sum(rate(dms_ocr_confidence_bucket[5m])) by (le))", "legendFormat": "p99"}]
+    },
+    {
+      "type": "timeseries", "title": "Uploads by doc_type",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (doc_type) (rate(dms_documents_uploaded_total[5m]))"}]
+    },
+    {
+      "type": "timeseries", "title": "HTTP status codes",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "targets": [{"expr": "sum by (status) (rate(dms_http_requests_total[1m]))"}]
+    }
+  ]
+}

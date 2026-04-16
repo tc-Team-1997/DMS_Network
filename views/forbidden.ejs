@@ -1,0 +1,8 @@
+<%- include('partials/header') %>
+<div class="card" style="max-width:500px;margin:60px auto;text-align:center;padding:40px">
+  <div style="font-size:48px;color:var(--danger);margin-bottom:12px">403</div>
+  <div class="page-title" style="margin-bottom:8px">Access Denied</div>
+  <div class="page-sub">Your role (<%= user.role %>) does not have permission: <strong style="color:var(--gold2)"><%= perm %></strong></div>
+  <a href="/" class="btn btn-primary" style="margin-top:20px">Back to Dashboard</a>
+</div>
+<%- include('partials/footer') %>

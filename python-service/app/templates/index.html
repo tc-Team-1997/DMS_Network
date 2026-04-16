@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>NBE DMS — Live</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/app.css"/>
+<link rel="stylesheet" href="/static/aaa.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script type="module" src="/static/a11y.js"></script>
+<script type="module" src="/static/i18n.js"></script>
+<script type="module" src="/static/tour.js"></script>
+<script type="module" src="/static/doc_classifier.js"></script>
+<script type="module" src="/static/assistant.js"></script>
+<script type="module" src="/static/sigpad.js"></script>
+<meta name="nbe-api-key" content="{{ api_key }}"/>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to main content</a>
+<header id="topbar" role="banner">
+  <div class="bank-logo">
+    <div class="logo-mark">NBE</div>
+    <div>
+      <div class="bank-name">National Bank of Egypt</div>
+      <div class="bank-sub">Document Management System</div>
+    </div>
+  </div>
+  <div class="search-wrap" role="search">
+    <label for="searchInput" class="sr-only">Search</label>
+    <input id="searchInput" type="search" data-i18n-placeholder="placeholder_search" placeholder="Search documents, customers, OCR text…" aria-label="Search documents"/>
+  </div>
+  <div class="topbar-actions">
+    <div class="lang-switch" role="group" aria-label="Language selection">
+      <button id="lang-en" aria-label="Switch to English" onclick="window.NBE_I18N.setLang('en'); refreshLangButtons()">EN</button>
+      <button id="lang-ar" aria-label="التبديل إلى العربية" onclick="window.NBE_I18N.setLang('ar'); refreshLangButtons()">عربي</button>
+    </div>
+    <button type="button" class="btn btn-secondary" aria-label="Start guided tour" onclick="window.NBE_Tour.start(currentScreen())" style="padding:6px 12px;font-size:11px">Guide me</button>
+    <button type="button" class="btn btn-secondary" aria-label="Toggle high-contrast AAA mode" onclick="window.NBE_A11Y.toggle()" style="padding:6px 12px;font-size:11px">AAA</button>
+    <button class="upload-btn" data-i18n="btn_upload" aria-label="Upload new document" onclick="document.getElementById('uploadInput').click()">Quick Upload</button>
+    <input id="uploadInput" type="file" style="display:none" onchange="uploadFile(this.files[0])" aria-label="File to upload"/>
+  </div>
+</header>
+<div id="body">
+  <nav id="sidebar" role="navigation" aria-label="Main">
+    <div class="nav-section">
+      <div class="nav-label" data-i18n="nav_overview">Overview</div>
+      <button type="button" class="nav-item active" onclick="showScreen('dashboard',this)" aria-current="page">Dashboard</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label" data-i18n="nav_lifecycle">Lifecycle</div>
+      <button type="button" class="nav-item" onclick="showScreen('capture',this)">Capture</button>
+      <button type="button" class="nav-item" onclick="showScreen('indexing',this)">Indexing</button>
+      <button type="button" class="nav-item" onclick="showScreen('ai',this)">AI Processing</button>
+      <button type="button" class="nav-item" onclick="showScreen('repository',this)">Repository</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label" data-i18n="nav_discovery">Discovery</div>
+      <button type="button" class="nav-item" onclick="showScreen('search',this)">Search</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label" data-i18n="nav_operations">Operations</div>
+      <button type="button" class="nav-item" onclick="showScreen('workflow',this)">Workflows</button>
+      <button type="button" class="nav-item" onclick="showScreen('integration',this)">Integration</button>
+    </div>
+  </nav>
+  <main id="main" role="main" tabindex="-1">
+
+    <section id="screen-dashboard" class="screen active">
+      <div class="page-header"><div><div class="page-title">Executive Dashboard</div><div class="page-sub">Live data from Python service</div></div></div>
+      <div class="grid4" id="kpiRow"></div>
+      <div class="grid2" style="margin-top:20px">
+        <div class="card"><div class="card-header">Document Inflow (7d)</div><canvas id="inflow-chart" height="160"></canvas></div>
+        <div class="card"><div class="card-header">Integration Status</div><div id="intStatus"></div></div>
+      </div>
+    </section>
+
+    <section id="screen-capture" class="screen">
+      <div class="page-header"><div><div class="page-title">Capture</div><div class="page-sub">Upload document to Python service</div></div></div>
+      <div class="card">
+        <div class="grid2">
+          <div class="field"><label>Document Type</label>
+            <select id="capType"><option>passport</option><option>national_id</option><option>utility_bill</option><option>loan_application</option></select>
+          </div>
+          <div class="field"><label>Customer CID</label><input id="capCid" type="text" value="EGY-2024-00847291"/></div>
+          <div class="field"><label>Branch</label><input id="capBranch" type="text" value="Cairo West"/></div>
+          <div class="field"><label>Expiry Date</label><input id="capExpiry" type="date"/></div>
+        </div>
+        <input id="capFile" type="file"/>
+        <button class="btn btn-primary" onclick="submitCapture()">Upload</button>
+        <pre id="capResult"></pre>
+      </div>
+    </section>
+
+    <section id="screen-indexing" class="screen">
+      <div class="page-header"><div><div class="page-title">Indexing</div><div class="page-sub">Recent captures awaiting indexing</div></div></div>
+      <div class="card"><table id="indexTable"><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>CID</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section id="screen-ai" class="screen">
+      <div class="page-header"><div><div class="page-title">AI Processing</div><div class="page-sub">OCR + field extraction + duplicate scan</div></div></div>
+      <div class="card">
+        <div class="field"><label>Document ID</label><input id="aiDocId" type="number"/></div>
+        <button class="btn btn-primary" onclick="runOcr()">Run OCR</button>
+        <button class="btn btn-secondary" onclick="runDupScan()">Scan Duplicates</button>
+        <pre id="aiResult"></pre>
+      </div>
+    </section>
+
+    <section id="screen-repository" class="screen">
+      <div class="page-header"><div><div class="page-title">Repository</div></div></div>
+      <div class="card"><table id="repoTable"><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Customer</th><th>Expiry</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section id="screen-search" class="screen">
+      <div class="page-header"><div><div class="page-title">Advanced Search</div></div></div>
+      <div class="card">
+        <input id="searchQ" type="text" placeholder="Query…"/>
+        <button class="btn btn-primary" onclick="runSearch()">Search</button>
+        <table id="searchTable"><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Customer</th><th>Status</th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <section id="screen-workflow" class="screen">
+      <div class="page-header"><div><div class="page-title">Workflow</div><div class="page-sub">Maker–Checker actions</div></div></div>
+      <div class="card">
+        <div class="grid2">
+          <div class="field"><label>Document ID</label><input id="wfDocId" type="number"/></div>
+          <div class="field"><label>Stage</label>
+            <select id="wfStage"><option>maker</option><option>checker</option><option>approve</option></select>
+          </div>
+          <div class="field"><label>Actor</label><input id="wfActor" type="text" value="Ahmed M."/></div>
+          <div class="field"><label>Action</label>
+            <select id="wfAction"><option>approve</option><option>reject</option><option>escalate</option></select>
+          </div>
+        </div>
+        <textarea id="wfComment" placeholder="Comment…"></textarea>
+        <button class="btn btn-primary" onclick="submitWorkflow()">Submit</button>
+        <pre id="wfResult"></pre>
+      </div>
+    </section>
+
+    <section id="screen-integration" class="screen">
+      <div class="page-header"><div><div class="page-title">Integration Hub</div></div></div>
+      <div class="card">
+        <div class="grid2">
+          <div class="field"><label>System</label>
+            <select id="intSys"><option>cbs</option><option>los</option><option>aml</option><option>ifrs9</option></select>
+          </div>
+          <div class="field"><label>Endpoint</label><input id="intEp" value="/customers/verify"/></div>
+        </div>
+        <textarea id="intPayload">{"cid":"EGY-2024-00847291"}</textarea>
+        <button class="btn btn-primary" onclick="callIntegration()">Call System</button>
+        <pre id="intResult"></pre>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const API_KEY = "{{ api_key }}";
+const H = () => ({"X-API-Key": API_KEY, "Content-Type": "application/json"});
+
+function currentScreen() {
+  return document.querySelector('.screen.active')?.id.replace('screen-', '') || 'dashboard';
+}
+function showScreen(name, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name)?.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'indexing') loadDocs('indexTable', {status: 'captured'});
+  if (name === 'repository') loadDocs('repoTable', {});
+}
+
+function refreshLangButtons() {
+  const lang = window.NBE_I18N?.getLang?.() || 'en';
+  document.getElementById('lang-en')?.classList.toggle('active', lang === 'en');
+  document.getElementById('lang-ar')?.classList.toggle('active', lang === 'ar');
+}
+window.addEventListener('DOMContentLoaded', refreshLangButtons);
+
+async function loadDashboard() {
+  const k = await (await fetch('/api/v1/dashboard/kpis', {headers: H()})).json();
+  const T = (key) => window.NBE_I18N?.t?.(key) || key;
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi gold-kpi"><div class="kpi-label">${T('kpi_total')}</div><div class="kpi-val">${k.total_documents}</div></div>
+    <div class="kpi blue-kpi"><div class="kpi-label">${T('kpi_ocr')}</div><div class="kpi-val">${k.ocr_processed_pct}%</div></div>
+    <div class="kpi red-kpi"><div class="kpi-label">${T('kpi_pending')}</div><div class="kpi-val">${k.pending_approvals}</div></div>
+    <div class="kpi"><div class="kpi-label">${T('kpi_expiring')}</div><div class="kpi-val">${k.expiring_documents}</div></div>`;
+
+  const flow = await (await fetch('/api/v1/dashboard/inflow?days=7', {headers: H()})).json();
+  new Chart(document.getElementById('inflow-chart'), {
+    type: 'line',
+    data: {labels: flow.map(r => r.date), datasets: [{data: flow.map(r => r.count), borderColor: '#c9a84c', fill: true, backgroundColor: 'rgba(201,168,76,0.08)', tension: 0.4}]},
+    options: {plugins: {legend: {display: false}}, scales: {x: {ticks: {color: '#8da0b8'}}, y: {ticks: {color: '#8da0b8'}}}}
+  });
+
+  const st = await (await fetch('/api/v1/integrations/status', {headers: H()})).json();
+  document.getElementById('intStatus').innerHTML = Object.entries(st).map(([k, v]) =>
+    `<div class="api-card"><div class="api-dot ${v.status === 'online' ? 'online' : v.status === 'degraded' ? 'warn' : 'offline'}"></div>
+    <div style="flex:1"><b>${k.toUpperCase()}</b><div class="page-sub">${v.latency_ms}ms</div></div>
+    <span class="tag tag-${v.status === 'online' ? 'success' : 'warn'}">${v.status}</span></div>`).join('');
+}
+
+async function loadDocs(tableId, filters) {
+  const qs = new URLSearchParams(filters).toString();
+  const docs = await (await fetch('/api/v1/documents?' + qs, {headers: H()})).json();
+  const tb = document.querySelector(`#${tableId} tbody`);
+  tb.innerHTML = docs.map(d => `<tr><td>${d.id}</td><td>${d.original_name}</td><td>${d.doc_type || '-'}</td><td>${d.customer_cid || '-'}</td><td>${d.expiry_date || '-'}</td><td><span class="tag tag-info">${d.status}</span></td></tr>`).join('');
+}
+
+async function submitCapture() {
+  const f = document.getElementById('capFile').files[0];
+  if (!f) return alert('Pick a file');
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('doc_type', document.getElementById('capType').value);
+  fd.append('customer_cid', document.getElementById('capCid').value);
+  fd.append('branch', document.getElementById('capBranch').value);
+  fd.append('expiry_date', document.getElementById('capExpiry').value);
+  fd.append('uploaded_by', 'web-ui');
+  const r = await fetch('/api/v1/documents', {method: 'POST', headers: {'X-API-Key': API_KEY}, body: fd});
+  document.getElementById('capResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+async function uploadFile(f) {
+  if (!f) return;
+  let predicted = null;
+  try {
+    predicted = await window.NBE_DocClassifier?.classifyFile(f);
+  } catch (_) {}
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('uploaded_by', 'quick-upload');
+  if (predicted?.label) fd.append('doc_type', predicted.label);
+  const r = await fetch('/api/v1/documents', {method: 'POST', headers: {'X-API-Key': API_KEY}, body: fd});
+  const body = await r.json();
+  alert('Uploaded: ' + JSON.stringify(body) +
+        (predicted ? `\nClient-side classification: ${predicted.label} (${(predicted.confidence*100|0)}%, via ${predicted.via})` : ''));
+}
+
+async function runOcr() {
+  const id = document.getElementById('aiDocId').value;
+  const r = await fetch(`/api/v1/ocr/${id}`, {method: 'POST', headers: H()});
+  document.getElementById('aiResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+async function runDupScan() {
+  const id = document.getElementById('aiDocId').value;
+  const r = await fetch(`/api/v1/duplicates/${id}/scan`, {method: 'POST', headers: H()});
+  document.getElementById('aiResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+async function runSearch() {
+  const q = document.getElementById('searchQ').value;
+  const r = await fetch('/api/v1/search?q=' + encodeURIComponent(q), {headers: H()});
+  const docs = await r.json();
+  document.querySelector('#searchTable tbody').innerHTML = docs.map(d =>
+    `<tr><td>${d.id}</td><td>${d.original_name}</td><td>${d.doc_type || '-'}</td><td>${d.customer_cid || '-'}</td><td>${d.status}</td></tr>`).join('');
+}
+
+async function submitWorkflow() {
+  const id = document.getElementById('wfDocId').value;
+  const body = {
+    stage: document.getElementById('wfStage').value,
+    action: document.getElementById('wfAction').value,
+    actor: document.getElementById('wfActor').value,
+    comment: document.getElementById('wfComment').value,
+  };
+  const r = await fetch(`/api/v1/workflow/${id}/actions`, {method: 'POST', headers: H(), body: JSON.stringify(body)});
+  document.getElementById('wfResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+async function callIntegration() {
+  const body = {
+    system: document.getElementById('intSys').value,
+    endpoint: document.getElementById('intEp').value,
+    method: 'POST',
+    payload: JSON.parse(document.getElementById('intPayload').value || '{}'),
+  };
+  const r = await fetch('/api/v1/integrations/call', {method: 'POST', headers: H(), body: JSON.stringify(body)});
+  document.getElementById('intResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+
+loadDashboard();
+window.addEventListener('load', () => setTimeout(() => window.NBE_Tour?.maybeAutoStart('dashboard'), 500));
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title">Security & Access</div><div class="page-sub">User management & RBAC</div></div>
+  <div style="display:flex;gap:8px">
+    <a href="/mfa/setup" class="btn btn-secondary">Setup MFA</a>
+    <form method="POST" action="/mfa/api-key" style="display:inline"><button class="btn btn-primary" type="submit">Generate API Key</button></form>
+  </div>
+</div>
+<div class="grid2">
+  <div class="card"><div class="card-header">Users</div>
+    <table><thead><tr><th>User</th><th>Role</th><th>Branch</th><th>MFA</th><th>Status</th><th></th></tr></thead><tbody>
+      <% users.forEach(u => { %><tr>
+        <td><%= u.full_name %><br/><span style="font-size:11px;color:var(--silver)"><%= u.username %></span></td>
+        <td><span class="tag tag-gold"><%= u.role %></span></td>
+        <td><%= u.branch %></td>
+        <td><%= u.mfa_enabled?'Yes':'No' %></td>
+        <td><span class="tag tag-<%= u.status==='Active'?'success':'warn' %>"><%= u.status %></span></td>
+        <td><form method="POST" action="/admin/users/<%= u.id %>/toggle"><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px"><%= u.status==='Active'?'Lock':'Unlock' %></button></form></td>
+      </tr><% }) %>
+    </tbody></table>
+  </div>
+  <div class="card"><div class="card-header">Add User</div>
+    <form method="POST" action="/admin/users">
+      <div class="field"><label>Username</label><input type="text" name="username" required/></div>
+      <div class="field"><label>Full Name</label><input type="text" name="full_name" required/></div>
+      <div class="field"><label>Password</label><input type="password" name="password" required/></div>
+      <div class="field"><label>Role</label><select name="role"><option>Viewer</option><option>Maker</option><option>Checker</option><option>Doc Admin</option></select></div>
+      <div class="field"><label>Branch</label><select name="branch"><option>Cairo West</option><option>Alexandria HQ</option><option>Giza</option><option>Cairo East</option></select></div>
+      <button class="btn btn-primary" type="submit">Create User</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

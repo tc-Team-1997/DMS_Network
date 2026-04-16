@@ -1,0 +1,40 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title">Version History</div><div class="page-sub"><%= doc.original_name %></div></div>
+  <a href="/documents/viewer/<%= doc.id %>" class="btn btn-secondary">Back to Document</a>
+</div>
+<div class="grid2">
+  <div class="card">
+    <div class="card-header">Versions (<%= versions.length + 1 %>)</div>
+    <table><thead><tr><th>Ver</th><th>Size</th><th>Changed by</th><th>Note</th><th>When</th><th></th></tr></thead><tbody>
+      <tr style="background:rgba(201,168,76,.08)">
+        <td><span class="tag tag-gold"><%= doc.version %> (current)</span></td>
+        <td><%= Math.round((doc.size||0)/1024) %> KB</td>
+        <td>-</td>
+        <td>Current file</td>
+        <td style="font-size:11px;color:var(--silver)"><%= doc.uploaded_at %></td>
+        <td><a href="/documents/<%= doc.id %>/download" class="btn btn-primary" style="padding:3px 10px;font-size:11px">Download</a></td>
+      </tr>
+      <% versions.forEach(v => { %>
+        <tr>
+          <td><span class="tag tag-info"><%= v.version %></span></td>
+          <td><%= Math.round((v.size||0)/1024) %> KB</td>
+          <td><%= v.username||'-' %></td>
+          <td style="font-size:12px"><%= v.change_note||'-' %></td>
+          <td style="font-size:11px;color:var(--silver)"><%= v.created_at %></td>
+          <td><a href="/versions/<%= doc.id %>/download/<%= v.id %>" class="btn btn-secondary" style="padding:3px 10px;font-size:11px">Download</a></td>
+        </tr>
+      <% }) %>
+      <% if (versions.length === 0) { %><tr><td colspan="6" style="color:var(--silver);text-align:center;padding:20px">No prior versions</td></tr><% } %>
+    </tbody></table>
+  </div>
+  <div class="card">
+    <div class="card-header">Upload New Version</div>
+    <form method="POST" action="/versions/<%= doc.id %>/upload" enctype="multipart/form-data">
+      <div class="field"><label>Replacement File</label><input type="file" name="file" required style="padding:7px"/></div>
+      <div class="field"><label>Change Note</label><textarea name="note" rows="3" placeholder="What changed and why"></textarea></div>
+      <button class="btn btn-primary" type="submit">Upload Version</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

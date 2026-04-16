@@ -1,0 +1,44 @@
+# Optional heavy deps — install explicitly on hosts that need them.
+# Face match (requires dlib build or wheel with system deps).
+face_recognition==1.3.0
+dlib==19.24.4
+
+# Blockchain anchoring (EVM).
+web3==6.19.0
+eth-account==0.11.2
+
+# Fraud scoring anomaly detection.
+scikit-learn==1.5.0
+
+# Vector search embeddings (384-dim MiniLM).
+sentence-transformers==2.7.0
+
+# Vector store clients — install the one you actually use.
+qdrant-client==1.9.0
+pgvector==0.2.5
+
+# PDF redaction (visible black-box overlays).
+pymupdf==1.24.5
+
+# Optional LLM providers for the copilot (install the one you actually use).
+anthropic==0.28.0
+openai==1.30.5
+
+# Async DB drivers (auto-enabled when DATABASE_URL matches).
+asyncpg==0.29.0
+aiosqlite==0.20.0
+
+# WebAuthn / passkeys.
+webauthn==2.1.0
+
+# Kafka producer (data-mesh fan-out).
+confluent-kafka==2.4.0
+
+# KMS SDKs (install the one you need).
+boto3==1.34.115
+azure-identity==1.17.1
+azure-keyvault-keys==4.9.0
+
+# Voice biometrics (MFCC).
+librosa==0.10.2
+soundfile==0.12.1

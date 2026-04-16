@@ -1,0 +1,17 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Integration Hub</div><div class="page-sub">Connected systems & API status</div></div></div>
+<div class="grid4" style="margin-bottom:20px">
+  <div class="kpi green-kpi"><div class="kpi-label">Active APIs</div><div class="kpi-val">8</div></div>
+  <div class="kpi blue-kpi"><div class="kpi-label">Requests Today</div><div class="kpi-val">284K</div></div>
+  <div class="kpi gold-kpi"><div class="kpi-label">Avg Latency</div><div class="kpi-val">42ms</div></div>
+  <div class="kpi red-kpi"><div class="kpi-label">Errors (24h)</div><div class="kpi-val">3</div></div>
+</div>
+<div class="card"><div class="card-header">Connected Systems</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+  <div class="api-card"><div class="api-dot online"></div><div style="flex:1"><div style="font-weight:600">Core Banking (CBS)</div><div style="font-size:11px;color:var(--silver)">Temenos T24 · REST</div></div><span class="tag tag-success">Online</span></div>
+  <div class="api-card"><div class="api-dot online"></div><div style="flex:1"><div style="font-weight:600">Loan Origination (LOS)</div><div style="font-size:11px;color:var(--silver)">FinnOne Neo</div></div><span class="tag tag-success">Online</span></div>
+  <div class="api-card"><div class="api-dot warn"></div><div style="flex:1"><div style="font-weight:600">KYC Verification</div><div style="font-size:11px;color:var(--silver)">Latency elevated</div></div><span class="tag tag-warn">Degraded</span></div>
+  <div class="api-card"><div class="api-dot online"></div><div style="flex:1"><div style="font-weight:600">Active Directory SSO</div><div style="font-size:11px;color:var(--silver)">SAML 2.0</div></div><span class="tag tag-success">Online</span></div>
+  <div class="api-card"><div class="api-dot offline"></div><div style="flex:1"><div style="font-weight:600">Archive S3</div><div style="font-size:11px;color:var(--silver)">Last sync: 2h ago</div></div><span class="tag tag-danger">Offline</span></div>
+</div></div>
+<%- include('partials/footer') %>

@@ -1,0 +1,31 @@
+groups:
+  - name: dms-logs
+    rules:
+      - alert: DmsErrorBurst
+        expr: |
+          sum(rate({job="nbe-dms-python"} |~ "(?i)error|traceback|exception"[5m])) > 20
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: ">20 error-log lines/sec for 5m"
+      - alert: DmsAuthFailures
+        expr: |
+          sum(rate({job="nbe-dms-python"} |~ "Invalid token|invalid_client|401"[5m])) > 30
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Auth failure spike — possible credential stuffing"
+      - alert: DmsWafBlocked
+        expr: |
+          sum(rate({job="nbe-dms-python"} |= "waf.alert"[5m])) > 40
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: "WAF block rate elevated — attack or misconfig"
+      - alert: DmsPIIInLogs
+        expr: |
+          sum(rate({job="nbe-dms-python"} |~ "[0-9]{14}|[0-9]{13,19}"[10m])) > 0
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "Possible PII/PAN leak in logs — investigate immediately"

@@ -1,0 +1,38 @@
+# Litmus ChaosEngine: kill random DMS pod every 5 min for 30 min.
+# Run: kubectl apply -f k8s/chaos/pod-kill.yaml
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: dms-pod-kill
+  namespace: nbe-dms
+spec:
+  appinfo:
+    appns: nbe-dms
+    applabel: "app=dms-python"
+    appkind: deployment
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - {name: TOTAL_CHAOS_DURATION, value: "1800"}   # 30 min
+            - {name: CHAOS_INTERVAL,       value: "300"}     # every 5 min
+            - {name: PODS_AFFECTED_PERC,   value: "50"}
+            - {name: FORCE,                value: "true"}
+        probe:
+          - name: availability-probe
+            type: httpProbe
+            mode: Continuous
+            runProperties:
+              probeTimeout: 5
+              retry: 2
+              interval: 10
+              stopOnFailure: false
+            httpProbe/inputs:
+              url: http://dms-python.nbe-dms.svc:8000/health
+              insecureSkipVerify: true
+              method:
+                get:
+                  criteria: "=="
+                  responseCode: "200"

@@ -1,0 +1,33 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title">Bulk Import</div><div class="page-sub">Import customer metadata via Excel (.xlsx)</div></div>
+  <a href="/import/template" class="btn btn-secondary">Download Template (CSV)</a>
+</div>
+<div class="grid2">
+  <div class="card">
+    <div class="card-header">Upload Spreadsheet</div>
+    <form method="POST" action="/import" enctype="multipart/form-data">
+      <div class="field"><label>File (.xlsx with header row)</label><input type="file" name="file" accept=".xlsx" required style="padding:8px"/></div>
+      <div style="font-size:11px;color:var(--silver);margin-bottom:10px">Required columns: customer_cid, customer_name, doc_type, doc_number, dob, issue_date, expiry_date, issuing_authority, branch</div>
+      <button class="btn btn-primary" type="submit">Import</button>
+    </form>
+  </div>
+  <div class="card">
+    <div class="card-header">Result</div>
+    <% if (!result) { %>
+      <div style="color:var(--silver);font-size:12px">No import yet. Rows with matching CID will be updated; others inserted.</div>
+    <% } else { %>
+      <div style="display:flex;gap:12px;margin-bottom:10px">
+        <span class="tag tag-success">+<%= result.inserted %> inserted</span>
+        <span class="tag tag-info">~<%= result.updated %> updated</span>
+        <span class="tag tag-<%= result.errors.length?'danger':'success' %>"><%= result.errors.length %> errors</span>
+      </div>
+      <% if (result.errors.length > 0) { %>
+        <div style="max-height:200px;overflow-y:auto;font-size:11px;color:var(--danger);background:rgba(224,92,92,.05);padding:10px;border-radius:6px">
+          <% result.errors.forEach(e => { %><div><%= e %></div><% }) %>
+        </div>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>

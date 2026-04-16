@@ -1,0 +1,15 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Alerts</div><div class="page-sub">System & compliance notifications</div></div></div>
+<% alerts.forEach(a => { %>
+  <div class="alert-item <%= a.level %>">
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600;color:var(--light)"><%= a.title %></div>
+      <div style="font-size:11px;color:var(--silver);margin-top:3px"><%= a.meta||'' %> · <%= a.created_at %></div>
+    </div>
+    <span class="tag tag-<%= a.level==='critical'?'danger':(a.level==='warning'?'warn':(a.level==='success'?'success':'info')) %>"><%= a.level %></span>
+    <% if (!a.is_read) { %>
+      <form method="POST" action="/alerts/<%= a.id %>/read" style="margin-left:10px"><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px">Mark Read</button></form>
+    <% } %>
+  </div>
+<% }) %>
+<%- include('partials/footer') %>

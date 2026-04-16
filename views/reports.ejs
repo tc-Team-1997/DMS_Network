@@ -1,0 +1,28 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title">Reports</div><div class="page-sub">Analytics & export</div></div>
+  <div style="display:flex;gap:8px">
+    <a href="/exports/documents.csv" class="btn btn-secondary">Documents CSV</a>
+    <a href="/exports/documents.xlsx" class="btn btn-secondary">Documents Excel</a>
+    <a href="/exports/expiring.csv" class="btn btn-secondary">Expiring CSV</a>
+    <a href="/exports/audit.csv" class="btn btn-primary">Audit CSV</a>
+  </div>
+</div>
+<div class="grid2">
+  <div class="card"><div class="card-header">By Document Type</div>
+    <table><thead><tr><th>Type</th><th>Count</th></tr></thead><tbody>
+      <% byType.forEach(r => { %><tr><td><%= r.t %></td><td><%= r.c %></td></tr><% }) %>
+    </tbody></table>
+  </div>
+  <div class="card"><div class="card-header">By Status</div>
+    <table><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody>
+      <% byStatus.forEach(r => { %><tr><td><%= r.status %></td><td><%= r.c %></td></tr><% }) %>
+    </tbody></table>
+  </div>
+</div>
+<div class="card" style="margin-top:16px"><div class="card-header">Total Documents: <%= total %></div>
+<div class="chart-wrap" style="height:240px"><canvas id="donut"></canvas></div></div>
+<script>
+new Chart(document.getElementById('donut'),{type:'doughnut',data:{labels:[<% byType.forEach((r,i)=>{ %>'<%= r.t %>'<%= i<byType.length-1?',':'' %><% }) %>],datasets:[{data:[<% byType.forEach((r,i)=>{ %><%= r.c %><%= i<byType.length-1?',':'' %><% }) %>],backgroundColor:['#c9a84c','#4a9fd4','#3cb97b','#e05c5c','#f0a440','#8da0b8']}]},options:{plugins:{legend:{position:'right',labels:{color:'#8da0b8'}}},responsive:true,maintainAspectRatio:false}});
+</script>
+<%- include('partials/footer') %>

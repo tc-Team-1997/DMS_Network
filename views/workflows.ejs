@@ -1,0 +1,30 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Workflows</div><div class="page-sub">Maker-Checker approval flows</div></div></div>
+<div class="card">
+<table><thead><tr><th>Ref</th><th>Title</th><th>Stage</th><th>Priority</th><th>Updated</th><th>Actions</th></tr></thead><tbody>
+<% flows.forEach(f => { %>
+  <tr>
+    <td><%= f.ref_code %></td>
+    <td><%= f.title %></td>
+    <td><span class="tag tag-<%= f.stage.includes('Rejected')?'danger':(f.stage==='Approved'?'success':'warn') %>"><%= f.stage %></span></td>
+    <td><%= f.priority %></td>
+    <td style="font-size:11px;color:var(--silver)"><%= f.updated_at %></td>
+    <td>
+      <form method="POST" action="/workflows/<%= f.id %>/action" style="display:inline">
+        <input type="hidden" name="action" value="approve"/>
+        <button class="btn btn-success" style="padding:4px 10px;font-size:11px">Approve</button>
+      </form>
+      <form method="POST" action="/workflows/<%= f.id %>/action" style="display:inline">
+        <input type="hidden" name="action" value="reject"/>
+        <button class="btn btn-danger" style="padding:4px 10px;font-size:11px">Reject</button>
+      </form>
+      <form method="POST" action="/workflows/<%= f.id %>/action" style="display:inline">
+        <input type="hidden" name="action" value="escalate"/>
+        <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px">Escalate</button>
+      </form>
+    </td>
+  </tr>
+<% }) %>
+</tbody></table>
+</div>
+<%- include('partials/footer') %>

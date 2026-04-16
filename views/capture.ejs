@@ -1,0 +1,32 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Capture</div><div class="page-sub">Upload documents for indexing</div></div></div>
+<div class="card">
+  <div class="card-header">Upload Documents</div>
+  <form method="POST" action="/documents/upload" enctype="multipart/form-data">
+    <div class="grid2">
+      <div class="field"><label>Document Type</label>
+        <select name="doc_type"><option value="">-- Select --</option><option>Passport</option><option>National ID</option><option>Driving License</option><option>Utility Bill</option><option>Loan Application</option><option>Contract</option></select>
+      </div>
+      <div class="field"><label>Customer CID</label><input type="text" name="customer_cid" placeholder="EGY-2024-XXXXXXXX"/></div>
+      <div class="field"><label>Customer Name</label><input type="text" name="customer_name"/></div>
+      <div class="field"><label>Document Number</label><input type="text" name="doc_number"/></div>
+      <div class="field"><label>Date of Birth</label><input type="date" name="dob"/></div>
+      <div class="field"><label>Issue Date</label><input type="date" name="issue_date"/></div>
+      <div class="field"><label>Expiry Date</label><input type="date" name="expiry_date"/></div>
+      <div class="field"><label>Issuing Authority</label><input type="text" name="issuing_authority"/></div>
+      <div class="field"><label>Branch</label>
+        <select name="branch"><option>Cairo West</option><option>Alexandria HQ</option><option>Giza</option><option>Cairo East</option></select>
+      </div>
+      <div class="field"><label>Folder</label>
+        <select name="folder_id"><option value="">-- None --</option><option value="2">Passports</option><option value="3">National IDs</option><option value="4">Utility Bills</option><option value="5">Loan Applications</option><option value="6">Contracts</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><textarea name="notes" rows="2"></textarea></div>
+    <div class="field"><label>Files (select one or more)</label>
+      <input type="file" name="files" multiple required style="background:rgba(255,255,255,.05);padding:8px"/>
+    </div>
+    <button class="btn btn-primary" type="submit">Upload & Index</button>
+    <a href="/documents" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+<%- include('partials/footer') %>

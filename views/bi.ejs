@@ -1,0 +1,93 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title">Business Intelligence</div><div class="page-sub">Drill-down analytics · click any chart segment</div></div>
+  <a href="/reports" class="btn btn-secondary">Standard Reports</a>
+</div>
+
+<div class="grid4" style="margin-bottom:20px">
+  <div class="kpi green-kpi"><div class="kpi-label">Valid</div><div class="kpi-val"><%= expiryBuckets.valid||0 %></div></div>
+  <div class="kpi gold-kpi"><div class="kpi-label">Expiring Soon</div><div class="kpi-val"><%= expiryBuckets.expiring||0 %></div></div>
+  <div class="kpi red-kpi"><div class="kpi-label">Expired</div><div class="kpi-val"><%= expiryBuckets.expired||0 %></div></div>
+  <div class="kpi blue-kpi"><div class="kpi-label">Top User</div><div class="kpi-val" style="font-size:20px"><%= topUsers[0]?topUsers[0].username:'-' %></div><div class="kpi-sub"><%= topUsers[0]?topUsers[0].c+' actions':'' %></div></div>
+</div>
+
+<div class="grid2" style="margin-bottom:16px">
+  <div class="card">
+    <div class="card-header">Documents by Type (click to drill)</div>
+    <div class="chart-wrap" style="height:260px"><canvas id="ch-type"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header">Documents by Branch (click to drill)</div>
+    <div class="chart-wrap" style="height:260px"><canvas id="ch-branch"></canvas></div>
+  </div>
+</div>
+
+<div class="grid2" style="margin-bottom:16px">
+  <div class="card">
+    <div class="card-header">Monthly Upload Trend</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="ch-month"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header">Workflow Stage Distribution (click to drill)</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="ch-stage"></canvas></div>
+  </div>
+</div>
+
+<div class="card" id="drill-panel" style="display:none">
+  <div class="card-header"><span id="drill-title">Drill-down</span> <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="document.getElementById('drill-panel').style.display='none'">Close</button></div>
+  <div id="drill-content">Loading...</div>
+</div>
+
+<script>
+const palette = ['#c9a84c','#4a9fd4','#3cb97b','#e05c5c','#f0a440','#8da0b8','#e8c96b','#70b8e8','#5dd4a0'];
+
+async function drill(dim, value) {
+  const panel = document.getElementById('drill-panel');
+  panel.style.display = 'block';
+  document.getElementById('drill-title').textContent = dim + ': ' + value;
+  const r = await fetch('/bi/drill?dim='+encodeURIComponent(dim)+'&value='+encodeURIComponent(value));
+  const rows = await r.json();
+  const div = document.getElementById('drill-content');
+  if (rows.length === 0) { div.innerHTML = '<div style="color:var(--silver);padding:20px">No records.</div>'; return; }
+  const cols = Object.keys(rows[0]);
+  let html = '<table><thead><tr>' + cols.map(c => '<th>'+c+'</th>').join('') + '</tr></thead><tbody>';
+  rows.forEach(r => {
+    html += '<tr>' + cols.map(c => {
+      if (c === 'id' && (dim === 'doc_type' || dim === 'branch' || dim === 'status')) return '<td><a href="/documents/viewer/'+r[c]+'" style="color:var(--gold2)">'+r[c]+'</a></td>';
+      return '<td>'+(r[c]==null?'-':r[c])+'</td>';
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  div.innerHTML = html;
+  panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+const typeData = <%- JSON.stringify(byType) %>;
+new Chart(document.getElementById('ch-type'), {
+  type: 'doughnut',
+  data: { labels: typeData.map(r=>r.t), datasets:[{data:typeData.map(r=>r.c), backgroundColor:palette, borderWidth:0}] },
+  options: { plugins:{legend:{position:'right',labels:{color:'#8da0b8'}}}, maintainAspectRatio:false, onClick:(e,el)=>{ if(el[0]) drill('doc_type', typeData[el[0].index].t); } }
+});
+
+const branchData = <%- JSON.stringify(byBranch) %>;
+new Chart(document.getElementById('ch-branch'), {
+  type: 'bar',
+  data: { labels: branchData.map(r=>r.b), datasets:[{data:branchData.map(r=>r.c), backgroundColor:'rgba(201,168,76,.6)', borderRadius:4}] },
+  options: { plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8da0b8'}},y:{ticks:{color:'#8da0b8'}}}, maintainAspectRatio:false, onClick:(e,el)=>{ if(el[0]) drill('branch', branchData[el[0].index].b); } }
+});
+
+const monthData = <%- JSON.stringify(byMonth) %>;
+new Chart(document.getElementById('ch-month'), {
+  type: 'line',
+  data: { labels: monthData.map(r=>r.m), datasets:[{data:monthData.map(r=>r.c), borderColor:'#4a9fd4', backgroundColor:'rgba(74,159,212,.1)', fill:true, tension:.3}] },
+  options: { plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8da0b8'}},y:{ticks:{color:'#8da0b8'}}}, maintainAspectRatio:false }
+});
+
+const stageData = <%- JSON.stringify(workflowStages) %>;
+new Chart(document.getElementById('ch-stage'), {
+  type: 'polarArea',
+  data: { labels: stageData.map(r=>r.stage), datasets:[{data:stageData.map(r=>r.c), backgroundColor:palette.map(c=>c+'cc'), borderWidth:0}] },
+  options: { plugins:{legend:{position:'right',labels:{color:'#8da0b8'}}}, scales:{r:{ticks:{display:false}}}, maintainAspectRatio:false, onClick:(e,el)=>{ if(el[0]) drill('stage', stageData[el[0].index].stage); } }
+});
+</script>
+<%- include('partials/footer') %>

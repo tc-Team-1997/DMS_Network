@@ -1,0 +1,93 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: dms-python
+  namespace: nbe-dms
+spec:
+  replicas: 4
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: {app: dms-python}
+  template:
+    metadata:
+      labels: {app: dms-python}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: api
+          image: nbe/dms-python:latest
+          ports: [{containerPort: 8000}]
+          envFrom:
+            - configMapRef: {name: dms-python-config}
+            - secretRef: {name: dms-python-secrets}
+          readinessProbe: {httpGet: {path: /health, port: 8000}, initialDelaySeconds: 5, periodSeconds: 10}
+          livenessProbe:  {httpGet: {path: /health, port: 8000}, initialDelaySeconds: 20, periodSeconds: 30}
+          resources:
+            requests: {cpu: "200m", memory: "512Mi"}
+            limits:   {cpu: "1",    memory: "2Gi"}
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: dms-python-data}
+  strategy:
+    canary:
+      canaryService: dms-python-canary
+      stableService: dms-python
+      trafficRouting:
+        nginx:
+          stableIngress: dms-python
+      steps:
+        - setWeight: 10
+        - pause: {duration: 2m}
+        - analysis:
+            templates: [{templateName: dms-success-rate}]
+        - setWeight: 25
+        - pause: {duration: 5m}
+        - analysis:
+            templates: [{templateName: dms-success-rate}]
+        - setWeight: 50
+        - pause: {duration: 5m}
+        - setWeight: 100
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: dms-success-rate
+  namespace: nbe-dms
+spec:
+  args:
+    - name: service-name
+      value: dms-python-canary
+  metrics:
+    - name: success-rate
+      interval: 1m
+      successCondition: result[0] >= 0.97
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc:9090
+          query: |
+            sum(rate(dms_http_requests_total{path!~"/health|/metrics",status!~"5.."}[2m]))
+            /
+            sum(rate(dms_http_requests_total{path!~"/health|/metrics"}[2m]))
+    - name: p95-latency
+      interval: 1m
+      successCondition: result[0] <= 0.500
+      failureLimit: 3
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc:9090
+          query: |
+            histogram_quantile(0.95, sum(rate(dms_http_request_seconds_bucket[2m])) by (le))
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dms-python-canary
+  namespace: nbe-dms
+spec:
+  selector: {app: dms-python}
+  ports: [{name: http, port: 8000, targetPort: 8000}]

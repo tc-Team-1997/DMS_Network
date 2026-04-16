@@ -1,0 +1,36 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title">Executive Dashboard</div><div class="page-sub">Real-time document intelligence</div></div>
+  <span class="tag tag-gold">AI Active</span>
+</div>
+<div class="grid4" style="margin-bottom:20px">
+  <div class="kpi gold-kpi"><div class="kpi-label">Total Documents</div><div class="kpi-val"><%= kpis.totalDocs.toLocaleString() %></div><div class="kpi-sub">All branches</div></div>
+  <div class="kpi blue-kpi"><div class="kpi-label">Pending Workflows</div><div class="kpi-val"><%= kpis.pending %></div><div class="kpi-sub">Awaiting action</div></div>
+  <div class="kpi red-kpi"><div class="kpi-label">Expired</div><div class="kpi-val"><%= kpis.expired %></div><div class="kpi-sub">Require renewal</div></div>
+  <div class="kpi" style="border-top:2px solid var(--warn)"><div class="kpi-label">Expiring Soon</div><div class="kpi-val" style="color:var(--warn)"><%= kpis.expiring %></div><div class="kpi-sub">Within 90 days</div></div>
+</div>
+<div class="grid2" style="margin-bottom:20px">
+  <div class="card"><div class="card-header">Document Inflow (7 days)</div><div class="chart-wrap"><canvas id="inflow"></canvas></div></div>
+  <div class="card"><div class="card-header">Processing SLA</div><div class="chart-wrap"><canvas id="sla"></canvas></div></div>
+</div>
+<div class="grid2">
+  <div class="ai-card">
+    <div class="ai-header"><div class="ai-pulse"></div> AI Insights</div>
+    <% alerts.forEach(a => { %>
+      <div class="ai-insight"><div class="ai-insight-text"><%= a.title %></div><div class="ai-insight-meta"><%= a.meta||'' %></div></div>
+    <% }) %>
+  </div>
+  <div class="card">
+    <div class="card-header">Recent Documents</div>
+    <table><thead><tr><th>Document</th><th>Customer</th><th>Status</th></tr></thead><tbody>
+    <% recentDocs.forEach(d => { %>
+      <tr><td><a href="/documents/viewer/<%= d.id %>" style="color:var(--gold2)"><%= d.original_name %></a></td><td><%= d.customer_name||'-' %></td><td><span class="tag tag-<%= d.status==='Valid'?'success':(d.status==='Expired'?'danger':'warn') %>"><%= d.status %></span></td></tr>
+    <% }) %>
+    </tbody></table>
+  </div>
+</div>
+<script>
+new Chart(document.getElementById('inflow'),{type:'line',data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[{data:[4200,5800,4900,7200,6100,3400,5300],borderColor:'#c9a84c',backgroundColor:'rgba(201,168,76,.1)',fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8da0b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#8da0b8'},grid:{color:'rgba(255,255,255,.05)'}}},responsive:true,maintainAspectRatio:false}});
+new Chart(document.getElementById('sla'),{type:'bar',data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[{label:'Met',data:[98,96,97,94,96,99,95],backgroundColor:'rgba(60,185,123,.6)'},{label:'Breached',data:[2,4,3,6,4,1,5],backgroundColor:'rgba(224,92,92,.5)'}]},options:{plugins:{legend:{labels:{color:'#8da0b8'}}},scales:{x:{stacked:true,ticks:{color:'#8da0b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{stacked:true,max:100,ticks:{color:'#8da0b8'},grid:{color:'rgba(255,255,255,.05)'}}},responsive:true,maintainAspectRatio:false}});
+</script>
+<%- include('partials/footer') %>

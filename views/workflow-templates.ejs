@@ -1,0 +1,44 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Workflow Templates</div><div class="page-sub">Define approval chains per document type</div></div></div>
+<div class="grid2">
+  <div>
+    <% templates.forEach(t => { %>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-header">
+          <div><%= t.name %> <span class="tag tag-<%= t.active?'success':'warn' %>"><%= t.active?'Active':'Disabled' %></span></div>
+          <div style="display:flex;gap:6px">
+            <form method="POST" action="/workflow-templates/<%= t.id %>/toggle" style="display:inline"><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px"><%= t.active?'Disable':'Enable' %></button></form>
+            <form method="POST" action="/workflow-templates/<%= t.id %>/delete" style="display:inline" onsubmit="return confirm('Delete template?')"><button class="btn btn-danger" style="padding:4px 10px;font-size:11px">Delete</button></form>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--silver);margin-bottom:8px">Document type: <strong style="color:var(--light)"><%= t.doc_type||'Any' %></strong></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <% t.steps.forEach((s, i) => { %>
+            <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);padding:6px 12px;border-radius:20px;font-size:11px">
+              <strong style="color:var(--gold2)"><%= i+1 %>.</strong> <%= s.name %> <span style="color:var(--silver)">[<%= s.role %>]</span>
+            </div>
+            <% if (i < t.steps.length-1) { %><span style="align-self:center;color:var(--silver)">→</span><% } %>
+          <% }) %>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+  <div class="card">
+    <div class="card-header">Create Template</div>
+    <form method="POST" action="/workflow-templates">
+      <div class="field"><label>Name</label><input type="text" name="name" required/></div>
+      <div class="field"><label>Document Type (optional)</label>
+        <select name="doc_type"><option value="">Any</option><option>Passport</option><option>National ID</option><option>Loan Application</option><option>Contract</option></select>
+      </div>
+      <div class="field"><label>Steps (JSON)</label>
+        <textarea name="steps_json" rows="10" style="font-family:monospace;font-size:11px">[
+  {"id":1,"name":"Capture","role":"Maker"},
+  {"id":2,"name":"Checker","role":"Checker"},
+  {"id":3,"name":"Approve","role":"Doc Admin"}
+]</textarea>
+      </div>
+      <button class="btn btn-primary" type="submit">Create</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

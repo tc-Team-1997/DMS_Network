@@ -1,0 +1,27 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Indexing</div><div class="page-sub">Assign metadata to uploaded documents</div></div><span class="tag tag-warn"><%= pending.length %> awaiting</span></div>
+<% if (pending.length === 0) { %>
+  <div class="card"><div style="padding:30px;text-align:center;color:var(--silver)">No documents awaiting indexing.</div></div>
+<% } else { %>
+  <% pending.forEach(d => { %>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><%= d.original_name %> <span class="tag tag-info">ID <%= d.id %></span></div>
+      <form method="POST" action="/documents/<%= d.id %>/index">
+        <div class="grid2">
+          <div class="field"><label>Doc Type</label><select name="doc_type"><option>Passport</option><option>National ID</option><option>Utility Bill</option><option>Loan Application</option><option>Contract</option></select></div>
+          <div class="field"><label>Customer CID</label><input type="text" name="customer_cid" value="<%= d.customer_cid||'' %>"/></div>
+          <div class="field"><label>Customer Name</label><input type="text" name="customer_name" value="<%= d.customer_name||'' %>"/></div>
+          <div class="field"><label>Doc Number</label><input type="text" name="doc_number" value="<%= d.doc_number||'' %>"/></div>
+          <div class="field"><label>DOB</label><input type="date" name="dob" value="<%= d.dob||'' %>"/></div>
+          <div class="field"><label>Issue Date</label><input type="date" name="issue_date" value="<%= d.issue_date||'' %>"/></div>
+          <div class="field"><label>Expiry Date</label><input type="date" name="expiry_date" value="<%= d.expiry_date||'' %>"/></div>
+          <div class="field"><label>Issuing Authority</label><input type="text" name="issuing_authority" value="<%= d.issuing_authority||'' %>"/></div>
+          <div class="field"><label>Branch</label><input type="text" name="branch" value="<%= d.branch||'' %>"/></div>
+        </div>
+        <div class="field"><label>Notes</label><textarea name="notes" rows="2"><%= d.notes||'' %></textarea></div>
+        <button class="btn btn-primary" type="submit">Save Metadata</button>
+      </form>
+    </div>
+  <% }) %>
+<% } %>
+<%- include('partials/footer') %>

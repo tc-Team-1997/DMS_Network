@@ -1,0 +1,29 @@
+node_modules/
+uploads/*
+!uploads/.gitkeep
+db/nbe-dms.db*
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+python-service/storage/
+python-service/*.db
+.pytest_cache/
+
+# Generated artifacts
+*.sig
+*.sig.json
+*.enc
+*.dec
+*.inksig.png
+*.inksigned.pdf
+*.signed.pdf
+*.pades.pdf
+*.redacted.pdf
+airgap-bundle/
+nbe-dms-airgap-*.tar.zst
+playwright-report/
+test-results/

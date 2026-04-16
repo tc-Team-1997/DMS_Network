@@ -1,0 +1,98 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title"><%= doc.original_name %></div><div class="page-sub"><%= doc.doc_type||'Unclassified' %> · <%= doc.customer_name||'-' %></div></div>
+  <div style="display:flex;gap:8px">
+    <a href="/versions/<%= doc.id %>" class="btn btn-secondary">Versions</a>
+    <% if (doc.mime_type === 'application/pdf') { %>
+      <form method="POST" action="/documents/<%= doc.id %>/sign" style="display:inline"><button class="btn btn-success" type="submit">Digitally Sign</button></form>
+    <% } %>
+    <a href="/documents/<%= doc.id %>/download" class="btn btn-primary">Download</a>
+    <a href="/documents" class="btn btn-secondary">Back</a>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 300px;gap:16px">
+  <div class="viewer-doc" style="padding:16px;position:relative">
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:11px" onclick="annTool='note'">📝 Note</button>
+      <button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:11px;background:rgba(240,220,60,.12);color:#e8d84a" onclick="annTool='highlight'">🖍 Highlight</button>
+      <button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:11px;background:rgba(224,92,92,.12);color:var(--danger)" onclick="annTool='redact'">⬛ Redact</button>
+      <span style="align-self:center;font-size:11px;color:var(--silver);margin-left:auto" id="ann-hint">Click tool, then click on document</span>
+    </div>
+    <div id="viewport" style="position:relative;display:inline-block;width:100%">
+      <% if (doc.mime_type && doc.mime_type.startsWith('image/')) { %>
+        <img id="doc-img" src="/uploads/<%= doc.filename %>" style="max-width:100%;max-height:600px;border-radius:8px;display:block"/>
+      <% } else if (doc.mime_type === 'application/pdf') { %>
+        <iframe src="/uploads/<%= doc.filename %>" style="width:100%;height:600px;border:none;border-radius:8px"></iframe>
+      <% } else { %>
+        <div style="padding:40px;text-align:center;color:var(--silver)">Preview not available. <a href="/documents/<%= doc.id %>/download" style="color:var(--gold2)">Download to view</a></div>
+      <% } %>
+      <div id="ann-layer" style="position:absolute;inset:0;pointer-events:none"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header" style="font-size:12px">Document Info</div>
+    <div style="font-size:12px;display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Type</span><span><%= doc.doc_type||'-' %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Customer</span><span><%= doc.customer_name||'-' %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">CID</span><span style="color:var(--gold)"><%= doc.customer_cid||'-' %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Doc No.</span><span><%= doc.doc_number||'-' %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Expiry</span><span><%= doc.expiry_date||'-' %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Branch</span><span><%= doc.branch||'-' %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Version</span><span><%= doc.version %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Size</span><span><%= Math.round((doc.size||0)/1024) %> KB</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">OCR Conf.</span><span><%= doc.ocr_confidence?doc.ocr_confidence.toFixed(1)+'%':'-' %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Uploaded</span><span><%= doc.uploaded_at %></span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Status</span><span class="tag tag-<%= doc.status==='Valid'?'success':(doc.status==='Expired'?'danger':'warn') %>"><%= doc.status %></span></div>
+    </div>
+  </div>
+</div>
+<script>
+const docId = <%= doc.id %>;
+let annTool = null;
+const layer = document.getElementById('ann-layer');
+const vp = document.getElementById('viewport');
+
+async function loadAnnotations() {
+  const r = await fetch('/annotations/' + docId);
+  const list = await r.json();
+  layer.innerHTML = '';
+  list.forEach(render);
+}
+
+function render(a) {
+  const el = document.createElement('div');
+  el.style.cssText = `position:absolute;left:${a.x}%;top:${a.y}%;padding:4px 8px;font-size:11px;border-radius:4px;pointer-events:auto;cursor:pointer`;
+  if (a.kind === 'highlight') el.style.cssText += 'background:rgba(240,220,60,.35);border:1px solid #e8d84a;color:#000';
+  else if (a.kind === 'redact') el.style.cssText += 'background:#000;color:#000;min-width:80px';
+  else el.style.cssText += 'background:rgba(201,168,76,.2);border:1px solid var(--gold);color:var(--light);max-width:200px';
+  el.textContent = a.text || (a.kind === 'redact' ? 'REDACTED' : 'note');
+  el.title = (a.username||'') + ' · ' + (a.created_at||'');
+  el.onclick = async (e) => {
+    e.stopPropagation();
+    if (confirm('Delete this annotation?')) {
+      await fetch('/annotations/' + docId + '/' + a.id, { method: 'DELETE' });
+      loadAnnotations();
+    }
+  };
+  layer.appendChild(el);
+}
+
+vp.addEventListener('click', async (e) => {
+  if (!annTool) return;
+  const rect = vp.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width * 100).toFixed(2);
+  const y = ((e.clientY - rect.top) / rect.height * 100).toFixed(2);
+  let text = '';
+  if (annTool === 'note') { text = prompt('Note text:'); if (!text) return; }
+  await fetch('/annotations/' + docId, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ kind: annTool, x, y, text, page: 1 })
+  });
+  annTool = null;
+  document.getElementById('ann-hint').textContent = 'Saved · click tool to add more';
+  loadAnnotations();
+});
+
+loadAnnotations();
+</script>
+<%- include('partials/footer') %>

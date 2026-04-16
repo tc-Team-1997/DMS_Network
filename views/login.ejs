@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><title>NBE DMS - Login</title>
+<link rel="stylesheet" href="/css/app.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=DM+Sans&display=swap" rel="stylesheet"/>
+</head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0a1628,#162d5a)">
+<div style="background:#0f2044;padding:40px;border-radius:14px;width:380px;border:1px solid rgba(201,168,76,.2)">
+  <div style="text-align:center;margin-bottom:28px">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:24px;color:#e8c96b;font-weight:700">National Bank of Egypt</div>
+    <div style="font-size:10px;color:#8da0b8;letter-spacing:2px;text-transform:uppercase">Document Management System</div>
+  </div>
+  <% if (error) { %><div style="background:rgba(224,92,92,.15);border:1px solid rgba(224,92,92,.3);color:#e05c5c;padding:10px;border-radius:8px;margin-bottom:14px;font-size:12px"><%= error %></div><% } %>
+  <form method="POST" action="/login">
+    <div class="field"><label>Username</label><input type="text" name="username" value="<%= typeof username!=='undefined'?username:'' %>" required/></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required/></div>
+    <% if (typeof mfaRequired !== 'undefined' && mfaRequired) { %>
+      <div class="field"><label>MFA Code</label><input type="text" name="mfa_token" maxlength="6" required autofocus/></div>
+    <% } %>
+    <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;margin-top:8px">Sign In</button>
+  </form>
+  <div style="margin-top:16px;font-size:11px;color:#8da0b8;text-align:center">Demo: admin / admin123</div>
+</div>
+</body></html>

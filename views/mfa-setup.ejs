@@ -1,0 +1,19 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">MFA Setup</div><div class="page-sub">Configure TOTP authenticator</div></div></div>
+<div class="grid2">
+  <div class="card">
+    <div class="card-header">Step 1 — Scan QR</div>
+    <% if (qr) { %><img src="<%= qr %>" style="background:#fff;padding:10px;border-radius:8px;width:220px"/><% } %>
+    <div style="margin-top:14px;font-size:12px;color:var(--silver)">Or enter this secret manually:</div>
+    <div style="font-family:monospace;background:rgba(0,0,0,.2);padding:8px;border-radius:6px;margin-top:6px;word-break:break-all"><%= secret %></div>
+  </div>
+  <div class="card">
+    <div class="card-header">Step 2 — Verify Code</div>
+    <% if (typeof error !== 'undefined' && error) { %><div class="tag tag-danger" style="margin-bottom:10px"><%= error %></div><% } %>
+    <form method="POST" action="/mfa/verify">
+      <div class="field"><label>6-digit code from authenticator</label><input type="text" name="token" maxlength="6" required/></div>
+      <button class="btn btn-primary" type="submit">Verify & Enable MFA</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

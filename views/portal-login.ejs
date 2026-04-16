@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><title>NBE Customer Portal</title>
+<link rel="stylesheet" href="/css/app.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=DM+Sans&display=swap" rel="stylesheet"/>
+</head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0a1628,#162d5a)">
+<div style="background:#0f2044;padding:40px;border-radius:14px;width:420px;border:1px solid rgba(201,168,76,.2)">
+  <div style="text-align:center;margin-bottom:28px">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:24px;color:#e8c96b;font-weight:700">Customer Self-Service</div>
+    <div style="font-size:10px;color:#8da0b8;letter-spacing:2px;text-transform:uppercase">National Bank of Egypt</div>
+  </div>
+  <% if (error) { %><div style="background:rgba(224,92,92,.15);border:1px solid rgba(224,92,92,.3);color:#e05c5c;padding:10px;border-radius:8px;margin-bottom:14px;font-size:12px"><%= error %></div><% } %>
+  <form method="POST" action="/portal/verify">
+    <div class="field"><label>Customer ID (CID)</label><input type="text" name="cid" value="<%= cid %>" placeholder="EGY-2024-XXXXXXXX" required/></div>
+    <div class="field"><label>Document Number (optional, to narrow)</label><input type="text" name="doc_number"/></div>
+    <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px">View My Documents</button>
+  </form>
+  <div style="margin-top:16px;font-size:11px;color:#8da0b8;text-align:center">Try CID: EGY-2024-00847 · EGY-2024-00848 · EGY-2024-00849</div>
+  <div style="margin-top:12px;text-align:center"><a href="/login" style="color:#8da0b8;font-size:11px">Staff login →</a></div>
+</div>
+</body></html>

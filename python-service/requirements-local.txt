@@ -1,0 +1,25 @@
+# Minimal, version-flexible requirements for running the DMS locally.
+# Use the pinned requirements.txt for reproducible prod builds; use this file
+# for local dev where you want latest wheels that match your Python version.
+fastapi
+uvicorn[standard]
+python-multipart
+sqlalchemy
+pydantic
+pydantic-settings
+aiofiles
+httpx
+python-jose[cryptography]
+passlib[bcrypt]
+pytesseract
+Pillow
+pdf2image
+imagehash
+rapidfuzz
+jinja2
+alembic
+pytest
+cryptography
+pypdf
+websockets
+prometheus-client

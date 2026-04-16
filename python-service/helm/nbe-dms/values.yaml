@@ -1,0 +1,47 @@
+image:
+  repository: nbe/dms-python
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: dms.nbe.local
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/websocket-services: "{{ include \"nbe-dms.fullname\" . }}"
+
+persistence:
+  enabled: true
+  size: 100Gi
+  storageClass: ""
+
+resources:
+  requests: {cpu: 200m, memory: 512Mi}
+  limits:   {cpu: "1",  memory: 2Gi}
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPU: 70
+
+env:
+  APP_ENV: prod
+  STORAGE_DIR: /data/documents
+  TESSERACT_CMD: /usr/bin/tesseract
+  ELASTICSEARCH_URL: "http://elasticsearch:9200"
+
+secrets:
+  API_KEY: "change-me"
+  JWT_SECRET: "change-me"
+  DATABASE_URL: "postgresql+psycopg://dms:dms@postgres:5432/dms"
+
+serviceMonitor:
+  enabled: false

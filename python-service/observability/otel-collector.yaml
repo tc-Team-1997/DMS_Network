@@ -1,0 +1,82 @@
+# OpenTelemetry Collector — one pipeline: traces + metrics + logs.
+# Fan-out targets: Tempo (traces), Prometheus (metrics scrape), Loki (logs).
+# Deploy as a DaemonSet for logs + Deployment for app pipeline.
+receivers:
+  otlp:
+    protocols:
+      grpc: {endpoint: 0.0.0.0:4317}
+      http: {endpoint: 0.0.0.0:4318}
+
+  filelog:
+    include: [/var/log/pods/nbe-dms*/**/*.log]
+    start_at: end
+    include_file_path: true
+    operators:
+      - type: json_parser
+        parse_from: body
+      - type: move
+        from: attributes["@timestamp"]
+        to: time
+
+  prometheus/self:
+    config:
+      scrape_configs:
+        - job_name: "dms-python"
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["dms-python.nbe-dms.svc:8000"]
+          metrics_path: /metrics
+
+processors:
+  batch: {send_batch_size: 1024, timeout: 1s}
+  memory_limiter: {check_interval: 1s, limit_mib: 512, spike_limit_mib: 128}
+  resource:
+    attributes:
+      - {key: deployment.environment, value: "${env:APP_ENV}", action: upsert}
+      - {key: service.namespace, value: "nbe-dms", action: upsert}
+  attributes/pii:
+    actions:
+      - {key: customer_cid, action: delete}
+      - {key: email,        action: delete}
+      - {key: passport_no,  action: delete}
+  tail_sampling:
+    decision_wait: 10s
+    policies:
+      - name: errors-always
+        type: status_code
+        status_code: {status_codes: [ERROR]}
+      - name: slow-traces
+        type: latency
+        latency: {threshold_ms: 500}
+      - name: baseline-1pc
+        type: probabilistic
+        probabilistic: {sampling_percentage: 1}
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo.observability.svc:4317
+    tls: {insecure: true}
+  loki:
+    endpoint: http://loki.observability.svc:3100/loki/api/v1/push
+    default_labels_enabled: {exporter: true, job: true}
+  prometheusremotewrite:
+    endpoint: http://prometheus.observability.svc:9090/api/v1/write
+  debug: {verbosity: basic}
+
+service:
+  telemetry:
+    logs: {level: info}
+    metrics: {address: 0.0.0.0:8888}
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, attributes/pii, tail_sampling, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp, prometheus/self]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp, filelog]
+      processors: [memory_limiter, resource, attributes/pii, batch]
+      exporters: [loki]

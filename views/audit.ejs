@@ -1,0 +1,43 @@
+<%- include('partials/header') %>
+<div class="page-header">
+  <div><div class="page-title">Audit Log</div><div class="page-sub">All system activity · CBE-compliant 7-year retention</div></div>
+  <a href="/exports/audit.csv" class="btn btn-primary">Export CSV</a>
+</div>
+<div class="card" style="margin-bottom:16px">
+  <form method="GET" action="/audit" style="display:grid;grid-template-columns:repeat(5,1fr) auto;gap:10px;align-items:end">
+    <div><label>User</label><input type="text" name="user" value="<%= query.user||'' %>" placeholder="username..."/></div>
+    <div><label>Action</label>
+      <select name="action">
+        <option value="">All</option>
+        <% actions.forEach(a => { %><option <%= query.action===a?'selected':'' %>><%= a %></option><% }) %>
+      </select>
+    </div>
+    <div><label>Entity</label>
+      <select name="entity">
+        <option value="">All</option>
+        <% entities.forEach(e => { %><option <%= query.entity===e?'selected':'' %>><%= e %></option><% }) %>
+      </select>
+    </div>
+    <div><label>From</label><input type="date" name="from" value="<%= query.from||'' %>"/></div>
+    <div><label>To</label><input type="date" name="to" value="<%= query.to||'' %>"/></div>
+    <button class="btn btn-primary" type="submit">Filter</button>
+  </form>
+</div>
+<div class="card">
+  <div class="card-header">Results (<%= rows.length %>)</div>
+  <table><thead><tr><th>#</th><th>User</th><th>Action</th><th>Entity</th><th>ID</th><th>Details</th><th>Time</th></tr></thead><tbody>
+    <% rows.forEach(r => { %>
+      <tr>
+        <td style="color:var(--silver)"><%= r.id %></td>
+        <td><%= r.username||'-' %></td>
+        <td><span class="tag tag-<%= (r.action||'').includes('REJECT')||(r.action||'').includes('DELETE')?'danger':((r.action||'').includes('APPROVE')||(r.action||'').includes('SIGN')?'success':'info') %>"><%= r.action %></span></td>
+        <td><%= r.entity||'-' %></td>
+        <td><%= r.entity_id||'-' %></td>
+        <td style="font-size:11px;color:var(--silver)"><%= r.details||'-' %></td>
+        <td style="font-size:11px;color:var(--silver)"><%= r.created_at %></td>
+      </tr>
+    <% }) %>
+    <% if (rows.length === 0) { %><tr><td colspan="7" style="text-align:center;color:var(--silver);padding:30px">No entries match the filter</td></tr><% } %>
+  </tbody></table>
+</div>
+<%- include('partials/footer') %>

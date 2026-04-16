@@ -1,0 +1,16 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">AI Processing Engine</div><div class="page-sub">Auto-classification, OCR & confidence scoring</div></div><span class="tag tag-gold">AI Active v3.2</span></div>
+<div class="grid4" style="margin-bottom:20px">
+  <div class="kpi blue-kpi"><div class="kpi-label">Queue</div><div class="kpi-val"><%= queue %></div></div>
+  <div class="kpi green-kpi"><div class="kpi-label">Processed Today</div><div class="kpi-val">8,471</div></div>
+  <div class="kpi gold-kpi"><div class="kpi-label">Avg Confidence</div><div class="kpi-val">94.7%</div></div>
+  <div class="kpi red-kpi"><div class="kpi-label">Manual Review</div><div class="kpi-val">7</div></div>
+</div>
+<div class="card"><div class="card-header">Extracted Fields Preview <span class="tag tag-success">97% confidence</span></div>
+<div style="display:flex;flex-direction:column;gap:8px">
+  <div style="padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">Full Name: Ahmed Hassan Ibrahim <span class="tag tag-success" style="float:right">99%</span></div>
+  <div style="padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">DOB: 14 April 1986 <span class="tag tag-success" style="float:right">98%</span></div>
+  <div style="padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">Passport No: A12345678 <span class="tag tag-success" style="float:right">99%</span></div>
+  <div style="padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">Expiry: 09 January 2032 <span class="tag tag-warn" style="float:right">87%</span></div>
+</div></div>
+<%- include('partials/footer') %>

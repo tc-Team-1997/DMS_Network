@@ -1,0 +1,21 @@
+# Inject 200ms latency + 5% loss on DMS pods for 10 min.
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: dms-network-latency
+  namespace: nbe-dms
+spec:
+  appinfo:
+    appns: nbe-dms
+    applabel: "app=dms-python"
+    appkind: deployment
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-latency
+      spec:
+        components:
+          env:
+            - {name: TOTAL_CHAOS_DURATION, value: "600"}
+            - {name: NETWORK_LATENCY,      value: "200"}
+            - {name: NETWORK_PACKET_LOSS_PERCENTAGE, value: "5"}
+            - {name: JITTER,               value: "50"}

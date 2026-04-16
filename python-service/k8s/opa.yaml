@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dms-opa-policies
+  namespace: nbe-dms
+data:
+  dms.rego: |-
+    # Copy of opa/policies/dms.rego — mounted as /policies into OPA sidecar.
+    package dms.authz
+    default allow := {"allow": false, "reason": "configmap_placeholder"}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opa
+  namespace: nbe-dms
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: opa}
+  template:
+    metadata:
+      labels: {app: opa}
+    spec:
+      containers:
+        - name: opa
+          image: openpolicyagent/opa:0.66.0-rootless
+          args: ["run", "--server", "--addr=0.0.0.0:8181", "/policies/dms.rego"]
+          ports: [{containerPort: 8181}]
+          volumeMounts: [{name: policies, mountPath: /policies}]
+          readinessProbe:
+            httpGet: {path: /health, port: 8181}
+          resources:
+            requests: {cpu: "50m", memory: "64Mi"}
+            limits:   {cpu: "200m", memory: "128Mi"}
+      volumes:
+        - name: policies
+          configMap: {name: dms-opa-policies}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opa
+  namespace: nbe-dms
+spec:
+  selector: {app: opa}
+  ports: [{port: 8181, targetPort: 8181}]

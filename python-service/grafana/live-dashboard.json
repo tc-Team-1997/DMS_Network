@@ -1,0 +1,47 @@
+{
+  "title": "NBE DMS — Realtime Operations",
+  "uid": "nbe-dms-live",
+  "refresh": "1s",
+  "time": {"from": "now-5m", "to": "now"},
+  "panels": [
+    {
+      "type": "live",
+      "title": "Document uploads (live)",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 6},
+      "datasource": {"type": "datasource", "uid": "-- Grafana --"},
+      "targets": [
+        {"queryType": "live",
+         "channel": "stream/nbe-dms/document",
+         "filter": {"fields": ["id", "original_name", "doc_type"]}}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Workflow actions / sec",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 6},
+      "targets": [{"expr": "rate(dms_http_requests_total{path=~\".*workflow.*actions\"}[30s])"}]
+    },
+    {
+      "type": "stat",
+      "title": "Fraud alerts (live)",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 6},
+      "datasource": {"type": "datasource", "uid": "-- Grafana --"},
+      "targets": [
+        {"queryType": "live", "channel": "stream/nbe-dms/fraud"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "WAF blocks (403/sec)",
+      "gridPos": {"x": 0, "y": 6, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(dms_http_requests_total{status=\"403\"}[1m])"}]
+    },
+    {
+      "type": "logs",
+      "title": "Event bus stream",
+      "gridPos": {"x": 12, "y": 6, "w": 12, "h": 8},
+      "datasource": {"type": "datasource", "uid": "-- Grafana --"},
+      "targets": [{"queryType": "live", "channel": "stream/nbe-dms/*"}]
+    }
+  ]
+}

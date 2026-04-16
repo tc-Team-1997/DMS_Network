@@ -1,0 +1,36 @@
+# Sigstore policy-controller: reject unsigned images + require SLSA provenance.
+# Install the controller first:  helm install policy-controller sigstore/policy-controller -n cosign-system
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: require-nbe-dms-signed
+spec:
+  images:
+    - glob: "ghcr.io/**/dms-python*"
+  authorities:
+    - name: github-actions-keyless
+      keyless:
+        url: https://fulcio.sigstore.dev
+        identities:
+          - issuer: https://token.actions.githubusercontent.com
+            subjectRegExp: "^https://github.com/.+/nbe-dms/"
+        ctlog:
+          url: https://rekor.sigstore.dev
+      attestations:
+        - name: must-have-sbom
+          predicateType: https://spdx.dev/Document
+          policy:
+            type: cue
+            data: |
+              predicate: {
+                  creationInfo: creators: [...string]
+              }
+        - name: must-have-slsa-provenance
+          predicateType: https://slsa.dev/provenance/v1
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nbe-dms
+  labels:
+    policy.sigstore.dev/include: "true"   # opt this namespace into enforcement

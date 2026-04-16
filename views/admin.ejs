@@ -1,0 +1,22 @@
+<%- include('partials/header') %>
+<div class="page-header"><div><div class="page-title">Admin Panel</div><div class="page-sub">System configuration & audit</div></div></div>
+<div class="grid2">
+  <div class="card"><div class="card-header">Recent Audit Log</div>
+    <table><thead><tr><th>User</th><th>Action</th><th>Entity</th><th>Time</th></tr></thead><tbody>
+      <% audit.forEach(a => { %><tr><td><%= a.username||'-' %></td><td><span class="tag tag-info"><%= a.action %></span></td><td><%= a.entity %><%= a.entity_id?' #'+a.entity_id:'' %></td><td style="font-size:11px;color:var(--silver)"><%= a.created_at %></td></tr><% }) %>
+    </tbody></table>
+  </div>
+  <div class="card"><div class="card-header">Retention Policies</div>
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+      <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,.04);border-radius:7px"><span>KYC Documents</span><span style="color:var(--gold)">10 Years</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,.04);border-radius:7px"><span>Loan Agreements</span><span style="color:var(--gold)">7 Years</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,.04);border-radius:7px"><span>Audit Logs</span><span style="color:var(--gold)">7 Years (CBE)</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,.04);border-radius:7px"><span>Scanned Images</span><span style="color:var(--gold)">5 Years</span></div>
+    </div>
+  </div>
+</div>
+<div class="card" style="margin-top:16px"><div class="card-header">System Users</div>
+<table><thead><tr><th>Username</th><th>Full Name</th><th>Role</th><th>Branch</th><th>Status</th></tr></thead><tbody>
+<% users.forEach(u => { %><tr><td><%= u.username %></td><td><%= u.full_name %></td><td><span class="tag tag-gold"><%= u.role %></span></td><td><%= u.branch %></td><td><span class="tag tag-<%= u.status==='Active'?'success':'warn' %>"><%= u.status %></span></td></tr><% }) %>
+</tbody></table></div>
+<%- include('partials/footer') %>

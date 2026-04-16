@@ -1,0 +1,13 @@
+services:
+  dms-python:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: dev
+      API_KEY: dev-key-change-me
+      DATABASE_URL: sqlite:///./storage/dms.db
+      STORAGE_DIR: /app/storage/documents
+      TESSERACT_CMD: /usr/bin/tesseract
+    volumes:
+      - ./storage:/app/storage

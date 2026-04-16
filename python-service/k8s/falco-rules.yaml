@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-rules-nbe-dms
+  namespace: falco
+data:
+  nbe-dms.yaml: |
+    - macro: dms_container
+      condition: container.image.repository contains "dms-python"
+
+    - macro: writable_docs
+      condition: fd.directory in (/data, /app/storage)
+
+    # 1. Any shell spawned inside DMS pod is suspicious (Python container should never exec sh).
+    - rule: DMS Pod Shell
+      desc: Shell spawned in NBE DMS container
+      condition: spawned_process and dms_container and proc.name in (sh, bash, dash, ash, busybox)
+      output: >
+        Shell in NBE DMS container (user=%user.name cmd=%proc.cmdline
+        pid=%proc.pid pod=%k8s.pod.name ns=%k8s.ns.name)
+      priority: CRITICAL
+      tags: [container, shell, mitre_execution]
+
+    # 2. Writes outside the document store dir.
+    - rule: DMS Unexpected Write
+      desc: Write outside /data or /app/storage
+      condition: >
+        evt.type in (open, openat, creat) and evt.is_open_write=true
+        and dms_container and not writable_docs
+        and not fd.name in (/tmp, /dev/null, /var/log)
+      output: "DMS wrote to unexpected path (%fd.name pid=%proc.pid cmd=%proc.cmdline)"
+      priority: WARNING
+      tags: [filesystem]
+
+    # 3. Outbound connection to unapproved CIDR.
+    - list: approved_egress
+      items: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+
+    - rule: DMS Unexpected Egress
+      desc: DMS connects to a public IP not in approved list
+      condition: >
+        outbound and dms_container
+        and not fd.sip in (approved_egress)
+        and not fd.sport in (53, 443, 80, 5432, 6379, 9092, 9200)
+      output: "DMS egress to %fd.sip:%fd.sport (pid=%proc.pid cmd=%proc.cmdline)"
+      priority: WARNING
+
+    # 4. Privileged syscalls that Python shouldn't need.
+    - rule: DMS Privileged Syscall
+      desc: ptrace / setuid / mount inside DMS
+      condition: evt.type in (ptrace, setuid, mount) and dms_container
+      output: "DMS privileged syscall %evt.type pid=%proc.pid"
+      priority: CRITICAL
+
+    # 5. Secret files read (ensure only signer + oidc key loads happen from known callers).
+    - rule: DMS Secret Read
+      desc: Reading keys dir from an unexpected process
+      condition: open_read and dms_container and fd.name startswith "/data/keys" and not proc.name="python3"
+      output: "DMS unexpected key read (%fd.name pid=%proc.pid cmd=%proc.cmdline)"
+      priority: CRITICAL
