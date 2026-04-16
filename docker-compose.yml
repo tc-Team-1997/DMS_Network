@@ -1,0 +1,19 @@
+services:
+  nbe-dms:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-nbe-webhook-secret}
+      - TWILIO_SID=${TWILIO_SID:-}
+      - TWILIO_TOKEN=${TWILIO_TOKEN:-}
+      - TWILIO_FROM=${TWILIO_FROM:-}
+    volumes:
+      - dms-uploads:/app/uploads
+      - dms-db:/app/db
+    restart: unless-stopped
+
+volumes:
+  dms-uploads:
+  dms-db:
