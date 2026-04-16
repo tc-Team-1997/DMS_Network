@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NBE · Enterprise DMS v4.2 · 18-Screen Complete Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --ink:#050d1a;--ink2:#0b1830;--ink3:#0f2240;--ink4:#16305a;
+  --gold:#b8912a;--gold2:#d4a73c;--gold3:#f0c84a;--goldT:rgba(184,145,42,.14);
+  --sil:#7a96b4;--mist:#bdd0e8;--wh:#e8f0fa;
+  --G:#2ecc8a;--GT:rgba(46,204,138,.13);
+  --R:#e05252;--RT:rgba(224,82,82,.13);
+  --W:#f0a030;--WT:rgba(240,160,48,.13);
+  --B:#3a9fd0;--BT:rgba(58,159,208,.13);
+  --P:#9b6fe0;--PT:rgba(155,111,224,.13);
+  --bd:rgba(255,255,255,.07);--gr:rgba(255,255,255,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+body{font-family:'Syne',sans-serif;background:var(--ink);color:var(--wh);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.serif{font-family:'Cormorant Garamond',serif}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* TOP BAR */
+#bar{height:52px;background:var(--ink2);border-bottom:1px solid rgba(184,145,42,.2);display:flex;align-items:center;gap:10px;padding:0 18px;flex-shrink:0;z-index:200}
+.logo{display:flex;align-items:center;gap:10px;padding-right:14px;border-right:1px solid var(--bd);flex-shrink:0}
+.gem{width:30px;height:30px;background:linear-gradient(135deg,var(--gold),var(--gold3));clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)}
+.bank-id b{font-size:13px;font-weight:700;color:var(--gold3);letter-spacing:.4px;display:block}
+.bank-id small{font-size:8px;color:var(--sil);letter-spacing:2px;text-transform:uppercase}
+.bsel{display:flex;align-items:center;gap:7px;background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:5px 11px;cursor:pointer;font-size:11.5px;color:var(--mist);flex-shrink:0}
+.bsel:hover{border-color:rgba(184,145,42,.4)}
+.bdot{width:7px;height:7px;border-radius:50%;background:var(--G);box-shadow:0 0 6px var(--G);flex-shrink:0}
+.gs{flex:1;max-width:520px;margin:0 12px;position:relative}
+.gs input{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--bd);border-radius:8px;padding:7px 38px 7px 13px;font-size:12px;color:var(--wh);font-family:'Syne',sans-serif;outline:none;transition:.2s}
+.gs input:focus{border-color:var(--gold)}
+.gs input::placeholder{color:var(--sil)}
+.ai-tag{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--gold);background:var(--goldT);padding:1px 6px;border-radius:3px}
+.bact{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ic{background:none;border:none;color:var(--sil);cursor:pointer;padding:6px;border-radius:6px;transition:.15s;position:relative;display:flex}
+.ic:hover{color:var(--gold3);background:rgba(255,255,255,.06)}
+.notdot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--R);border:1.5px solid var(--ink2)}
+.upbtn{background:linear-gradient(135deg,var(--gold),var(--gold3));color:var(--ink);border:none;padding:7px 14px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Syne',sans-serif;letter-spacing:.4px}
+.upbtn:hover{opacity:.88}
+.usr{display:flex;align-items:center;gap:7px;background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:4px 10px 4px 6px;cursor:pointer}
+.usr:hover{background:rgba(255,255,255,.08)}
+.av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--ink4),var(--gold));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.usr b{font-size:11px;font-weight:600;display:block}
+.usr small{font-size:9px;color:var(--gold);letter-spacing:.4px;text-transform:uppercase}
+
+/* SHELL */
+#shell{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+#nav{width:208px;background:var(--ink2);border-right:1px solid rgba(184,145,42,.1);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+#nav::-webkit-scrollbar{width:2px}
+#nav::-webkit-scrollbar-thumb{background:rgba(184,145,42,.15)}
+.ns{padding:10px 0 2px}
+.nl{font-size:8.5px;text-transform:uppercase;letter-spacing:2.5px;color:var(--sil);padding:0 15px 5px;opacity:.6}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 15px;cursor:pointer;font-size:11.5px;color:var(--sil);transition:.15s;border-left:2px solid transparent}
+.ni:hover{color:var(--mist);background:rgba(255,255,255,.04)}
+.ni.on{color:var(--gold3);background:rgba(184,145,42,.07);border-left-color:var(--gold2)}
+.ni svg{width:15px;height:15px;flex-shrink:0}
+.nb{margin-left:auto;font-size:9.5px;font-weight:700;border-radius:10px;padding:1px 6px;line-height:1.5}
+.nb-r{background:var(--R);color:#fff}
+.nb-g{background:var(--gold);color:var(--ink)}
+.nb-b{background:var(--B);color:#fff}
+.nfoot{margin-top:auto;padding:12px 15px;border-top:1px solid var(--bd)}
+.sys{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--sil)}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--G);animation:pa 2s infinite}
+@keyframes pa{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(46,204,138,.4)}50%{opacity:.6;box-shadow:0 0 0 5px rgba(46,204,138,0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* MAIN */
+#main{flex:1;overflow-y:auto;background:var(--ink);padding:22px 24px}
+#main::-webkit-scrollbar{width:4px}
+#main::-webkit-scrollbar-thumb{background:rgba(184,145,42,.12)}
+.scr{display:none;animation:fu .25s ease}
+.scr.on{display:block}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* SHARED COMPONENTS */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap}
+.ph h2{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;color:var(--gold3);line-height:1}
+.ph p{font-size:11px;color:var(--sil);margin-top:3px}
+.phr{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.card{background:var(--ink2);border:1px solid var(--bd);border-radius:10px;padding:18px}
+.chd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:12px;font-weight:600;color:var(--mist)}
+
+/* TAGS */
+.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px;line-height:1.6}
+.tg{background:var(--GT);color:var(--G)}
+.tr{background:var(--RT);color:var(--R)}
+.tw{background:var(--WT);color:var(--W)}
+.tb{background:var(--BT);color:var(--B)}
+.tp{background:var(--PT);color:var(--P)}
+.tgold{background:var(--goldT);color:var(--gold3)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;transition:.2s;border:none;font-family:'Syne',sans-serif;letter-spacing:.3px;white-space:nowrap}
+.bg{background:linear-gradient(135deg,var(--gold),var(--gold3));color:var(--ink)}.bg:hover{opacity:.88}
+.bs{background:rgba(255,255,255,.07);color:var(--mist);border:1px solid var(--bd)}.bs:hover{background:rgba(255,255,255,.11)}
+.bok{background:var(--GT);color:var(--G);border:1px solid rgba(46,204,138,.3)}
+.bx{background:var(--RT);color:var(--R);border:1px solid rgba(224,82,82,.3)}
+.bw{background:var(--WT);color:var(--W);border:1px solid rgba(240,160,48,.3)}
+.bb{background:var(--BT);color:var(--B);border:1px solid rgba(58,159,208,.3)}
+.sm{padding:5px 10px;font-size:10px}
+.xs{padding:3px 8px;font-size:9.5px}
+
+/* GRID */
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g21{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.g12{display:grid;grid-template-columns:1fr 2fr;gap:14px}
+.g3c{display:grid;grid-template-columns:220px 1fr 250px;gap:14px}
+
+/* KPI */
+.kpi{background:var(--ink2);border:1px solid var(--bd);border-radius:10px;padding:16px 18px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kg::before{background:linear-gradient(90deg,var(--gold),var(--gold3))}
+.kb::before{background:linear-gradient(90deg,var(--B),#70c8e8)}
+.kok::before{background:linear-gradient(90deg,var(--G),#5dd4a0)}
+.kr::before{background:linear-gradient(90deg,var(--R),#f08080)}
+.kp::before{background:linear-gradient(90deg,var(--P),#c0a0f8)}
+.kw::before{background:linear-gradient(90deg,var(--W),#f8c070)}
+.kl{font-size:9.5px;text-transform:uppercase;letter-spacing:1.8px;color:var(--sil);margin-bottom:8px}
+.kv{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:700;color:var(--wh);line-height:1}
+.ks{font-size:10px;color:var(--sil);margin-top:5px}
+.ku{color:var(--G);font-weight:700}
+.kd{color:var(--R);font-weight:700}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse}
+th{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--sil);text-align:left;padding:9px 12px;border-bottom:1px solid var(--bd);font-weight:500}
+td{padding:10px 12px;font-size:12px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--mist);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+/* FORM */
+.field{margin-bottom:12px}
+label{font-size:10.5px;color:var(--sil);margin-bottom:4px;display:block;letter-spacing:.3px}
+input[type=text],input[type=date],input[type=number],select,textarea{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:8px 12px;font-size:12px;color:var(--wh);font-family:'Syne',sans-serif;outline:none;width:100%;transition:.2s}
+input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+select option{background:var(--ink2)}
+hr{border:none;border-top:1px solid var(--bd);margin:14px 0}
+
+/* PROGRESS */
+.bw2{height:4px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden}
+.bf{height:100%;border-radius:4px}
+.bf-g{background:linear-gradient(90deg,var(--gold),var(--gold3))}
+.bf-ok{background:linear-gradient(90deg,var(--G),#5dd4a0)}
+.bf-b{background:linear-gradient(90deg,var(--B),#70c8e8)}
+.bf-r{background:linear-gradient(90deg,var(--R),#f08080)}
+
+/* TABS */
+.tabs{display:flex;gap:3px;background:rgba(255,255,255,.04);border-radius:8px;padding:4px;width:fit-content;margin-bottom:16px;border:1px solid var(--bd)}
+.tab{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--sil);transition:.2s;border:none;background:none;font-family:'Syne',sans-serif}
+.tab.on{background:var(--goldT);color:var(--gold3)}
+.tab:hover:not(.on){color:var(--mist)}
+
+/* AI PANEL */
+.aip{background:linear-gradient(135deg,rgba(10,18,32,.95),rgba(15,34,64,.9));border:1px solid rgba(184,145,42,.25);border-radius:10px;padding:16px}
+.aihd{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;font-weight:700;color:var(--gold3)}
+.aidot{width:7px;height:7px;border-radius:50%;background:var(--gold3);animation:pa 1.5s infinite}
+.aii{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:7px;background:rgba(255,255,255,.04);margin-bottom:6px;border-left:2px solid var(--gold)}
+.aii:last-of-type{margin-bottom:0}
+.aii.r{border-left-color:var(--R)}
+.aii.b{border-left-color:var(--B)}
+.aii.g{border-left-color:var(--G)}
+.aii.p{border-left-color:var(--P)}
+.ait{font-size:11px;color:var(--mist);line-height:1.5}
+.aim{font-size:10px;color:var(--sil);margin-top:2px}
+
+/* TIMELINE */
+.tl{position:relative;padding-left:20px}
+.tl::before{content:'';position:absolute;left:7px;top:0;bottom:0;width:1px;background:rgba(255,255,255,.1)}
+.tli{position:relative;padding-bottom:14px}
+.tli:last-child{padding-bottom:0}
+.tld{position:absolute;left:-17px;top:3px;width:10px;height:10px;border-radius:50%;border:2px solid var(--ink2)}
+.tld.done{background:var(--G);border-color:var(--G)}
+.tld.act{background:var(--gold2);border-color:var(--gold2);box-shadow:0 0 8px var(--gold2)}
+.tld.pend{background:var(--ink4);border-color:rgba(255,255,255,.2)}
+.tlt{font-size:12px;font-weight:600;color:var(--mist)}
+.tls{font-size:10px;color:var(--sil);margin-top:2px}
+
+/* FLOW */
+.flow{display:flex;align-items:center;overflow-x:auto;padding:12px 0}
+.fn{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:80px}
+.fn-nd{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid}
+.fd{border-color:var(--G);background:rgba(46,204,138,.15);color:var(--G)}
+.fa{border-color:var(--gold2);background:rgba(184,145,42,.15);color:var(--gold2);box-shadow:0 0 10px rgba(184,145,42,.3)}
+.fp{border-color:rgba(255,255,255,.15);background:var(--ink2);color:var(--sil)}
+.fn-lb{font-size:9px;color:var(--sil);text-align:center;line-height:1.3}
+.fc{flex:1;height:2px;min-width:16px}
+.fcd{background:var(--G)}
+.fcp{background:rgba(255,255,255,.1)}
+
+/* ALERT ROW */
+.ar{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-radius:8px;background:var(--gr);border-left:3px solid;margin-bottom:8px;cursor:pointer;transition:.15s}
+.ar:hover{background:rgba(255,255,255,.06)}
+.arc{border-color:var(--R)}
+.arw{border-color:var(--W)}
+.ari{border-color:var(--B)}
+.ars{border-color:var(--G)}
+
+/* AUDIT ROW */
+.atr{display:flex;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.atu{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--ink4),var(--gold));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+
+/* BRANCH CARD */
+.brc{background:var(--ink3);border:1px solid var(--bd);border-radius:8px;padding:14px;cursor:pointer;transition:.15s}
+.brc:hover,.brc.sel{border-color:rgba(184,145,42,.4);background:rgba(184,145,42,.05)}
+.bst{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.bon{background:var(--G);box-shadow:0 0 5px var(--G)}
+.bwn{background:var(--W)}
+.boff{background:var(--R)}
+
+/* STATUS ROW */
+.sr{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--gr);border-radius:7px;margin-bottom:6px;font-size:12px}
+
+/* PERMISSION CELL */
+.pc{width:30px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:12px}
+.pcy{background:var(--GT);color:var(--G)}
+.pcn{background:rgba(255,255,255,.04);color:rgba(255,255,255,.18)}
+.pcp{background:var(--WT);color:var(--W)}
+
+/* WF BUILDER NODE */
+.wfn{width:52px;height:52px;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid;transition:transform .15s}
+.wfn:hover{transform:scale(1.06)}
+.wft{border-color:rgba(58,159,208,.5);background:var(--BT)}
+.wfa{border-color:rgba(184,145,42,.5);background:var(--goldT)}
+.wfh{border-color:rgba(46,204,138,.5);background:var(--GT)}
+.wfg{border-color:rgba(155,111,224,.5);background:var(--PT)}
+.wfno{border-color:rgba(240,160,48,.5);background:var(--WT)}
+.wfe{border-color:rgba(46,204,138,.5);background:rgba(46,204,138,.08)}
+.wfadd{border-color:rgba(255,255,255,.15);background:var(--gr);border-style:dashed}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:rgba(184,145,42,.12);border-radius:4px}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="bar">
+  <div class="logo">
+    <div class="gem"></div>
+    <div class="bank-id"><b>National Bank of Egypt</b><small>Enterprise Document Platform v4.2</small></div>
+  </div>
+  <div class="bsel"><div class="bdot"></div><span id="branchLabel">All Branches — HQ Cairo</span>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+  <div class="gs">
+    <input type="text" placeholder="Semantic AI search — customer, CID, document content, type…"/>
+    <div class="ai-tag">AI</div>
+  </div>
+  <div class="bact">
+    <button class="ic" onclick="go('alerts')" title="Alerts (11)">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <div class="notdot"></div>
+    </button>
+    <button class="ic" onclick="go('compliance')" title="Compliance Status">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </button>
+    <button class="upbtn" onclick="go('capture')">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Ingest Document
+    </button>
+    <div class="usr">
+      <div class="av">AM</div>
+      <div><b>Ahmed M.</b><small>Chief Doc Officer</small></div>
+    </div>
+  </div>
+</div>
+
+<div id="shell">
+<!-- SIDEBAR -->
+<div id="nav">
+  <div class="ns">
+    <div class="nl">Intelligence</div>
+    <div class="ni on" onclick="go('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Executive Dashboard</div>
+    <div class="ni" onclick="go('branches')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Branch Network<span class="nb nb-r">3</span></div>
+    <div class="ni" onclick="go('customer360')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Customer 360°</div>
+  </div>
+  <div class="ns">
+    <div class="nl">Ingestion</div>
+    <div class="ni" onclick="go('capture')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Multi-Channel Capture</div>
+    <div class="ni" onclick="go('indexing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Indexing &amp; QA<span class="nb nb-r">18</span></div>
+    <div class="ni" onclick="go('ai')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>AI Engine<span class="nb nb-g">342</span></div>
+  </div>
+  <div class="ns">
+    <div class="nl">Management</div>
+    <div class="ni" onclick="go('cases')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Case Management<span class="nb nb-b">4</span></div>
+    <div class="ni" onclick="go('repository')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Repository</div>
+    <div class="ni" onclick="go('records')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Records Management</div>
+    <div class="ni" onclick="go('lifecycle')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Document Lifecycle</div>
+  </div>
+  <div class="ns">
+    <div class="nl">Discovery</div>
+    <div class="ni" onclick="go('search')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Enterprise Search</div>
+    <div class="ni" onclick="go('viewer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Document Viewer</div>
+  </div>
+  <div class="ns">
+    <div class="nl">Process</div>
+    <div class="ni" onclick="go('workflow')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="6"/><rect x="15" y="3" width="6" height="6"/><rect x="9" y="15" width="6" height="6"/><path d="M6 9v3a6 6 0 0 0 6 6"/><path d="M18 9v3a6 6 0 0 1-3 5.2"/></svg>Workflow Engine<span class="nb nb-g">6</span></div>
+    <div class="ni" onclick="go('compliance')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Compliance &amp; Audit</div>
+    <div class="ni" onclick="go('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Alerts &amp; Events<span class="nb nb-r">11</span></div>
+  </div>
+  <div class="ns">
+    <div class="nl">Analytics &amp; Platform</div>
+    <div class="ni" onclick="go('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reports &amp; BI</div>
+    <div class="ni" onclick="go('integration')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="6" y1="9" x2="6" y2="15"/><line x1="9" y1="18" x2="15" y2="18"/></svg>Integration Hub</div>
+    <div class="ni" onclick="go('security')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Security &amp; RBAC</div>
+    <div class="ni" onclick="go('admin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>System Admin</div>
+  </div>
+  <div class="nfoot">
+    <div class="sys"><div class="pulse"></div>All 18 services healthy</div>
+    <div style="font-size:9px;color:var(--sil);margin-top:5px" class="mono">v4.2.1 · Build 20260414</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="main">
+
+<!-- ═══ 1. DASHBOARD ═══ -->
+<div id="s-dashboard" class="scr on">
+  <div class="ph"><div><h2>Executive Dashboard</h2><p>Real-time intelligence · 84 branches · AI-driven · Last sync 47s ago</p></div>
+  <div class="phr"><span class="tag tgold" style="font-size:11px;padding:4px 10px">● AI Active</span><span class="tag tb" style="font-size:11px;padding:4px 10px">84 Branches</span><button class="btn bs sm">Export PDF</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kg"><div class="kl">Total Documents</div><div class="kv">8,427,913</div><div class="ks"><span class="ku">↑ 4.2%</span> vs last month</div></div>
+    <div class="kpi kb"><div class="kl">AI Accuracy</div><div class="kv">97.4%</div><div class="ks">Watsonx NLP v3.4</div></div>
+    <div class="kpi kr"><div class="kl">Compliance Breaches</div><div class="kv" style="color:var(--R)">47</div><div class="ks"><span class="kd">↑ 12 today</span> · CBE regulated</div></div>
+    <div class="kpi kw"><div class="kl">Expiring ≤ 90 days</div><div class="kv" style="color:var(--W)">3,841</div><div class="ks">Critical ≤7d: <span style="color:var(--R)">142</span></div></div>
+  </div>
+  <div class="g4" style="margin-bottom:16px">
+    <div class="kpi kok"><div class="kl">Processed Today</div><div class="kv">42,871</div><div class="ks">Avg cycle: <span style="color:var(--G)">3.8s</span></div></div>
+    <div class="kpi kp"><div class="kl">Pending Approvals</div><div class="kv">834</div><div class="ks"><span class="kd">18 escalated</span></div></div>
+    <div class="kpi kb"><div class="kl">Active Workflows</div><div class="kv">1,247</div><div class="ks">6 stuck · 3 escalated</div></div>
+    <div class="kpi kg"><div class="kl">Legal Holds Active</div><div class="kv">23</div><div class="ks">14 CBE · 6 litigation</div></div>
+  </div>
+  <div class="g3" style="margin-bottom:14px">
+    <div class="card" style="grid-column:span 2"><div class="chd">Document Inflow — All Branches (30 days)<span class="tag tb">Daily Volume</span></div><div style="height:155px"><canvas id="inflowC"></canvas></div></div>
+    <div class="card"><div class="chd">Doc Type Distribution<span class="tag tgold">MTD</span></div><div style="height:155px"><canvas id="donutC"></canvas></div></div>
+  </div>
+  <div class="g3">
+    <div class="aip">
+      <div class="aihd"><div class="aidot"></div>AI Insight Engine · 12 findings</div>
+      <div class="aii r"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--R)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg><div><div class="ait">42 KYC documents expired — Cairo West · CBE compliance breach risk</div><div class="aim">CRITICAL · 8 min ago · Auto-escalated to CDO</div></div></div>
+      <div class="aii" style="border-left-color:var(--W)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--W)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg><div><div class="ait">20 passports: name mismatch vs CBS records — possible fraud pattern</div><div class="aim">HIGH RISK · Confidence 91% · Giza branch cluster</div></div></div>
+      <div class="aii b"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--B)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><div><div class="ait">342 passports queued for AI batch processing — ETA 4 min</div><div class="aim">OCR Queue · Auto-classification ready</div></div></div>
+      <div class="aii g"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--G)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg><div><div class="ait">Loan batch #L-2024-0892 — 87 docs indexed · zero exceptions</div><div class="aim">Maker-checker workflow auto-triggered</div></div></div>
+      <div class="aii p"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--P)" stroke-width="2" style="flex-shrink:0;margin-top:2px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><div><div class="ait">2,104 documents eligible for auto-disposal — awaiting legal hold check</div><div class="aim">Records Management · Scheduled 03:00 AM</div></div></div>
+      <div style="margin-top:10px;display:flex;gap:6px"><button class="btn bg sm" style="flex:1">Review All (12)</button><button class="btn bs sm">Dismiss Read</button></div>
+    </div>
+    <div class="card">
+      <div class="chd">Branch Activity Heatmap <span class="tag tgold">Today</span></div>
+      <div style="font-size:10px;color:var(--sil);margin-bottom:8px">Document volume · Each cell = 1 branch-hour</div>
+      <div style="display:grid;grid-template-columns:repeat(14,1fr);gap:3px;margin-bottom:8px" id="heatmap"></div>
+      <div style="display:flex;gap:5px;align-items:center;font-size:10px;color:var(--sil);margin-bottom:10px">
+        <div style="width:8px;height:8px;border-radius:2px;background:rgba(184,145,42,.15)"></div><span>Low</span>
+        <div style="width:8px;height:8px;border-radius:2px;background:rgba(184,145,42,.5)"></div><span>Med</span>
+        <div style="width:8px;height:8px;border-radius:2px;background:var(--gold3)"></div><span>Peak</span>
+      </div>
+      <hr style="margin:10px 0"/>
+      <div style="font-size:11px;font-weight:600;color:var(--mist);margin-bottom:8px">Top Branches by Volume</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="width:100px;color:var(--sil)">Cairo West HQ</span><div style="flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px"><div style="height:100%;width:92%;background:var(--gold2);border-radius:2px"></div></div><span style="color:var(--gold3)">12,841</span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="width:100px;color:var(--sil)">Alexandria HQ</span><div style="flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px"><div style="height:100%;width:74%;background:var(--B);border-radius:2px"></div></div><span style="color:var(--B)">9,220</span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="width:100px;color:var(--sil)">Giza Central</span><div style="flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px"><div style="height:100%;width:61%;background:var(--G);border-radius:2px"></div></div><span style="color:var(--G)">7,614</span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="width:100px;color:var(--sil)">Heliopolis</span><div style="flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px"><div style="height:100%;width:42%;background:var(--P);border-radius:2px"></div></div><span style="color:var(--P)">5,104</span></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px"><span style="width:100px;color:var(--sil)">Assiut</span><div style="flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px"><div style="height:100%;width:31%;background:var(--W);border-radius:2px"></div></div><span style="color:var(--W)">3,921</span></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card"><div class="chd">SLA Compliance <span class="tag tg">96.2%</span></div><div style="height:90px"><canvas id="slaC"></canvas></div></div>
+      <div class="card">
+        <div class="chd" style="margin-bottom:10px">Quick Actions</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+          <button class="btn bg" style="justify-content:center;padding:10px" onclick="go('capture')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Scan Doc</button>
+          <button class="btn bs" style="justify-content:center;padding:10px" onclick="go('cases')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>New Case</button>
+          <button class="btn bs" style="justify-content:center;padding:10px" onclick="go('search')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>Search</button>
+          <button class="btn bs" style="justify-content:center;padding:10px" onclick="go('compliance')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Compliance</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 2. BRANCH NETWORK ═══ -->
+<div id="s-branches" class="scr">
+  <div class="ph"><div><h2>Branch Network</h2><p>84 branches · 6 regions · Multi-branch governance, access control &amp; replication</p></div>
+  <div class="phr"><button class="btn bs sm">Network Report</button><button class="btn bg sm">+ Add Branch</button></div></div>
+  <div class="g4" style="margin-bottom:16px">
+    <div class="kpi kok"><div class="kl">Active Branches</div><div class="kv">84</div><div class="ks">6 regions nationwide</div></div>
+    <div class="kpi kb"><div class="kl">Cross-Branch Docs Today</div><div class="kv">4,821</div><div class="ks">Shared access transactions</div></div>
+    <div class="kpi kr"><div class="kl">Branches with Issues</div><div class="kv">3</div><div class="ks">2 expired KYC · 1 sync lag</div></div>
+    <div class="kpi kg"><div class="kl">Avg Replication Latency</div><div class="kv">180ms</div><div class="ks">Cross-branch sync</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px">
+    <div class="brc sel"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div class="bst bon"></div><span style="font-size:13px;font-weight:700;color:var(--gold3)">Cairo West HQ</span><span class="tag tgold" style="margin-left:auto">HQ</span></div><div style="font-size:10px;color:var(--sil);margin-bottom:8px">Tahrir Square · Branch #001</div><div style="font-size:11px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Documents</span><span>1,241,820</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Today ingest</span><span style="color:var(--G)">12,841</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Pending index</span><span style="color:var(--W)">124</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Workflows</span><span>287</span></div></div></div>
+    <div class="brc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div class="bst bon"></div><span style="font-size:13px;font-weight:700;color:var(--mist)">Alexandria HQ</span></div><div style="font-size:10px;color:var(--sil);margin-bottom:8px">Corniche · Branch #002</div><div style="font-size:11px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Documents</span><span>987,441</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Today ingest</span><span style="color:var(--G)">9,220</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Pending index</span><span style="color:var(--G)">38</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Workflows</span><span>214</span></div></div></div>
+    <div class="brc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div class="bst bwn"></div><span style="font-size:13px;font-weight:700;color:var(--mist)">Giza Central</span><span class="tag tw" style="margin-left:auto">⚠ Alert</span></div><div style="font-size:10px;color:var(--sil);margin-bottom:8px">6 October City · Branch #003</div><div style="font-size:11px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Documents</span><span>801,293</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Today ingest</span><span style="color:var(--G)">7,614</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Pending index</span><span style="color:var(--R)">341</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Compliance issues</span><span style="color:var(--R)">8</span></div></div></div>
+    <div class="brc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div class="bst bon"></div><span style="font-size:13px;font-weight:700;color:var(--mist)">Heliopolis</span></div><div style="font-size:10px;color:var(--sil);margin-bottom:8px">Heliopolis, Cairo · Branch #005</div><div style="font-size:11px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Documents</span><span>524,812</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Today ingest</span><span style="color:var(--G)">5,104</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Pending index</span><span style="color:var(--G)">12</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Workflows</span><span>98</span></div></div></div>
+    <div class="brc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div class="bst bon"></div><span style="font-size:13px;font-weight:700;color:var(--mist)">Assiut</span></div><div style="font-size:10px;color:var(--sil);margin-bottom:8px">Assiut Governorate · Branch #022</div><div style="font-size:11px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Documents</span><span>380,442</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Today ingest</span><span style="color:var(--G)">3,921</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Pending index</span><span style="color:var(--G)">22</span></div></div></div>
+    <div class="brc"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div class="bst boff"></div><span style="font-size:13px;font-weight:700;color:var(--mist)">Luxor</span><span class="tag tr" style="margin-left:auto">Sync Lag</span></div><div style="font-size:10px;color:var(--sil);margin-bottom:8px">Luxor Governorate · Branch #031</div><div style="font-size:11px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Last sync</span><span style="color:var(--R)">41 min ago</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Unsynced</span><span style="color:var(--R)">847 docs</span></div></div></div>
+    <div class="brc" style="border-style:dashed;display:flex;align-items:center;justify-content:center;min-height:140px;cursor:pointer"><div style="text-align:center;color:var(--sil)"><div style="font-size:24px">+</div><div style="font-size:11px">Add Branch</div></div></div>
+  </div>
+  <div class="card"><div class="chd">Cross-Branch Access &amp; Replication Policy</div>
+  <table><thead><tr><th>Branch</th><th>Read Access</th><th>Write Access</th><th>Replication Mode</th><th>Latency</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td><div style="display:flex;align-items:center;gap:6px"><div class="bst bon"></div>Cairo West HQ</div></td><td>All Branches</td><td>All Branches</td><td><span class="tag tg">Active-Active</span></td><td style="color:var(--G)">12ms</td><td><span class="tag tg">Online</span></td></tr>
+    <tr><td><div style="display:flex;align-items:center;gap:6px"><div class="bst bon"></div>Alexandria HQ</div></td><td>All Branches</td><td>Own + Cairo HQ</td><td><span class="tag tb">Active-Passive</span></td><td style="color:var(--G)">38ms</td><td><span class="tag tg">Online</span></td></tr>
+    <tr><td><div style="display:flex;align-items:center;gap:6px"><div class="bst bwn"></div>Giza Central</div></td><td>Own Region</td><td>Own Branch</td><td><span class="tag tb">Active-Passive</span></td><td style="color:var(--W)">182ms</td><td><span class="tag tw">Degraded</span></td></tr>
+    <tr><td><div style="display:flex;align-items:center;gap:6px"><div class="bst boff"></div>Luxor</div></td><td>Own Branch</td><td>Own Branch</td><td><span class="tag tr">Paused</span></td><td style="color:var(--R)">Timeout</td><td><span class="tag tr">Offline</span></td></tr>
+  </tbody></table></div>
+</div>
+
+<!-- ═══ 3. CUSTOMER 360 ═══ -->
+<div id="s-customer360" class="scr">
+  <div class="ph"><div><h2>Customer 360°</h2><p>Complete document portfolio · CID-centric view · KYC compliance status</p></div>
+  <div class="phr"><input type="text" style="width:260px;font-size:12px" placeholder="Search CID, name, account…"/><button class="btn bg sm">Find</button></div></div>
+  <div class="g21">
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--ink4),var(--gold));display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:700;flex-shrink:0">AH</div>
+          <div style="flex:1"><div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:var(--gold3)">Ahmed Hassan Ibrahim</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap"><span class="mono" style="font-size:10px;color:var(--sil)">CID: EGY-2024-00847291</span><span class="tag tb" style="font-size:10px">Cairo West Branch</span><span class="tag tg">KYC Verified</span><span class="tag tgold">Private Banking</span></div></div>
+          <div style="text-align:right"><div style="font-size:10px;color:var(--sil)">Last activity</div><div style="font-size:12px">Today, 09:14</div><button class="btn bg xs" style="margin-top:6px">Full Profile</button></div>
+        </div>
+        <hr/>
+        <div class="g4">
+          <div style="text-align:center"><div style="font-size:10px;color:var(--sil);margin-bottom:2px">DOB</div><div style="font-size:12px">14 Apr 1986</div></div>
+          <div style="text-align:center"><div style="font-size:10px;color:var(--sil);margin-bottom:2px">Accounts</div><div style="font-size:12px">4 Active</div></div>
+          <div style="text-align:center"><div style="font-size:10px;color:var(--sil);margin-bottom:2px">Customer Since</div><div style="font-size:12px">Jan 2008</div></div>
+          <div style="text-align:center"><div style="font-size:10px;color:var(--sil);margin-bottom:2px">Risk Rating</div><div style="font-size:12px;color:var(--G)">Low</div></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="chd">KYC Compliance Status · CBE Requirements</div>
+        <div class="sr"><span>Passport (Primary ID)</span><span style="display:flex;gap:6px;align-items:center"><span class="tag tg">Valid · Exp Jan 2032</span><button class="btn bs xs" onclick="go('viewer')">View</button></span></div>
+        <div class="sr"><span>National ID</span><span style="display:flex;gap:6px;align-items:center"><span class="tag tg">Valid · Exp Mar 2028</span><button class="btn bs xs" onclick="go('viewer')">View</button></span></div>
+        <div class="sr"><span>Utility Bill (≤3 months)</span><span style="display:flex;gap:6px;align-items:center"><span class="tag tw">Expiring · Mar 2024</span><button class="btn bw xs">Update</button></span></div>
+        <div class="sr"><span>Income Proof / Tax Return</span><span style="display:flex;gap:6px;align-items:center"><span class="tag tg">On file · 2023</span><button class="btn bs xs" onclick="go('viewer')">View</button></span></div>
+        <div class="sr"><span>AML Screening Declaration</span><span class="tag tg">Cleared · 14 Jan 2024</span></div>
+        <div class="sr"><span>FATCA / CRS Declaration</span><span style="display:flex;gap:6px;align-items:center"><span class="tag tr">Missing</span><button class="btn bx xs">Request</button></span></div>
+      </div>
+      <div class="card">
+        <div class="chd">Document Portfolio <span class="tag tb">34 Documents</span></div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px">
+          <div onclick="go('viewer')" style="background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:10px;cursor:pointer;text-align:center;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'"><div style="font-size:18px;margin-bottom:4px">🛂</div><div style="font-size:10px;font-weight:600;color:var(--mist)">Passport</div><span class="tag tg" style="font-size:9px">Valid</span></div>
+          <div onclick="go('viewer')" style="background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:10px;cursor:pointer;text-align:center;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'"><div style="font-size:18px;margin-bottom:4px">🪪</div><div style="font-size:10px;font-weight:600;color:var(--mist)">Nat. ID</div><span class="tag tg" style="font-size:9px">Valid</span></div>
+          <div onclick="go('viewer')" style="background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:10px;cursor:pointer;text-align:center;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'"><div style="font-size:18px;margin-bottom:4px">💡</div><div style="font-size:10px;font-weight:600;color:var(--mist)">Utility Bill</div><span class="tag tw" style="font-size:9px">Expiring</span></div>
+          <div onclick="go('viewer')" style="background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:10px;cursor:pointer;text-align:center;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'"><div style="font-size:18px;margin-bottom:4px">🏦</div><div style="font-size:10px;font-weight:600;color:var(--mist)">Loan Agr.</div><span class="tag tb" style="font-size:9px">Active</span></div>
+          <div onclick="go('viewer')" style="background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:10px;cursor:pointer;text-align:center;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'"><div style="font-size:18px;margin-bottom:4px">📊</div><div style="font-size:10px;font-weight:600;color:var(--mist)">Tax Ret.</div><span class="tag tg" style="font-size:9px">2023</span></div>
+          <div onclick="go('viewer')" style="background:var(--gr);border:1px solid var(--bd);border-radius:7px;padding:10px;cursor:pointer;text-align:center;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'"><div style="font-size:18px;margin-bottom:4px">🏠</div><div style="font-size:10px;font-weight:600;color:var(--mist)">Mortgage</div><span class="tag tg" style="font-size:9px">Reg.</span></div>
+          <div style="background:var(--gr);border:1px dashed var(--bd);border-radius:7px;padding:10px;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center"><div style="color:var(--sil)"><div style="font-size:16px">+28</div><div style="font-size:10px">more</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card"><div class="chd">Activity Timeline</div>
+        <div class="tl">
+          <div class="tli"><div class="tld act"></div><div class="tlt">Utility Bill — Expiry Warning Sent</div><div class="tls">SMS + Email · Today 09:14 · Auto-generated</div></div>
+          <div class="tli"><div class="tld done"></div><div class="tlt">FATCA Declaration — Request Sent</div><div class="tls">Email · 12 Apr 2024 · Awaiting response</div></div>
+          <div class="tli"><div class="tld done"></div><div class="tlt">Passport — Re-scanned &amp; Re-indexed (v2.0)</div><div class="tls">Omar K. · Cairo West · 10 Jan 2024</div></div>
+          <div class="tli"><div class="tld done"></div><div class="tlt">Loan Agreement — Digitally Signed &amp; Archived</div><div class="tls">e-Signature · eIDAS verified · 15 Nov 2023</div></div>
+          <div class="tli"><div class="tld done"></div><div class="tlt">KYC Annual Review — Completed &amp; Cleared</div><div class="tls">AML cleared · CBE compliant · 02 Jan 2024</div></div>
+          <div class="tli"><div class="tld done"></div><div class="tlt">Customer Onboarded — Initial KYC Archived</div><div class="tls">Cairo West · January 2008</div></div>
+        </div>
+      </div>
+      <div class="card"><div class="chd">KYC Completeness</div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="position:relative;width:68px;height:68px;flex-shrink:0">
+            <svg width="68" height="68" viewBox="0 0 68 68"><circle cx="34" cy="34" r="26" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="6"/><circle cx="34" cy="34" r="26" fill="none" stroke="var(--gold2)" stroke-width="6" stroke-dasharray="138 163" stroke-linecap="round" transform="rotate(-90 34 34)"/></svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:14px;font-weight:700;color:var(--gold3)">85%</div>
+          </div>
+          <div><div style="font-size:12px;font-weight:600;color:var(--mist);margin-bottom:5px">85% Complete · 1 Missing</div><div style="font-size:11px;color:var(--sil);line-height:1.6">FATCA/CRS declaration outstanding. Customer notified via SMS &amp; email. Auto-escalation to RM in 48h if unresolved.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 4. CAPTURE ═══ -->
+<div id="s-capture" class="scr">
+  <div class="ph"><div><h2>Multi-Channel Capture</h2><p>WIA · TWAIN · Email Ingestion · API Push · Customer Portal · Bulk Import</p></div></div>
+  <div class="tabs"><button class="tab on">📷 Scanner (WIA/TWAIN)</button><button class="tab">📁 File Upload</button><button class="tab">📧 Email Ingestion</button><button class="tab">🌐 Customer Portal</button><button class="tab">⚡ API Push</button><button class="tab">📦 Bulk Import</button></div>
+  <div class="g2">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="chd">Scanner Configuration</div>
+        <div class="g2">
+          <div class="field"><label>Scanner Device</label><select><option>FUJITSU fi-8170 (WIA)</option><option>Canon DR-G2110 (TWAIN)</option><option>Kodak S3100 (ISIS)</option></select></div>
+          <div class="field"><label>Protocol</label><select><option>WIA 2.0</option><option>TWAIN 2.4</option><option>ISIS</option></select></div>
+        </div>
+        <div class="g2">
+          <div class="field"><label>Resolution</label><select><option>150 DPI</option><option>200 DPI</option><option selected>300 DPI</option><option>600 DPI</option></select></div>
+          <div class="field"><label>Color Profile</label><select><option selected>Color (24-bit)</option><option>Greyscale (8-bit)</option><option>B&W (1-bit)</option><option>Auto</option></select></div>
+        </div>
+        <div class="g2">
+          <div class="field"><label>Paper Size</label><select><option>A4</option><option>A3</option><option selected>Auto-detect</option></select></div>
+          <div class="field"><label>Duplex</label><select><option selected>Simplex</option><option>Duplex (Both)</option></select></div>
+        </div>
+        <div class="g2">
+          <div class="field"><label>Enhancement</label><select><option selected>Auto-deskew + Despeckle</option><option>Off</option></select></div>
+          <div class="field"><label>Blank Pages</label><select><option selected>Auto-remove</option><option>Keep all</option></select></div>
+        </div>
+        <div class="field"><label>Batch Label / Reference</label><input type="text" placeholder="KYC-CAIRO-WEST-20260414-001"/></div>
+        <div class="field"><label>Destination Folder</label><select><option>KYC Documents / Passports</option><option>KYC Documents / National IDs</option><option>Loan Applications</option><option>Compliance</option></select></div>
+        <div style="display:flex;gap:8px;margin-top:4px"><button class="btn bg" style="flex:1">▶ Start Scan</button><button class="btn bs">Test Scanner</button><button class="btn bs">Calibrate</button></div>
+      </div>
+      <div style="border:2px dashed rgba(184,145,42,.3);border-radius:10px;padding:36px 20px;text-align:center;cursor:pointer;transition:.2s;background:rgba(184,145,42,.02)" onmouseover="this.style.borderColor='var(--gold2)'" onmouseout="this.style.borderColor='rgba(184,145,42,.3)'">
+        <div style="color:var(--gold);margin:0 auto 12px;opacity:.7"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+        <div style="font-size:14px;font-weight:600;color:var(--mist);margin-bottom:5px">Drop files or click to upload</div>
+        <div style="font-size:11px;color:var(--sil)">PDF, TIFF, JPEG, PNG, DOCX · Max 100MB · Batch supported</div>
+      </div>
+      <div class="card">
+        <div class="chd">Today's Ingestion by Channel</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+          <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--sil)">Branch Scanners</span><span>24,841 docs</span></div><div class="bw2"><div class="bf bf-g" style="width:82%"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--sil)">Customer Portal Upload</span><span>10,247 docs</span></div><div class="bw2"><div class="bf bf-b" style="width:54%"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--sil)">Email Ingestion (SMTP)</span><span>4,921 docs</span></div><div class="bw2"><div class="bf bf-ok" style="width:26%"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--sil)">API Push (CBS/LOS)</span><span>2,862 docs</span></div><div class="bw2"><div class="bf bf-r" style="width:15%"></div></div></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="chd">Capture Queue <span class="tag tgold">5 items</span></div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--gr);border-radius:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--R)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><div style="flex:1"><div style="font-size:12px;color:var(--mist)">Passport_Scan_001.pdf</div><div style="font-size:10px;color:var(--sil)">300 DPI · 2.1 MB · Auto-class: Passport (98%)</div></div><span class="tag tg">Ready</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--gr);border-radius:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--R)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><div style="flex:1"><div style="font-size:12px;color:var(--mist)">NatID_Scan_002.jpg</div><div style="font-size:10px;color:var(--sil)">300 DPI · 1.8 MB · Auto-class: National ID (96%)</div></div><span class="tag tg">Ready</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--gr);border-radius:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--W)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><div style="flex:1"><div style="font-size:12px;color:var(--mist)">Utility_Bill_003.pdf</div><div style="font-size:10px;color:var(--sil)">Low quality · Deskew applied · Review recommended</div></div><span class="tag tw">Review</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--gr);border-radius:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--B)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg><div style="flex:1"><div style="font-size:12px;color:var(--mist)">LoanApp_Batch_004.pdf</div><div style="font-size:10px;color:var(--sil)">12 pages · 8.4 MB · Queued for AI extraction</div></div><span class="tag tb">Queued</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--gr);border-radius:7px"><div style="width:14px;height:14px;border:2px solid var(--gold);border-radius:50%;border-top-color:transparent;animation:spin .8s linear infinite;flex-shrink:0"></div><div style="flex:1"><div style="font-size:12px;color:var(--mist)">Contract_005.docx</div><div style="font-size:10px;color:var(--sil)">Converting to PDF/A · AI classification running…</div></div><span class="tag tgold">Processing</span></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn bg" style="flex:1" onclick="go('indexing')">Submit All to Indexing</button><button class="btn bs">Clear Queue</button></div>
+      </div>
+      <div class="card">
+        <div class="chd">Email Ingestion Configuration</div>
+        <div class="field"><label>Monitored Mailbox</label><input type="text" value="dms-ingest@nbe.com.eg"/></div>
+        <div class="g2">
+          <div class="field"><label>Protocol</label><select><option selected>IMAP / SSL</option><option>POP3</option><option>Microsoft Graph API</option></select></div>
+          <div class="field"><label>Check Interval</label><select><option>1 min</option><option selected>5 min</option><option>15 min</option></select></div>
+        </div>
+        <div class="field"><label>Auto-Classification</label><select><option selected>AI-powered · Route by attachment type</option><option>Manual review all</option></select></div>
+        <div style="display:flex;gap:8px;margin-top:4px"><button class="btn bg btn-sm">Save &amp; Test</button><button class="btn bs btn-sm">Test Connection</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 5. INDEXING ═══ -->
+<div id="s-indexing" class="scr">
+  <div class="ph"><div><h2>Indexing &amp; QA</h2><p>AI-assisted metadata extraction · Dynamic forms · CID binding · QA checklist</p></div>
+  <div class="phr"><span class="tag tr">18 pending</span><button class="btn bg sm">Auto-Index All (AI)</button></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="chd">Document Viewer <div style="display:flex;gap:5px"><button class="btn bs xs">◀ Prev</button><span style="color:var(--sil);font-size:11px;align-self:center">3/18</span><button class="btn bs xs">Next ▶</button></div></div>
+        <div style="background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1);border-radius:8px;padding:24px;min-height:280px;display:flex;align-items:center;justify-content:center">
+          <div style="background:rgba(255,255,255,.05);border-radius:5px;padding:16px;max-width:240px;width:100%">
+            <div style="font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);margin-bottom:10px">ARAB REPUBLIC OF EGYPT · PASSPORT</div>
+            <div style="display:flex;gap:10px">
+              <div style="width:46px;height:60px;background:rgba(184,145,42,.1);border-radius:4px;border:1px dashed rgba(184,145,42,.3);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px"><div style="height:7px;background:rgba(255,255,255,.15);border-radius:2px;width:90%"></div><div style="height:7px;background:rgba(255,255,255,.1);border-radius:2px;width:70%"></div><div style="height:7px;background:rgba(255,255,255,.1);border-radius:2px;width:80%"></div></div>
+            </div>
+            <div style="margin-top:10px;font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--sil);background:rgba(0,0,0,.25);padding:6px;border-radius:3px;letter-spacing:1px">P&lt;EGYAHMED&lt;HASSAN&lt;&lt;<br/>A12345678&lt;EGY860414</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chd">QA Checklist</div>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:12px">
+          <label style="display:flex;align-items:center;gap:8px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>Image quality acceptable (≥200 DPI)</label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>All fields legible</label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>Document not expired</label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>MRZ / barcode verified</label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--mist);cursor:pointer"><input type="checkbox" style="width:auto;accent-color:var(--gold)"/>Security features visible</label>
+          <label style="display:flex;align-items:center;gap:8px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>Name matches CBS record</label>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="chd">Metadata Form — Passport <span class="tag tgold">AI-assisted · 97.4% filled</span></div>
+      <div class="g2">
+        <div class="field"><label>Document Type *</label><select><option selected>Passport</option><option>National ID</option><option>Driving Licence</option><option>Utility Bill</option><option>Loan Agreement</option></select></div>
+        <div class="field"><label>Customer CID *</label><input type="text" value="EGY-2024-00847291"/></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Full Name (as printed) *</label><input type="text" value="Ahmed Hassan Ibrahim"/></div>
+        <div class="field"><label>Date of Birth *</label><input type="date" value="1986-04-14"/></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Document Number *</label><input type="text" value="A12345678"/></div>
+        <div class="field"><label>Nationality</label><input type="text" value="Egyptian"/></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Issue Date *</label><input type="date" value="2022-01-10"/></div>
+        <div class="field"><label>Expiry Date *</label><input type="date" value="2032-01-09"/></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Issuing Authority</label><input type="text" value="Egyptian Ministry of Interior"/></div>
+        <div class="field"><label>Branch / Source</label><select><option selected>Cairo West HQ (#001)</option><option>Alexandria HQ (#002)</option></select></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Document Classification</label><select><option selected>KYC — Primary Identity</option><option>KYC — Address Proof</option><option>Loan Documentation</option><option>Compliance</option></select></div>
+        <div class="field"><label>Retention Policy</label><select><option selected>10 Years (KYC)</option><option>7 Years (CBE)</option><option>5 Years (Standard)</option></select></div>
+      </div>
+      <div class="field">
+        <label>AI Extracted Data Validation</label>
+        <div style="background:rgba(184,145,42,.05);border:1px solid rgba(184,145,42,.2);border-radius:7px;padding:10px;font-size:11px;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">MRZ Line 1:</span><span class="mono">P&lt;EGYAHMED&lt;HASSAN&lt;IBRAHIM&lt;&lt;</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">MRZ Checksum:</span><span style="color:var(--G)">✓ Valid</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">CBS Name Match:</span><span style="color:var(--G)">✓ Match (100%)</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">AML Screening:</span><span style="color:var(--G)">✓ Cleared (World-Check)</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Fraud Score:</span><span style="color:var(--G)">Low (0.02)</span></div>
+        </div>
+      </div>
+      <div class="field"><label>Indexer Notes</label><textarea rows="2" placeholder="Optional remarks for checker…"></textarea></div>
+      <hr/>
+      <div style="display:flex;gap:8px"><button class="btn bg" style="flex:1" onclick="go('workflow')">Save &amp; Send to Workflow</button><button class="btn bok">Approve &amp; Archive</button><button class="btn bx">Reject</button><button class="btn bs">Hold</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 6. AI ENGINE ═══ -->
+<div id="s-ai" class="scr">
+  <div class="ph"><div><h2>AI Processing Engine</h2><p>IBM Watsonx NLP · ABBYY OCR · Auto-classification · Extraction · Anomaly detection</p></div>
+  <div class="phr"><span class="tag tgold">Watsonx v3.4</span><span class="tag tg">97.4% Accuracy</span></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kb"><div class="kl">Queue Size</div><div class="kv">342</div><div class="ks">Est. 4 min to clear</div></div>
+    <div class="kpi kok"><div class="kl">Processed Today</div><div class="kv">42,871</div><div class="ks">Avg 3.8s per doc</div></div>
+    <div class="kpi kg"><div class="kl">Avg Confidence</div><div class="kv">97.4%</div><div class="ks">Threshold: 90%</div></div>
+    <div class="kpi kr"><div class="kl">Manual Review</div><div class="kv">7</div><div class="ks">Confidence &lt; 80%</div></div>
+  </div>
+  <div class="g2">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="chd">Document · AI Extraction Overlay <span class="tag tb">Passport · MRZ Detected</span></div>
+        <div style="background:rgba(255,255,255,.03);border-radius:8px;border:1px solid var(--bd);padding:20px">
+          <div style="font-size:8px;color:var(--gold);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">ARAB REPUBLIC OF EGYPT · PASSPORT</div>
+          <div style="display:flex;gap:12px;margin-bottom:12px">
+            <div style="width:56px;height:76px;background:rgba(184,145,42,.08);border:2px solid rgba(46,204,138,.4);border-radius:4px;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+            <div style="flex:1">
+              <div style="margin-bottom:5px"><div style="font-size:9px;color:var(--sil);margin-bottom:2px">SURNAME / GIVEN NAMES</div><div style="background:rgba(184,145,42,.15);border:1px solid rgba(184,145,42,.3);border-radius:3px;padding:3px 8px;font-size:12px">IBRAHIM / AHMED HASSAN</div></div>
+              <div class="g2" style="gap:6px">
+                <div><div style="font-size:9px;color:var(--sil);margin-bottom:2px">DATE OF BIRTH</div><div style="background:var(--BT);border:1px solid rgba(58,159,208,.25);border-radius:3px;padding:3px 7px;font-size:11px">14 APR 1986</div></div>
+                <div><div style="font-size:9px;color:var(--sil);margin-bottom:2px">PASSPORT NO.</div><div style="background:var(--GT);border:1px solid rgba(46,204,138,.25);border-radius:3px;padding:3px 7px;font-size:11px">A12345678</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="g2" style="gap:6px;margin-bottom:10px">
+            <div><div style="font-size:9px;color:var(--sil);margin-bottom:2px">EXPIRY DATE</div><div style="background:var(--GT);border:1px solid rgba(46,204,138,.25);border-radius:3px;padding:3px 7px;font-size:11px">09 JAN 2032</div></div>
+            <div><div style="font-size:9px;color:var(--sil);margin-bottom:2px">NATIONALITY</div><div style="background:var(--GT);border:1px solid rgba(46,204,138,.25);border-radius:3px;padding:3px 7px;font-size:11px">EGYPTIAN</div></div>
+          </div>
+          <div style="background:rgba(0,0,0,.25);border-radius:4px;padding:7px;font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--sil);letter-spacing:1px">P&lt;EGYIBRAHIM&lt;&lt;AHMED&lt;HASSAN&lt;&lt;&lt;&lt;&lt;<br/>A12345678&lt;EGY8604145M3201095&lt;&lt;&lt;</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chd">Classification Result</div>
+        <div style="background:rgba(184,145,42,.05);border:1px solid rgba(184,145,42,.2);border-radius:8px;padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold3)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <div><div style="font-size:13px;font-weight:700;color:var(--gold3)">Egyptian Passport (Type P) · MRZ Valid</div><div style="font-size:10px;color:var(--sil);margin-top:2px">Confidence: 99.1% · No anomalies · CBS name match ✓ · AML clear ✓</div></div>
+        </div>
+        <div style="display:flex;gap:8px"><button class="btn bok" style="flex:1" onclick="go('indexing')">Accept &amp; Index</button><button class="btn bs">Edit Fields</button><button class="btn bx">Reprocess</button><button class="btn bw">Flag</button></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="chd">Extracted Fields <span class="tag tgold">97.2% Avg Confidence</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--gr);border-radius:6px"><div style="width:85px;font-size:10px;color:var(--sil)">Surname</div><div style="flex:1;font-size:12px">IBRAHIM</div><div style="font-size:10px;color:var(--G);font-weight:700;width:30px;text-align:right">99%</div><div class="bw2" style="width:50px"><div class="bf bf-ok" style="width:99%"></div></div></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--gr);border-radius:6px"><div style="width:85px;font-size:10px;color:var(--sil)">Given Names</div><div style="flex:1;font-size:12px">AHMED HASSAN</div><div style="font-size:10px;color:var(--G);font-weight:700;width:30px;text-align:right">98%</div><div class="bw2" style="width:50px"><div class="bf bf-ok" style="width:98%"></div></div></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--gr);border-radius:6px"><div style="width:85px;font-size:10px;color:var(--sil)">Date of Birth</div><div style="flex:1;font-size:12px">14 APR 1986</div><div style="font-size:10px;color:var(--G);font-weight:700;width:30px;text-align:right">99%</div><div class="bw2" style="width:50px"><div class="bf bf-ok" style="width:99%"></div></div></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--gr);border-radius:6px"><div style="width:85px;font-size:10px;color:var(--sil)">Passport No.</div><div style="flex:1;font-size:12px">A12345678</div><div style="font-size:10px;color:var(--G);font-weight:700;width:30px;text-align:right">99%</div><div class="bw2" style="width:50px"><div class="bf bf-ok" style="width:99%"></div></div></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--gr);border-radius:6px"><div style="width:85px;font-size:10px;color:var(--sil)">Expiry Date</div><div style="flex:1;font-size:12px">09 JAN 2032</div><div style="font-size:10px;color:var(--W);font-weight:700;width:30px;text-align:right">87%</div><div class="bw2" style="width:50px"><div class="bf" style="width:87%;background:var(--W)"></div></div></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--gr);border-radius:6px"><div style="width:85px;font-size:10px;color:var(--sil)">Issue Date</div><div style="flex:1;font-size:12px">10 JAN 2022</div><div style="font-size:10px;color:var(--G);font-weight:700;width:30px;text-align:right">96%</div><div class="bw2" style="width:50px"><div class="bf bf-ok" style="width:96%"></div></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chd">AI Engine Status</div>
+        <div style="font-size:12px;display:flex;flex-direction:column;gap:7px">
+          <div class="sr"><span style="color:var(--sil)">OCR Engine</span><span class="tag tgold">ABBYY FineReader v15</span></div>
+          <div class="sr"><span style="color:var(--sil)">NLP Model</span><span class="tag tgold">IBM Watsonx v3.4</span></div>
+          <div class="sr"><span style="color:var(--sil)">Classification</span><span class="tag tb">Custom CNN · 97.4% acc</span></div>
+          <div class="sr"><span style="color:var(--sil)">Confidence Threshold</span><span>90% (auto-flag below)</span></div>
+          <div class="sr"><span style="color:var(--sil)">CBS Live Matching</span><span class="tag tg">Active · Temenos T24</span></div>
+          <div class="sr"><span style="color:var(--sil)">AML Screening</span><span class="tag tg">Active · World-Check</span></div>
+          <div class="sr"><span style="color:var(--sil)">Fraud Detection</span><span class="tag tg">Active · Isolation Forest</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 7. CASES ═══ -->
+<div id="s-cases" class="scr">
+  <div class="ph"><div><h2>Case Management</h2><p>End-to-end document cases · KYC · Loan Origination · Account Opening · Compliance</p></div>
+  <div class="phr"><button class="btn bg sm">+ New Case</button><button class="btn bs sm">Import Case</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kb"><div class="kl">Active Cases</div><div class="kv">1,247</div></div>
+    <div class="kpi kok"><div class="kl">Closed This Month</div><div class="kv">4,821</div></div>
+    <div class="kpi kr"><div class="kl">Overdue Cases</div><div class="kv">18</div></div>
+    <div class="kpi kw"><div class="kl">Avg Resolution</div><div class="kv">2.4d</div></div>
+  </div>
+  <div class="tabs"><button class="tab on">All Cases</button><button class="tab">KYC Onboarding</button><button class="tab">Loan Applications</button><button class="tab">Account Opening</button><button class="tab">AML/Compliance</button></div>
+  <div class="g2">
+    <!-- Case cards column -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="background:var(--ink3);border:1px solid var(--bd);border-radius:8px;padding:14px;cursor:pointer;transition:.15s;border-left:3px solid var(--gold2)" onmouseover="this.style.borderColor='rgba(184,145,42,.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px"><div><span class="mono" style="font-size:10px;color:var(--sil)">KYC-2024-04829</span><div style="font-size:13px;font-weight:700;color:var(--mist);margin-top:2px">Ahmed Hassan Ibrahim</div></div><span class="tag tw">In Progress</span></div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:8px">KYC Annual Review · Cairo West · 6 documents</div>
+        <div class="flow" style="padding:6px 0">
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Capture</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">AI Index</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fa">●</div><div class="fn-lb">Maker</div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">4</div><div class="fn-lb">Checker</div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">5</div><div class="fn-lb">Archive</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--sil);margin-top:6px"><span>Assigned: Omar K.</span><span>Due: 16 Apr 2024</span></div>
+      </div>
+      <div style="background:var(--ink3);border:1px solid var(--bd);border-radius:8px;padding:14px;cursor:pointer;transition:.15s;border-left:3px solid var(--B)" onmouseover="this.style.borderColor='rgba(58,159,208,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px"><div><span class="mono" style="font-size:10px;color:var(--sil)">LOAN-2024-00341</span><div style="font-size:13px;font-weight:700;color:var(--mist);margin-top:2px">Mohamed Farouk Aly</div></div><span class="tag tb">Manager Review</span></div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:8px">Mortgage Application · Giza Branch · 14 documents</div>
+        <div class="flow" style="padding:6px 0">
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Apply</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Doc Verify</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">AI Score</div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fa">●</div><div class="fn-lb">Manager</div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">5</div><div class="fn-lb">Legal</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--sil);margin-top:6px"><span>Assigned: Sara M.</span><span>Due: 20 Apr 2024</span></div>
+      </div>
+      <div style="background:var(--ink3);border:1px solid var(--bd);border-radius:8px;padding:14px;cursor:pointer;transition:.15s;border-left:3px solid var(--R)" onmouseover="this.style.borderColor='rgba(224,82,82,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px"><div><span class="mono" style="font-size:10px;color:var(--sil)">COMP-2024-00022</span><div style="font-size:13px;font-weight:700;color:var(--mist);margin-top:2px">Nour Khaled Rashid</div></div><span class="tag tr">Overdue 3 days</span></div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:8px">AML Compliance Review · Alexandria · 3 documents</div>
+        <div class="flow" style="padding:6px 0">
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Flag</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fa">●</div><div class="fn-lb">AML Review</div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">3</div><div class="fn-lb">Legal</div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">4</div><div class="fn-lb">Compliance</div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">5</div><div class="fn-lb">Close</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:6px"><span style="color:var(--sil)">Legal Dept.</span><span style="color:var(--R)">Overdue — escalated</span></div>
+      </div>
+      <div style="background:var(--ink3);border:1px solid var(--bd);border-radius:8px;padding:14px;cursor:pointer;transition:.15s;border-left:3px solid var(--G)" onmouseover="this.style.borderColor='rgba(46,204,138,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px"><div><span class="mono" style="font-size:10px;color:var(--sil)">ACC-2024-01192</span><div style="font-size:13px;font-weight:700;color:var(--mist);margin-top:2px">Hana Sami Abdel-Aziz</div></div><span class="tag tg">Approved</span></div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:8px">New Account Opening · Heliopolis · 5 documents</div>
+        <div class="flow" style="padding:6px 0">
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Apply</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">KYC</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Maker</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Approve</div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Archive</div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:6px"><span style="color:var(--sil)">Completed: 12 Apr 2024</span><span style="color:var(--G)">SLA: Met (1.2d)</span></div>
+      </div>
+    </div>
+    <!-- Case detail panel -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="chd">KYC-2024-04829 · Current Stage: Maker Review</div>
+        <div class="flow" style="padding:10px 0">
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Capture<br/><span style="color:var(--G);font-size:9px">Done</span></div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">AI Index<br/><span style="color:var(--G);font-size:9px">Auto</span></div></div><div class="fc fcd"></div>
+          <div class="fn"><div class="fn-nd fa">●</div><div class="fn-lb">Maker<br/><span style="color:var(--gold2);font-size:9px">Active</span></div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">4</div><div class="fn-lb">Checker<br/><span style="color:var(--sil);font-size:9px">Pending</span></div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">5</div><div class="fn-lb">Mgr Sign<br/><span style="color:var(--sil);font-size:9px">Pending</span></div></div><div class="fc fcp"></div>
+          <div class="fn"><div class="fn-nd fp">6</div><div class="fn-lb">Archive<br/><span style="color:var(--sil);font-size:9px">Pending</span></div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px"><button class="btn bok" style="flex:1">✓ Approve &amp; Forward</button><button class="btn bx">✗ Reject</button><button class="btn bw">⇧ Escalate</button><button class="btn bs">Hold</button></div>
+      </div>
+      <div class="card">
+        <div class="chd">Case Documents</div>
+        <table>
+          <thead><tr><th>Document</th><th>Type</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>Passport_AHI_2022.pdf</td><td><span class="tag tgold">Passport</span></td><td><span class="tag tg">Indexed</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+            <tr><td>NatID_AHI_2023.pdf</td><td><span class="tag tb">Nat. ID</span></td><td><span class="tag tg">Indexed</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+            <tr><td>UtilityBill_Apr24.pdf</td><td><span class="tag tp">Address</span></td><td><span class="tag tw">Expiring</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+            <tr><td>TaxReturn_2023.pdf</td><td><span class="tag tg">Income</span></td><td><span class="tag tg">Verified</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+            <tr><td>AML_Declaration.pdf</td><td><span class="tag tr">AML</span></td><td><span class="tag tg">Cleared</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+            <tr><td>FATCA_CRS.pdf</td><td><span class="tag tp">FATCA</span></td><td><span class="tag tr">Missing</span></td><td><button class="btn bx xs">Request</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 8. REPOSITORY ═══ -->
+<div id="s-repository" class="scr">
+  <div class="ph"><div><h2>Document Repository</h2><p>Hierarchical cabinet structure · Version control · Full-text search · Secure archival</p></div>
+  <div class="phr"><button class="btn bs sm">New Folder</button><button class="btn bg sm">Upload Document</button></div></div>
+  <div class="g3c">
+    <div class="card" style="padding:12px">
+      <div class="chd" style="font-size:11px">Folder Structure</div>
+      <div style="font-size:12px;display:flex;flex-direction:column;gap:2px">
+        <div style="padding:7px 10px;border-radius:6px;background:var(--goldT);color:var(--gold3);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>KYC Documents<span style="margin-left:auto;font-size:10px">3.2M</span></div>
+        <div style="padding:6px 10px 6px 26px;border-radius:6px;color:var(--mist);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Passports<span style="margin-left:auto;font-size:10px;color:var(--sil)">841K</span></div>
+        <div style="padding:6px 10px 6px 26px;border-radius:6px;color:var(--sil);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>National IDs<span style="margin-left:auto;font-size:10px">1.1M</span></div>
+        <div style="padding:6px 10px 6px 26px;border-radius:6px;color:var(--sil);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Utility Bills<span style="margin-left:auto;font-size:10px">624K</span></div>
+        <div style="padding:7px 10px;border-radius:6px;color:var(--sil);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Loan Applications<span style="margin-left:auto;font-size:10px">1.8M</span></div>
+        <div style="padding:7px 10px;border-radius:6px;color:var(--sil);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Contracts &amp; Legal<span style="margin-left:auto;font-size:10px">920K</span></div>
+        <div style="padding:7px 10px;border-radius:6px;color:var(--sil);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Compliance<span style="margin-left:auto;font-size:10px">487K</span></div>
+        <div style="padding:7px 10px;border-radius:6px;color:var(--sil);cursor:pointer;display:flex;align-items:center;gap:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>🔒 Cold Archive<span style="margin-left:auto;font-size:10px;color:var(--B)">1.1M</span></div>
+      </div>
+    </div>
+    <div class="card" style="overflow:auto">
+      <div class="chd">KYC Documents — Passports (841,293 documents)
+        <div style="display:flex;gap:5px"><button class="btn bs xs">⊞ Grid</button><button class="btn bs xs">☰ List</button></div>
+      </div>
+      <table>
+        <thead><tr><th>Document Name</th><th>Customer</th><th>Branch</th><th>Expiry</th><th>Version</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--gold3);cursor:pointer" onclick="go('viewer')">Passport_AHI_2022.pdf</td><td>Ahmed H. Ibrahim</td><td>Cairo West</td><td>09 Jan 2032</td><td>v2.0</td><td><span class="tag tg">Valid</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">Passport_SMK_2021.pdf</td><td>Sara M. Kamal</td><td>Giza</td><td>15 Mar 2026</td><td>v1.0</td><td><span class="tag tw">Expiring</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer" onclick="go('viewer')">Passport_MFA_2023.jpg</td><td>Mohamed F. Aly</td><td>Alexandria</td><td>22 Jul 2033</td><td>v1.0</td><td><span class="tag tg">Valid</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">Passport_NKR_2019.pdf</td><td>Nour K. Rashid</td><td>Alexandria</td><td>02 Dec 2024</td><td>v3.1</td><td><span class="tag tr">Expired</span></td><td><button class="btn bs xs">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">Passport_HSA_2022.pdf</td><td>Hana S. Abdel</td><td>Heliopolis</td><td>18 Oct 2032</td><td>v1.0</td><td><span class="tag tg">Valid</span></td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">Passport_KMA_2023.pdf</td><td>Karim M. Aziz</td><td>Cairo West</td><td>30 Jun 2033</td><td>v1.0</td><td><span class="tag tg">Valid</span></td><td><button class="btn bs xs">View</button></td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:11px;color:var(--sil)">
+        <span>Showing 1–6 of 841,293</span>
+        <div style="display:flex;gap:5px"><button class="btn bs xs">← Prev</button><button class="btn bs xs">Next →</button></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="chd" style="font-size:11px">Document Preview</div>
+        <div style="background:var(--gr);border-radius:7px;height:160px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--bd);margin-bottom:10px"><span style="font-size:11px;color:var(--sil)">Select to preview</span></div>
+        <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Version</span><span>v2.0</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Uploaded</span><span>12 Jan 2024</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Size</span><span>1.8 MB</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Format</span><span class="mono">PDF/A-2b</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Encryption</span><span>AES-256</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Retention</span><span>10 Years</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Legal Hold</span><span style="color:var(--G)">None</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chd" style="font-size:11px">Version History</div>
+        <div style="font-size:11px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;gap:8px;align-items:center;padding:7px;background:var(--gr);border-radius:6px"><span class="tag tg">v2.0</span><div style="flex:1"><div>Re-uploaded (renewed)</div><div style="font-size:10px;color:var(--sil)">12 Jan 2024 · Omar K.</div></div><button class="btn bs xs" onclick="go('viewer')">View</button></div>
+          <div style="display:flex;gap:8px;align-items:center;padding:7px;background:var(--gr);border-radius:6px"><span class="tag tb">v1.0</span><div style="flex:1"><div style="color:var(--sil)">Original scan</div><div style="font-size:10px;color:var(--sil)">10 Jan 2022 · Omar K.</div></div><button class="btn bs xs" onclick="go('viewer')">View</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 9. RECORDS MANAGEMENT ═══ -->
+<div id="s-records" class="scr">
+  <div class="ph"><div><h2>Records Management</h2><p>Retention schedules · Legal holds · Disposal authority · CBE / Basel III / GDPR compliance</p></div>
+  <div class="phr"><button class="btn bw sm">Place Legal Hold</button><button class="btn bg sm">New Retention Rule</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kg"><div class="kl">Managed Records</div><div class="kv">8.4M</div><div class="ks">Under retention schedule</div></div>
+    <div class="kpi kw"><div class="kl">Legal Holds Active</div><div class="kv">23</div><div class="ks">14 CBE · 6 litigation · 3 reg</div></div>
+    <div class="kpi kr"><div class="kl">Eligible for Disposal</div><div class="kv">2,104</div><div class="ks">Awaiting legal hold check</div></div>
+    <div class="kpi kb"><div class="kl">Disposed This Year</div><div class="kv">148K</div><div class="ks">Certified destructions</div></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="chd">Retention Schedule (File Plan) · CBE / Basel / GDPR</div>
+      <table>
+        <thead><tr><th>Document Class</th><th>Retention</th><th>Trigger</th><th>Regulation</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>KYC — Identity Documents</td><td class="mono" style="color:var(--gold3)">10 Years</td><td>Account Close + 5Y</td><td><span class="tag tgold">CBE Reg 2/2020</span></td><td><span style="color:var(--G);font-size:11px;font-weight:600">● Active</span></td></tr>
+          <tr><td>Loan Agreements</td><td class="mono" style="color:var(--gold3)">7 Years</td><td>Loan Closure</td><td><span class="tag tgold">CBE Circular 21</span></td><td><span style="color:var(--G);font-size:11px;font-weight:600">● Active</span></td></tr>
+          <tr><td>Audit Logs &amp; Trails</td><td class="mono" style="color:var(--gold3)">7 Years</td><td>Log Date</td><td><span class="tag tgold">CBE / Basel III</span></td><td><span style="color:var(--G);font-size:11px;font-weight:600">● Active</span></td></tr>
+          <tr><td>Mortgage Deeds</td><td class="mono" style="color:var(--gold3)">25 Years</td><td>Deed Date</td><td><span class="tag tb">Egyptian Civil Law</span></td><td><span style="color:var(--G);font-size:11px;font-weight:600">● Active</span></td></tr>
+          <tr><td>AML Screening Records</td><td class="mono" style="color:var(--gold3)">10 Years</td><td>Screening Date</td><td><span class="tag tr">FATF / AML Law 80</span></td><td><span style="color:var(--G);font-size:11px;font-weight:600">● Active</span></td></tr>
+          <tr><td>GDPR / Personal Data</td><td class="mono" style="color:var(--gold3)">5 Years</td><td>Purpose Fulfilled</td><td><span class="tag tgold">GDPR Art.17</span></td><td><span style="color:var(--W);font-size:11px;font-weight:600">⚠ Review</span></td></tr>
+          <tr><td>Transaction Records</td><td class="mono" style="color:var(--gold3)">5 Years</td><td>Transaction Date</td><td><span class="tag tgold">CBE</span></td><td><span style="color:var(--G);font-size:11px;font-weight:600">● Active</span></td></tr>
+          <tr><td>Scanned Originals (archive)</td><td class="mono" style="color:var(--W)">Permanent</td><td>Do Not Delete</td><td><span class="tag tgold">Permanent Record</span></td><td><span style="color:var(--B);font-size:11px;font-weight:600">🔒 Permanent</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="chd">Active Legal Holds <span class="tag tw">23 Active</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="padding:10px;background:rgba(240,160,48,.07);border:1px solid rgba(240,160,48,.2);border-radius:7px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;font-weight:600;color:var(--W)">Hold #LH-2024-001 · CBE Inspection</span><span class="tag tw">CBE</span></div><div style="font-size:11px;color:var(--sil)">14,827 docs frozen · Since 01 Jan 2024 · No expiry · Superintendent order</div></div>
+          <div style="padding:10px;background:rgba(224,82,82,.06);border:1px solid rgba(224,82,82,.2);border-radius:7px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;font-weight:600;color:var(--R)">Hold #LH-2024-006 · Litigation Case #C8821</span><span class="tag tr">Litigation</span></div><div style="font-size:11px;color:var(--sil)">3,421 docs frozen · Since 14 Feb 2024 · Expiry: Court order</div></div>
+          <div style="padding:10px;background:rgba(155,111,224,.06);border:1px solid rgba(155,111,224,.2);border-radius:7px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;font-weight:600;color:var(--P)">Hold #LH-2024-009 · FRA Regulatory Review</span><span class="tag tp">Regulatory</span></div><div style="font-size:11px;color:var(--sil)">892 docs frozen · Since 20 Mar 2024 · FRA order</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chd">Disposal Queue <span class="tag tr">2,104 eligible</span></div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:10px">These documents passed retention period. Legal hold check required before certified disposal.</div>
+        <div class="sr"><span>Utility Bills (2019 batch)</span><span style="color:var(--R)">1,847 docs</span></div>
+        <div class="sr"><span>Marketing Materials (2021)</span><span style="color:var(--R)">214 docs</span></div>
+        <div class="sr"><span>Temp Scan Files (2023 Q1)</span><span style="color:var(--R)">43 docs</span></div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn bx" style="flex:1">Run Hold Check &amp; Dispose</button><button class="btn bs">Schedule 03:00</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 10. LIFECYCLE ═══ -->
+<div id="s-lifecycle" class="scr">
+  <div class="ph"><div><h2>Document Lifecycle</h2><p>End-to-end: Capture → Index → Classify → Approve → Archive → Dispose</p></div>
+  <div class="phr"><input type="text" style="width:200px;font-size:12px" placeholder="Track by doc name or CID…"/><button class="btn bg sm">Track</button></div></div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="chd">Lifecycle Pipeline — All Channels · Real-Time</div>
+    <div style="display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:4px 0">
+      <div style="min-width:120px;padding:12px;background:var(--BT);border:1px solid rgba(58,159,208,.2);border-radius:8px 0 0 8px;text-align:center"><div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--B);margin-bottom:6px">Capture</div><div style="font-family:'Cormorant Garamond',serif;font-size:26px">42,871</div><div style="font-size:10px;color:var(--sil)">Today's ingest</div></div>
+      <div style="display:flex;align-items:center;padding:0 6px;color:var(--sil)">▶</div>
+      <div style="min-width:120px;padding:12px;background:var(--WT);border:1px solid rgba(240,160,48,.2);text-align:center"><div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--W);margin-bottom:6px">Indexing</div><div style="font-family:'Cormorant Garamond',serif;font-size:26px">18</div><div style="font-size:10px;color:var(--sil)">Pending review</div></div>
+      <div style="display:flex;align-items:center;padding:0 6px;color:var(--sil)">▶</div>
+      <div style="min-width:120px;padding:12px;background:var(--goldT);border:1px solid rgba(184,145,42,.2);text-align:center"><div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--gold2);margin-bottom:6px">AI Classify</div><div style="font-family:'Cormorant Garamond',serif;font-size:26px">342</div><div style="font-size:10px;color:var(--sil)">In AI queue</div></div>
+      <div style="display:flex;align-items:center;padding:0 6px;color:var(--sil)">▶</div>
+      <div style="min-width:120px;padding:12px;background:var(--PT);border:1px solid rgba(155,111,224,.2);text-align:center"><div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--P);margin-bottom:6px">Workflow</div><div style="font-family:'Cormorant Garamond',serif;font-size:26px">1,247</div><div style="font-size:10px;color:var(--sil)">In approval</div></div>
+      <div style="display:flex;align-items:center;padding:0 6px;color:var(--sil)">▶</div>
+      <div style="min-width:120px;padding:12px;background:var(--GT);border:1px solid rgba(46,204,138,.2);text-align:center"><div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--G);margin-bottom:6px">Repository</div><div style="font-family:'Cormorant Garamond',serif;font-size:26px">8.4M</div><div style="font-size:10px;color:var(--sil)">Archived</div></div>
+      <div style="display:flex;align-items:center;padding:0 6px;color:var(--sil)">▶</div>
+      <div style="min-width:120px;padding:12px;background:var(--RT);border:1px solid rgba(224,82,82,.2);border-radius:0 8px 8px 0;text-align:center"><div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--R);margin-bottom:6px">Disposal</div><div style="font-family:'Cormorant Garamond',serif;font-size:26px">2,104</div><div style="font-size:10px;color:var(--sil)">Eligible</div></div>
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="chd">Lifecycle Trace — Passport_AHI_2022.pdf</div>
+      <div class="tl">
+        <div class="tli"><div class="tld done"></div><div class="tlt">Captured via Branch Scanner (WIA)</div><div class="tls">Cairo West HQ · 10 Jan 2022 · 300 DPI · 2.1 MB · Omar K.</div></div>
+        <div class="tli"><div class="tld done"></div><div class="tlt">AI Classification — Egyptian Passport (99.1%)</div><div class="tls">Watsonx v3.4 · MRZ validated · AML cleared · CBS match ✓</div></div>
+        <div class="tli"><div class="tld done"></div><div class="tlt">Indexing Completed — CID Bound</div><div class="tls">Omar K. · QA passed · All 6 QA checks passed</div></div>
+        <div class="tli"><div class="tld done"></div><div class="tlt">Maker Review — Approved</div><div class="tls">Sara M. · Cairo West · 10 Jan 2022 · 14:22</div></div>
+        <div class="tli"><div class="tld done"></div><div class="tlt">Checker Approval — Signed Off</div><div class="tls">Ali R. (Branch Manager) · 10 Jan 2022 · 16:05</div></div>
+        <div class="tli"><div class="tld done"></div><div class="tlt">Archived — KYC/Passports/2022</div><div class="tls">PDF/A-2b · AES-256 · v1.0 · 10 Year retention</div></div>
+        <div class="tli"><div class="tld done"></div><div class="tlt">Re-indexed v2.0 — Renewed Passport</div><div class="tls">Omar K. · 12 Jan 2024 · Updated expiry &amp; metadata</div></div>
+        <div class="tli"><div class="tld act"></div><div class="tlt">Active · Expires 09 Jan 2032 · No Legal Holds</div><div class="tls">Retention: 10 years from last renewal · Next audit: Jan 2025</div></div>
+        <div class="tli"><div class="tld pend"></div><div class="tlt">Scheduled Disposal — Jan 2032</div><div class="tls">Subject to legal hold check · Certified destruction required</div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div class="chd">Audit Trail</div>
+        <div style="display:flex;flex-direction:column">
+          <div class="atr"><div class="atu">AM</div><div><div style="font-size:11px;color:var(--mist)">Ahmed M. — Viewed document</div><div style="font-size:10px;color:var(--sil)">Today 09:14 · Cairo West · Session #S84921</div></div></div>
+          <div class="atr"><div class="atu">OK</div><div><div style="font-size:11px;color:var(--mist)">Omar K. — Re-indexed v2.0</div><div style="font-size:10px;color:var(--sil)">12 Jan 2024 · Metadata updated + file replaced</div></div></div>
+          <div class="atr"><div class="atu">AR</div><div><div style="font-size:11px;color:var(--mist)">Ali R. — Approved (Checker) · Digital signature</div><div style="font-size:10px;color:var(--sil)">10 Jan 2022 · eIDAS certified signature</div></div></div>
+          <div class="atr"><div class="atu">SM</div><div><div style="font-size:11px;color:var(--mist)">Sara M. — Approved (Maker)</div><div style="font-size:10px;color:var(--sil)">10 Jan 2022 · All metadata verified</div></div></div>
+          <div class="atr"><div class="atu">SY</div><div><div style="font-size:11px;color:var(--mist)">System — AI Classified (Watsonx v3.4)</div><div style="font-size:10px;color:var(--sil)">10 Jan 2022 · Passport · 99.1% confidence</div></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chd" style="font-size:11px">Version Control</div>
+        <div style="font-size:11px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;gap:8px;align-items:center;padding:7px;background:var(--gr);border-radius:6px"><span class="tag tg">v2.0</span><div style="flex:1"><div>Re-uploaded (renewed passport)</div><div style="font-size:10px;color:var(--sil)">12 Jan 2024 · Omar K.</div></div><button class="btn bs xs" onclick="go('viewer')">View</button></div>
+          <div style="display:flex;gap:8px;align-items:center;padding:7px;background:var(--gr);border-radius:6px"><span class="tag tb">v1.0</span><div style="flex:1"><div style="color:var(--sil)">Original scan</div><div style="font-size:10px;color:var(--sil)">10 Jan 2022 · Omar K.</div></div><button class="btn bs xs" onclick="go('viewer')">View</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 11. SEARCH ═══ -->
+<div id="s-search" class="scr">
+  <div class="ph"><div><h2>Enterprise Search</h2><p>Semantic NLP · Full-text OCR · Boolean · Fuzzy · Wildcard · Faceted · Saved queries</p></div></div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;gap:10px;align-items:flex-end">
+      <div style="flex:1"><label>Query</label><input type="text" value="Ahmed Hassan expired passport Cairo 2024" style="font-size:13px;padding:10px 14px"/></div>
+      <div style="width:160px"><label>Mode</label><select><option>Semantic (NLP)</option><option>Full-Text OCR</option><option>Boolean</option><option>Fuzzy Match</option></select></div>
+      <div style="width:130px"><label>Scope</label><select><option>All Branches</option><option>Cairo West</option><option>My Branch</option></select></div>
+      <button class="btn bg" style="padding:10px 20px;font-size:12px">Search</button>
+      <button class="btn bs" style="padding:10px 14px;font-size:12px">Saved Queries</button>
+    </div>
+  </div>
+  <div class="g3c">
+    <div class="card" style="padding:14px">
+      <div class="chd" style="font-size:11px">Filters &amp; Facets</div>
+      <div class="field"><label>Document Type</label><select><option>All Types</option><option>Passport</option><option>National ID</option><option>Loan Agreement</option><option>Contract</option></select></div>
+      <div class="field"><label>Date Range</label><input type="date" style="margin-bottom:6px"/><input type="date"/></div>
+      <div class="field"><label>Expiry Status</label><select><option>All</option><option>Valid</option><option>Expired</option><option>Expiring ≤30d</option><option>Expiring ≤90d</option></select></div>
+      <div class="field"><label>Branch</label><select><option>All Branches</option><option>Cairo West HQ</option><option>Alexandria HQ</option><option>Giza Central</option></select></div>
+      <div class="field"><label>Risk Rating</label><select><option>All</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+      <div class="field"><label>Legal Hold</label><select><option>All</option><option>Has Hold</option><option>No Hold</option></select></div>
+      <button class="btn bs" style="width:100%;justify-content:center;font-size:11px">Clear All</button>
+      <hr/>
+      <div style="font-size:11px;font-weight:600;color:var(--mist);margin-bottom:8px">Saved Queries</div>
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:11px">
+        <div style="padding:6px 8px;background:var(--gr);border-radius:5px;cursor:pointer;color:var(--mist)">KYC expiring 30 days</div>
+        <div style="padding:6px 8px;background:var(--gr);border-radius:5px;cursor:pointer;color:var(--mist)">Pending KYC — All branches</div>
+        <div style="padding:6px 8px;background:var(--gr);border-radius:5px;cursor:pointer;color:var(--mist)">Documents on legal hold</div>
+        <div style="padding:6px 8px;background:var(--gr);border-radius:5px;cursor:pointer;color:var(--mist)">OCR errors this week</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="chd">Results <span style="font-size:11px;color:var(--sil);font-weight:400">— 1,247 matches · 0.08s · Semantic ranked</span></div>
+      <table>
+        <thead><tr><th>Document</th><th>Customer</th><th>Type</th><th>Branch</th><th>Date</th><th>Status</th><th>Score</th><th></th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--gold3);cursor:pointer" onclick="go('viewer')">Passport_AHI_2022.pdf</td><td><div style="font-size:12px">Ahmed H. Ibrahim</div><div class="mono" style="font-size:9px;color:var(--sil)">EGY-2024-00847</div></td><td><span class="tag tgold">Passport</span></td><td><span style="font-size:10px;color:var(--B)">Cairo West</span></td><td>Jan 2022</td><td><span class="tag tg">Valid</span></td><td style="color:var(--G);font-weight:700">99%</td><td><button class="btn bs xs" onclick="go('viewer')">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">NatID_AHK_2023.pdf</td><td><div style="font-size:12px">Ahmed H. Karim</div><div class="mono" style="font-size:9px;color:var(--sil)">EGY-2023-00412</div></td><td><span class="tag tb">Nat. ID</span></td><td><span style="font-size:10px;color:var(--B)">Giza</span></td><td>Mar 2023</td><td><span class="tag tg">Valid</span></td><td style="color:var(--G);font-weight:700">94%</td><td><button class="btn bs xs">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">Passport_MHA_2019.pdf</td><td><div style="font-size:12px">M. Hassan Aly</div><div class="mono" style="font-size:9px;color:var(--sil)">EGY-2019-08821</div></td><td><span class="tag tgold">Passport</span></td><td><span style="font-size:10px;color:var(--B)">Alexandria</span></td><td>Oct 2019</td><td><span class="tag tr">Expired</span></td><td style="color:var(--W);font-weight:700">91%</td><td><button class="btn bs xs">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">LoanApp_AHM_2024.pdf</td><td><div style="font-size:12px">A. Hassan Mahmoud</div><div class="mono" style="font-size:9px;color:var(--sil)">EGY-2024-01122</div></td><td><span class="tag tb">Loan App</span></td><td><span style="font-size:10px;color:var(--B)">Heliopolis</span></td><td>Feb 2024</td><td><span class="tag tp">In Review</span></td><td style="color:var(--W);font-weight:700">88%</td><td><button class="btn bs xs">View</button></td></tr>
+          <tr><td style="color:var(--gold3);cursor:pointer">Contract_HAB_2023.pdf</td><td><div style="font-size:12px">H. Ahmed Bassam</div><div class="mono" style="font-size:9px;color:var(--sil)">EGY-2023-00291</div></td><td><span class="tag tp">Contract</span></td><td><span style="font-size:10px;color:var(--B)">Cairo West</span></td><td>Nov 2023</td><td><span class="tag tg">Valid</span></td><td style="color:var(--sil);font-weight:700">82%</td><td><button class="btn bs xs">View</button></td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:11px;color:var(--sil)">
+        <span>Showing 1–5 of 1,247</span>
+        <div style="display:flex;gap:5px"><button class="btn bs xs">← Prev</button><button class="btn bs xs">Next →</button></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card"><div class="chd" style="font-size:11px">Quick Preview</div>
+        <div style="background:var(--gr);border:1px dashed var(--bd);border-radius:7px;height:180px;display:flex;align-items:center;justify-content:center;margin-bottom:10px"><span style="font-size:11px;color:var(--sil)">Click a result</span></div>
+        <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Type</span><span>—</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Customer</span><span>—</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Branch</span><span>—</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--sil)">Expiry</span><span>—</span></div>
+        </div>
+      </div>
+      <div class="card"><div class="chd" style="font-size:11px">Export Results</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn bs" style="justify-content:flex-start;font-size:11px">Export as PDF Report</button>
+          <button class="btn bs" style="justify-content:flex-start;font-size:11px">Export as Excel</button>
+          <button class="btn bs" style="justify-content:flex-start;font-size:11px">Generate Compliance Report</button>
+          <button class="btn bs" style="justify-content:flex-start;font-size:11px">Bulk Download (ZIP)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 12. DOCUMENT VIEWER ═══ -->
+<div id="s-viewer" class="scr">
+  <div class="ph"><div><h2>Document Viewer</h2><p>Annotation · Redaction · e-Signature (eIDAS) · Stamp · Version Compare · Collaboration</p></div>
+  <div class="phr"><button class="btn bs sm">Download</button><button class="btn bs sm">Print</button><button class="btn bg sm">Share</button></div></div>
+  <div class="card" style="padding:10px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <button class="btn bs xs">⊖</button><button class="btn bs xs">⊕</button><button class="btn bs xs">↻ Rotate</button>
+      <div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div>
+      <button class="btn xs" style="background:rgba(240,220,60,.1);color:#e8d020;border:1px solid rgba(240,220,60,.3)">✏ Highlight</button>
+      <button class="btn xs" style="background:var(--RT);color:var(--R);border:1px solid rgba(224,82,82,.3)">🔒 Redact</button>
+      <button class="btn xs" style="background:var(--GT);color:var(--G);border:1px solid rgba(46,204,138,.3)">✍ e-Sign (eIDAS)</button>
+      <button class="btn xs" style="background:var(--BT);color:var(--B);border:1px solid rgba(58,159,208,.3)">🗒 Annotate</button>
+      <button class="btn xs" style="background:var(--PT);color:var(--P);border:1px solid rgba(155,111,224,.3)">📋 Stamp</button>
+      <div style="width:1px;height:20px;background:var(--bd);margin:0 4px"></div>
+      <button class="btn bs xs">Compare Versions</button><button class="btn bs xs">Share View</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:5px"><span style="font-size:11px;color:var(--sil)">Page</span><input type="text" value="1" style="width:34px;text-align:center;padding:4px"/><span style="font-size:11px;color:var(--sil)">/ 4</span></div>
+    </div>
+  </div>
+  <div class="g21">
+    <div class="card">
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--bd);border-radius:8px;padding:32px;min-height:440px;position:relative">
+        <div style="max-width:380px;margin:0 auto">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold)">NATIONAL BANK OF EGYPT · CUSTOMER RECORD</div>
+            <div style="background:var(--GT);border:1px solid rgba(46,204,138,.3);border-radius:4px;padding:2px 8px;font-size:9px;color:var(--G)">APPROVED</div>
+          </div>
+          <div style="height:9px;background:rgba(255,255,255,.15);border-radius:2px;margin-bottom:7px;width:75%"></div>
+          <div style="height:9px;background:rgba(255,255,255,.08);border-radius:2px;margin-bottom:7px"></div>
+          <div style="height:9px;background:rgba(255,255,255,.08);border-radius:2px;margin-bottom:16px;width:60%"></div>
+          <div style="padding:10px;background:rgba(240,220,60,.06);border-left:3px solid #e8d020;border-radius:0 6px 6px 0;margin-bottom:12px">
+            <div style="font-size:9px;color:#e8d020;margin-bottom:4px;letter-spacing:1px">HIGHLIGHTED — REVIEWER NOTE</div>
+            <div style="height:8px;background:rgba(240,220,60,.2);border-radius:2px;margin-bottom:5px"></div>
+            <div style="height:8px;background:rgba(240,220,60,.12);border-radius:2px;width:70%"></div>
+          </div>
+          <div style="height:9px;background:rgba(255,255,255,.08);border-radius:2px;margin-bottom:7px"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <div style="font-size:10px;color:var(--sil)">REDACTED:</div>
+            <div style="height:12px;width:160px;background:rgba(255,255,255,.18);border-radius:2px"></div>
+          </div>
+          <div style="height:9px;background:rgba(255,255,255,.08);border-radius:2px;margin-bottom:7px"></div>
+          <div style="height:9px;background:rgba(255,255,255,.08);border-radius:2px;margin-bottom:7px;width:85%"></div>
+          <div style="margin-top:24px;padding:14px;border:1px dashed rgba(46,204,138,.4);border-radius:8px;display:flex;align-items:center;gap:12px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--G)" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+            <div><div style="font-size:11px;font-weight:600;color:var(--G)">Digitally Signed · Ahmed Mohamed — CDO</div><div style="font-size:10px;color:var(--sil)">14 Apr 2024, 09:32 EET · eIDAS Certificate: NBE-2024 · ✓ Valid</div></div>
+          </div>
+          <div style="position:absolute;top:16px;right:16px;background:var(--PT);border:1px solid rgba(155,111,224,.4);border-radius:6px;padding:5px 9px;font-size:9px;color:var(--P);font-weight:700;letter-spacing:1px">CONFIDENTIAL</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card"><div class="chd" style="font-size:11px">Document Metadata</div>
+        <div style="font-size:11px;display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">Type</span><span>Passport</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">Customer</span><span>Ahmed H. Ibrahim</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">CID</span><span class="mono" style="color:var(--gold3)">EGY-2024-00847</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">Branch</span><span style="color:var(--B)">Cairo West HQ</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">Expiry</span><span style="color:var(--G)">09 Jan 2032</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">Version</span><span>v2.0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">Format</span><span class="mono">PDF/A-2b</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--sil)">Encryption</span><span class="mono">AES-256</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--sil)">Legal Hold</span><span style="color:var(--G)">None</span></div>
+        </div>
+      </div>
+      <div class="card"><div class="chd" style="font-size:11px">Annotations (3)</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="padding:8px;background:rgba(240,220,60,.06);border-radius:6px;border-left:2px solid #e8d020"><div style="font-size:10px;color:#e8d020">Highlight · Page 1</div><div style="font-size:11px;color:var(--mist);margin-top:2px">Verify expiry date alignment with CBS</div></div>
+          <div style="padding:8px;background:var(--RT);border-radius:6px;border-left:2px solid var(--R)"><div style="font-size:10px;color:var(--R)">Redaction · Page 1</div><div style="font-size:11px;color:var(--mist);margin-top:2px">Account number redacted per data policy</div></div>
+          <div style="padding:8px;background:var(--PT);border-radius:6px;border-left:2px solid var(--P)"><div style="font-size:10px;color:var(--P)">Stamp · Page 4</div><div style="font-size:11px;color:var(--mist);margin-top:2px">CONFIDENTIAL stamp applied · CDO authorised</div></div>
+        </div>
+      </div>
+      <div class="card"><div class="chd" style="font-size:11px">Collaborators</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--ink4),var(--gold));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">AM</div>
+          <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--B),var(--G));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">OK</div>
+          <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--P),var(--R));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">SM</div>
+          <span style="font-size:11px;color:var(--sil);margin-left:4px">+ 2 more</span>
+          <button class="btn bs xs" style="margin-left:auto">Invite</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 13. WORKFLOW ═══ -->
+<div id="s-workflow" class="scr">
+  <div class="ph"><div><h2>Workflow Engine</h2><p>Maker-Checker · Parallel flows · Escalation · BPMN 2.0 builder · SLA monitoring</p></div>
+  <div class="phr"><button class="btn bg sm">+ New Workflow</button><button class="btn bs sm">Import BPMN</button></div></div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="chd">Active Workflows <span class="tag tw">6 requiring action</span></div>
+      <table>
+        <thead><tr><th>Workflow</th><th>Type</th><th>Stage</th><th>Assigned</th><th>SLA</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>KYC-2024-04829</td><td><span class="tag tgold">KYC</span></td><td><span class="tag tw">Maker Review</span></td><td>Omar K.</td><td style="color:var(--W)">6h left</td><td><button class="btn bg xs">Review</button></td></tr>
+          <tr><td>LOAN-2024-00341</td><td><span class="tag tb">Loan</span></td><td><span class="tag tb">Mgr Approval</span></td><td>Sara M.</td><td style="color:var(--W)">4h left</td><td><button class="btn bg xs">Review</button></td></tr>
+          <tr><td>COMP-2024-00022</td><td><span class="tag tr">AML</span></td><td><span class="tag tr">AML Review</span></td><td>Legal</td><td style="color:var(--R)">Overdue</td><td><button class="btn bg xs">Review</button></td></tr>
+          <tr><td>ACC-2024-01192</td><td><span class="tag tp">Acc.Open</span></td><td><span class="tag tg">Done</span></td><td>—</td><td style="color:var(--G)">Met</td><td><button class="btn bs xs">Archive</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="chd">KYC-2024-04829 · Active: Maker Review</div>
+      <div class="flow" style="padding:10px 0">
+        <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">Capture</div></div><div class="fc fcd"></div>
+        <div class="fn"><div class="fn-nd fd">✓</div><div class="fn-lb">AI Index</div></div><div class="fc fcd"></div>
+        <div class="fn"><div class="fn-nd fa">●</div><div class="fn-lb">Maker</div></div><div class="fc fcp"></div>
+        <div class="fn"><div class="fn-nd fp">4</div><div class="fn-lb">Checker</div></div><div class="fc fcp"></div>
+        <div class="fn"><div class="fn-nd fp">5</div><div class="fn-lb">Mgr Sign</div></div><div class="fc fcp"></div>
+        <div class="fn"><div class="fn-nd fp">6</div><div class="fn-lb">Archive</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn bok" style="flex:1">✓ Approve &amp; Forward</button><button class="btn bx">✗ Reject</button><button class="btn bw">⇧ Escalate</button><button class="btn bs">Hold</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="chd">Visual Workflow Builder <span class="tag tb">BPMN 2.0 Compatible</span></div>
+    <div style="background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.08);border-radius:8px;padding:24px;overflow-x:auto">
+      <div style="display:flex;align-items:center;gap:8px;min-width:700px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn wft"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--B)" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div><span style="font-size:9px;color:var(--sil);text-align:center">Doc<br/>Captured</span></div>
+        <div style="flex:1;height:2px;background:rgba(255,255,255,.1)"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn wfa"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/></svg></div><span style="font-size:9px;color:var(--sil);text-align:center">AI Classify<br/>+ Extract</span></div>
+        <div style="flex:1;height:2px;background:rgba(255,255,255,.1)"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn wfg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--P)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5"/></svg></div><span style="font-size:9px;color:var(--sil);text-align:center">Confidence<br/>Gate ≥90%</span></div>
+        <div style="flex:1;height:2px;background:rgba(255,255,255,.1)"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn wfh"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--G)" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div><span style="font-size:9px;color:var(--sil);text-align:center">Maker<br/>Review</span></div>
+        <div style="flex:1;height:2px;background:rgba(255,255,255,.1)"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn" style="border-color:rgba(58,159,208,.5);background:var(--BT)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--B)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><span style="font-size:9px;color:var(--sil);text-align:center">Checker<br/>Approval</span></div>
+        <div style="flex:1;height:2px;background:rgba(255,255,255,.1)"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn wfno"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--W)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg></div><span style="font-size:9px;color:var(--sil);text-align:center">Notify<br/>+ Alert CBS</span></div>
+        <div style="flex:1;height:2px;background:rgba(255,255,255,.1)"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn wfe"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--G)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div><span style="font-size:9px;color:var(--sil);text-align:center">Archive<br/>Repository</span></div>
+        <div style="flex:1;height:2px;background:rgba(255,255,255,.1)"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div class="wfn wfadd"><span style="color:var(--sil);font-size:18px">+</span></div><span style="font-size:9px;color:var(--sil);text-align:center">Add<br/>Step</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 14. COMPLIANCE ═══ -->
+<div id="s-compliance" class="scr">
+  <div class="ph"><div><h2>Compliance &amp; Audit</h2><p>CBE · Basel III/IV · GDPR · Egypt AML Law 80/2002 · eIDAS · ISO 27001 · SOX</p></div>
+  <div class="phr"><button class="btn bg sm">Generate Audit Report</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kok"><div class="kl">Compliance Score</div><div class="kv" style="color:var(--G)">94.2%</div><div class="ks"><span class="ku">↑ 1.4%</span> vs last quarter</div></div>
+    <div class="kpi kr"><div class="kl">Open Breaches</div><div class="kv" style="color:var(--R)">47</div><div class="ks">14 CBE · 19 GDPR · 14 AML</div></div>
+    <div class="kpi kok"><div class="kl">Audit Trail Entries (MTD)</div><div class="kv">2.8M</div><div class="ks">Tamper-proof · SHA-256</div></div>
+    <div class="kpi kb"><div class="kl">e-Signatures Valid</div><div class="kv">18,421</div><div class="ks">eIDAS · Zero failures</div></div>
+  </div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="chd">Regulatory Compliance Matrix</div>
+      <table>
+        <thead><tr><th>Framework</th><th>Scope</th><th>Score</th><th>Issues</th><th>Last Audit</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:700">CBE Circular 21/2020</td><td>KYC Doc Retention</td><td style="color:var(--G);font-weight:700">96%</td><td style="color:var(--W)">14</td><td>01 Jan 2024</td><td><span class="tag tg">Compliant</span></td></tr>
+          <tr><td style="font-weight:700">Egypt AML Law 80/2002</td><td>AML Screening &amp; Records</td><td style="color:var(--G);font-weight:700">98%</td><td style="color:var(--G)">3</td><td>15 Feb 2024</td><td><span class="tag tg">Compliant</span></td></tr>
+          <tr><td style="font-weight:700">GDPR (EU data subjects)</td><td>Data Retention &amp; Privacy</td><td style="color:var(--W);font-weight:700">87%</td><td style="color:var(--R)">19</td><td>10 Mar 2024</td><td><span class="tag tw">Action Needed</span></td></tr>
+          <tr><td style="font-weight:700">Basel III / BCBS 239</td><td>Risk Data Aggregation</td><td style="color:var(--G);font-weight:700">94%</td><td style="color:var(--W)">8</td><td>20 Jan 2024</td><td><span class="tag tg">Compliant</span></td></tr>
+          <tr><td style="font-weight:700">eIDAS (Digital Signature)</td><td>e-Signature Validity</td><td style="color:var(--G);font-weight:700">100%</td><td style="color:var(--G)">0</td><td>14 Apr 2024</td><td><span class="tag tg">Certified</span></td></tr>
+          <tr><td style="font-weight:700">ISO 27001</td><td>Information Security</td><td style="color:var(--G);font-weight:700">93%</td><td style="color:var(--W)">3</td><td>05 Mar 2024</td><td><span class="tag tg">Certified</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="chd">Audit Trail — Recent Events</div>
+      <div>
+        <div class="atr"><div class="atu">AM</div><div style="flex:1"><div style="font-size:11px;color:var(--mist)">Ahmed M. — Viewed Passport_AHI_2022.pdf</div><div style="font-size:10px;color:var(--sil)">Today 09:14 · Cairo West · Session #S84921</div></div><span class="tag tb">View</span></div>
+        <div class="atr"><div class="atu">OK</div><div style="flex:1"><div style="font-size:11px;color:var(--mist)">Omar K. — Metadata edited on NatID_SMK.pdf</div><div style="font-size:10px;color:var(--sil)">Today 08:52 · Expiry Date changed</div></div><span class="tag tw">Edit</span></div>
+        <div class="atr"><div class="atu">SM</div><div style="flex:1"><div style="font-size:11px;color:var(--mist)">Sara M. — Approved workflow KYC-2024-04812</div><div style="font-size:10px;color:var(--sil)">Today 08:30 · Maker step completed</div></div><span class="tag tg">Approve</span></div>
+        <div class="atr"><div class="atu">SY</div><div style="flex:1"><div style="font-size:11px;color:var(--mist)">System — AI batch: 342 docs classified</div><div style="font-size:10px;color:var(--sil)">Today 08:15 · Watsonx v3.4</div></div><span class="tag tgold">AI Auto</span></div>
+        <div class="atr"><div class="atu">AL</div><div style="flex:1"><div style="font-size:11px;color:var(--mist)">Ali R. — Document exported to PDF</div><div style="font-size:10px;color:var(--sil)">Yesterday 17:44 · Alexandria HQ</div></div><span class="tag tp">Export</span></div>
+        <div class="atr"><div class="atu">SY</div><div style="flex:1"><div style="font-size:11px;color:var(--mist)">System — Legal Hold #LH-2024-006 placed (3,421 docs)</div><div style="font-size:10px;color:var(--sil)">14 Feb 2024 · Litigation Case #C8821</div></div><span class="tag tr">Legal Hold</span></div>
+      </div>
+      <button class="btn bs sm" style="margin-top:10px">View Full Audit Trail →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 15. ALERTS ═══ -->
+<div id="s-alerts" class="scr">
+  <div class="ph"><div><h2>Alerts &amp; Event Management</h2><p>CBE expiry · AML triggers · Workflow SLA · System events · Multi-channel delivery</p></div>
+  <div class="phr"><button class="btn bg sm">+ New Alert Rule</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kr"><div class="kl">Critical Alerts</div><div class="kv" style="color:var(--R)">4</div></div>
+    <div class="kpi kw"><div class="kl">Warnings</div><div class="kv" style="color:var(--W)">12</div></div>
+    <div class="kpi kb"><div class="kl">Info Notifications</div><div class="kv">24</div></div>
+    <div class="kpi kok"><div class="kl">Alerts Sent Today</div><div class="kv">1,847</div><div class="ks">Email + SMS + WhatsApp</div></div>
+  </div>
+  <div class="g2">
+    <div>
+      <div class="ar arc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--R)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg><div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--mist)">CRITICAL · 42 KYC documents expired — Cairo West · CBE compliance breach</div><div style="font-size:10px;color:var(--sil);margin-top:2px">Auto-generated · 08:14 AM · Escalated to CDO + Compliance Officer</div></div><span class="tag tr">Critical</span></div>
+      <div class="ar arc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--R)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/></svg><div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--mist)">CRITICAL · Workflow COMP-2024-00022 overdue 3 days — AML review stuck</div><div style="font-size:10px;color:var(--sil);margin-top:2px">SLA breach · Escalated to Legal Director</div></div><span class="tag tr">Critical</span></div>
+      <div class="ar arw"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--W)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/></svg><div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--mist)">245 passports expiring in 90 days — renewal SMS sent to customers</div><div style="font-size:10px;color:var(--sil);margin-top:2px">Scheduled · Daily 7:00 AM · All branches</div></div><span class="tag tw">Warning</span></div>
+      <div class="ar arw"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--W)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg><div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--mist)">Luxor branch sync paused · 847 unsynced documents · Network timeout</div><div style="font-size:10px;color:var(--sil);margin-top:2px">IT alert · 41 min ago · Auto-retry in 10 min</div></div><span class="tag tw">Warning</span></div>
+      <div class="ar ari"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--B)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/></svg><div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--mist)">AI batch complete — 342 documents classified and indexed successfully</div><div style="font-size:10px;color:var(--sil);margin-top:2px">System event · 3 min ago · Zero exceptions</div></div><span class="tag tb">Info</span></div>
+      <div class="ar ars"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--G)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><polyline points="20 6 9 17 4 12"/></svg><div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--mist)">Workflow ACC-2024-01192 approved &amp; archived · SLA met (1.2 days)</div><div style="font-size:10px;color:var(--sil);margin-top:2px">1 hr ago · Hana S. Abdel-Aziz</div></div><span class="tag tg">Success</span></div>
+    </div>
+    <div class="card">
+      <div class="chd">Configure Alert Rule</div>
+      <div class="field"><label>Rule Name</label><input type="text" placeholder="KYC Expiry 30-Day Warning…"/></div>
+      <div class="field"><label>Trigger Event</label><select><option>Document Expiring in X days</option><option>OCR Confidence Below Threshold</option><option>Workflow SLA Breach</option><option>Missing Mandatory Document</option><option>AML Match Detected</option><option>Legal Hold Placed</option><option>Branch Sync Failure</option><option>Compliance Score Below X%</option></select></div>
+      <div class="g2">
+        <div class="field"><label>Value / Days</label><input type="number" value="30"/></div>
+        <div class="field"><label>Priority</label><select><option>Critical</option><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+      </div>
+      <div class="field"><label>Apply To</label><select><option>All Branches</option><option>Cairo West HQ</option><option>All KYC Documents</option></select></div>
+      <div class="field"><label>Delivery Channels</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>In-App</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>Email</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mist);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/>SMS</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mist);cursor:pointer"><input type="checkbox" style="width:auto;accent-color:var(--gold)"/>WhatsApp</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mist);cursor:pointer"><input type="checkbox" style="width:auto;accent-color:var(--gold)"/>MS Teams</label>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Escalate if unactioned in</label><select><option>2h</option><option>4h</option><option selected>8h</option><option>24h</option></select></div>
+        <div class="field"><label>Escalation Target</label><select><option>Branch Manager</option><option>CDO</option><option>Compliance Officer</option><option>Legal Director</option></select></div>
+      </div>
+      <button class="btn bg" style="width:100%;justify-content:center;margin-top:4px">Save Alert Rule</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 16. REPORTS ═══ -->
+<div id="s-reports" class="scr">
+  <div class="ph"><div><h2>Reports &amp; Business Intelligence</h2><p>Standard reports · Custom dashboards · CBE regulatory submissions · Scheduled exports</p></div>
+  <div class="phr"><button class="btn bs sm">Export PDF</button><button class="btn bs sm">Export Excel</button><button class="btn bg sm">+ Custom Report</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kg"><div class="kl">Docs Processed (MTD)</div><div class="kv">824,871</div></div>
+    <div class="kpi kok"><div class="kl">SLA Met</div><div class="kv">96.2%</div></div>
+    <div class="kpi kb"><div class="kl">AI OCR Accuracy</div><div class="kv">97.4%</div></div>
+    <div class="kpi kr"><div class="kl">Compliance Score</div><div class="kv">94.2%</div></div>
+  </div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card"><div class="chd">Monthly Document Volume by Type <span class="tag tgold">2024</span></div><div style="height:180px"><canvas id="report-bar"></canvas></div></div>
+    <div class="card"><div class="chd">Branch Performance Ranking <span class="tag tb">By Volume</span></div><div style="height:180px"><canvas id="branch-bar"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="chd">Standard Report Library</div>
+    <div class="g3">
+      <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px;cursor:pointer;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="font-size:13px;font-weight:700;color:var(--mist);margin-bottom:4px">KYC Expiry Report</div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:10px">30/60/90 day expiry by branch, document type, customer risk rating</div>
+        <div style="display:flex;gap:6px"><button class="btn bg xs">Generate</button><button class="btn bs xs">Schedule</button></div>
+      </div>
+      <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px;cursor:pointer;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="font-size:13px;font-weight:700;color:var(--mist);margin-bottom:4px">AI Engine Performance</div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:10px">Confidence scores, failure analysis, model drift, processing speed</div>
+        <div style="display:flex;gap:6px"><button class="btn bg xs">Generate</button><button class="btn bs xs">Schedule</button></div>
+      </div>
+      <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px;cursor:pointer;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="font-size:13px;font-weight:700;color:var(--mist);margin-bottom:4px">Compliance Breach Report</div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:10px">CBE, GDPR, AML breaches by severity, branch, regulatory framework</div>
+        <div style="display:flex;gap:6px"><button class="btn bg xs">Generate</button><button class="btn bs xs">Schedule</button></div>
+      </div>
+      <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px;cursor:pointer;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="font-size:13px;font-weight:700;color:var(--mist);margin-bottom:4px">Workflow Audit Trail</div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:10px">All maker/checker actions, rejections, escalations with timestamps</div>
+        <div style="display:flex;gap:6px"><button class="btn bg xs">Generate</button><button class="btn bs xs">Schedule</button></div>
+      </div>
+      <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px;cursor:pointer;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="font-size:13px;font-weight:700;color:var(--mist);margin-bottom:4px">Records Disposal Certificate</div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:10px">Certified destruction log, legal hold check, authorised officer sign-off</div>
+        <div style="display:flex;gap:6px"><button class="btn bg xs">Generate</button><button class="btn bs xs">Schedule</button></div>
+      </div>
+      <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px;cursor:pointer;transition:.15s" onmouseover="this.style.borderColor='rgba(184,145,42,.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,.07)'">
+        <div style="font-size:13px;font-weight:700;color:var(--mist);margin-bottom:4px">CBE Regulatory Submission</div>
+        <div style="font-size:11px;color:var(--sil);margin-bottom:10px">Formatted quarterly report for CBE document management compliance</div>
+        <div style="display:flex;gap:6px"><button class="btn bg xs">Generate</button><button class="btn bs xs">Submit to CBE</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 17. INTEGRATION HUB ═══ -->
+<div id="s-integration" class="scr">
+  <div class="ph"><div><h2>Integration Hub</h2><p>CBS · LOS · KYC Engine · SWIFT · SSO · SMTP/SMS · S3 Cold Archive · REST/gRPC APIs</p></div>
+  <div class="phr"><button class="btn bg sm">+ Add Integration</button><button class="btn bs sm">API Docs</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kok"><div class="kl">Active Integrations</div><div class="kv">12</div></div>
+    <div class="kpi kb"><div class="kl">API Calls Today</div><div class="kv">2.84M</div></div>
+    <div class="kpi kg"><div class="kl">Avg Latency</div><div class="kv">38ms</div></div>
+    <div class="kpi kr"><div class="kl">Failed Calls (24h)</div><div class="kv">3</div></div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="chd">Connected Systems</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gr);border:1px solid var(--bd);border-radius:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--G);box-shadow:0 0 6px var(--G);flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">Core Banking System (CBS) · Temenos T24</div><div style="font-size:10px;color:var(--sil)">REST API v3 · Bidirectional · CID, account &amp; KYC sync</div></div>
+          <span class="tag tg">Online</span><span style="font-size:10px;color:var(--sil)">12ms</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gr);border:1px solid var(--bd);border-radius:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--G);box-shadow:0 0 6px var(--G);flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">Loan Origination System (LOS) · FinnOne Neo</div><div style="font-size:10px;color:var(--sil)">REST API · Document push + status webhook</div></div>
+          <span class="tag tg">Online</span><span style="font-size:10px;color:var(--sil)">24ms</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gr);border:1px solid rgba(240,160,48,.25);border-radius:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--W);flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">KYC Verification Engine · Internal</div><div style="font-size:10px;color:var(--sil)">gRPC · Elevated latency detected</div></div>
+          <span class="tag tw">Degraded</span><span style="font-size:10px;color:var(--W)">847ms</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gr);border:1px solid var(--bd);border-radius:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--G);box-shadow:0 0 6px var(--G);flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">Active Directory · SAML 2.0 SSO</div><div style="font-size:10px;color:var(--sil)">LDAP + SAML 2.0 · Auth for all 284 platform users</div></div>
+          <span class="tag tg">Online</span><span style="font-size:10px;color:var(--sil)">8ms</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gr);border:1px solid var(--bd);border-radius:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--G);box-shadow:0 0 6px var(--G);flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">Notification Bus · Twilio + SparkPost</div><div style="font-size:10px;color:var(--sil)">SMTP + SMS + WhatsApp Business API · 1,847 sent today</div></div>
+          <span class="tag tg">Online</span><span style="font-size:10px;color:var(--sil)">18ms</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gr);border:1px solid rgba(224,82,82,.25);border-radius:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--R);flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">Cold Archive · AWS S3-Compatible Object Store</div><div style="font-size:10px;color:var(--sil)">Last sync: 2h ago · 847 unsynced · Network timeout</div></div>
+          <span class="tag tr">Offline</span><span style="font-size:10px;color:var(--R)">Timeout</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gr);border:1px solid var(--bd);border-radius:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--G);box-shadow:0 0 6px var(--G);flex-shrink:0"></div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600">AML Screening · Refinitiv World-Check</div><div style="font-size:10px;color:var(--sil)">Real-time API · Sanctions + PEP lists · FATF compliant</div></div>
+          <span class="tag tg">Online</span><span style="font-size:10px;color:var(--sil)">42ms</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="chd">API Request Log <span class="tag tb">Last 100 calls</span></div>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Method</th><th>Status</th><th>Latency</th><th>Time</th></tr></thead>
+          <tbody>
+            <tr><td class="mono" style="font-size:10px">/api/v3/docs/index</td><td><span class="tag tb">POST</span></td><td style="color:var(--G)">200</td><td>38ms</td><td style="color:var(--sil)">09:14:22</td></tr>
+            <tr><td class="mono" style="font-size:10px">/api/v3/kyc/verify</td><td><span class="tag tb">POST</span></td><td style="color:var(--W)">429</td><td>—</td><td style="color:var(--sil)">09:13:47</td></tr>
+            <tr><td class="mono" style="font-size:10px">/api/v3/workflow/approve</td><td><span class="tag tg">PUT</span></td><td style="color:var(--G)">200</td><td>52ms</td><td style="color:var(--sil)">09:12:08</td></tr>
+            <tr><td class="mono" style="font-size:10px">/api/v3/docs/search</td><td><span class="tag tgold">GET</span></td><td style="color:var(--G)">200</td><td>29ms</td><td style="color:var(--sil)">09:11:55</td></tr>
+            <tr><td class="mono" style="font-size:10px">/api/v3/ocr/batch</td><td><span class="tag tb">POST</span></td><td style="color:var(--R)">500</td><td>—</td><td style="color:var(--sil)">09:10:30</td></tr>
+            <tr><td class="mono" style="font-size:10px">/api/v3/records/hold</td><td><span class="tag tb">POST</span></td><td style="color:var(--G)">201</td><td>44ms</td><td style="color:var(--sil)">09:09:17</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="chd">Webhook Configuration</div>
+        <div class="field"><label>Endpoint URL</label><input type="text" value="https://cbs.nbe.com.eg/api/dms-webhook"/></div>
+        <div class="g2">
+          <div class="field"><label>Auth Method</label><select><option selected>HMAC-SHA256</option><option>Bearer Token</option><option>Basic Auth</option></select></div>
+          <div class="field"><label>Events</label><select><option selected>Doc Indexed + Approved</option><option>Workflow Complete</option><option>All Events</option></select></div>
+        </div>
+        <button class="btn bg xs" style="margin-top:4px">Save Webhook</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 18. SECURITY & RBAC ═══ -->
+<div id="s-security" class="scr">
+  <div class="ph"><div><h2>Security &amp; Access Control</h2><p>RBAC · MFA · SSO · Zero-Trust · AES-256 Encryption · Permission Matrix · Session Audit</p></div>
+  <div class="phr"><button class="btn bg sm">+ Add User</button><button class="btn bs sm">Add Role</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kok"><div class="kl">Active Users</div><div class="kv">284</div><div class="ks">12 roles defined</div></div>
+    <div class="kpi kg"><div class="kl">MFA Enrolled</div><div class="kv">97%</div><div class="ks">7 users pending</div></div>
+    <div class="kpi kr"><div class="kl">Failed Logins (24h)</div><div class="kv">7</div><div class="ks">3 IPs auto-blocked</div></div>
+    <div class="kpi kb"><div class="kl">Active Sessions</div><div class="kv">142</div><div class="ks">Across 84 branches</div></div>
+  </div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="chd">User Management</div>
+      <table>
+        <thead><tr><th>User</th><th>Role</th><th>Branch</th><th>MFA</th><th>Last Login</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Ahmed Mohamed</td><td><span class="tag tgold">CDO / Doc Admin</span></td><td>Cairo West HQ</td><td style="color:var(--G)">✓ TOTP</td><td>Today 09:14</td><td><span class="tag tg">Active</span></td></tr>
+          <tr><td>Sara Kamal</td><td><span class="tag tb">Maker</span></td><td>Giza</td><td style="color:var(--G)">✓ SMS OTP</td><td>Today 08:52</td><td><span class="tag tg">Active</span></td></tr>
+          <tr><td>Mohamed Aly</td><td><span class="tag tg">Checker</span></td><td>Alexandria</td><td style="color:var(--W)">⚠ Pending</td><td>Yesterday</td><td><span class="tag tg">Active</span></td></tr>
+          <tr><td>Nour Rashid</td><td><span class="tag tp">Viewer</span></td><td>Cairo East</td><td style="color:var(--G)">✓ TOTP</td><td>2 days ago</td><td><span class="tag tw">Locked</span></td></tr>
+          <tr><td>Omar Khaled</td><td><span class="tag tb">Indexer</span></td><td>Cairo West HQ</td><td style="color:var(--G)">✓ TOTP</td><td>Today 08:30</td><td><span class="tag tg">Active</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card" style="overflow-x:auto">
+      <div class="chd">Permission Matrix <span style="font-size:10px;color:var(--sil);font-weight:400">✓ Full &nbsp; ~ Partial &nbsp; ✗ None</span></div>
+      <table>
+        <thead><tr><th>Module</th><th style="text-align:center">CDO</th><th style="text-align:center">Maker</th><th style="text-align:center">Checker</th><th style="text-align:center">Indexer</th><th style="text-align:center">Viewer</th><th style="text-align:center">Auditor</th></tr></thead>
+        <tbody>
+          <tr><td style="font-size:11px">Capture &amp; Scan</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td></tr>
+          <tr><td style="font-size:11px">Indexing</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcp">~</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td></tr>
+          <tr><td style="font-size:11px">Approve / Reject</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td></tr>
+          <tr><td style="font-size:11px">Repository View</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcy">✓</div></td><td><div class="pc pcy">✓</div></td></tr>
+          <tr><td style="font-size:11px">Legal Hold</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcp">~</div></td></tr>
+          <tr><td style="font-size:11px">Compliance &amp; Audit</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcy">✓</div></td></tr>
+          <tr><td style="font-size:11px">Admin Panel</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td></tr>
+          <tr><td style="font-size:11px">Cross-Branch Access</td><td><div class="pc pcy">✓</div></td><td><div class="pc pcp">~</div></td><td><div class="pc pcp">~</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcn">✗</div></td><td><div class="pc pcy">✓</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="g3">
+    <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><div style="font-size:13px;font-weight:700">Multi-Factor Auth (MFA)</div><div style="width:36px;height:20px;background:var(--G);border-radius:10px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div></div>
+      <div style="font-size:11px;color:var(--sil)">TOTP + SMS OTP. Enforced for all Maker, Checker, CDO and Admin roles. Biometric option enabled on mobile.</div>
+    </div>
+    <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><div style="font-size:13px;font-weight:700">Single Sign-On (SSO)</div><div style="width:36px;height:20px;background:var(--G);border-radius:10px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div></div>
+      <div style="font-size:11px;color:var(--sil)">SAML 2.0 with Active Directory. Session timeout: 8h. Concurrent sessions: 2 max. Forced re-auth on suspicious activity.</div>
+    </div>
+    <div style="padding:14px;background:var(--gr);border:1px solid var(--bd);border-radius:9px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><div style="font-size:13px;font-weight:700">Encryption at Rest</div><div style="width:36px;height:20px;background:var(--G);border-radius:10px;position:relative;cursor:pointer"><div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px"></div></div></div>
+      <div style="font-size:11px;color:var(--sil)">AES-256 on all documents, metadata and audit trails. Key rotation every 90 days. HSM-managed keys (SafeNet Luna).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 19. SYSTEM ADMIN ═══ -->
+<div id="s-admin" class="scr">
+  <div class="ph"><div><h2>System Administration</h2><p>Platform health · Disaster Recovery · Backup · Storage · Maintenance scheduling</p></div>
+  <div class="phr"><button class="btn bg sm">Run Diagnostics</button></div></div>
+  <div class="g4" style="margin-bottom:14px">
+    <div class="kpi kok"><div class="kl">System Uptime (YTD)</div><div class="kv">99.97%</div><div class="ks">2 planned outages</div></div>
+    <div class="kpi kb"><div class="kl">Storage Used</div><div class="kv">18.4 TB</div><div class="ks">of 50 TB · 63% total</div></div>
+    <div class="kpi kg"><div class="kl">Cold Archive (S3)</div><div class="kv">84.2 TB</div><div class="ks">Historical records</div></div>
+    <div class="kpi kw"><div class="kl">Last Full Backup</div><div class="kv">03:00</div><div class="ks">Today · 2h 14m · Success</div></div>
+  </div>
+  <div class="g2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="chd">Service Health Monitor</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="sr"><span style="display:flex;align-items:center;gap:7px"><div class="pulse"></div>Document Repository (PostgreSQL)</span><div style="display:flex;align-items:center;gap:8px"><div style="width:100px"><div class="bw2"><div class="bf bf-ok" style="width:38%"></div></div></div><span style="font-size:11px;color:var(--G)">38% CPU</span><span class="tag tg">Healthy</span></div></div>
+        <div class="sr"><span style="display:flex;align-items:center;gap:7px"><div class="pulse"></div>AI Engine (Watsonx)</span><div style="display:flex;align-items:center;gap:8px"><div style="width:100px"><div class="bw2"><div class="bf bf-g" style="width:74%"></div></div></div><span style="font-size:11px;color:var(--gold3)">74% GPU</span><span class="tag tg">Healthy</span></div></div>
+        <div class="sr"><span style="display:flex;align-items:center;gap:7px"><div class="pulse"></div>Workflow Engine (Camunda)</span><div style="display:flex;align-items:center;gap:8px"><div style="width:100px"><div class="bw2"><div class="bf bf-ok" style="width:29%"></div></div></div><span style="font-size:11px;color:var(--G)">29% CPU</span><span class="tag tg">Healthy</span></div></div>
+        <div class="sr"><span style="display:flex;align-items:center;gap:7px"><div style="width:6px;height:6px;border-radius:50%;background:var(--W);flex-shrink:0"></div>KYC Verification Engine</span><div style="display:flex;align-items:center;gap:8px"><div style="width:100px"><div class="bw2"><div class="bf" style="width:91%;background:var(--W)"></div></div></div><span style="font-size:11px;color:var(--W)">91% CPU</span><span class="tag tw">Warning</span></div></div>
+        <div class="sr"><span style="display:flex;align-items:center;gap:7px"><div class="pulse"></div>Search Engine (Elasticsearch)</span><div style="display:flex;align-items:center;gap:8px"><div style="width:100px"><div class="bw2"><div class="bf bf-b" style="width:44%"></div></div></div><span style="font-size:11px;color:var(--B)">44% CPU</span><span class="tag tg">Healthy</span></div></div>
+        <div class="sr"><span style="display:flex;align-items:center;gap:7px"><div class="pulse"></div>Notification Bus (Twilio)</span><div style="display:flex;align-items:center;gap:8px"><div style="width:100px"><div class="bw2"><div class="bf bf-ok" style="width:12%"></div></div></div><span style="font-size:11px;color:var(--G)">12% CPU</span><span class="tag tg">Healthy</span></div></div>
+        <div class="sr"><span style="display:flex;align-items:center;gap:7px"><div style="width:6px;height:6px;border-radius:50%;background:var(--R);flex-shrink:0"></div>Cold Archive Sync (S3)</span><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--R)">Network timeout</span><span class="tag tr">Offline</span></div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="chd">Disaster Recovery Status</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="background:var(--ink3);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+            <div style="flex-shrink:0"><div style="font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--G);margin-bottom:3px">Primary Site</div><div style="font-size:13px;font-weight:700">Cairo Data Center</div></div>
+            <div style="flex:1"><div style="font-size:11px;color:var(--sil)">AWS Bahrain (me-south-1) · Active-Active</div><div style="margin-top:4px"><span class="tag tg">● Live · 99.97% uptime</span></div></div>
+          </div>
+          <div style="background:var(--ink3);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+            <div style="flex-shrink:0"><div style="font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--B);margin-bottom:3px">DR Site</div><div style="font-size:13px;font-weight:700">Alexandria DR Center</div></div>
+            <div style="flex:1"><div style="font-size:11px;color:var(--sil)">AWS UAE (me-central-1) · Active-Passive</div><div style="margin-top:4px"><span class="tag tb">● Synced · RPO: 15min · RTO: 30min</span></div></div>
+          </div>
+        </div>
+        <div class="g2" style="margin-top:12px">
+          <div><div style="font-size:10px;color:var(--sil);margin-bottom:4px">Last DR Test</div><div style="font-size:12px;color:var(--G)">01 Mar 2024 · Passed</div></div>
+          <div><div style="font-size:10px;color:var(--sil);margin-bottom:4px">Replication Lag</div><div style="font-size:12px;color:var(--G)">180ms avg</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chd">Backup Schedule</div>
+        <div style="font-size:12px;display:flex;flex-direction:column;gap:6px">
+          <div class="sr"><span style="color:var(--sil)">Full Backup</span><span>Daily 03:00 AM · 2h 14m · <span style="color:var(--G)">Success</span></span></div>
+          <div class="sr"><span style="color:var(--sil)">Incremental</span><span>Every 4h · 12 min · <span style="color:var(--G)">Success</span></span></div>
+          <div class="sr"><span style="color:var(--sil)">Transaction Logs</span><span>Continuous streaming</span></div>
+          <div class="sr"><span style="color:var(--sil)">Retention</span><span>30 days hot · 7 years cold</span></div>
+          <div class="sr"><span style="color:var(--sil)">Next Scheduled</span><span style="color:var(--gold3)">Today 03:00 AM</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="chd">Scheduled Maintenance</div>
+    <table>
+      <thead><tr><th>Task</th><th>Schedule</th><th>Duration</th><th>Next Run</th><th>Last Result</th></tr></thead>
+      <tbody>
+        <tr><td>Full Backup to DR</td><td>Daily 03:00</td><td>~2h</td><td>Tomorrow 03:00</td><td><span class="tag tg">Success</span></td></tr>
+        <tr><td>AI Model Retraining</td><td>Weekly Sunday</td><td>~6h</td><td>Sun 21 Apr</td><td><span class="tag tg">Success</span></td></tr>
+        <tr><td>Records Disposal Check</td><td>Daily 03:30</td><td>~30m</td><td>Tomorrow 03:30</td><td><span class="tag tg">Success</span></td></tr>
+        <tr><td>Elasticsearch Re-index</td><td>Weekly Monday</td><td>~4h</td><td>Mon 22 Apr</td><td><span class="tag tg">Success</span></td></tr>
+        <tr><td>Audit Log Archive</td><td>Monthly 1st</td><td>~1h</td><td>01 May 2024</td><td><span class="tag tg">Success</span></td></tr>
+        <tr><td>Cold Sync (S3)</td><td>Every 2h</td><td>~20m</td><td style="color:var(--R)">Pending retry</td><td><span class="tag tr">Failed</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /#main -->
+</div><!-- /#shell -->
+
+<script>
+// ═══════════════════════════════════════════════
+// NBE Enterprise DMS v4.2 — Navigation & Charts
+// ═══════════════════════════════════════════════
+
+// NAVIGATION
+function go(id) {
+  document.querySelectorAll('.scr').forEach(function(s){ s.classList.remove('on'); });
+  document.querySelectorAll('.ni').forEach(function(n){ n.classList.remove('on'); });
+  var scr = document.getElementById('s-' + id);
+  if (scr) scr.classList.add('on');
+  document.querySelectorAll('.ni').forEach(function(n){
+    var oc = n.getAttribute('onclick') || '';
+    if (oc.indexOf("'" + id + "'") !== -1) n.classList.add('on');
+  });
+  var main = document.getElementById('main');
+  if (main) main.scrollTop = 0;
+}
+
+// TABS
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.tabs').forEach(function(tabGroup){
+    tabGroup.querySelectorAll('.tab').forEach(function(tab){
+      tab.addEventListener('click', function(){
+        tabGroup.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('on'); });
+        tab.classList.add('on');
+      });
+    });
+  });
+});
+
+// HEATMAP
+(function(){
+  var h = document.getElementById('heatmap');
+  if (!h) return;
+  var vals = [0.1,0.4,0.8,0.6,0.3,0.9,1.0,0.7,0.5,0.2,0.6,0.8,0.4,0.1,
+              0.2,0.7,0.9,0.5,0.8,1.0,0.7,0.4,0.6,0.3,0.9,0.5,0.7,0.2,
+              0.5,0.3,0.6,1.0,0.7,0.8,0.4,0.9,0.2,0.5,0.7,0.6,0.3,0.8,0.4,
+              0.8,1.0,0.4,0.7,0.9,0.3,0.6,0.5,0.8,0.4,0.2,0.7,0.9,0.5,0.3,
+              0.3,0.5,0.7,0.4,0.6,0.8,0.2,0.7,0.9,0.5,0.3,0.6,0.4,0.8,0.5,
+              0.6,0.2,0.8,0.9,0.4,0.5,0.7,0.3,0.6,0.8,0.4,0.9,0.5,0.2,0.7];
+  vals.forEach(function(v){
+    var d = document.createElement('div');
+    d.className = 'hm-cell';
+    var a = 0.1 + v * 0.9;
+    d.style.cssText = 'width:12px;height:12px;border-radius:2px;cursor:pointer;transition:.15s;background:rgba(184,145,42,' + a.toFixed(2) + ')';
+    d.title = Math.round(v * 12841) + ' docs';
+    d.onmouseover = function(){ this.style.transform='scale(1.5)'; };
+    d.onmouseout  = function(){ this.style.transform='scale(1)'; };
+    h.appendChild(d);
+  });
+})();
+
+// CHARTS — wait for DOM
+window.addEventListener('load', function(){
+
+  Chart.defaults.color = '#7a96b4';
+  Chart.defaults.font.size = 10;
+
+  var GOLD='#b8912a', GOLD2='#d4a73a', B='#3a9fd0', G='#2ecc8a', P='#9b6fe0', W='#f0a030', R='#e05252';
+  var gridX = { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#7a96b4'} };
+  var gridY = { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#7a96b4'} };
+
+  // 1. INFLOW LINE CHART
+  var el1 = document.getElementById('inflowC');
+  if (el1) {
+    var labels30 = [];
+    for (var i=0; i<30; i++){
+      var d = new Date(2024,2,15+i);
+      labels30.push(d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
+    }
+    new Chart(el1, {
+      type: 'line',
+      data: {
+        labels: labels30,
+        datasets: [{
+          data: [28400,31200,29800,34100,38200,42800,39400,44100,41200,37800,
+                 43200,46100,39800,41400,44200,42100,45800,47200,43100,40800,
+                 44900,48200,41700,43800,46100,42800,44500,41200,43700,42871],
+          borderColor: GOLD2,
+          backgroundColor: 'rgba(184,145,42,0.07)',
+          fill: true, tension: 0.4, borderWidth: 2,
+          pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: GOLD2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{display:false} },
+        scales: {
+          x: Object.assign({}, gridX, {ticks:{maxTicksLimit:8,color:'#7a96b4'}}),
+          y: Object.assign({}, gridY, {ticks:{callback:function(v){return (v/1000).toFixed(0)+'k';},color:'#7a96b4'}})
+        }
+      }
+    });
+  }
+
+  // 2. DONUT CHART
+  var el2 = document.getElementById('donutC');
+  if (el2) {
+    new Chart(el2, {
+      type: 'doughnut',
+      data: {
+        labels: ['KYC Docs','Loan Apps','Contracts','Compliance','Other'],
+        datasets: [{
+          data: [38,27,18,11,6],
+          backgroundColor: [GOLD,B,G,P,W],
+          borderColor: '#0b1a2e',
+          borderWidth: 3, hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: {
+            display: true, position: 'bottom',
+            labels: { color:'#7a96b4', boxWidth:10, padding:6, font:{size:9} }
+          }
+        }
+      }
+    });
+  }
+
+  // 3. SLA GAUGE
+  var el3 = document.getElementById('slaC');
+  if (el3) {
+    new Chart(el3, {
+      type: 'bar',
+      data: {
+        labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+        datasets: [
+          { data:[97,95,96,98,94,97,96], backgroundColor:'rgba(46,204,138,0.6)', borderRadius:3, label:'Met %' },
+          { data:[3,5,4,2,6,3,4], backgroundColor:'rgba(224,82,82,0.45)', borderRadius:3, label:'Missed %' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{display:false} },
+        scales: {
+          x: { stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#7a96b4',font:{size:9}} },
+          y: { stacked:true, min:0, max:100, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#7a96b4',font:{size:9}} }
+        }
+      }
+    });
+  }
+
+  // 4. REPORTS BAR
+  var el4 = document.getElementById('report-bar');
+  if (el4) {
+    new Chart(el4, {
+      type: 'bar',
+      data: {
+        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+        datasets: [
+          { label:'KYC',        data:[28400,31200,29800,34100,38200,42800,39400,44100,41200,37800,43200,46100], backgroundColor:'rgba(184,145,42,0.7)', borderRadius:3 },
+          { label:'Loans',      data:[12400,14200,11800,16100,15200,18800,17400,19100,16200,14800,18200,21100], backgroundColor:'rgba(58,159,208,0.6)',  borderRadius:3 },
+          { label:'Compliance', data:[4400,5200,4800,6100,7200,6800,7400,8100,6200,5800,7200,8100],            backgroundColor:'rgba(155,111,224,0.6)', borderRadius:3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{ display:true, position:'bottom', labels:{color:'#7a96b4',boxWidth:10,padding:6,font:{size:9}} } },
+        scales: {
+          x: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#7a96b4',font:{size:9}} },
+          y: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{callback:function(v){return (v/1000).toFixed(0)+'k';},color:'#7a96b4'} }
+        }
+      }
+    });
+  }
+
+  // 5. BRANCH HORIZONTAL BAR
+  var el5 = document.getElementById('branch-bar');
+  if (el5) {
+    new Chart(el5, {
+      type: 'bar',
+      data: {
+        labels: ['Cairo W.','Alexandria','Giza','Heliopolis','Assiut','Luxor','Suez','Mansoura'],
+        datasets: [{
+          label: 'Docs Today',
+          data: [12841,9220,7614,5104,4721,847,3218,2941],
+          backgroundColor: [
+            'rgba(184,145,42,0.85)','rgba(58,159,208,0.75)','rgba(46,204,138,0.75)',
+            'rgba(155,111,224,0.75)','rgba(240,160,48,0.75)','rgba(224,82,82,0.55)',
+            'rgba(58,159,208,0.5)','rgba(46,204,138,0.5)'
+          ],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend:{display:false} },
+        scales: {
+          x: { grid:{color:'rgba(255,255,255,0.04)'}, ticks:{callback:function(v){return (v/1000).toFixed(0)+'k';},color:'#7a96b4'} },
+          y: { grid:{display:false}, ticks:{color:'#bdd0e8',font:{size:10}} }
+        }
+      }
+    });
+  }
+
+  console.log('%c NBE Enterprise DMS v4.2 — 18 screens operational ', 'background:#b8912a;color:#050d1a;font-weight:bold;padding:4px 12px;border-radius:4px;');
+});
+</script>
+</body>
+</html>

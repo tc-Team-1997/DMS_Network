@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NBE — Document Management System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --navy:    #0a1628;
+    --navy2:   #0f2044;
+    --navy3:   #162d5a;
+    --gold:    #c9a84c;
+    --gold2:   #e8c96b;
+    --gold3:   #f5e0a0;
+    --silver:  #8da0b8;
+    --light:   #e8eef6;
+    --white:   #f4f7fb;
+    --danger:  #e05c5c;
+    --success: #3cb97b;
+    --warn:    #f0a440;
+    --info:    #4a9fd4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--light);min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  h1,h2,h3,.serif{font-family:'Cormorant Garamond',serif}
+
+  /* ─── TOPBAR ─── */
+  #topbar{height:56px;background:var(--navy2);border-bottom:1px solid rgba(201,168,76,.18);display:flex;align-items:center;gap:12px;padding:0 20px;flex-shrink:0;z-index:100}
+  .bank-logo{display:flex;align-items:center;gap:10px;margin-right:16px;flex-shrink:0}
+  .logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .logo-mark svg{width:20px;height:20px;fill:var(--navy);stroke:none}
+  .bank-name{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:700;color:var(--gold2);letter-spacing:.5px;line-height:1.1}
+  .bank-sub{font-size:9px;color:var(--silver);letter-spacing:2px;text-transform:uppercase}
+  .search-wrap{flex:1;max-width:440px;position:relative}
+  .search-wrap input{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:7px 36px 7px 14px;font-size:13px;color:var(--light);outline:none;transition:border .2s}
+  .search-wrap input:focus{border-color:var(--gold)}
+  .search-wrap input::placeholder{color:var(--silver)}
+  .search-icon{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--silver);width:15px;height:15px}
+  .topbar-actions{margin-left:auto;display:flex;align-items:center;gap:14px}
+  .icon-btn{background:none;border:none;color:var(--silver);cursor:pointer;position:relative;padding:4px;transition:color .2s}
+  .icon-btn:hover{color:var(--gold2)}
+  .notif-dot{position:absolute;top:2px;right:2px;width:7px;height:7px;background:var(--danger);border-radius:50%;border:1px solid var(--navy2)}
+  .upload-btn{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy);border:none;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;letter-spacing:.4px;transition:opacity .2s}
+  .upload-btn:hover{opacity:.9}
+  .user-pill{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:5px 12px 5px 7px;cursor:pointer;transition:background .2s}
+  .user-pill:hover{background:rgba(255,255,255,.09)}
+  .avatar{width:28px;height:28px;background:linear-gradient(135deg,var(--navy3),var(--gold));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--white)}
+  .user-info{line-height:1.2}
+  .user-name{font-size:12px;font-weight:600;color:var(--light)}
+  .user-role{font-size:10px;color:var(--gold);letter-spacing:.5px}
+
+  /* ─── BODY ─── */
+  #body{display:flex;flex:1;overflow:hidden}
+
+  /* ─── SIDEBAR ─── */
+  #sidebar{width:220px;background:var(--navy2);border-right:1px solid rgba(201,168,76,.12);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+  #sidebar::-webkit-scrollbar{width:3px}
+  #sidebar::-webkit-scrollbar-thumb{background:rgba(201,168,76,.2);border-radius:4px}
+  .nav-section{padding:12px 0 4px}
+  .nav-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--silver);padding:0 18px 8px;opacity:.7}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 18px;cursor:pointer;font-size:13px;color:var(--silver);transition:all .15s;position:relative;border-left:2px solid transparent}
+  .nav-item:hover{color:var(--light);background:rgba(255,255,255,.04)}
+  .nav-item.active{color:var(--gold2);background:rgba(201,168,76,.08);border-left-color:var(--gold)}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0}
+  .nav-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;border-radius:10px;padding:1px 6px;font-weight:600}
+  .nav-badge.gold{background:var(--gold);color:var(--navy)}
+  .sidebar-footer{margin-top:auto;padding:14px;border-top:1px solid rgba(255,255,255,.06)}
+  .sys-status{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--silver)}
+  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* ─── MAIN ─── */
+  #main{flex:1;overflow-y:auto;background:var(--navy);padding:24px}
+  #main::-webkit-scrollbar{width:5px}
+  #main::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);border-radius:4px}
+  .screen{display:none}
+  .screen.active{display:block;animation:fadeIn .3s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ─── COMMON ─── */
+  .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+  .page-title{font-size:22px;font-weight:700;color:var(--gold2)}
+  .page-sub{font-size:12px;color:var(--silver);margin-top:2px}
+  .card{background:var(--navy2);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:20px}
+  .card-header{font-size:13px;font-weight:600;color:var(--light);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .tag-gold{background:rgba(201,168,76,.15);color:var(--gold2)}
+  .tag-success{background:rgba(60,185,123,.15);color:var(--success)}
+  .tag-danger{background:rgba(224,92,92,.15);color:var(--danger)}
+  .tag-warn{background:rgba(240,164,64,.15);color:var(--warn)}
+  .tag-info{background:rgba(74,159,212,.15);color:var(--info)}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:none;letter-spacing:.3px}
+  .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--navy)}
+  .btn-primary:hover{opacity:.9}
+  .btn-secondary{background:rgba(255,255,255,.07);color:var(--light);border:1px solid rgba(255,255,255,.1)}
+  .btn-secondary:hover{background:rgba(255,255,255,.12)}
+  .btn-danger{background:rgba(224,92,92,.15);color:var(--danger);border:1px solid rgba(224,92,92,.3)}
+  .btn-success{background:rgba(60,185,123,.15);color:var(--success);border:1px solid rgba(60,185,123,.3)}
+  .divider{height:1px;background:rgba(255,255,255,.06);margin:16px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  input[type=text],input[type=date],input[type=email],input[type=password],select,textarea{
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;
+    padding:9px 13px;font-size:13px;color:var(--light);outline:none;width:100%;
+    font-family:'DM Sans',sans-serif;transition:border .2s
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+  select option{background:var(--navy2);color:var(--light)}
+  label{font-size:12px;color:var(--silver);margin-bottom:4px;display:block;letter-spacing:.3px}
+  .field{margin-bottom:14px}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--silver);text-align:left;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
+  td{padding:11px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--light)}
+  tr:hover td{background:rgba(255,255,255,.03)}
+
+  /* ─── KPI CARDS ─── */
+  .kpi{background:var(--navy2);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden}
+  .kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.gold-kpi::after{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+  .kpi.blue-kpi::after{background:linear-gradient(90deg,var(--info),#70b8e8)}
+  .kpi.green-kpi::after{background:linear-gradient(90deg,var(--success),#5dd4a0)}
+  .kpi.red-kpi::after{background:linear-gradient(90deg,var(--danger),#f08080)}
+  .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--silver);margin-bottom:10px}
+  .kpi-val{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:700;color:var(--white);line-height:1}
+  .kpi-sub{font-size:11px;color:var(--silver);margin-top:6px;display:flex;align-items:center;gap:4px}
+  .kpi-trend{font-size:11px;font-weight:600;display:flex;align-items:center;gap:2px}
+  .kpi-trend.up{color:var(--success)}
+  .kpi-trend.down{color:var(--danger)}
+  .kpi-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);opacity:.1;color:var(--gold)}
+  .kpi-icon svg{width:48px;height:48px}
+
+  /* ─── AI INSIGHTS ─── */
+  .ai-card{background:linear-gradient(135deg,rgba(10,22,40,.9),rgba(15,32,68,.9));border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:18px 20px}
+  .ai-header{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;font-weight:600;color:var(--gold2)}
+  .ai-pulse{width:8px;height:8px;border-radius:50%;background:var(--gold);animation:pulse 1.5s infinite}
+  .ai-insight{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,.04);margin-bottom:8px;border-left:2px solid var(--gold)}
+  .ai-insight:last-child{margin-bottom:0}
+  .ai-insight-icon{color:var(--gold);flex-shrink:0;margin-top:1px}
+  .ai-insight-text{font-size:12px;color:var(--light);line-height:1.5}
+  .ai-insight-meta{font-size:11px;color:var(--silver);margin-top:3px}
+
+  /* ─── DOCUMENT TABLE ─── */
+  .doc-row td:first-child{display:flex;align-items:center;gap:10px}
+  .doc-icon{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .doc-icon.pdf{background:rgba(224,92,92,.15)}
+  .doc-icon.img{background:rgba(74,159,212,.15)}
+  .doc-icon.word{background:rgba(60,185,123,.15)}
+
+  /* ─── TABS ─── */
+  .tabs{display:flex;gap:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:4px;width:fit-content;margin-bottom:20px}
+  .tab{padding:7px 18px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;color:var(--silver);transition:all .2s;border:none;background:none}
+  .tab.active{background:rgba(201,168,76,.12);color:var(--gold2);font-weight:600}
+  .tab:hover:not(.active){color:var(--light)}
+
+  /* ─── DROPZONE ─── */
+  .dropzone{border:2px dashed rgba(201,168,76,.3);border-radius:12px;padding:48px 24px;text-align:center;transition:all .2s;cursor:pointer;background:rgba(201,168,76,.02)}
+  .dropzone:hover{border-color:var(--gold);background:rgba(201,168,76,.05)}
+  .dropzone-icon{color:var(--gold);margin:0 auto 14px}
+  .dropzone-title{font-size:15px;font-weight:600;color:var(--light);margin-bottom:6px}
+  .dropzone-sub{font-size:12px;color:var(--silver)}
+
+  /* ─── PROGRESS ─── */
+  .progress-bar{height:5px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin-top:6px}
+  .progress-fill{height:100%;border-radius:4px;transition:width .8s ease}
+  .progress-gold{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+  .progress-green{background:linear-gradient(90deg,var(--success),#5dd4a0)}
+  .progress-blue{background:linear-gradient(90deg,var(--info),#70b8e8)}
+
+  /* ─── WORKFLOW ─── */
+  .flow-steps{display:flex;align-items:center;gap:0;overflow-x:auto;padding-bottom:4px}
+  .flow-step{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:100px;position:relative}
+  .flow-step::after{content:'';position:absolute;top:16px;left:50%;width:100%;height:2px;background:rgba(255,255,255,.1);z-index:0}
+  .flow-step:last-child::after{display:none}
+  .flow-node{width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;position:relative;z-index:1;background:var(--navy2)}
+  .flow-node.done{border-color:var(--success);background:rgba(60,185,123,.15);color:var(--success)}
+  .flow-node.active{border-color:var(--gold);background:rgba(201,168,76,.15);color:var(--gold);animation:pulse 1.5s infinite}
+  .flow-node.pending{color:var(--silver)}
+  .flow-label{font-size:10px;color:var(--silver);text-align:center;line-height:1.3}
+
+  /* ─── VIEWER ─── */
+  .viewer-toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:12px;flex-wrap:wrap}
+  .viewer-doc{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;min-height:480px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .doc-preview{width:100%;height:480px;display:flex;flex-direction:column;gap:8px;padding:32px;color:var(--silver);font-size:13px}
+  .doc-line{height:10px;background:rgba(255,255,255,.08);border-radius:3px}
+  .doc-line.short{width:60%}
+  .doc-line.title{width:40%;height:14px;background:rgba(201,168,76,.2);margin-bottom:12px}
+  .redact-box{background:rgba(255,255,255,.9);border-radius:2px;display:inline-block;height:10px;width:120px;opacity:.2}
+
+  /* ─── PERMISSION MATRIX ─── */
+  .matrix-cell{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px}
+  .matrix-cell.allow{background:rgba(60,185,123,.15);color:var(--success)}
+  .matrix-cell.deny{background:rgba(224,92,92,.1);color:rgba(255,255,255,.2)}
+  .matrix-cell.partial{background:rgba(240,164,64,.12);color:var(--warn)}
+
+  /* ─── ALERTS ─── */
+  .alert-item{display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:10px;background:rgba(255,255,255,.04);border-left:3px solid;margin-bottom:10px;transition:background .2s;cursor:pointer}
+  .alert-item:hover{background:rgba(255,255,255,.07)}
+  .alert-item.critical{border-left-color:var(--danger)}
+  .alert-item.warning{border-left-color:var(--warn)}
+  .alert-item.info{border-left-color:var(--info)}
+  .alert-item.success{border-left-color:var(--success)}
+
+  /* ─── INTEGRATION ─── */
+  .api-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:16px;display:flex;align-items:center;gap:14px;transition:background .2s;cursor:pointer}
+  .api-card:hover{background:rgba(255,255,255,.07)}
+  .api-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .api-dot.online{background:var(--success);box-shadow:0 0 6px var(--success)}
+  .api-dot.warn{background:var(--warn);box-shadow:0 0 6px var(--warn)}
+  .api-dot.offline{background:var(--danger)}
+
+  /* ─── CHARTS ─── */
+  .chart-wrap{position:relative;height:160px}
+
+  /* scrollbar */
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-thumb{background:rgba(201,168,76,.15);border-radius:4px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ TOP BAR ═══════════════ -->
+<div id="topbar">
+  <div class="bank-logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="bank-name">National Bank of Egypt</div>
+      <div class="bank-sub">Document Management System</div>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <input type="text" placeholder="AI-powered search — documents, customers, IDs…"/>
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+  </div>
+  <div class="topbar-actions">
+    <button class="icon-btn" title="Notifications" onclick="showScreen('alerts')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notif-dot"></span>
+    </button>
+    <button class="icon-btn" title="Settings" onclick="showScreen('admin')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    </button>
+    <button class="upload-btn" onclick="showScreen('capture')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Quick Upload
+    </button>
+    <div class="user-pill">
+      <div class="avatar">AM</div>
+      <div class="user-info">
+        <div class="user-name">Ahmed M.</div>
+        <div class="user-role">DOC ADMIN</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ BODY ═══════════════ -->
+<div id="body">
+
+  <!-- ─── SIDEBAR ─── -->
+  <div id="sidebar">
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" onclick="showScreen('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Document Lifecycle</div>
+      <div class="nav-item" onclick="showScreen('capture')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Capture
+      </div>
+      <div class="nav-item" onclick="showScreen('indexing')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Indexing
+        <span class="nav-badge">12</span>
+      </div>
+      <div class="nav-item" onclick="showScreen('ai')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        AI Processing
+        <span class="nav-badge gold">7</span>
+      </div>
+      <div class="nav-item" onclick="showScreen('repository')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Repository
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Discovery</div>
+      <div class="nav-item" onclick="showScreen('search')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Search
+      </div>
+      <div class="nav-item" onclick="showScreen('viewer')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Document Viewer
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Operations</div>
+      <div class="nav-item" onclick="showScreen('workflow')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Workflows
+        <span class="nav-badge">4</span>
+      </div>
+      <div class="nav-item" onclick="showScreen('alerts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Alerts
+        <span class="nav-badge">9</span>
+      </div>
+      <div class="nav-item" onclick="showScreen('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reports
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">System</div>
+      <div class="nav-item" onclick="showScreen('integration')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="6" height="6"/><rect x="16" y="3" width="6" height="6"/><rect x="9" y="15" width="6" height="6"/><path d="M5 9v3a7 7 0 0 0 7 7v0a7 7 0 0 0 7-7V9"/><path d="M12 16v-4"/></svg>
+        Integration
+      </div>
+      <div class="nav-item" onclick="showScreen('security')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Security & Access
+      </div>
+      <div class="nav-item" onclick="showScreen('admin')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Admin Panel
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="sys-status">
+        <span class="status-dot"></span>
+        All systems operational
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+  <div id="main">
+
+    <!-- ──────────── DASHBOARD ──────────── -->
+    <div id="screen-dashboard" class="screen active">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Executive Dashboard</div>
+          <div class="page-sub">Real-time document intelligence — updated 2 mins ago</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="tag tag-gold">AI Active</span>
+          <button class="btn btn-secondary" style="font-size:11px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 9l-5 5-5-5M12 12.8V2.5"/></svg>
+            Export PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid4" style="margin-bottom:20px">
+        <div class="kpi gold-kpi">
+          <div class="kpi-label">Total Documents</div>
+          <div class="kpi-val">2,847,391</div>
+          <div class="kpi-sub"><span class="kpi-trend up">↑ 4.2%</span> vs last month</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>
+        </div>
+        <div class="kpi blue-kpi">
+          <div class="kpi-label">OCR Processed</div>
+          <div class="kpi-val">96.8%</div>
+          <div class="kpi-sub"><span class="kpi-trend up">↑ 1.1%</span> accuracy rate</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+        </div>
+        <div class="kpi red-kpi">
+          <div class="kpi-label">Pending Approvals</div>
+          <div class="kpi-val">247</div>
+          <div class="kpi-sub"><span class="kpi-trend down">↑ 18</span> since yesterday</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+        </div>
+        <div class="kpi" style="border-top:2px solid var(--warn)">
+          <div class="kpi-label">Expiring Documents</div>
+          <div class="kpi-val" style="color:var(--warn)">1,042</div>
+          <div class="kpi-sub"><span class="kpi-trend down">↑ 83</span> expiring in 30 days</div>
+          <div class="kpi-icon" style="color:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+        </div>
+      </div>
+
+      <div class="grid2" style="margin-bottom:20px">
+        <!-- Charts -->
+        <div class="card">
+          <div class="card-header">Document Inflow Trend <span class="tag tag-info">Last 7 days</span></div>
+          <div class="chart-wrap"><canvas id="inflow-chart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header">Processing SLA Compliance <span class="tag tag-success">96%</span></div>
+          <div class="chart-wrap"><canvas id="sla-chart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <!-- AI Insights -->
+        <div class="ai-card">
+          <div class="ai-header"><div class="ai-pulse"></div> AI Insights Engine</div>
+          <div class="ai-insight">
+            <div class="ai-insight-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+            <div>
+              <div class="ai-insight-text">15 KYC documents are missing expiry dates — immediate indexing required</div>
+              <div class="ai-insight-meta">Detected 14 min ago · Customers: Branch Cairo West</div>
+            </div>
+          </div>
+          <div class="ai-insight">
+            <div class="ai-insight-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div>
+              <div class="ai-insight-text">20 customer documents flagged for name/DOB mismatch with CBS records</div>
+              <div class="ai-insight-meta">Classification confidence: 94.2% · Action needed</div>
+            </div>
+          </div>
+          <div class="ai-insight" style="border-left-color:var(--info)">
+            <div class="ai-insight-icon" style="color:var(--info)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div>
+              <div class="ai-insight-text">Batch of 342 scanned passports ready for auto-classification</div>
+              <div class="ai-insight-meta">OCR queue · Estimated processing: 4 min</div>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn btn-primary" style="font-size:11px">Review All Insights</button>
+            <button class="btn btn-secondary" style="font-size:11px">Dismiss Read</button>
+          </div>
+        </div>
+
+        <!-- Quick Actions + Recent -->
+        <div class="card">
+          <div class="card-header">Quick Actions</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+            <button class="btn btn-primary" onclick="showScreen('capture')" style="justify-content:center;padding:14px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Scan Document
+            </button>
+            <button class="btn btn-secondary" onclick="showScreen('capture')" style="justify-content:center;padding:14px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Batch
+            </button>
+            <button class="btn btn-secondary" onclick="showScreen('search')" style="justify-content:center;padding:14px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Search Documents
+            </button>
+            <button class="btn btn-secondary" onclick="showScreen('reports')" style="justify-content:center;padding:14px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              Run Report
+            </button>
+          </div>
+          <div class="divider"></div>
+          <div class="card-header" style="margin-bottom:10px">Recent Activity</div>
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,.03);border-radius:7px">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0"></div>
+              <div style="flex:1;color:var(--light)">Passport batch (87 docs) indexed</div>
+              <div style="color:var(--silver)">2 min ago</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,.03);border-radius:7px">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--warn);flex-shrink:0"></div>
+              <div style="flex:1;color:var(--light)">Workflow: Loan App #A4829 awaiting approval</div>
+              <div style="color:var(--silver)">11 min ago</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,.03);border-radius:7px">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--danger);flex-shrink:0"></div>
+              <div style="flex:1;color:var(--light)">Alert: 12 documents expiring in 7 days</div>
+              <div style="color:var(--silver)">1 hr ago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── CAPTURE ──────────── -->
+    <div id="screen-capture" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Capture</div><div class="page-sub">Scan or upload documents — WIA / TWAIN compliant</div></div>
+      </div>
+      <div class="tabs">
+        <button class="tab active">📷 Scan</button>
+        <button class="tab">📁 Upload</button>
+        <button class="tab">📦 Batch Upload</button>
+      </div>
+      <div class="grid2">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <div class="card-header">Scanner Configuration</div>
+            <div class="field"><label>Scanner Device</label>
+              <select><option>FUJITSU fi-7260 (WIA)</option><option>Canon DR-G1100 (TWAIN)</option><option>Epson DS-860 (WIA)</option></select>
+            </div>
+            <div class="grid2">
+              <div class="field"><label>Resolution (DPI)</label>
+                <select><option>150 DPI</option><option>200 DPI</option><option selected>300 DPI</option><option>600 DPI</option></select>
+              </div>
+              <div class="field"><label>Color Mode</label>
+                <select><option>Greyscale</option><option selected>Color</option><option>Black & White</option></select>
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="field"><label>Paper Size</label>
+                <select><option>A4</option><option>Letter</option><option>Legal</option><option>Auto-detect</option></select>
+              </div>
+              <div class="field"><label>Duplex</label>
+                <select><option selected>Single-sided</option><option>Double-sided</option></select>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <button class="btn btn-primary" style="flex:1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                Start Scan
+              </button>
+              <button class="btn btn-secondary">Test Connection</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">Scan Queue <span class="tag tag-gold">3 pages</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,.04);border-radius:8px">
+                <div class="doc-icon img" style="width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </div>
+                <div style="flex:1"><div style="font-size:13px;color:var(--light)">Page_001.jpg</div><div style="font-size:11px;color:var(--silver)">300 DPI · 2.1 MB</div></div>
+                <span class="tag tag-success">Ready</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,.04);border-radius:8px">
+                <div class="doc-icon img" style="width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </div>
+                <div style="flex:1"><div style="font-size:13px;color:var(--light)">Page_002.jpg</div><div style="font-size:11px;color:var(--silver)">300 DPI · 2.3 MB</div></div>
+                <span class="tag tag-success">Ready</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,.04);border-radius:8px">
+                <div class="doc-icon img" style="width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </div>
+                <div style="flex:1"><div style="font-size:13px;color:var(--light)">Page_003.jpg</div><div style="font-size:11px;color:var(--silver)">Low quality detected</div></div>
+                <span class="tag tag-warn">Rescan?</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-primary" style="flex:1">Submit to Indexing</button>
+              <button class="btn btn-secondary">Rescan All</button>
+            </div>
+          </div>
+        </div>
+        <!-- Preview Panel -->
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="card-header">Preview Panel</div>
+          <div style="flex:1;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.07);min-height:400px;display:flex;align-items:center;justify-content:center;position:relative">
+            <div style="text-align:center;color:var(--silver)">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin:0 auto 12px;opacity:.3"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <div style="font-size:13px">Select a page to preview</div>
+            </div>
+            <div style="position:absolute;top:12px;right:12px;display:flex;gap:6px">
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px">Rotate</button>
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px">Crop</button>
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px">Enhance</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── INDEXING ──────────── -->
+    <div id="screen-indexing" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Indexing</div><div class="page-sub">Assign metadata and CID mapping to captured documents</div></div>
+        <span class="tag tag-warn">12 documents awaiting indexing</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:16px">
+        <!-- Document Viewer -->
+        <div class="card">
+          <div class="card-header">Document Viewer
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px">Prev</button>
+              <span style="font-size:12px;color:var(--silver);align-self:center">1 / 12</span>
+              <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px">Next</button>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1);border-radius:10px;height:420px;display:flex;align-items:center;justify-content:center;position:relative">
+            <div style="text-align:center;padding:24px;width:100%">
+              <!-- Fake document -->
+              <div style="background:rgba(255,255,255,.06);border-radius:6px;padding:20px;max-width:280px;margin:0 auto;text-align:left">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;align-items:center">
+                  <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--gold)">NATIONAL ID — EGYPT</div>
+                  <div class="tag tag-info" style="font-size:9px">OCR Ready</div>
+                </div>
+                <div style="height:8px;background:rgba(255,255,255,.12);border-radius:3px;margin-bottom:8px;width:70%"></div>
+                <div style="height:8px;background:rgba(255,255,255,.08);border-radius:3px;margin-bottom:8px;width:55%"></div>
+                <div style="height:8px;background:rgba(255,255,255,.08);border-radius:3px;margin-bottom:14px;width:65%"></div>
+                <div style="display:flex;gap:10px">
+                  <div style="width:56px;height:72px;background:rgba(201,168,76,.15);border-radius:4px;border:1px dashed rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                  </div>
+                  <div style="flex:1">
+                    <div style="height:7px;background:rgba(255,255,255,.12);border-radius:2px;margin-bottom:5px;width:80%"></div>
+                    <div style="height:7px;background:rgba(255,255,255,.08);border-radius:2px;margin-bottom:5px;width:60%"></div>
+                    <div style="height:7px;background:rgba(255,255,255,.08);border-radius:2px;width:70%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Metadata Form -->
+        <div class="card">
+          <div class="card-header">Metadata Form <span class="tag tag-gold">KYC Document</span></div>
+          <div class="grid2">
+            <div class="field"><label>Document Type *</label>
+              <select><option>National ID</option><option>Passport</option><option>Driving License</option><option>Utility Bill</option></select>
+            </div>
+            <div class="field"><label>Customer CID *</label>
+              <input type="text" value="EGY-2024-00847291" placeholder="e.g. EGY-2024-XXXXXXXX"/>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Full Name (as per doc) *</label><input type="text" value="Ahmed Mohamed Hassan"/></div>
+            <div class="field"><label>Date of Birth *</label><input type="date" value="1986-04-15"/></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Document Number *</label><input type="text" value="28604150182937"/></div>
+            <div class="field"><label>Issue Date *</label><input type="date" value="2022-01-10"/></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Expiry Date *</label><input type="date" value="2027-01-09"/></div>
+            <div class="field"><label>Issuing Authority</label><input type="text" value="Civil Status Authority, Cairo"/></div>
+          </div>
+          <div class="field"><label>Branch / Source</label>
+            <select><option>Cairo West Branch</option><option>Alexandria HQ</option><option>Giza Branch</option></select>
+          </div>
+          <div class="field"><label>Notes</label><textarea rows="2" placeholder="Optional remarks…"></textarea></div>
+          <div class="divider"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" style="flex:1">Save & Next</button>
+            <button class="btn btn-success">Submit to Workflow</button>
+            <button class="btn btn-danger">Reject</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── AI PROCESSING ──────────── -->
+    <div id="screen-ai" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">AI Processing Engine</div><div class="page-sub">Auto-classification, OCR extraction & confidence scoring</div></div>
+        <span class="tag tag-gold">AI Active — Model v3.2</span>
+      </div>
+      <div class="grid4" style="margin-bottom:20px">
+        <div class="kpi blue-kpi"><div class="kpi-label">Queue</div><div class="kpi-val">342</div><div class="kpi-sub">documents pending</div></div>
+        <div class="kpi green-kpi"><div class="kpi-label">Processed Today</div><div class="kpi-val">8,471</div><div class="kpi-sub">avg 4.2s / doc</div></div>
+        <div class="kpi gold-kpi"><div class="kpi-label">Avg Confidence</div><div class="kpi-val">94.7%</div><div class="kpi-sub">above 90% threshold</div></div>
+        <div class="kpi red-kpi"><div class="kpi-label">Manual Review</div><div class="kpi-val">7</div><div class="kpi-sub">low-confidence docs</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1.1fr;gap:16px">
+        <!-- Doc with highlights -->
+        <div class="card">
+          <div class="card-header">Document with AI Highlights</div>
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:24px;min-height:360px;position:relative">
+            <div style="font-size:10px;color:var(--gold);letter-spacing:1px;margin-bottom:14px;text-transform:uppercase">Passport — MRZ Auto-detected</div>
+            <div style="display:flex;gap:12px;margin-bottom:14px">
+              <div style="width:60px;height:80px;background:linear-gradient(135deg,rgba(201,168,76,.15),rgba(74,159,212,.15));border-radius:6px;border:1px dashed rgba(201,168,76,.4);display:flex;align-items:center;justify-content:center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+              </div>
+              <div style="flex:1">
+                <!-- highlighted fields -->
+                <div style="margin-bottom:6px">
+                  <div style="font-size:10px;color:var(--silver);margin-bottom:2px">Full Name</div>
+                  <div style="background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.4);border-radius:4px;padding:4px 8px;font-size:13px;color:var(--light)">AHMED HASSAN IBRAHIM</div>
+                </div>
+                <div class="grid2" style="gap:6px">
+                  <div>
+                    <div style="font-size:10px;color:var(--silver);margin-bottom:2px">Date of Birth</div>
+                    <div style="background:rgba(74,159,212,.15);border:1px solid rgba(74,159,212,.3);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--light)">14 APR 1986</div>
+                  </div>
+                  <div>
+                    <div style="font-size:10px;color:var(--silver);margin-bottom:2px">Passport No.</div>
+                    <div style="background:rgba(60,185,123,.15);border:1px solid rgba(60,185,123,.3);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--light)">A12345678</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="grid2" style="gap:6px">
+              <div>
+                <div style="font-size:10px;color:var(--silver);margin-bottom:2px">Issue Date</div>
+                <div style="background:rgba(60,185,123,.15);border:1px solid rgba(60,185,123,.3);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--light)">10 JAN 2022</div>
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--silver);margin-bottom:2px">Expiry Date</div>
+                <div style="background:rgba(240,164,64,.15);border:1px solid rgba(240,164,64,.3);border-radius:4px;padding:4px 8px;font-size:12px;color:var(--light)">09 JAN 2032</div>
+              </div>
+            </div>
+            <div style="margin-top:14px;font-size:10px;color:var(--silver);font-family:monospace;background:rgba(0,0,0,.2);padding:8px;border-radius:5px;letter-spacing:1px">
+              P&lt;EGYAHMED&lt;HASSAN&lt;IBRAHIM&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<br/>
+              A12345678&lt;EGY8604145M3201095&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+            </div>
+          </div>
+        </div>
+        <!-- Extraction results & confidence -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card">
+            <div class="card-header">Extracted Fields <span class="tag tag-success">Confidence 97.2%</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">
+                <div style="width:80px;font-size:11px;color:var(--silver)">Full Name</div>
+                <div style="flex:1;font-size:13px;color:var(--light)">Ahmed Hassan Ibrahim</div>
+                <div class="tag tag-success">99%</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">
+                <div style="width:80px;font-size:11px;color:var(--silver)">Date of Birth</div>
+                <div style="flex:1;font-size:13px;color:var(--light)">14 April 1986</div>
+                <div class="tag tag-success">98%</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">
+                <div style="width:80px;font-size:11px;color:var(--silver)">Doc Number</div>
+                <div style="flex:1;font-size:13px;color:var(--light)">A12345678</div>
+                <div class="tag tag-success">99%</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">
+                <div style="width:80px;font-size:11px;color:var(--silver)">Expiry Date</div>
+                <div style="flex:1;font-size:13px;color:var(--light)">09 January 2032</div>
+                <div class="tag tag-warn">87%</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:7px">
+                <div style="width:80px;font-size:11px;color:var(--silver)">Nationality</div>
+                <div style="flex:1;font-size:13px;color:var(--light)">Egyptian</div>
+                <div class="tag tag-success">99%</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">Classification Result</div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(201,168,76,.06);border-radius:8px;border:1px solid rgba(201,168,76,.2);margin-bottom:12px">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--gold2)">Egyptian Passport (Type P)</div>
+                <div style="font-size:11px;color:var(--silver)">Auto-classified · MRZ validated · Not expired</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-success" style="flex:1">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Accept & Index
+              </button>
+              <button class="btn btn-secondary">Edit Fields</button>
+              <button class="btn btn-danger">Reprocess</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── REPOSITORY ──────────── -->
+    <div id="screen-repository" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Repository</div><div class="page-sub">Folder-based document archive with version control</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            New Folder
+          </button>
+          <button class="btn btn-primary">Upload Document</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:220px 1fr 280px;gap:16px">
+        <!-- Folder Tree -->
+        <div class="card" style="padding:12px">
+          <div class="card-header" style="font-size:12px">Folder Structure</div>
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:2px">
+            <div style="padding:7px 10px;border-radius:6px;background:rgba(201,168,76,.1);color:var(--gold2);cursor:pointer;display:flex;align-items:center;gap:7px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              KYC Documents
+            </div>
+            <div style="padding:7px 10px 7px 26px;border-radius:6px;color:var(--silver);cursor:pointer;display:flex;align-items:center;gap:7px" class="nav-hover">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Passports
+            </div>
+            <div style="padding:7px 10px 7px 26px;border-radius:6px;color:var(--silver);cursor:pointer;display:flex;align-items:center;gap:7px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              National IDs
+            </div>
+            <div style="padding:7px 10px 7px 26px;border-radius:6px;color:var(--silver);cursor:pointer;display:flex;align-items:center;gap:7px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Utility Bills
+            </div>
+            <div style="padding:7px 10px;border-radius:6px;color:var(--silver);cursor:pointer;display:flex;align-items:center;gap:7px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Loan Applications
+            </div>
+            <div style="padding:7px 10px;border-radius:6px;color:var(--silver);cursor:pointer;display:flex;align-items:center;gap:7px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Contracts
+            </div>
+            <div style="padding:7px 10px;border-radius:6px;color:var(--silver);cursor:pointer;display:flex;align-items:center;gap:7px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Compliance
+            </div>
+            <div style="padding:7px 10px;border-radius:6px;color:var(--silver);cursor:pointer;display:flex;align-items:center;gap:7px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Archived
+            </div>
+          </div>
+        </div>
+        <!-- Document Grid -->
+        <div class="card" style="overflow:auto">
+          <div class="card-header">KYC Documents — Passports
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px">⊞ Grid</button>
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px">☰ List</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>Document Name</th><th>Customer</th><th>Expiry</th><th>Version</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr class="doc-row"><td><div class="doc-icon pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>Passport_AHI_2022.pdf</td><td>Ahmed H. Ibrahim</td><td>09 Jan 2032</td><td>v2.0</td><td><span class="tag tag-success">Valid</span></td><td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="showScreen('viewer')">View</button></td></tr>
+              <tr class="doc-row"><td><div class="doc-icon pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>Passport_SMK_2021.pdf</td><td>Sara M. Kamal</td><td>15 Mar 2026</td><td>v1.0</td><td><span class="tag tag-warn">Expiring</span></td><td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="showScreen('viewer')">View</button></td></tr>
+              <tr class="doc-row"><td><div class="doc-icon img"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/></svg></div>Passport_MFA_2023.jpg</td><td>Mohamed F. Aly</td><td>22 Jul 2033</td><td>v1.0</td><td><span class="tag tag-success">Valid</span></td><td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="showScreen('viewer')">View</button></td></tr>
+              <tr class="doc-row"><td><div class="doc-icon pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>Passport_NKR_2019.pdf</td><td>Nour K. Rashid</td><td>02 Dec 2024</td><td>v3.1</td><td><span class="tag tag-danger">Expired</span></td><td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="showScreen('viewer')">View</button></td></tr>
+              <tr class="doc-row"><td><div class="doc-icon pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>Passport_HSA_2022.pdf</td><td>Hana S. Abdel</td><td>18 Oct 2032</td><td>v1.0</td><td><span class="tag tag-success">Valid</span></td><td><button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" onclick="showScreen('viewer')">View</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Preview -->
+        <div class="card">
+          <div class="card-header">Preview</div>
+          <div style="background:rgba(255,255,255,.03);border-radius:8px;height:200px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;border:1px dashed rgba(255,255,255,.1)">
+            <span style="font-size:12px;color:var(--silver)">Select document to preview</span>
+          </div>
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Version</span><span>v2.0</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Uploaded</span><span>12 Jan 2024</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Size</span><span>1.8 MB</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Format</span><span>PDF/A</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Indexed by</span><span>Ahmed M.</span></div>
+          </div>
+          <div class="divider"></div>
+          <div class="card-header" style="font-size:12px;margin-bottom:8px">Version History</div>
+          <div style="font-size:11px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:8px;align-items:center"><span class="tag tag-success" style="font-size:10px">v2.0</span><span style="color:var(--light)">Re-uploaded</span><span style="color:var(--silver);margin-left:auto">Jan 12</span></div>
+            <div style="display:flex;gap:8px;align-items:center"><span class="tag tag-info" style="font-size:10px">v1.0</span><span style="color:var(--silver)">Original scan</span><span style="color:var(--silver);margin-left:auto">Mar 08</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── SEARCH ──────────── -->
+    <div id="screen-search" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Advanced Search</div><div class="page-sub">Full-text OCR · Boolean · Fuzzy · Wildcard search</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:10px;align-items:flex-end">
+          <div style="flex:1">
+            <label>Search Query</label>
+            <input type="text" value="Ahmed Hassan expired passport 2024" style="font-size:14px;padding:11px 14px"/>
+          </div>
+          <div style="min-width:150px">
+            <label>Search Mode</label>
+            <select><option>Full Text (OCR)</option><option>Metadata</option><option>Boolean</option><option>Fuzzy</option></select>
+          </div>
+          <button class="btn btn-primary" style="padding:11px 24px;font-size:13px">Search</button>
+          <button class="btn btn-secondary" style="padding:11px 16px;font-size:13px">Saved Searches</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:220px 1fr 280px;gap:16px">
+        <!-- Filters -->
+        <div class="card" style="padding:14px">
+          <div class="card-header" style="font-size:12px">Filters</div>
+          <div class="field"><label>Document Type</label>
+            <select><option>All Types</option><option>Passport</option><option>National ID</option><option>Loan Agreement</option></select>
+          </div>
+          <div class="field"><label>Date Range</label>
+            <input type="date" style="margin-bottom:6px"/><input type="date"/>
+          </div>
+          <div class="field"><label>Status</label>
+            <select><option>All</option><option>Valid</option><option>Expired</option><option>Expiring Soon</option></select>
+          </div>
+          <div class="field"><label>Branch</label>
+            <select><option>All Branches</option><option>Cairo West</option><option>Alexandria HQ</option><option>Giza</option></select>
+          </div>
+          <div class="field"><label>Uploaded By</label>
+            <input type="text" placeholder="e.g. Ahmed M."/></div>
+          <button class="btn btn-secondary" style="width:100%;justify-content:center;margin-top:4px">Clear Filters</button>
+        </div>
+        <!-- Results -->
+        <div class="card">
+          <div class="card-header">Search Results <span style="font-size:12px;color:var(--silver);font-weight:400">— 1,247 results (0.08s)</span></div>
+          <table>
+            <thead><tr><th>Document</th><th>Customer</th><th>Type</th><th>Date</th><th>Status</th><th>Score</th></tr></thead>
+            <tbody>
+              <tr><td style="color:var(--gold2);cursor:pointer" onclick="showScreen('viewer')">Passport_AHI_2022.pdf</td><td>Ahmed H. Ibrahim</td><td>Passport</td><td>12 Jan 2022</td><td><span class="tag tag-success">Valid</span></td><td><span style="color:var(--success);font-weight:600">99%</span></td></tr>
+              <tr><td style="color:var(--gold2);cursor:pointer" onclick="showScreen('viewer')">NatID_AHK_2023.pdf</td><td>Ahmed H. Karim</td><td>National ID</td><td>05 Mar 2023</td><td><span class="tag tag-success">Valid</span></td><td><span style="color:var(--success);font-weight:600">94%</span></td></tr>
+              <tr><td style="color:var(--gold2);cursor:pointer" onclick="showScreen('viewer')">Passport_MHA_2019.pdf</td><td>M. Hassan Aly</td><td>Passport</td><td>10 Oct 2019</td><td><span class="tag tag-danger">Expired</span></td><td><span style="color:var(--warn);font-weight:600">91%</span></td></tr>
+              <tr><td style="color:var(--gold2);cursor:pointer">LoanApp_AHM_2024.pdf</td><td>A. Hassan Mahmoud</td><td>Loan App</td><td>01 Feb 2024</td><td><span class="tag tag-info">In Review</span></td><td><span style="color:var(--silver);font-weight:600">88%</span></td></tr>
+              <tr><td style="color:var(--gold2);cursor:pointer">Contract_HAB_2023.pdf</td><td>H. Ahmed Bassam</td><td>Contract</td><td>15 Nov 2023</td><td><span class="tag tag-success">Valid</span></td><td><span style="color:var(--silver);font-weight:600">82%</span></td></tr>
+            </tbody>
+          </table>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-size:12px;color:var(--silver)">
+            <span>Showing 1–5 of 1,247</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px">← Prev</button>
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:11px">Next →</button>
+            </div>
+          </div>
+        </div>
+        <!-- Quick preview -->
+        <div class="card">
+          <div class="card-header" style="font-size:12px">Quick Preview</div>
+          <div style="background:rgba(255,255,255,.03);border-radius:8px;height:200px;border:1px dashed rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;margin-bottom:12px">
+            <span style="font-size:12px;color:var(--silver)">Click a result to preview</span>
+          </div>
+          <div style="font-size:12px;color:var(--silver)">Select a document from the results to see a quick preview and metadata here.</div>
+          <div class="divider"></div>
+          <div class="card-header" style="font-size:12px;margin-bottom:8px">Saved Searches</div>
+          <div style="font-size:12px;display:flex;flex-direction:column;gap:6px">
+            <div style="padding:7px 10px;background:rgba(255,255,255,.04);border-radius:6px;cursor:pointer;color:var(--light)">Expiring in 30 days</div>
+            <div style="padding:7px 10px;background:rgba(255,255,255,.04);border-radius:6px;cursor:pointer;color:var(--light)">Pending KYC — Cairo</div>
+            <div style="padding:7px 10px;background:rgba(255,255,255,.04);border-radius:6px;cursor:pointer;color:var(--light)">OCR errors this week</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── VIEWER ──────────── -->
+    <div id="screen-viewer" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Document Viewer</div><div class="page-sub">Annotation · Redaction · Stamps · Digital Signature</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary">Download</button>
+          <button class="btn btn-primary">Share</button>
+        </div>
+      </div>
+      <div class="viewer-toolbar">
+        <button class="btn btn-secondary" style="padding:7px 12px;font-size:11px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Zoom
+        </button>
+        <button class="btn btn-secondary" style="padding:7px 12px;font-size:11px">Rotate</button>
+        <div style="width:1px;height:24px;background:rgba(255,255,255,.1);margin:0 4px"></div>
+        <button class="btn btn-secondary" style="padding:7px 12px;font-size:11px;background:rgba(240,220,60,.12);color:#e8d84a;border-color:rgba(240,220,60,.3)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Highlight
+        </button>
+        <button class="btn btn-secondary" style="padding:7px 12px;font-size:11px;background:rgba(224,92,92,.12);color:var(--danger);border-color:rgba(224,92,92,.3)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Redact
+        </button>
+        <button class="btn btn-secondary" style="padding:7px 12px;font-size:11px;background:rgba(60,185,123,.12);color:var(--success);border-color:rgba(60,185,123,.3)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          Sign
+        </button>
+        <button class="btn btn-secondary" style="padding:7px 12px;font-size:11px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          Stamp
+        </button>
+        <button class="btn btn-secondary" style="padding:7px 12px;font-size:11px">Annotate</button>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <span style="font-size:11px;color:var(--silver)">Page</span>
+          <input type="text" value="1" style="width:40px;text-align:center;padding:5px"/>
+          <span style="font-size:11px;color:var(--silver)">/ 4</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:16px">
+        <div class="viewer-doc">
+          <div class="doc-preview">
+            <div class="doc-line title"></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:14px">
+              <div style="font-size:10px;color:var(--gold);letter-spacing:1px;text-transform:uppercase">NATIONAL BANK OF EGYPT — KYC Document</div>
+              <div style="background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--gold)">APPROVED</div>
+            </div>
+            <div class="doc-line"></div><div class="doc-line short"></div><div class="doc-line"></div>
+            <div style="margin:14px 0;padding:10px;background:rgba(240,164,64,.05);border-left:3px solid var(--warn);border-radius:0 6px 6px 0">
+              <div style="font-size:10px;color:var(--warn);margin-bottom:4px">HIGHLIGHTED SECTION</div>
+              <div class="doc-line" style="background:rgba(240,220,60,.15)"></div>
+              <div class="doc-line short" style="background:rgba(240,220,60,.15);margin-top:6px"></div>
+            </div>
+            <div class="doc-line"></div><div class="doc-line short"></div>
+            <div style="margin:14px 0;display:inline-block">
+              <div style="font-size:10px;color:var(--silver);margin-bottom:4px">REDACTED FIELD</div>
+              <div style="background:rgba(255,255,255,.15);border-radius:3px;height:12px;width:180px"></div>
+            </div>
+            <div class="doc-line"></div><div class="doc-line"></div><div class="doc-line short"></div>
+            <div style="margin-top:20px;padding:12px;border:1px dashed rgba(60,185,123,.4);border-radius:6px;display:flex;align-items:center;gap:10px">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+              <div>
+                <div style="font-size:11px;color:var(--success)">Digitally signed by Ahmed Mohamed</div>
+                <div style="font-size:10px;color:var(--silver)">14 Apr 2024, 09:32 · Certificate valid</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="card">
+            <div class="card-header" style="font-size:12px">Document Info</div>
+            <div style="font-size:12px;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Type</span><span>Passport</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Customer</span><span>Ahmed H. Ibrahim</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">CID</span><span style="color:var(--gold)">EGY-2024-00847</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Expiry</span><span style="color:var(--success)">09 Jan 2032</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Version</span><span>v2.0</span></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:var(--silver)">Indexed by</span><span>Ahmed M.</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header" style="font-size:12px">Annotations (2)</div>
+            <div style="font-size:12px;display:flex;flex-direction:column;gap:8px">
+              <div style="padding:8px;background:rgba(240,220,60,.06);border-radius:6px;border-left:2px solid #e8d84a">
+                <div style="color:#e8d84a;font-size:10px;margin-bottom:3px">Highlight · pg.1</div>
+                <div style="color:var(--light)">Check expiry alignment with system</div>
+              </div>
+              <div style="padding:8px;background:rgba(224,92,92,.06);border-radius:6px;border-left:2px solid var(--danger)">
+                <div style="color:var(--danger);font-size:10px;margin-bottom:3px">Redaction · pg.1</div>
+                <div style="color:var(--light)">Account number redacted per policy</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── WORKFLOW ──────────── -->
+    <div id="screen-workflow" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Workflow Management</div><div class="page-sub">Maker-Checker · Approval Flows · Escalation Rules</div></div>
+        <button class="btn btn-primary">+ New Workflow</button>
+      </div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-header">Active Workflows <span class="tag tag-warn">4 pending</span></div>
+          <table>
+            <thead><tr><th>Workflow</th><th>Stage</th><th>Priority</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td>KYC Approval #K4829</td><td><span class="tag tag-warn">Maker Review</span></td><td><span style="color:var(--danger);font-weight:600">High</span></td><td><button class="btn btn-primary" style="padding:4px 12px;font-size:11px">Review</button></td></tr>
+              <tr><td>Loan App #L0341</td><td><span class="tag tag-info">Manager Sign-off</span></td><td><span style="color:var(--warn);font-weight:600">Med</span></td><td><button class="btn btn-primary" style="padding:4px 12px;font-size:11px">Review</button></td></tr>
+              <tr><td>Contract #C8822</td><td><span class="tag tag-success">Legal Review</span></td><td><span style="color:var(--silver);font-weight:600">Low</span></td><td><button class="btn btn-secondary" style="padding:4px 12px;font-size:11px">View</button></td></tr>
+              <tr><td>Compliance #CP22</td><td><span class="tag tag-danger">Rejected — Rework</span></td><td><span style="color:var(--danger);font-weight:600">High</span></td><td><button class="btn btn-primary" style="padding:4px 12px;font-size:11px">Review</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-header">KYC Approval #K4829 — Flow</div>
+          <div class="flow-steps" style="padding:20px 10px">
+            <div class="flow-step">
+              <div class="flow-node done">✓</div>
+              <div class="flow-label">Capture<br/><span style="color:var(--success);font-size:9px">Completed</span></div>
+            </div>
+            <div style="flex:1;height:2px;background:var(--success);align-self:center;margin-bottom:20px;margin-top:2px"></div>
+            <div class="flow-step">
+              <div class="flow-node done">✓</div>
+              <div class="flow-label">AI Index<br/><span style="color:var(--success);font-size:9px">Auto-done</span></div>
+            </div>
+            <div style="flex:1;height:2px;background:var(--success);align-self:center;margin-bottom:20px;margin-top:2px"></div>
+            <div class="flow-step">
+              <div class="flow-node active">●</div>
+              <div class="flow-label">Maker<br/><span style="color:var(--gold);font-size:9px">In Progress</span></div>
+            </div>
+            <div style="flex:1;height:2px;background:rgba(255,255,255,.1);align-self:center;margin-bottom:20px;margin-top:2px"></div>
+            <div class="flow-step">
+              <div class="flow-node pending">4</div>
+              <div class="flow-label">Checker<br/><span style="color:var(--silver);font-size:9px">Pending</span></div>
+            </div>
+            <div style="flex:1;height:2px;background:rgba(255,255,255,.1);align-self:center;margin-bottom:20px;margin-top:2px"></div>
+            <div class="flow-step">
+              <div class="flow-node pending">5</div>
+              <div class="flow-label">Approve<br/><span style="color:var(--silver);font-size:9px">Pending</span></div>
+            </div>
+            <div style="flex:1;height:2px;background:rgba(255,255,255,.1);align-self:center;margin-bottom:20px;margin-top:2px"></div>
+            <div class="flow-step">
+              <div class="flow-node pending">6</div>
+              <div class="flow-label">Archive<br/><span style="color:var(--silver);font-size:9px">Pending</span></div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-success" style="flex:1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Approve & Forward
+            </button>
+            <button class="btn btn-danger" style="flex:1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Reject
+            </button>
+            <button class="btn btn-secondary">Escalate</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Workflow Builder</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border:1px dashed rgba(255,255,255,.1);overflow-x:auto">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;min-width:90px">
+            <div style="width:48px;height:48px;border-radius:10px;background:rgba(74,159,212,.15);border:1px solid rgba(74,159,212,.3);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <span style="font-size:10px;color:var(--silver)">Trigger</span>
+          </div>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--silver)" stroke-width="1.5" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;min-width:90px">
+            <div style="width:48px;height:48px;border-radius:10px;background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            </div>
+            <span style="font-size:10px;color:var(--silver)">AI Check</span>
+          </div>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--silver)" stroke-width="1.5" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;min-width:90px">
+            <div style="width:48px;height:48px;border-radius:10px;background:rgba(255,255,255,.07);border:1px dashed rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--silver)" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <span style="font-size:10px;color:var(--silver)">+ Add Step</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── ALERTS ──────────── -->
+    <div id="screen-alerts" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Alerts & Notifications</div><div class="page-sub">Email · SMS · WhatsApp · In-app alerts</div></div>
+        <button class="btn btn-primary">+ New Alert Rule</button>
+      </div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div>
+          <div style="margin-bottom:12px">
+            <div class="alert-item critical">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:var(--light)">CRITICAL: 42 KYC documents expired — compliance breach risk</div>
+                <div style="font-size:11px;color:var(--silver);margin-top:3px">Auto-generated · 08:14 AM · Escalated to Branch Managers</div>
+              </div>
+              <span class="tag tag-danger">Critical</span>
+            </div>
+            <div class="alert-item warning">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:var(--light)">245 passports expiring within 90 days — renewal action required</div>
+                <div style="font-size:11px;color:var(--silver);margin-top:3px">Scheduled alert · Daily 7:00 AM · SMS sent to customers</div>
+              </div>
+              <span class="tag tag-warn">Warning</span>
+            </div>
+            <div class="alert-item info">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:var(--light)">AI batch processing complete — 342 documents indexed</div>
+                <div style="font-size:11px;color:var(--silver);margin-top:3px">System alert · 3 min ago</div>
+              </div>
+              <span class="tag tag-info">Info</span>
+            </div>
+            <div class="alert-item success">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><polyline points="20 6 9 17 4 12"/></svg>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:var(--light)">Workflow #K4829 approved by Checker — archived successfully</div>
+                <div style="font-size:11px;color:var(--silver);margin-top:3px">Workflow alert · 1 hr ago</div>
+              </div>
+              <span class="tag tag-success">Success</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Configure Alert Rule</div>
+          <div class="field"><label>Rule Name</label><input type="text" placeholder="e.g. Passport Expiry 30-Day Alert"/></div>
+          <div class="field"><label>Trigger Condition</label>
+            <select><option>Document Expiring in X days</option><option>OCR Confidence Below Threshold</option><option>Workflow Stalled</option><option>Batch Upload Complete</option></select>
+          </div>
+          <div class="field"><label>Days Before Expiry</label><input type="text" value="30"/></div>
+          <div class="field"><label>Notification Channels</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--light);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/> Email</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--light);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/> SMS</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--light);cursor:pointer"><input type="checkbox" style="width:auto;accent-color:var(--gold)"/> WhatsApp</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--light);cursor:pointer"><input type="checkbox" checked style="width:auto;accent-color:var(--gold)"/> In-App</label>
+            </div>
+          </div>
+          <div class="field"><label>Escalation (if unread in)</label>
+            <select><option>4 hours</option><option>8 hours</option><option>24 hours</option><option>48 hours</option></select>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px">Save Alert Rule</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── REPORTS ──────────── -->
+    <div id="screen-reports" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Reports & Analytics</div><div class="page-sub">Standard reports · Custom dashboards · Export</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4"/><polyline points="17 9 12 4 7 9"/><line x1="12" y1="4" x2="12" y2="15"/></svg>
+            Export PDF
+          </button>
+          <button class="btn btn-secondary">Export Excel</button>
+          <button class="btn btn-primary">+ Custom Report</button>
+        </div>
+      </div>
+      <div class="grid4" style="margin-bottom:20px">
+        <div class="kpi gold-kpi"><div class="kpi-label">Docs Processed (MTD)</div><div class="kpi-val">124,847</div></div>
+        <div class="kpi green-kpi"><div class="kpi-label">SLA Met</div><div class="kpi-val">96.2%</div></div>
+        <div class="kpi blue-kpi"><div class="kpi-label">Avg Process Time</div><div class="kpi-val">4.1s</div></div>
+        <div class="kpi red-kpi"><div class="kpi-label">Failed OCR</div><div class="kpi-val">312</div></div>
+      </div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-header">Document Type Distribution <span class="tag tag-info">This Month</span></div>
+          <div class="chart-wrap" style="height:200px"><canvas id="donut-chart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header">Monthly Inflow vs Processing <span class="tag tag-gold">2024</span></div>
+          <div class="chart-wrap" style="height:200px"><canvas id="bar-chart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Standard Reports</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div style="padding:14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07);cursor:pointer;transition:background .2s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='rgba(255,255,255,.04)'">
+            <div style="font-size:13px;font-weight:600;color:var(--light);margin-bottom:5px">KYC Expiry Report</div>
+            <div style="font-size:11px;color:var(--silver)">Documents expiring in 30/60/90 days grouped by branch</div>
+            <button class="btn btn-primary" style="margin-top:10px;font-size:11px;padding:5px 12px">Generate</button>
+          </div>
+          <div style="padding:14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07);cursor:pointer;transition:background .2s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='rgba(255,255,255,.04)'">
+            <div style="font-size:13px;font-weight:600;color:var(--light);margin-bottom:5px">OCR Accuracy Report</div>
+            <div style="font-size:11px;color:var(--silver)">Confidence scores, failure analysis, model performance</div>
+            <button class="btn btn-primary" style="margin-top:10px;font-size:11px;padding:5px 12px">Generate</button>
+          </div>
+          <div style="padding:14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07);cursor:pointer;transition:background .2s" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='rgba(255,255,255,.04)'">
+            <div style="font-size:13px;font-weight:600;color:var(--light);margin-bottom:5px">Workflow Audit Trail</div>
+            <div style="font-size:11px;color:var(--silver)">All approval/rejection events with timestamps and users</div>
+            <button class="btn btn-primary" style="margin-top:10px;font-size:11px;padding:5px 12px">Generate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── INTEGRATION ──────────── -->
+    <div id="screen-integration" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Integration Hub</div><div class="page-sub">CBS · LOS · KYC · API Management · Status Monitoring</div></div>
+        <button class="btn btn-primary">+ Add Integration</button>
+      </div>
+      <div class="grid4" style="margin-bottom:20px">
+        <div class="kpi green-kpi"><div class="kpi-label">Active APIs</div><div class="kpi-val">8</div></div>
+        <div class="kpi blue-kpi"><div class="kpi-label">Requests Today</div><div class="kpi-val">284K</div></div>
+        <div class="kpi gold-kpi"><div class="kpi-label">Avg Latency</div><div class="kpi-val">42ms</div></div>
+        <div class="kpi red-kpi"><div class="kpi-label">Errors (24h)</div><div class="kpi-val">3</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-header">Connected Systems</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="api-card">
+              <div class="api-dot online"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--light)">Core Banking System (CBS)</div><div style="font-size:11px;color:var(--silver)">Temenos T24 · REST API · Bidirectional sync</div></div>
+              <span class="tag tag-success">Online</span>
+            </div>
+            <div class="api-card">
+              <div class="api-dot online"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--light)">Loan Origination System (LOS)</div><div style="font-size:11px;color:var(--silver)">FinnOne Neo · REST API · Document push</div></div>
+              <span class="tag tag-success">Online</span>
+            </div>
+            <div class="api-card">
+              <div class="api-dot warn"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--light)">KYC Verification Engine</div><div style="font-size:11px;color:var(--silver)">Internal · gRPC · Latency elevated</div></div>
+              <span class="tag tag-warn">Degraded</span>
+            </div>
+            <div class="api-card">
+              <div class="api-dot online"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--light)">Active Directory (SSO)</div><div style="font-size:11px;color:var(--silver)">LDAP / SAML 2.0 · Auth provider</div></div>
+              <span class="tag tag-success">Online</span>
+            </div>
+            <div class="api-card">
+              <div class="api-dot online"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--light)">SMTP / SMS / WhatsApp Gateway</div><div style="font-size:11px;color:var(--silver)">Twilio + SparkPost · Notification bus</div></div>
+              <span class="tag tag-success">Online</span>
+            </div>
+            <div class="api-card">
+              <div class="api-dot offline"></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--light)">Archive Cold Storage (S3)</div><div style="font-size:11px;color:var(--silver)">AWS S3 compatible · Last sync: 2h ago</div></div>
+              <span class="tag tag-danger">Offline</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">API Request Logs</div>
+          <table>
+            <thead><tr><th>Endpoint</th><th>Method</th><th>Status</th><th>Latency</th></tr></thead>
+            <tbody>
+              <tr><td style="font-size:11px;color:var(--silver)">/api/v2/documents/index</td><td><span class="tag tag-info" style="font-size:10px">POST</span></td><td><span style="color:var(--success)">200</span></td><td>38ms</td></tr>
+              <tr><td style="font-size:11px;color:var(--silver)">/api/v2/kyc/verify</td><td><span class="tag tag-info" style="font-size:10px">POST</span></td><td><span style="color:var(--warn)">429</span></td><td>—</td></tr>
+              <tr><td style="font-size:11px;color:var(--silver)">/api/v2/workflow/approve</td><td><span class="tag tag-success" style="font-size:10px">PUT</span></td><td><span style="color:var(--success)">200</span></td><td>52ms</td></tr>
+              <tr><td style="font-size:11px;color:var(--silver)">/api/v2/documents/search</td><td><span class="tag tag-gold" style="font-size:10px">GET</span></td><td><span style="color:var(--success)">200</span></td><td>29ms</td></tr>
+              <tr><td style="font-size:11px;color:var(--silver)">/api/v2/ocr/process</td><td><span class="tag tag-info" style="font-size:10px">POST</span></td><td><span style="color:var(--danger)">500</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+          <button class="btn btn-secondary" style="margin-top:12px;font-size:11px">View Full Logs</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── SECURITY ──────────── -->
+    <div id="screen-security" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Security & Access Control</div><div class="page-sub">RBAC · MFA · SSO · Permission Matrix</div></div>
+        <button class="btn btn-primary">+ Add User</button>
+      </div>
+      <div class="grid4" style="margin-bottom:20px">
+        <div class="kpi green-kpi"><div class="kpi-label">Active Users</div><div class="kpi-val">284</div></div>
+        <div class="kpi blue-kpi"><div class="kpi-label">Roles Defined</div><div class="kpi-val">12</div></div>
+        <div class="kpi gold-kpi"><div class="kpi-label">MFA Enabled</div><div class="kpi-val">97%</div></div>
+        <div class="kpi red-kpi"><div class="kpi-label">Failed Logins (24h)</div><div class="kpi-val">7</div></div>
+      </div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-header">User Management</div>
+          <table>
+            <thead><tr><th>User</th><th>Role</th><th>Branch</th><th>MFA</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Ahmed Mohamed</td><td><span class="tag tag-gold">Doc Admin</span></td><td>Cairo West</td><td><span style="color:var(--success)">✓</span></td><td><span class="tag tag-success">Active</span></td></tr>
+              <tr><td>Sara Kamal</td><td><span class="tag tag-info">Maker</span></td><td>Giza</td><td><span style="color:var(--success)">✓</span></td><td><span class="tag tag-success">Active</span></td></tr>
+              <tr><td>Mohamed Aly</td><td><span class="tag tag-warn">Checker</span></td><td>Alexandria</td><td><span style="color:var(--warn)">⚠</span></td><td><span class="tag tag-success">Active</span></td></tr>
+              <tr><td>Nour Rashid</td><td><span class="tag tag-info">Viewer</span></td><td>Cairo East</td><td><span style="color:var(--success)">✓</span></td><td><span class="tag tag-warn">Locked</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-header">Permission Matrix</div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Module</th>
+                  <th style="text-align:center">Admin</th>
+                  <th style="text-align:center">Maker</th>
+                  <th style="text-align:center">Checker</th>
+                  <th style="text-align:center">Viewer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="font-size:12px">Capture</td>
+                  <td style="text-align:center"><div class="matrix-cell allow" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell allow" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                </tr>
+                <tr>
+                  <td style="font-size:12px">Indexing</td>
+                  <td style="text-align:center"><div class="matrix-cell allow" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell allow" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell partial" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                </tr>
+                <tr>
+                  <td style="font-size:12px">Approve / Reject</td>
+                  <td style="text-align:center"><div class="matrix-cell allow" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell allow" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                </tr>
+                <tr>
+                  <td style="font-size:12px">Admin Panel</td>
+                  <td style="text-align:center"><div class="matrix-cell allow" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                  <td style="text-align:center"><div class="matrix-cell deny" style="margin:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Security Settings</div>
+        <div class="grid3">
+          <div style="padding:14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:13px;font-weight:600">Multi-Factor Auth (MFA)</div>
+              <div style="width:40px;height:22px;background:var(--success);border-radius:11px;position:relative;cursor:pointer"><div style="width:18px;height:18px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px;transition:.2s"></div></div>
+            </div>
+            <div style="font-size:11px;color:var(--silver)">Enforced for all privileged roles. TOTP / SMS OTP supported.</div>
+          </div>
+          <div style="padding:14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:13px;font-weight:600">Single Sign-On (SSO)</div>
+              <div style="width:40px;height:22px;background:var(--success);border-radius:11px;position:relative;cursor:pointer"><div style="width:18px;height:18px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px;transition:.2s"></div></div>
+            </div>
+            <div style="font-size:11px;color:var(--silver)">SAML 2.0 with Active Directory. Session timeout: 8 hours.</div>
+          </div>
+          <div style="padding:14px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid rgba(255,255,255,.07)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:13px;font-weight:600">Audit Logging</div>
+              <div style="width:40px;height:22px;background:var(--success);border-radius:11px;position:relative;cursor:pointer"><div style="width:18px;height:18px;background:#fff;border-radius:50%;position:absolute;right:2px;top:2px;transition:.2s"></div></div>
+            </div>
+            <div style="font-size:11px;color:var(--silver)">All access, edits, downloads logged. Retention: 7 years (CBE).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────── ADMIN ──────────── -->
+    <div id="screen-admin" class="screen">
+      <div class="page-header">
+        <div><div class="page-title">Admin Panel</div><div class="page-sub">System configuration · Retention policies · Audit · Maintenance</div></div>
+      </div>
+      <div class="grid3" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-header">System Health</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--silver)">CPU Usage</span><span>42%</span></div>
+              <div class="progress-bar"><div class="progress-fill progress-blue" style="width:42%"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--silver)">Memory</span><span>68%</span></div>
+              <div class="progress-bar"><div class="progress-fill progress-gold" style="width:68%"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--silver)">Storage Used</span><span>54 TB / 100 TB</span></div>
+              <div class="progress-bar"><div class="progress-fill progress-green" style="width:54%"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--silver)">OCR Engine Queue</span><span>342 docs</span></div>
+              <div class="progress-bar"><div class="progress-fill progress-blue" style="width:25%"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Retention Policies</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(255,255,255,.04);border-radius:7px">
+              <span>KYC Documents</span><span style="color:var(--gold)">10 Years</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(255,255,255,.04);border-radius:7px">
+              <span>Loan Agreements</span><span style="color:var(--gold)">7 Years</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(255,255,255,.04);border-radius:7px">
+              <span>Audit Logs</span><span style="color:var(--gold)">7 Years (CBE)</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(255,255,255,.04);border-radius:7px">
+              <span>Scanned Images</span><span style="color:var(--gold)">5 Years</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(255,255,255,.04);border-radius:7px">
+              <span>Temp / Draft Docs</span><span style="color:var(--silver)">90 Days</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Maintenance</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-secondary" style="justify-content:flex-start;font-size:12px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+              Rebuild OCR Index
+            </button>
+            <button class="btn btn-secondary" style="justify-content:flex-start;font-size:12px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Backup Now
+            </button>
+            <button class="btn btn-secondary" style="justify-content:flex-start;font-size:12px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Run System Diagnostics
+            </button>
+            <button class="btn btn-secondary" style="justify-content:flex-start;font-size:12px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+              Export Audit Logs
+            </button>
+            <button class="btn btn-danger" style="justify-content:flex-start;font-size:12px;margin-top:4px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+              Purge Expired Documents
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">System Configuration</div>
+        <div class="grid3">
+          <div class="field"><label>OCR Engine</label>
+            <select><option>ABBYY FineReader v15</option><option>Tesseract 5.x</option><option>Azure Cognitive Services</option></select>
+          </div>
+          <div class="field"><label>Default Document Format</label>
+            <select><option>PDF/A-1b</option><option>PDF/A-2b</option><option>TIFF Group 4</option></select>
+          </div>
+          <div class="field"><label>Max Upload Size</label>
+            <select><option>10 MB</option><option selected>50 MB</option><option>100 MB</option><option>500 MB</option></select>
+          </div>
+          <div class="field"><label>AI Confidence Threshold</label>
+            <input type="text" value="90%" /></div>
+          <div class="field"><label>Session Timeout</label>
+            <select><option>30 min</option><option>1 hour</option><option selected>8 hours</option></select>
+          </div>
+          <div class="field"><label>Backup Schedule</label>
+            <select><option>Every 6 hours</option><option selected>Daily at 02:00</option><option>Weekly</option></select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:8px">Save Configuration</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /body -->
+
+<script>
+// ── Screen switching ──
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const s = document.getElementById('screen-' + name);
+  if(s) s.classList.add('active');
+  // highlight sidebar
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if(n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + name + "'")) {
+      n.classList.add('active');
+    }
+  });
+  // lazy init charts
+  if(name === 'dashboard') initDashCharts();
+  if(name === 'reports') initReportCharts();
+}
+
+// ── Charts ──
+let dashInit = false;
+function initDashCharts() {
+  if(dashInit) return; dashInit = true;
+
+  const gridColor = 'rgba(255,255,255,0.05)';
+  const labelColor = '#8da0b8';
+
+  // Inflow chart
+  new Chart(document.getElementById('inflow-chart'), {
+    type: 'line',
+    data: {
+      labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets: [{
+        data: [4200,5800,4900,7200,6100,3400,5300],
+        borderColor: '#c9a84c',
+        backgroundColor: 'rgba(201,168,76,0.08)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#c9a84c',
+        pointRadius: 4,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:gridColor},ticks:{color:labelColor,font:{size:11}}},
+        y:{grid:{color:gridColor},ticks:{color:labelColor,font:{size:11},callback:v=>v>=1000?v/1000+'k':v}}
+      },
+      responsive:true, maintainAspectRatio:false
+    }
+  });
+
+  // SLA chart
+  new Chart(document.getElementById('sla-chart'), {
+    type: 'bar',
+    data: {
+      labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets: [
+        {label:'Met',data:[98,96,97,94,96,99,95],backgroundColor:'rgba(60,185,123,0.6)',borderRadius:4},
+        {label:'Breached',data:[2,4,3,6,4,1,5],backgroundColor:'rgba(224,92,92,0.5)',borderRadius:4}
+      ]
+    },
+    options: {
+      plugins:{legend:{labels:{color:labelColor,font:{size:11}}}},
+      scales:{
+        x:{stacked:true,grid:{color:gridColor},ticks:{color:labelColor,font:{size:11}}},
+        y:{stacked:true,grid:{color:gridColor},ticks:{color:labelColor,font:{size:11},callback:v=>v+'%'},max:100}
+      },
+      responsive:true, maintainAspectRatio:false
+    }
+  });
+}
+
+let reportInit = false;
+function initReportCharts() {
+  if(reportInit) return; reportInit = true;
+  const labelColor = '#8da0b8';
+
+  new Chart(document.getElementById('donut-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Passports','National IDs','Loan Apps','Contracts','Utility Bills','Other'],
+      datasets:[{
+        data:[34,28,16,10,8,4],
+        backgroundColor:['#c9a84c','#4a9fd4','#3cb97b','#e05c5c','#f0a440','#8da0b8'],
+        borderWidth:0,
+        hoverOffset:8
+      }]
+    },
+    options:{
+      plugins:{legend:{position:'right',labels:{color:labelColor,font:{size:11},boxWidth:12,padding:12}}},
+      responsive:true, maintainAspectRatio:false, cutout:'62%'
+    }
+  });
+
+  new Chart(document.getElementById('bar-chart'), {
+    type: 'bar',
+    data: {
+      labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      datasets:[
+        {label:'Inflow',data:[82,91,78,104,88,96,112,87,99,108,94,120],backgroundColor:'rgba(201,168,76,0.5)',borderRadius:4},
+        {label:'Processed',data:[80,89,76,102,85,94,110,84,97,105,91,117],backgroundColor:'rgba(60,185,123,0.5)',borderRadius:4}
+      ]
+    },
+    options:{
+      plugins:{legend:{labels:{color:labelColor,font:{size:11}}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:labelColor,font:{size:10}}},
+        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:labelColor,font:{size:10},callback:v=>v+'K'}}
+      },
+      responsive:true, maintainAspectRatio:false
+    }
+  });
+}
+
+// Boot
+initDashCharts();
+</script>
+</body>
+</html>
