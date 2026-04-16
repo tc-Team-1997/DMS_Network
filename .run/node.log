@@ -1,0 +1,5 @@
+[saml] not configured (set SAML_ENTRY_POINT and SAML_IDP_CERT to enable)
+[expiry-job] scheduled daily at 02:00
+[retention] scheduled daily at 02:30
+[ws] live alert channel attached at /ws
+NBE DMS running on http://localhost:3000

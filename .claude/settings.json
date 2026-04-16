@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(brew list *)",
+      "Bash(npm install *)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/python -m pip install --upgrade pip)",
+      "Bash(brew install *)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(node /Users/cosmicintelligence/Documents/DMS_Network/db/seed.js)",
+      "Bash(API_KEY=test-key DATABASE_URL=sqlite:///./storage/test.db .venv/bin/pytest -q)",
+      "Bash(chmod +x /Users/cosmicintelligence/Documents/DMS_Network/start.sh /Users/cosmicintelligence/Documents/DMS_Network/stop.sh /Users/cosmicintelligence/Documents/DMS_Network/restart.sh)",
+      "Bash(./start.sh)",
+      "Bash(curl -sS http://localhost:3000/login -o /dev/null -w \"Node /login: %{http_code}\\\\n\")",
+      "Bash(curl -sS http://localhost:8001/health)",
+      "Bash(curl -sS -H \"X-API-Key: dev-key-change-me\" http://localhost:3000/py/api/v1/dashboard/kpis)",
+      "Bash(./restart.sh)",
+      "Bash(./stop.sh)",
+      "Bash(curl -sS -o /dev/null -w \"Node: %{http_code}  \" http://localhost:3000/login)",
+      "Bash(curl -sS -o /dev/null -w \"Python: %{http_code}\\\\n\" http://localhost:8001/health)"
+    ]
+  }
+}
