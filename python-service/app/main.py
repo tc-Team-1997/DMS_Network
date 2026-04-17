@@ -125,6 +125,10 @@ app.include_router(blast_router.router)
 app.include_router(stride_router.router)
 app.include_router(lang_router_r.router)
 
+# DocBrain (AI) — OCR + classify + extract + embed + RAG chat.
+from .routers import docbrain as docbrain_router  # noqa: E402
+app.include_router(docbrain_router.router)
+
 
 setup_tracing(app, engine)
 

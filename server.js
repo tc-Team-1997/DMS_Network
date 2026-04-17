@@ -8,6 +8,18 @@ const ws = require('./services/ws');
 const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Baseline security headers. The EJS app loads Chart.js + Google Fonts from
+// CDNs so we keep script-src permissive for those origins; tighten further
+// once the EJS surface is retired in favor of apps/web.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
+  next();
+});
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -58,7 +70,13 @@ app.get('/logout', (req, res) => {
 });
 
 app.use('/api/v1', require('./routes/api'));
-app.use('/py', require('./routes/py-proxy'));
+app.use('/spa/api', require('./routes/spa-api'));
+// /py forwards to the Python FastAPI service. Require a valid session so an
+// unauthenticated browser can't reach the Python API surface via the proxy.
+app.use('/py', (req, res, next) => {
+  if (!req.session.user) return res.status(401).json({ error: 'unauthenticated' });
+  next();
+}, require('./routes/py-proxy'));
 app.use('/graphql', ...require('./routes/graphql'));
 app.use('/webhooks', express.json(), require('./routes/webhooks'));
 app.use('/portal', require('./routes/portal'));

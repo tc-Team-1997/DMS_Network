@@ -18,7 +18,30 @@
       "Bash(./restart.sh)",
       "Bash(./stop.sh)",
       "Bash(curl -sS -o /dev/null -w \"Node: %{http_code}  \" http://localhost:3000/login)",
-      "Bash(curl -sS -o /dev/null -w \"Python: %{http_code}\\\\n\" http://localhost:8001/health)"
+      "Bash(curl -sS -o /dev/null -w \"Python: %{http_code}\\\\n\" http://localhost:8001/health)",
+      "Read(//Users/cosmicintelligence/Documents/**)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(npm run *)",
+      "Bash(curl -sSf -o /dev/null -w \"Node :3000 %{http_code}\\\\n\" http://localhost:3000/login)",
+      "Bash(curl -sSf -o /dev/null -w \"Python :8001 %{http_code}\\\\n\" http://localhost:8001/health)",
+      "Bash(curl -sS http://localhost:3000/spa/api/me)",
+      "Bash(curl -sS -c /tmp/nbe-cookies.txt -X POST http://localhost:3000/spa/api/login -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"admin123\"}')",
+      "Bash(curl -sS -b /tmp/nbe-cookies.txt http://localhost:3000/spa/api/stats)",
+      "Bash(curl -sS -b /tmp/nbe-cookies.txt 'http://localhost:3000/spa/api/documents?limit=3')",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/py/health)",
+      "Bash(curl -sS -b /tmp/nbe-cookies.txt http://localhost:3000/py/api/v1/dashboard/kpis)",
+      "Bash(pkill -f 'vite')",
+      "Bash(curl -sS -o /dev/null -w \"Vite %{http_code}\\\\n\" http://localhost:5174/)",
+      "Bash(rm -f /tmp/vite-cookies.txt)",
+      "Bash(curl -sS -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5174/)",
+      "Bash(curl -sS -c /tmp/vite-cookies.txt -X POST http://localhost:5174/spa/api/login -H 'Content-Type: application/json' -d '{\"username\":\"sara\",\"password\":\"sara123\"}')",
+      "Bash(curl -sS -b /tmp/vite-cookies.txt http://localhost:5174/spa/api/me)",
+      "Bash(curl -sS -b /tmp/vite-cookies.txt http://localhost:5174/spa/api/stats)",
+      "Bash(curl -sS -b /tmp/vite-cookies.txt http://localhost:5174/spa/api/stats/expiry)",
+      "Bash(curl -sS -b /tmp/vite-cookies.txt 'http://localhost:5174/spa/api/search?q=Passport')",
+      "Bash(curl -sS -b /tmp/vite-cookies.txt -X POST http://localhost:5174/spa/api/logout)",
+      "Bash(curl -sS -o /dev/null -w \"SPA: %{http_code}\\\\n\" http://localhost:5174/)",
+      "Bash(curl -sS http://localhost:5174/spa/api/me)"
     ]
   }
 }

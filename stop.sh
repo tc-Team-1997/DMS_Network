@@ -28,12 +28,18 @@ stop_pid() {
   fi
 }
 
+stop_pid "Web"    "$RUN_DIR/web.pid"
 stop_pid "Node"   "$RUN_DIR/node.pid"
 stop_pid "Python" "$RUN_DIR/python.pid"
+stop_pid "MinIO"  "$RUN_DIR/minio.pid"
+stop_pid "Ollama" "$RUN_DIR/ollama.pid"
 
 # Fallback sweep for any leftover processes from prior runs.
 pkill -f "node $ROOT/server.js" 2>/dev/null || true
 pkill -f "node server.js"       2>/dev/null || true
 pkill -f "uvicorn app.main:app" 2>/dev/null || true
+pkill -f "vite --port"          2>/dev/null || true
+pkill -f "minio server"         2>/dev/null || true
+pkill -f "ollama serve"         2>/dev/null || true
 
 echo "Stopped."

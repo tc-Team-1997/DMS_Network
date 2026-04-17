@@ -1,0 +1,9 @@
+
+> @docmanager/web@0.1.0 dev
+> vite --port 5174 --port 5174
+
+
+  VITE v5.4.21  ready in 99 ms
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: use --host to expose
