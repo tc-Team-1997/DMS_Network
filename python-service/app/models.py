@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Float, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Float, Boolean, LargeBinary, UniqueConstraint
 from sqlalchemy.orm import relationship
 from .db import Base
 
@@ -376,3 +376,167 @@ class DuplicateMatch(Base):
     similarity = Column(Float)
     match_type = Column(String(32))
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlertRecord(Base):
+    """Persisted alert record created via POST /api/v1/alerts."""
+    __tablename__ = "alert_records"
+    id = Column(Integer, primary_key=True)
+    user_sub = Column(String(128), index=True, nullable=False)
+    level = Column(String(16), default="info", index=True)   # info | warning | critical
+    title = Column(String(256), nullable=False)
+    message = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class UserNotificationPreference(Base):
+    """Stores per-user notification channel preferences.
+
+    ``notification_channels`` is a JSON array stored as TEXT,
+    e.g. '["email","sms"]'.  NULL means default (["email"]).
+    ``email`` and ``phone`` hold the destination addresses.
+    """
+    __tablename__ = "user_notification_preferences"
+    id = Column(Integer, primary_key=True)
+    user_sub = Column(String(128), unique=True, index=True, nullable=False)
+    notification_channels = Column(Text, nullable=True)   # JSON array, e.g. '["email","sms"]'
+    email = Column(String(256), nullable=True)
+    phone = Column(String(32), nullable=True)             # E.164, used for SMS + WhatsApp
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class DocumentTypeSchema(Base):
+    """Admin-configurable field schema for one document type.
+
+    Mirrors the SQLite ``document_type_schemas`` table in the Node schema plus
+    the four DocBrain inference columns added in migration 0018.
+    """
+    __tablename__ = "document_type_schemas"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(128), unique=True, nullable=False, index=True)
+    description = Column(Text)
+    fields_json = Column(Text, nullable=False, default="[]")
+    active = Column(Integer, default=1)
+    tenant_id = Column(String(64), default="nbe", index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # DocBrain inference state (migration 0018)
+    schema_version = Column(Integer, nullable=False, default=1)
+    inference_status = Column(String(32), nullable=False, default="pending")
+    source_samples_count = Column(Integer, nullable=False, default=0)
+    vector_index_version = Column(Integer, nullable=False, default=0)
+
+    samples = relationship(
+        "DocumentTypeSample",
+        back_populates="schema",
+        cascade="all, delete-orphan",
+    )
+
+
+class DocumentTypeSample(Base):
+    """Reference image/PDF used by DocBrain to train inference for a schema."""
+    __tablename__ = "document_type_samples"
+    id                  = Column(Integer, primary_key=True)
+    schema_id           = Column(
+        Integer,
+        ForeignKey("document_type_schemas.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    filename            = Column(String(512), nullable=False)
+    sha256              = Column(String(64), nullable=False, index=True)
+    storage_key         = Column(String(512), nullable=False)
+    size                = Column(Integer, nullable=False)
+    mime_type           = Column(String(128), nullable=False)
+    ocr_text            = Column(Text)
+    ocr_backend         = Column(String(64))
+    ocr_mean_confidence = Column(Float)
+    schema_version      = Column(Integer, nullable=False, default=1)
+    uploaded_by         = Column(String(128))
+    uploaded_at         = Column(DateTime, default=datetime.utcnow)
+    tenant_id           = Column(String(64), nullable=False, default="nbe", index=True)
+
+    __table_args__ = (
+        UniqueConstraint("schema_id", "sha256", name="uq_dts_schema_sha256"),
+    )
+
+    schema = relationship("DocumentTypeSchema", back_populates="samples")
+    chunks = relationship(
+        "DoctypeSampleChunk",
+        back_populates="sample",
+        cascade="all, delete-orphan",
+    )
+
+
+class DoctypeSampleChunk(Base):
+    """Vector embedding chunk derived from a DocumentTypeSample.
+
+    ``embedding`` is stored as raw bytes (LargeBinary) so the column works with
+    both SQLite (BLOB) and Postgres (BYTEA) without a pgvector extension
+    dependency at the model layer.  The AI service serialises/deserialises the
+    float32 array via ``numpy.frombuffer`` / ``ndarray.tobytes()``.
+    """
+    __tablename__ = "doctype_sample_chunks"
+    id = Column(Integer, primary_key=True)
+    sample_id = Column(
+        Integer,
+        ForeignKey("document_type_samples.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_index = Column(Integer, nullable=False, default=0)
+    page = Column(Integer)
+    text_snippet = Column(Text)
+    embedding = Column(LargeBinary)    # float32 array, numpy tobytes()
+    model_name = Column(String(128))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    sample = relationship("DocumentTypeSample", back_populates="chunks")
+
+
+# ---------------------------------------------------------------------------
+# CBS integration models (migration 0019_customers)
+# ---------------------------------------------------------------------------
+
+
+class Customer(Base):
+    """
+    CBS-sourced customer record, upserted by the KYC/CIF link layer.
+
+    cif         — customer identifier as used in the CBS (e.g. Temenos CIF)
+    tenant_id   — tenant isolation key (one row per cif+tenant_id)
+    cbs_source  — adapter name that last wrote this row (e.g. "temenos_t24")
+    last_synced_at — UTC timestamp of the last successful CBS pull
+    raw_json    — full CBS response body as JSON text (for debug/audit)
+    """
+    __tablename__ = "customers"
+    id             = Column(Integer, primary_key=True)
+    cif            = Column(String(64), nullable=False, index=True)
+    name           = Column(String(512))
+    tenant_id      = Column(String(64), nullable=False, index=True)
+    cbs_source     = Column(String(64), default="temenos_t24")
+    last_synced_at = Column(DateTime, index=True)
+    raw_json       = Column(Text)
+    created_at     = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("cif", "tenant_id", name="uq_customer_cif_tenant"),
+    )
+
+
+class AuditLog(Base):
+    """
+    Append-only audit log for all CBS integration operations.
+
+    Written by kyc_cif.py and any future service that needs a durable,
+    human-readable trail of who did what to which resource.
+    """
+    __tablename__ = "audit_log"
+    id            = Column(Integer, primary_key=True)
+    tenant        = Column(String(64), nullable=False, index=True)
+    actor         = Column(String(128), nullable=False, index=True)
+    action        = Column(String(64), nullable=False, index=True)
+    resource_type = Column(String(64), index=True)
+    resource_id   = Column(String(128), index=True)
+    detail        = Column(Text)
+    created_at    = Column(DateTime, default=datetime.utcnow, index=True)

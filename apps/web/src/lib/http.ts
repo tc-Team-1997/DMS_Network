@@ -6,10 +6,15 @@ import { z, type ZodTypeAny } from 'zod';
  * the session cookie rides automatically. In dev, Vite proxies these
  * paths to Node :3000 (see vite.config.ts).
  */
+// Many endpoints proxy to the Python service which can take a while:
+// LLM classification/extraction/chat, OCR on multi-page PDFs, analytics
+// aggregations, glossary regenerate. 5 minutes is a pragmatic ceiling —
+// long enough to swallow slow local LLM runs, short enough to fail a
+// genuinely hung request. Individual calls can override via `{ timeout }`.
 export const http: AxiosInstance = axios.create({
   baseURL: '/',
   withCredentials: true,
-  timeout: 20_000,
+  timeout: 300_000,
 });
 
 export class HttpError extends Error {
@@ -22,6 +27,8 @@ export class HttpError extends Error {
   }
 }
 
+const SESSION_STATUS_PATH = '/spa/api/auth/session-status';
+
 http.interceptors.response.use(
   (r) => r,
   (error: AxiosError) => {
@@ -31,6 +38,19 @@ http.interceptors.response.use(
       (typeof data === 'object' && data !== null && 'error' in data
         ? String((data as { error: unknown }).error)
         : null) ?? error.message;
+
+    // Global 401 redirect — skip the session-status endpoint itself to
+    // avoid an infinite loop when the session polling detects expiry.
+    if (status === 401) {
+      const requestUrl: string = (error.config?.url) ?? '';
+      const isSessionPoll = requestUrl.includes(SESSION_STATUS_PATH);
+      const isLoginPage = window.location.pathname === '/login';
+      if (!isSessionPoll && !isLoginPage) {
+        const next = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.assign(`/login?next=${next}`);
+      }
+    }
+
     return Promise.reject(new HttpError(message, status, data));
   },
 );
@@ -63,6 +83,15 @@ export async function postForm<S extends ZodTypeAny>(
   schema: S,
 ): Promise<z.infer<S>> {
   const { data } = await http.post<unknown>(url, form);
+  return schema.parse(data);
+}
+
+export async function put<S extends ZodTypeAny>(
+  url: string,
+  body: unknown,
+  schema: S,
+): Promise<z.infer<S>> {
+  const { data } = await http.put<unknown>(url, body);
   return schema.parse(data);
 }
 

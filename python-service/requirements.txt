@@ -34,3 +34,5 @@ pyarrow==16.1.0
 python3-saml==1.16.0
 redis==5.0.4
 rq==1.16.2
+aiosmtplib>=3.0
+twilio>=9.0

@@ -89,3 +89,78 @@ There is **no JavaScript test suite** for the Node app — CI only runs `node -c
 ## CI gates
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) runs: `python -m compileall` (lint), `pytest`, `terraform fmt -check && validate`, `helm lint python-service/helm/nbe-dms`, and Playwright E2E (chromium-ltr + chromium-rtl) against a live uvicorn on port 8000. Tesseract and poppler are apt-installed in CI — local runs need them too for OCR tests (see `TESSERACT_CMD` / `POPPLER_PATH` in [python-service/app/config.py](python-service/app/config.py)).
+
+## Agent teams
+
+This repo is set up for [Claude Code Agent Teams](https://code.claude.com/docs/en/agent-teams). The experimental flag is already on in [.claude/settings.json](.claude/settings.json) (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"`).
+
+Eight reusable teammate roles are defined in [.claude/agents/](.claude/agents/). Spawn any combination by name — each ships with its own non-negotiables, coordination rules, and test gates:
+
+| Agent | Owns | Use when |
+|---|---|---|
+| `spa-engineer` | `apps/web/` | New SPA module / component / zod-validated endpoint call |
+| `node-engineer` | `server.js`, `routes/`, `services/`, `db/` | New `/spa/api/*` endpoint, RBAC change, FTS5 column, proxy |
+| `python-engineer` | `python-service/` | New FastAPI router, service, Alembic migration, background task |
+| `docbrain-ai-engineer` | `python-service/app/services/docbrain/`, `routers/docbrain.py` | OCR, classify, extract, embed, vector search, RAG work |
+| `integrations-engineer` | `python-service/app/services/integrations/` | CBS / CRM adapter (Temenos, FLEXCUBE, Finastra, …) |
+| `db-migrator` | `db/schema.sql`, `python-service/migrations/` | Schema change, FTS5 trigger sync, Postgres migration |
+| `qa-engineer` | `apps/web/e2e/`, `python-service/tests/` | New Playwright spec, pytest, flake hunt |
+| `security-reviewer` | (read-only) | Review a diff against OWASP + banking threat model |
+| `docs-architect` | `docs/` | Update strategic + technical docs, maintain changelog |
+
+### Spawn templates — paste one into the lead session
+
+**Parallel M2 build (SPA + Node + Python + DB + QA, bounded):**
+```
+Create an agent team of 5 teammates to ship M2 Workflows end to end:
+- node-engineer: add /spa/api/workflows/* endpoints (list, advance, reject, escalate, approve) with RBAC perm "workflow"
+- python-engineer: expose /api/v1/workflows/* for BPMN step execution
+- db-migrator: add workflow_instances + workflow_steps tables + seed
+- spa-engineer: build src/modules/workflows/WorkflowsPage.tsx with the Maker/Checker/Admin views
+- qa-engineer: extend e2e with workflows.spec.ts covering each RBAC path
+Require plan approval before any teammate starts writing code. Only approve plans that include a zod schema for every new endpoint and at least one Playwright spec per surface.
+```
+
+**Parallel code review (3 reviewers, read-only):**
+```
+Create a review team of 3 teammates for the current diff on branch feat/workflows:
+- security-reviewer: full OWASP + banking threat model sweep
+- qa-engineer: verify Playwright + pytest coverage is adequate and specs are deterministic
+- docs-architect: check docs are updated and links resolve
+Have them post findings to the shared task list. Synthesise a single go/no-go verdict when all three finish.
+```
+
+**Integrations surge (5 adapters in parallel):**
+```
+Create an agent team of 5 teammates, all using the integrations-engineer subagent type, to ship 5 CBS adapters in parallel:
+- teammate temenos:       python-service/app/services/integrations/temenos_t24.py
+- teammate flexcube:      python-service/app/services/integrations/flexcube.py
+- teammate finastra:      python-service/app/services/integrations/finastra_fusion.py
+- teammate mambu:         python-service/app/services/integrations/mambu.py
+- teammate thought:       python-service/app/services/integrations/thought_machine.py
+Each must implement the Adapter Protocol exactly, ship a mock subclass, ship a contract test, and never share state with another tenant. When all finish, have docs-architect update INTEGRATION_STRATEGY.md §3 (capability matrix).
+```
+
+**Debugging with competing hypotheses (when a bug's root cause is unclear):**
+```
+Users report <symptom>. Create a team of 4 investigators, each with a different
+hypothesis, and have them message each other to disprove each other's theories.
+Update docs/INCIDENT_<date>.md with the surviving explanation once consensus emerges.
+Reviewers: do NOT edit production code — only read.
+```
+
+### House rules for the team lead
+
+- **Require plan approval for any teammate touching `db/schema.sql`, `python-service/migrations/`, or `services/rbac.js`.** These are high-blast-radius surfaces.
+- **Never let two teammates edit the same file concurrently.** If two agents need the same file, sequence them via task dependencies.
+- **Before `clean up the team`**, confirm `npm run typecheck`, `npx playwright test`, and `pytest -q` are all green.
+- **Display mode:** iTerm2 + `it2` CLI → auto split-panes; anything else → in-process (Shift+Down to cycle).
+- **Don't resume agent-team sessions via `/resume`**; in-process teammates don't restore. Re-spawn them.
+
+## Compact instructions
+
+When compacting, **preserve**: the current todo list, file paths under edit, the last user directive, green/red state of typecheck + Playwright + pytest, and any open coordination messages between teammates.
+
+**Drop**: tool-call transcripts, dev-server log dumps, intermediate curl output, full test-report bodies (keep pass/fail counts only), and any verbose stdout from `./start.sh` / `./stop.sh`.
+
+Favour the code and the decisions over the mechanics that produced them.

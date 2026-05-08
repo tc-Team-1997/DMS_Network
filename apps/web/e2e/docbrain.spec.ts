@@ -59,8 +59,30 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
   });
 
   test('RAG chat sends question and renders grounded answer with citation', async ({ page }) => {
+    // Supply a populated analysis so the chat input is un-gated.
     await page.route('**/spa/api/docbrain/document/**', (route) =>
-      route.fulfill({ status: 404, body: '{}' }),
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          document_id: 1,
+          classification: { doc_class: 'Passport', confidence: 0.95, reasoning: 'mocked' },
+          extraction: {
+            customer_cid:      { value: 'EGY-2024-00847', confidence: 0.9 },
+            customer_name:     { value: 'Ahmed H. Ibrahim', confidence: 0.9 },
+            doc_number:        { value: 'A12345678', confidence: 0.9 },
+            dob:               { value: null, confidence: 0 },
+            issue_date:        { value: null, confidence: 0 },
+            expiry_date:       { value: '2032-01-09', confidence: 0.9 },
+            issuing_authority: { value: null, confidence: 0 },
+            address:           { value: null, confidence: 0 },
+          },
+          ocr_language: 'eng',
+          ocr_confidence: 97,
+          chunks_indexed: 3,
+          updated_at: new Date().toISOString(),
+        }),
+      }),
     );
     await page.route('**/spa/api/docbrain/chat', (route) =>
       route.fulfill({
@@ -85,8 +107,30 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
   });
 
   test('RAG refuses an answer without evidence and surfaces the warning', async ({ page }) => {
+    // Supply a populated analysis so the chat input is un-gated.
     await page.route('**/spa/api/docbrain/document/**', (route) =>
-      route.fulfill({ status: 404, body: '{}' }),
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          document_id: 1,
+          classification: { doc_class: 'Passport', confidence: 0.95, reasoning: 'mocked' },
+          extraction: {
+            customer_cid:      { value: 'EGY-2024-00847', confidence: 0.9 },
+            customer_name:     { value: 'Ahmed H. Ibrahim', confidence: 0.9 },
+            doc_number:        { value: 'A12345678', confidence: 0.9 },
+            dob:               { value: null, confidence: 0 },
+            issue_date:        { value: null, confidence: 0 },
+            expiry_date:       { value: '2032-01-09', confidence: 0.9 },
+            issuing_authority: { value: null, confidence: 0 },
+            address:           { value: null, confidence: 0 },
+          },
+          ocr_language: 'eng',
+          ocr_confidence: 97,
+          chunks_indexed: 3,
+          updated_at: new Date().toISOString(),
+        }),
+      }),
     );
     await page.route('**/spa/api/docbrain/chat', (route) =>
       route.fulfill({
@@ -103,5 +147,85 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
     await page.getByTestId('docbrain-chat-input').fill('What colour is the customer\'s tie?');
     await page.getByTestId('docbrain-chat-send').click();
     await expect(page.getByText(/No grounded evidence/i)).toBeVisible();
+  });
+
+  test('needs_verification: answer rendered with amber verify banner + retrieved passages', async ({ page }) => {
+    await page.route('**/spa/api/docbrain/document/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          document_id: 1,
+          classification: { doc_class: 'Passport', confidence: 0.95, reasoning: 'mocked' },
+          extraction: {
+            customer_cid:      { value: null, confidence: 0 },
+            customer_name:     { value: null, confidence: 0 },
+            doc_number:        { value: null, confidence: 0 },
+            dob:               { value: null, confidence: 0 },
+            issue_date:        { value: null, confidence: 0 },
+            expiry_date:       { value: null, confidence: 0 },
+            issuing_authority: { value: null, confidence: 0 },
+            address:           { value: null, confidence: 0 },
+          },
+          ocr_language: 'eng',
+          ocr_confidence: 50,
+          chunks_indexed: 2,
+          updated_at: new Date().toISOString(),
+        }),
+      }),
+    );
+    await page.route('**/spa/api/docbrain/chat', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          answer: 'The passport expires in 2032.',
+          citations: [
+            { document_id: 1, chunk_index: 0, snippet: 'Date of expiry: 2032-01-09' },
+            { document_id: 1, chunk_index: 1, snippet: 'Issuing authority: Egyptian Passport Authority' },
+          ],
+          has_evidence: true,
+          needs_verification: true,
+        }),
+      }),
+    );
+    await page.goto('/viewer/1');
+    await page.getByTestId('docbrain-chat-input').fill('When does it expire?');
+    await page.getByTestId('docbrain-chat-send').click();
+    const verify = page.getByTestId('docbrain-chat-verify');
+    await expect(verify).toBeVisible();
+    await expect(verify).toContainText(/Model did not cite passages/);
+    await expect(verify).toContainText('Date of expiry: 2032-01-09');
+  });
+
+  test('chat is gated with a warning when chunks_indexed === 0', async ({ page }) => {
+    await page.route('**/spa/api/docbrain/document/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          document_id: 1,
+          classification: { doc_class: 'Passport', confidence: 0.95, reasoning: 'mocked' },
+          extraction: {
+            customer_cid:      { value: null, confidence: 0 },
+            customer_name:     { value: null, confidence: 0 },
+            doc_number:        { value: null, confidence: 0 },
+            dob:               { value: null, confidence: 0 },
+            issue_date:        { value: null, confidence: 0 },
+            expiry_date:       { value: null, confidence: 0 },
+            issuing_authority: { value: null, confidence: 0 },
+            address:           { value: null, confidence: 0 },
+          },
+          ocr_language: 'eng',
+          ocr_confidence: 0,
+          chunks_indexed: 0,
+          updated_at: new Date().toISOString(),
+        }),
+      }),
+    );
+    await page.goto('/viewer/1');
+    await expect(page.getByTestId('docbrain-chat-not-indexed')).toBeVisible();
+    await expect(page.getByTestId('docbrain-chat-input')).toBeDisabled();
+    await expect(page.getByTestId('docbrain-chat-send')).toBeDisabled();
   });
 });

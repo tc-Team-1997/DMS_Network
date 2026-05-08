@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from .llm import chat_json
 
@@ -32,6 +32,7 @@ class ExtractionResult:
     expiry_date:         ExtractedField
     issuing_authority:   ExtractedField
     address:             ExtractedField
+    extra_fields:        Dict[str, ExtractedField] = field(default_factory=dict)
 
     def as_prefill(self, confidence_floor: float = 0.7) -> Dict[str, str]:
         """
@@ -52,23 +53,33 @@ class ExtractionResult:
 SYSTEM_PROMPT = """You are DocBrain, a named-entity extractor for banking documents.
 From the OCR text below, extract these fields:
 
-  customer_cid        - customer identifier (Egyptian CID format "EGY-YYYY-NNNNN", national ID, or bank customer number)
-  customer_name       - full legal name of the person the document is about
-  doc_number          - the document's own identifier (passport number, contract number, etc.)
+  customer_cid        - the citizen / customer identifier on the document. Examples:
+                        Bhutanese Citizenship ID No. (11 digits, e.g. "10712002883"),
+                        Egyptian National ID (14 digits), Indian Aadhaar, bank customer
+                        number / CIF, or any label explicitly called "CID",
+                        "Citizenship ID", "National ID No.", "Customer ID".
+                        Prefer the longest pure-numeric identifier when multiple appear.
+  customer_name       - full legal name of the person the document is about. Concatenate
+                        surname + given names when listed separately.
+  doc_number          - the document's own identifier (passport number, card number,
+                        contract number, etc.) — distinct from customer_cid.
   dob                 - date of birth (ISO 8601 format YYYY-MM-DD)
   issue_date          - issue date (ISO 8601)
   expiry_date         - expiry date (ISO 8601)
-  issuing_authority   - who issued the document
+  issuing_authority   - who issued the document (e.g. "KINGDOM OF BHUTAN",
+                        "Royal Bhutan Police", "Ministry of Interior")
   address             - address if one is clearly present
 
 Reply as a JSON object. For each field, return:
     { "value": "<extracted string or null>", "confidence": <number 0..1> }
 
 Return null (not an empty string) for fields not present in the text.
-Dates MUST be ISO 8601. If the text gives a date in another format, convert
-it. If you cannot parse it, return null with confidence 0.
-Do not invent information. Do not hallucinate Egyptian CID formatting if
-the document is not Egyptian.
+Dates MUST be ISO 8601. Common input formats to convert:
+  "26/12/2000"   -> "2000-12-26"   (DD/MM/YYYY, default for non-US documents)
+  "15 JAN 1990"  -> "1990-01-15"
+If you cannot parse a date unambiguously, return null with confidence 0.
+Do not invent information. If the document is not Egyptian, do NOT impose
+Egyptian CID formatting.
 """
 
 _FIELDS = (
@@ -107,13 +118,69 @@ def _validate_dates(result: Dict[str, ExtractedField]) -> Dict[str, ExtractedFie
     return result
 
 
-def extract_entities(ocr_text: str, *, max_chars: int = 5000) -> ExtractionResult:
+_SCHEMA_HINT_BLOCK = """\n\nAdditional context: This document is known to be type: {name}.
+Expected schema-specific fields (extract these in addition to the 8 canonical fields above,
+using the same {{\"value\": ..., \"confidence\": ...}} format):
+{field_list}
+Return these extra fields under their exact key names alongside the 8 canonical fields."""
+
+
+def extract_entities(
+    ocr_text: str,
+    *,
+    max_chars: int = 5000,
+    schema_hint: Optional[Any] = None,
+) -> ExtractionResult:
+    """
+    Extract 8 canonical fields from OCR text, plus any extra fields defined
+    in schema_hint.
+
+    schema_hint may be:
+      - a dict with keys "name" and "fields" (list of {"key": ..., "label": ...})
+      - a string (treated as the schema name only, no extra fields)
+      - None (unchanged behaviour)
+    """
     if not ocr_text or len(ocr_text.strip()) < 20:
         empty = {k: ExtractedField(value=None, confidence=0.0) for k in _FIELDS}
         return ExtractionResult(**empty)
 
     snippet = ocr_text.strip()[:max_chars]
-    reply = chat_json(SYSTEM_PROMPT, snippet, temperature=0.0)
-    parsed = {k: _parse_field(reply.get(k)) for k in _FIELDS}
+
+    # Build system prompt, optionally extended with schema-hint block.
+    effective_prompt = SYSTEM_PROMPT
+    extra_keys: list = []
+
+    if schema_hint:
+        hint_name = ""
+        hint_fields: list = []
+        if isinstance(schema_hint, dict):
+            hint_name   = str(schema_hint.get("name", ""))
+            hint_fields = schema_hint.get("fields", [])
+        elif isinstance(schema_hint, str):
+            hint_name = schema_hint
+
+        if hint_name:
+            field_list_str = ""
+            for f in hint_fields:
+                key   = str(f.get("key", ""))
+                label = str(f.get("label", key))
+                if key:
+                    field_list_str += f"  {key} ({label})\n"
+                    extra_keys.append(key)
+            effective_prompt = SYSTEM_PROMPT + _SCHEMA_HINT_BLOCK.format(
+                name=hint_name,
+                field_list=field_list_str or "  (none specified)",
+            )
+
+    reply = chat_json(effective_prompt, snippet, temperature=0.0)
+    parsed: Dict[str, ExtractedField] = {k: _parse_field(reply.get(k)) for k in _FIELDS}
     parsed = _validate_dates(parsed)
-    return ExtractionResult(**parsed)
+
+    # Parse extra schema-specific fields.
+    extra_fields: Dict[str, ExtractedField] = {}
+    for key in extra_keys:
+        raw = reply.get(key)
+        if raw is not None:
+            extra_fields[key] = _parse_field(raw)
+
+    return ExtractionResult(**parsed, extra_fields=extra_fields)

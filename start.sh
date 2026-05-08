@@ -11,6 +11,13 @@
 # Postgres + Redis are expected to already be running via `brew services`
 # (they're started on boot once you've run `brew services start postgresql@16 redis`).
 # DocManager uses SQLite in the pilot; Postgres migration is Q2 2026 work.
+#
+# Redis is OPTIONAL for local dev.  Without it the Node gateway uses an
+# in-process MemoryStore — sessions vanish on restart and /active-sessions
+# returns [].  To enable the full Redis-backed session store:
+#   brew install redis && brew services start redis
+# Then export REDIS_URL before running this script:
+#   export REDIS_URL=redis://127.0.0.1:6379/0
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -110,6 +117,9 @@ echo "Starting Python service on :$PY_PORT ..."
   S3_SECRET_KEY="$MINIO_PASS" \
   OLLAMA_HOST="http://127.0.0.1:$OLLAMA_PORT" \
   DOCBRAIN_DB="$ROOT/storage/docbrain.sqlite" \
+  DOCBRAIN_VISION_OCR="${DOCBRAIN_VISION_OCR:-qwen2.5vl:7b}" \
+  DOCBRAIN_VISION_OCR_THRESHOLD="${DOCBRAIN_VISION_OCR_THRESHOLD:-70}" \
+  INTEGRATIONS_USE_MOCKS="${INTEGRATIONS_USE_MOCKS:-true}" \
   nohup .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$PY_PORT" \
     > "$RUN_DIR/python.log" 2>&1 &
   echo $! > "$RUN_DIR/python.pid"
@@ -120,6 +130,8 @@ echo "Starting Node gateway on :$NODE_PORT ..."
 PORT="$NODE_PORT" \
 PYTHON_SERVICE_URL="http://127.0.0.1:$PY_PORT" \
 PYTHON_SERVICE_KEY="$PY_API_KEY" \
+REDIS_URL="${REDIS_URL:-}" \
+SESSION_SECRET="${SESSION_SECRET:-dev-secret-change-me}" \
   nohup node server.js > "$RUN_DIR/node.log" 2>&1 &
 echo $! > "$RUN_DIR/node.pid"
 

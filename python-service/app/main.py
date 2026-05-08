@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from .config import settings
 from .db import Base, engine
 from .services import tasks as _tasks_model  # noqa: F401 (registers TaskRun on Base)
-from .routers import documents, ocr, workflow, duplicates, integrations, search, dashboard, alerts, signatures, tasks as tasks_router, ws, auth, bi, saml as saml_router, anchor as anchor_router, face as face_router, eforms as eforms_router, siem as siem_router, fraud as fraud_router, vector as vector_router, copilot as copilot_router, portal as portal_router, redaction as redaction_router, retention as retention_router, dsar as dsar_router, cbe as cbe_router, stepup as stepup_router, summarize as summarize_router, customer_risk as customer_risk_router, fx as fx_router, ifrs9 as ifrs9_router, replication as replication_router, provenance as prov_router, campaigns as campaigns_router, aisp as aisp_router, ocr_arabic as ocr_ar_router, dp as dp_router, oidc as oidc_router, adversarial as adversarial_router, encryption as encryption_router, graph as graph_router, voice as voice_router, zkkyc as zk_router, ledger as ledger_router, sustainability as sustainability_router, coach as coach_router, journey as journey_router, live as live_router, usage as usage_router, moderation as moderation_router, remediation as remediation_router, passkeys as passkeys_router, federated as federated_router, watchlist as watchlist_router, covenants as covenants_router, lineage as lineage_router, tenant_keys as tenant_keys_router, abac as abac_router, stamp_search as stamp_router, compliance as compliance_router, workflow_designer as wfd_router, retention_nl as retention_nl_router, test_data as test_data_router, transparency as transparency_router, redteam as redteam_router, doc_diff as doc_diff_router, exec_report as exec_report_router, blast_radius as blast_router, stride as stride_router, lang_router as lang_router_r
+from .routers import documents, ocr, workflow, duplicates, integrations, search, dashboard, alerts, signatures, tasks as tasks_router, ws, auth, bi, saml as saml_router, anchor as anchor_router, face as face_router, eforms as eforms_router, siem as siem_router, fraud as fraud_router, vector as vector_router, copilot as copilot_router, portal as portal_router, redaction as redaction_router, retention as retention_router, dsar as dsar_router, cbe as cbe_router, stepup as stepup_router, summarize as summarize_router, customer_risk as customer_risk_router, fx as fx_router, ifrs9 as ifrs9_router, replication as replication_router, provenance as prov_router, campaigns as campaigns_router, aisp as aisp_router, ocr_arabic as ocr_ar_router, dp as dp_router, oidc as oidc_router, adversarial as adversarial_router, encryption as encryption_router, graph as graph_router, voice as voice_router, zkkyc as zk_router, ledger as ledger_router, sustainability as sustainability_router, coach as coach_router, journey as journey_router, live as live_router, usage as usage_router, moderation as moderation_router, remediation as remediation_router, passkeys as passkeys_router, federated as federated_router, watchlist as watchlist_router, covenants as covenants_router, lineage as lineage_router, tenant_keys as tenant_keys_router, abac as abac_router, stamp_search as stamp_router, compliance as compliance_router, workflow_designer as wfd_router, retention_nl as retention_nl_router, test_data as test_data_router, transparency as transparency_router, redteam as redteam_router, doc_diff as doc_diff_router, exec_report as exec_report_router, blast_radius as blast_router, stride as stride_router, lang_router as lang_router_r, notify as notify_router, cbs as cbs_router
 from .services import task_handlers  # noqa: F401 (register handlers)
 from .services.tasks import start_workers
 from .services.metrics import PrometheusMiddleware, metrics_response
@@ -124,10 +124,16 @@ app.include_router(exec_report_router.router)
 app.include_router(blast_router.router)
 app.include_router(stride_router.router)
 app.include_router(lang_router_r.router)
+app.include_router(notify_router.router)
+app.include_router(cbs_router.router)
 
 # DocBrain (AI) — OCR + classify + extract + embed + RAG chat.
 from .routers import docbrain as docbrain_router  # noqa: E402
 app.include_router(docbrain_router.router)
+from .routers import ai_glossary as ai_glossary_router  # noqa: E402
+app.include_router(ai_glossary_router.router)
+from .routers import doctypes as doctypes_router  # noqa: E402
+app.include_router(doctypes_router.router)
 
 
 setup_tracing(app, engine)
@@ -140,3 +146,13 @@ async def _startup():
         await start_workers(n=2)
     from .services.remediation import start as start_remediation
     await start_remediation()
+    # Best-effort DMS knowledge ingest — populates the vector store so the
+    # AI Engine agent's search_knowledge tool can answer narrative questions
+    # even on a fresh install. Non-fatal: if Ollama is down we just log and
+    # continue; the search() call will lazily retry.
+    try:
+        from .services.docbrain import knowledge as dms_knowledge
+        dms_knowledge.ingest()
+    except Exception as exc:  # noqa: BLE001
+        import logging as _logging
+        _logging.getLogger(__name__).warning("knowledge ingest skipped: %s", exc)

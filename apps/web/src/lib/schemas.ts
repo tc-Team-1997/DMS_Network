@@ -9,6 +9,7 @@ export const UserSchema = z.object({
   full_name: z.string().nullable(),
   role: RoleSchema,
   branch: z.string().nullable(),
+  tenant_id: z.string().default('nbe'),
 });
 export type User = z.infer<typeof UserSchema>;
 
@@ -30,7 +31,9 @@ export const DocumentSchema = z.object({
   size: z.number().int().nullable(),
   mime_type: z.string().nullable(),
   ocr_confidence: z.number().nullable(),
+  metadata_json: z.string().nullable().default(null),
   uploaded_at: z.string(),
+  schema_id: z.number().int().nullable().optional(),
 });
 export type DocumentRow = z.infer<typeof DocumentSchema>;
 

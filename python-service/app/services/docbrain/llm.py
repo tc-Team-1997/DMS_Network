@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import ollama
 
@@ -29,6 +29,16 @@ def client() -> ollama.Client:
     if _client is None:
         _client = ollama.Client(host=OLLAMA_HOST)
     return _client
+
+
+def _extract_content(resp: Any) -> str:
+    """Pull `message.content` off an Ollama response regardless of whether
+    the library returned a plain dict (older versions) or a pydantic
+    ChatResponse (newer versions). Returns '' on any shape mismatch."""
+    if isinstance(resp, dict):
+        return resp.get("message", {}).get("content", "") or ""
+    msg = getattr(resp, "message", None)
+    return getattr(msg, "content", "") or "" if msg is not None else ""
 
 
 def chat_json(
@@ -57,7 +67,7 @@ def chat_json(
         log.exception("Ollama chat call failed: %s", exc)
         return {}
 
-    raw = resp.get("message", {}).get("content", "").strip()
+    raw = _extract_content(resp).strip()
     try:
         return json.loads(raw) if raw else {}
     except json.JSONDecodeError:
@@ -85,7 +95,51 @@ def chat_text(
     except Exception as exc:  # noqa: BLE001
         log.exception("Ollama chat_text failed: %s", exc)
         return ""
-    return resp.get("message", {}).get("content", "").strip()
+    return _extract_content(resp).strip()
+
+
+def chat_stream(
+    messages: List[Dict[str, str]],
+    *,
+    temperature: float = 0.2,
+    model: Optional[str] = None,
+) -> Iterator[str]:
+    """
+    Streaming chat. Yields raw token strings from Ollama one chunk at a time.
+    On any daemon error we yield a single bounded error marker and stop — the
+    caller decides how to present it. The generator is lazy; the HTTP client
+    is only hit when the consumer starts iterating.
+
+    `messages` is the full role-tagged history so multi-turn context works
+    without the caller flattening it into a single user string.
+    """
+    try:
+        stream = client().chat(
+            model=model or CHAT_MODEL,
+            stream=True,
+            options={"temperature": temperature},
+            messages=messages,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Ollama chat_stream open failed: %s", exc)
+        yield f"\n[error: {exc}]"
+        return
+
+    try:
+        for chunk in stream:
+            # The ollama lib switched from plain dicts to pydantic ChatResponse
+            # objects a while back. Handle both so we don't silently drop
+            # every token when the library upgrades.
+            if isinstance(chunk, dict):
+                part = chunk.get("message", {}).get("content", "") or ""
+            else:
+                msg = getattr(chunk, "message", None)
+                part = getattr(msg, "content", "") or "" if msg is not None else ""
+            if part:
+                yield part
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Ollama chat_stream read failed: %s", exc)
+        yield f"\n[error: {exc}]"
 
 
 def embed(text: str, *, model: Optional[str] = None) -> List[float]:

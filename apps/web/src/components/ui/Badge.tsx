@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn';
-import type { ReactNode } from 'react';
+import type { HTMLAttributes } from 'react';
 
 export type BadgeTone = 'success' | 'warning' | 'danger' | 'blue' | 'purple' | 'neutral';
 
@@ -12,17 +12,12 @@ const tones: Record<BadgeTone, string> = {
   neutral: 'bg-divider    text-ink-sub',
 };
 
-export function Badge({
-  tone = 'neutral',
-  children,
-  className,
-}: {
-  tone?: BadgeTone;
-  children: ReactNode;
-  className?: string;
-}) {
+type BadgeProps = { tone?: BadgeTone } & HTMLAttributes<HTMLSpanElement>;
+
+export function Badge({ tone = 'neutral', children, className, ...rest }: BadgeProps) {
   return (
     <span
+      {...rest}
       className={cn(
         'inline-block rounded-badge px-[9px] py-[3px] text-[11px] font-medium',
         tones[tone],

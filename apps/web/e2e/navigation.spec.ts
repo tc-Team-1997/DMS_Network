@@ -27,8 +27,9 @@ test.describe('Navigation between modules', () => {
     await expect(page.locator('h2').filter({ hasText: /alerts$/ })).toBeVisible();
   });
 
-  test('coming-soon route shows placeholder', async ({ page }) => {
-    await page.goto('/workflows');
-    await expect(page.getByText(/coming soon|next milestone/i)).toBeVisible();
+  test('unknown route redirects to dashboard', async ({ page }) => {
+    await page.goto('/this-route-does-not-exist');
+    await page.waitForURL('**/');
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   });
 });

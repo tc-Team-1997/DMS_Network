@@ -1,0 +1,21 @@
+{
+  "body": {
+    "id": "0011234560101",
+    "currency": "EGP",
+    "category": "1001",
+    "productCode": "SAVCUR",
+    "shortTitle": "FATMOSTAFA-SAV",
+    "customer": "CIF001",
+    "openingDate": "20200315",
+    "maturityDate": null,
+    "availableBalance": "125000.00",
+    "clearedBalance": "125000.00",
+    "onlineActualBalance": "125000.00",
+    "workingBalance": "125000.00",
+    "lockedAmount": "0.00",
+    "status": "ACTIVE",
+    "branchId": "HQ",
+    "interestRate": "0.085",
+    "statementCycle": "MONTHLY"
+  }
+}

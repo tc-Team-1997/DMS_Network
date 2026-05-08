@@ -1,0 +1,30 @@
+{
+  "body": [
+    {
+      "documentId": "T24-DOC-CIF001-001",
+      "documentType": "NATIONAL_ID",
+      "description": "National ID — front",
+      "mimeType": "image/jpeg",
+      "size": 204800,
+      "createdDate": "20240115",
+      "documentUrl": "https://mock.t24.local/docs/CIF001/001",
+      "metadata": {
+        "source": "mock",
+        "verified": true
+      }
+    },
+    {
+      "documentId": "T24-DOC-CIF001-002",
+      "documentType": "ACCOUNT_STATEMENT",
+      "description": "Account statement Q1-2024",
+      "mimeType": "application/pdf",
+      "size": 512000,
+      "createdDate": "20240401",
+      "documentUrl": "https://mock.t24.local/docs/CIF001/002",
+      "metadata": {
+        "source": "mock",
+        "period": "Q1-2024"
+      }
+    }
+  ]
+}

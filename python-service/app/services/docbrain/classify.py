@@ -56,11 +56,47 @@ Be conservative. If the OCR text is garbled or too short to decide, return
 """.format(classes="\n  ".join(f"- {c}" for c in DOC_CLASSES))
 
 
-def classify_document(ocr_text: str, *, max_chars: int = 4000) -> ClassificationResult:
+def _build_bias_block(text: str) -> str:
+    """
+    Call nearest_schemas() and format the top-3 matches as a few-shot hint
+    block to prepend to the system prompt. Returns an empty string if no
+    samples are indexed or the import fails.
+    """
+    try:
+        from .doctype_learner import nearest_schemas  # lazy; avoids circular import
+        matches = nearest_schemas(text, top_k=3)
+    except Exception:  # noqa: BLE001
+        return ""
+
+    if not matches:
+        return ""
+
+    lines = ["Based on stored sample embeddings, strong matches are:"]
+    for m in matches:
+        name = m.get("name", "Unknown")
+        sim  = m.get("similarity", 0.0)
+        pct  = round(sim * 100)
+        lines.append(f"  - {name} ({pct}%)")
+    lines.append(
+        "Use these hints unless the document clearly differs from those types."
+    )
+    return "\n".join(lines)
+
+
+def classify_document(
+    ocr_text: str,
+    *,
+    max_chars: int = 4000,
+    use_sample_bias: bool = True,
+) -> ClassificationResult:
     """
     One-shot classification. We trim very long OCR text to keep latency
     predictable on dev-grade hardware; the head of the doc is usually
     sufficient for class (titles, issuing authority, etc. appear early).
+
+    When use_sample_bias=True (default), nearest_schemas() is called before
+    the LLM to inject top-3 sample-based hints into the system prompt.
+    Existing callers without the kwarg continue to work unchanged.
     """
     if not ocr_text or len(ocr_text.strip()) < 20:
         return ClassificationResult(
@@ -69,7 +105,16 @@ def classify_document(ocr_text: str, *, max_chars: int = 4000) -> Classification
         )
 
     snippet = ocr_text.strip()[:max_chars]
-    reply = chat_json(SYSTEM_PROMPT, snippet, temperature=0.0)
+
+    # Build the effective system prompt.
+    effective_prompt = SYSTEM_PROMPT
+
+    if use_sample_bias:
+        bias_block = _build_bias_block(snippet)
+        if bias_block:
+            effective_prompt = SYSTEM_PROMPT + "\n\n" + bias_block
+
+    reply = chat_json(effective_prompt, snippet, temperature=0.0)
 
     doc_class = str(reply.get("doc_class", "Unknown"))
     if doc_class not in DOC_CLASSES and doc_class != "Unknown":

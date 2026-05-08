@@ -1,13 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCircle2 } from 'lucide-react';
-import { get, post } from '@/lib/http';
-import { AlertSchema, OkSchema, type Alert } from '@/lib/schemas';
-import { z } from 'zod';
+import { type Alert } from '@/lib/schemas';
 import { Badge, Panel, type BadgeTone } from '@/components/ui';
 import { cn } from '@/lib/cn';
-
-const fetchAlerts = () => get('/spa/api/alerts', z.array(AlertSchema), { limit: 200 });
-const markRead = (id: number) => post(`/spa/api/alerts/${id}/read`, {}, OkSchema);
+import { fetchAlerts, markAlertRead } from './api';
 
 const toneByLevel: Record<Alert['level'], BadgeTone> = {
   critical: 'danger',
@@ -20,7 +16,7 @@ export function AlertsPage() {
   const qc = useQueryClient();
   const alerts = useQuery({ queryKey: ['alerts'], queryFn: fetchAlerts });
   const mark = useMutation({
-    mutationFn: markRead,
+    mutationFn: markAlertRead,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['alerts'] });
       void qc.invalidateQueries({ queryKey: ['stats'] });

@@ -21,6 +21,7 @@ from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text as sqltext
 from sqlalchemy.orm import Session
@@ -29,9 +30,11 @@ from ..db import get_db
 from ..security import require_api_key
 from ..services.docbrain import (
     classify_document, extract_entities, ocr_document, rag_answer,
-    upsert_document, DOC_CLASSES,
+    rag_answer_stream, upsert_document, DOC_CLASSES,
 )
 from ..services.docbrain.extract import ExtractedField
+from ..services.docbrain.lc_rag import USE_LANGCHAIN, rag_answer_stream_langchain
+from ..services.docbrain.agent import agent_stream
 from ..services.docbrain.llm import healthcheck as llm_healthcheck
 
 log = logging.getLogger(__name__)
@@ -140,6 +143,21 @@ class AnalyzeResponse(BaseModel):
     chunks_indexed: int
 
 
+class PreviewRequest(BaseModel):
+    """Pre-upload preview. No document_id — nothing is persisted or indexed."""
+    bytes_b64: Optional[str] = None
+    mime_type: Optional[str] = None
+    text:      Optional[str] = None
+
+
+class PreviewResponse(BaseModel):
+    classification: Dict[str, Any]
+    extraction:    Dict[str, Any]
+    ocr: Dict[str, Any]
+    prefill: Dict[str, str]     # high-confidence fields the SPA should auto-fill
+    summary: str = ""           # short plain-text AI summary of the document
+
+
 class ExtractRequest(BaseModel):
     text: str = Field(..., min_length=1)
 
@@ -158,6 +176,19 @@ class ChatResponse(BaseModel):
     answer: str
     citations: List[Dict[str, Any]]
     has_evidence: bool
+    needs_verification: bool = False
+
+
+class ChatTurn(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str
+
+
+class ChatStreamRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    document_id: Optional[int] = None
+    tenant_id: Optional[str] = None
+    history: List[ChatTurn] = Field(default_factory=list)
 
 
 # ---------- helpers --------------------------------------------------------
@@ -168,8 +199,12 @@ def _extraction_to_dict(result) -> Dict[str, Any]:
         "customer_cid", "customer_name", "doc_number", "dob",
         "issue_date", "expiry_date", "issuing_authority", "address",
     ):
-        field: ExtractedField = getattr(result, key)
-        out[key] = {"value": field.value, "confidence": field.confidence}
+        f: ExtractedField = getattr(result, key)
+        out[key] = {"value": f.value, "confidence": f.confidence}
+    # Include extra schema-specific fields when present.
+    extra = getattr(result, "extra_fields", None) or {}
+    for key, ef in extra.items():
+        out[key] = {"value": getattr(ef, "value", None), "confidence": getattr(ef, "confidence", 0.0)}
     return out
 
 
@@ -202,6 +237,7 @@ def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
             "pages": len(ocr_res.pages),
             "mean_confidence": ocr_res.mean_confidence,
             "languages": ocr_res.languages,
+            "backend": ocr_res.backend,
         }
     else:
         full_text = (req.text or "").strip()
@@ -209,6 +245,7 @@ def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
             "pages": 1,
             "mean_confidence": 100.0,
             "languages": ["eng"],
+            "backend": "passthrough",
         }
 
     classification = classify_document(full_text)
@@ -245,6 +282,76 @@ def extract(req: ExtractRequest):
     return ExtractResponse(fields=fields, prefill=result.as_prefill())
 
 
+@router.post("/preview", response_model=PreviewResponse)
+def preview(req: PreviewRequest):
+    """
+    Pre-upload preview. OCR (if bytes) → classify → extract. No sidecar
+    write, no vector upsert. Used by the Capture page so the user sees the
+    AI's best guess *before* committing the upload.
+    """
+    if not (req.text or req.bytes_b64):
+        raise HTTPException(status_code=400, detail="supply text or bytes_b64")
+
+    if req.bytes_b64:
+        try:
+            data = base64.b64decode(req.bytes_b64, validate=True)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=f"bad base64: {exc}")
+        mime = req.mime_type or "application/octet-stream"
+        ocr_res = ocr_document(data, mime)
+        full_text = ocr_res.full_text
+        ocr_summary = {
+            "pages": len(ocr_res.pages),
+            "mean_confidence": ocr_res.mean_confidence,
+            "languages": ocr_res.languages,
+            "backend": ocr_res.backend,
+        }
+    else:
+        full_text = (req.text or "").strip()
+        ocr_summary = {
+            "pages": 1, "mean_confidence": 100.0, "languages": ["eng"],
+            "backend": "passthrough",
+        }
+
+    classification = classify_document(full_text)
+    extraction     = extract_entities(full_text)
+
+    # as_prefill() on the ExtractionResult returns only fields with
+    # confidence >= 0.7 — this is the canonical "safe to auto-fill" view.
+    prefill = extraction.as_prefill()
+
+    # Include doc_type in the prefill when classification is confident.
+    if classification.doc_class and classification.doc_class != "Unknown":
+        prefill = dict(prefill)
+        prefill.setdefault("doc_type", classification.doc_class)
+
+    # Short AI summary — one or two sentences. Best-effort, empty string on LLM failure.
+    from ..services.docbrain.llm import chat_text  # noqa: PLC0415
+    summary = ""
+    if full_text and len(full_text.strip()) >= 40:
+        try:
+            summary = chat_text(
+                system=(
+                    "You are DocBrain summarising a banking/KYC document for an operator. "
+                    "In one or two sentences (max 40 words), state the document type, who it is about, "
+                    "and the single most actionable fact (issue/expiry date, balance, or customer name). "
+                    "No preamble. No disclaimers. No markdown."
+                ),
+                user=full_text[:4000],
+                temperature=0.0,
+            ).strip()
+        except Exception:  # noqa: BLE001
+            summary = ""
+
+    return PreviewResponse(
+        classification=asdict(classification),
+        extraction=_extraction_to_dict(extraction),
+        ocr=ocr_summary,
+        prefill=prefill,
+        summary=summary,
+    )
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     ans = rag_answer(req.question, document_id=req.document_id)
@@ -252,6 +359,47 @@ def chat(req: ChatRequest):
         answer=ans.answer,
         citations=[asdict(c) for c in ans.citations],
         has_evidence=ans.has_evidence,
+        needs_verification=ans.needs_verification,
+    )
+
+
+@router.post("/chat/stream")
+def chat_stream(req: ChatStreamRequest):
+    """
+    Server-sent events. Each frame is a single JSON object on one line,
+    prefixed with `data: ` per the SSE spec. Frame types:
+      - `citations`   — the retrieved passages the answer will ground on
+      - `no_evidence` — retrieval returned nothing; stream terminates
+      - `token`       — one delta of the answer text
+      - `done`        — final event with evidence flag
+    The `X-Accel-Buffering: no` header disables proxy buffering so tokens
+    reach the browser as they're produced.
+    """
+    # Pick implementation: env-flag picks LangChain path, default is the
+    # existing custom generator. Same SSE event shape either way.
+    stream_impl = rag_answer_stream_langchain if USE_LANGCHAIN else rag_answer_stream
+
+    def event_gen():
+        try:
+            for evt in stream_impl(
+                req.question,
+                tenant_id=req.tenant_id,
+                document_id=req.document_id,
+                history=[h.model_dump() for h in req.history],
+            ):
+                yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+        except Exception as exc:  # noqa: BLE001
+            log.exception("chat_stream failed: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)[:200]})}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
 
 
@@ -261,3 +409,41 @@ def get_analysis(document_id: int, db: Session = Depends(get_db)):
     if not rec:
         raise HTTPException(status_code=404, detail="not analysed yet")
     return rec
+
+
+# ---------- agent (tool-using) ---------------------------------------------
+
+class AgentStreamRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    history: List[ChatTurn] = Field(default_factory=list)
+
+
+@router.post("/agent/stream")
+def agent_stream_endpoint(req: AgentStreamRequest):
+    """Server-sent events for the tool-using agent. Frame types:
+      `tool_call`  {name, arguments}
+      `tool_result`{name, result}
+      `token`      {text}
+      `done`       {iterations, used_tools}
+      `error`      {message}
+    """
+    def event_gen():
+        try:
+            for evt in agent_stream(
+                req.question,
+                history=[h.model_dump() for h in req.history],
+            ):
+                yield f"data: {json.dumps(evt, ensure_ascii=False, default=str)}\n\n"
+        except Exception as exc:  # noqa: BLE001
+            log.exception("agent_stream failed: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)[:200]})}\n\n"
+
+    return StreamingResponse(
+        event_gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )

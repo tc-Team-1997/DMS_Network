@@ -9,7 +9,20 @@ import { RepositoryPage } from '@/modules/repository/RepositoryPage';
 import { ViewerPage } from '@/modules/viewer/ViewerPage';
 import { SearchPage } from '@/modules/search/SearchPage';
 import { AlertsPage } from '@/modules/alerts/AlertsPage';
-import { ComingSoonPage } from '@/modules/_placeholder/ComingSoonPage';
+import { WorkflowsPage } from '@/modules/workflows/WorkflowsPage';
+import { IndexingPage } from '@/modules/indexing/IndexingPage';
+import { ReportsPage } from '@/modules/reports/ReportsPage';
+import { TemplatesPage } from '@/modules/workflow-templates/TemplatesPage';
+import { AIEnginePage } from '@/modules/ai/AIEnginePage';
+import { ChatPage } from '@/modules/ai/ChatPage';
+import { CompliancePage } from '@/modules/compliance/CompliancePage';
+import { IntegrationsPage } from '@/modules/integrations/IntegrationsPage';
+import { SecurityPage } from '@/modules/security/SecurityPage';
+import { UsersPage } from '@/modules/users/UsersPage';
+import { AdminPage } from '@/modules/admin/AdminPage';
+import { DedupSettingsPage } from '@/modules/admin/DedupSettingsPage';
+import { DocumentTypesPage } from '@/modules/document-types/DocumentTypesPage';
+import { GlossaryPage } from '@/modules/ai/GlossaryPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,17 +59,20 @@ export function App() {
             <Route path="/viewer/:id" element={<ViewerPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
-
-            {/* Placeholders — deliberate no-op until their milestone. */}
-            <Route path="/indexing"     element={<ComingSoonPage />} />
-            <Route path="/workflows"    element={<ComingSoonPage />} />
-            <Route path="/ai"           element={<ComingSoonPage />} />
-            <Route path="/reports"      element={<ComingSoonPage />} />
-            <Route path="/compliance"   element={<ComingSoonPage />} />
-            <Route path="/integration"  element={<ComingSoonPage />} />
-            <Route path="/security"     element={<ComingSoonPage />} />
-            <Route path="/users"        element={<ComingSoonPage />} />
-            <Route path="/admin"        element={<ComingSoonPage />} />
+            <Route path="/workflows" element={<WorkflowsPage />} />
+            <Route path="/workflows/templates" element={<TemplatesPage />} />
+            <Route path="/indexing" element={<IndexingPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/ai" element={<ChatPage />} />
+            <Route path="/ai/engine" element={<AIEnginePage />} />
+            <Route path="/compliance" element={<CompliancePage />} />
+            <Route path="/integration" element={<IntegrationsPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/document-types" element={<DocumentTypesPage />} />
+            <Route path="/admin/dedup-settings" element={<DedupSettingsPage />} />
+            <Route path="/admin/ai-glossary" element={<GlossaryPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

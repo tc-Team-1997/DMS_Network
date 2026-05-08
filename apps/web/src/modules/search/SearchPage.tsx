@@ -2,13 +2,9 @@ import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Search as SearchIcon } from 'lucide-react';
-import { get } from '@/lib/http';
-import { DocumentSchema, type DocumentRow } from '@/lib/schemas';
-import { z } from 'zod';
+import { type DocumentRow } from '@/lib/schemas';
 import { Badge, Button, DataTable, Input, Panel, statusTone, type Column } from '@/components/ui';
-
-const fetchSearch = (q: string) =>
-  get('/spa/api/search', z.array(DocumentSchema), { q });
+import { fetchSearch } from './api';
 
 const columns: Column<DocumentRow>[] = [
   { key: 'name',   header: 'Document',

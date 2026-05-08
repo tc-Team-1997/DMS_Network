@@ -14,6 +14,9 @@ import {
   Plug,
   Users,
   Sparkles,
+  FileSliders,
+  BookOpen,
+  CopyX,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -31,22 +34,25 @@ export const navItems: NavItem[] = [
   { label: 'Dashboard',      path: '/',            icon: LayoutDashboard, section: 'Overview',   perm: 'view' },
 
   { label: 'Capture',        path: '/capture',     icon: Camera,          section: 'Operations', perm: 'capture' },
-  { label: 'Indexing',       path: '/indexing',    icon: FilePenLine,     section: 'Operations', perm: 'index',  comingSoon: true },
+  { label: 'Indexing',       path: '/indexing',    icon: FilePenLine,     section: 'Operations', perm: 'index' },
   { label: 'Repository',     path: '/repository',  icon: FolderTree,      section: 'Operations', perm: 'view' },
-  { label: 'Workflows',      path: '/workflows',   icon: Workflow,        section: 'Operations', perm: 'workflow', comingSoon: true },
+  { label: 'Workflows',      path: '/workflows',   icon: Workflow,        section: 'Operations', perm: 'workflow' },
 
   { label: 'Search',         path: '/search',      icon: Search,          section: 'Discovery',  perm: 'view' },
   { label: 'Viewer',         path: '/viewer',      icon: Eye,             section: 'Discovery',  perm: 'view' },
-  { label: 'AI Engine',      path: '/ai',          icon: Sparkles,        section: 'Discovery',  perm: 'view',    comingSoon: true },
+  { label: 'AI Engine',      path: '/ai',          icon: Sparkles,        section: 'Discovery',  perm: 'view' },
 
   { label: 'Alerts',         path: '/alerts',      icon: Bell,            section: 'Governance', perm: 'view' },
-  { label: 'Reports & BI',   path: '/reports',     icon: BarChart3,       section: 'Governance', perm: 'view',    comingSoon: true },
-  { label: 'Compliance',     path: '/compliance',  icon: ScrollText,      section: 'Governance', perm: 'view',    comingSoon: true },
+  { label: 'Reports & BI',   path: '/reports',     icon: BarChart3,       section: 'Governance', perm: 'view' },
+  { label: 'Compliance',     path: '/compliance',  icon: ScrollText,      section: 'Governance', perm: 'view' },
 
-  { label: 'Integration',    path: '/integration', icon: Plug,            section: 'Platform',   perm: 'view',    comingSoon: true },
-  { label: 'Security & RBAC',path: '/security',    icon: ShieldCheck,     section: 'Platform',   perm: 'admin',   comingSoon: true },
-  { label: 'Users',          path: '/users',       icon: Users,           section: 'Platform',   perm: 'admin',   comingSoon: true },
-  { label: 'System Admin',   path: '/admin',       icon: Settings,        section: 'Platform',   perm: 'admin',   comingSoon: true },
+  { label: 'Integration',    path: '/integration', icon: Plug,            section: 'Platform',   perm: 'view' },
+  { label: 'Security & RBAC',path: '/security',    icon: ShieldCheck,     section: 'Platform',   perm: 'admin' },
+  { label: 'Users',          path: '/users',       icon: Users,           section: 'Platform',   perm: 'admin' },
+  { label: 'Document types', path: '/admin/document-types',  icon: FileSliders, section: 'Platform', perm: 'admin' },
+  { label: 'Dedup settings', path: '/admin/dedup-settings',  icon: CopyX,       section: 'Platform', perm: 'admin' },
+  { label: 'AI glossary',    path: '/admin/ai-glossary',     icon: BookOpen,    section: 'Platform', perm: 'admin' },
+  { label: 'System Admin',   path: '/admin',                 icon: Settings,    section: 'Platform', perm: 'admin' },
 ];
 
 export const sections: NavItem['section'][] = [

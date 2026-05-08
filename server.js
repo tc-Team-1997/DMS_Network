@@ -4,6 +4,7 @@ const path = require('path');
 const http = require('http');
 const db = require('./db');
 const ws = require('./services/ws');
+const { createSessionStore, redis: sessionRedis } = require('./services/session-store');
 
 const app = express();
 app.set('view engine', 'ejs');
@@ -14,7 +15,9 @@ app.set('views', path.join(__dirname, 'views'));
 // once the EJS surface is retired in favor of apps/web.
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  // SAMEORIGIN (not DENY) so the SPA iframe can preview /uploads/* PDFs.
+  // Same-origin is enforced — cross-origin embeds still blocked.
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
   next();
@@ -25,12 +28,49 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+const SESSION_TTL_SECONDS     = parseInt(process.env.SESSION_TTL_SECONDS     || '7200', 10);  // 2h
+const SESSION_EXTEND_SECONDS  = parseInt(process.env.SESSION_EXTEND_SECONDS  || '3600', 10);  // +1h
+const SESSION_WARNING_SECONDS = parseInt(process.env.SESSION_WARNING_SECONDS || '1800', 10);  // 30m banner
+
+app.locals.sessionConfig = {
+  ttl:     SESSION_TTL_SECONDS,
+  extend:  SESSION_EXTEND_SECONDS,
+  warning: SESSION_WARNING_SECONDS,
+};
+
+const _sessionStore = createSessionStore();
+
 app.use(session({
-  secret: 'nbe-dms-secret-change-me',
+  store: _sessionStore,
+  secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
+  name: 'dms.sid',
   resave: false,
+  rolling: true,           // sliding expiration on every request
   saveUninitialized: false,
-  cookie: { maxAge: 8 * 60 * 60 * 1000 }
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: SESSION_TTL_SECONDS * 1000,
+  },
 }));
+
+// Activity refresh middleware: update last_active_at in Redis on every
+// non-polling request, fire-and-forget so latency is unaffected.
+app.use((req, _res, next) => {
+  // Skip the session-status polling endpoint so it doesn't act as activity.
+  if (req.path === '/spa/api/auth/session-status') return next();
+  if (req.session && req.session.user) {
+    const sid = req.sessionID;
+    if (sid) {
+      setImmediate(() => {
+        sessionRedis.hset(`dms:session-meta:${sid}`, 'last_active_at', new Date().toISOString())
+          .catch(() => {});
+      });
+    }
+  }
+  next();
+});
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
@@ -62,10 +102,35 @@ app.post('/login', (req, res) => {
   }
   req.session.user = { id: user.id, username: user.username, full_name: user.full_name, role: user.role, branch: user.branch };
   db.prepare('INSERT INTO audit_log (user_id, action, entity) VALUES (?, ?, ?)').run(user.id, 'LOGIN', 'user');
+
+  // Per-user session tracking in Redis (no-op when Redis is not configured).
+  req.session.save(() => {
+    const sid = req.sessionID;
+    const ttlSeconds = SESSION_TTL_SECONDS;
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+    const now = new Date().toISOString();
+    const meta = JSON.stringify({
+      userId: user.id,
+      createdAt: now,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] || '',
+      last_active_at: now,
+    });
+    sessionRedis.hset(`dms:user-sessions:${user.id}`, sid, expiresAt).catch(() => {});
+    sessionRedis.expire(`dms:user-sessions:${user.id}`, ttlSeconds + 300).catch(() => {});
+    sessionRedis.set(`dms:session-meta:${sid}`, meta, 'EX', ttlSeconds + 300).catch(() => {});
+  });
+
   res.redirect('/');
 });
 
 app.get('/logout', (req, res) => {
+  const sid = req.sessionID;
+  const userId = req.session?.user?.id;
+  if (sid && userId) {
+    sessionRedis.hdel(`dms:user-sessions:${userId}`, sid).catch(() => {});
+    sessionRedis.del(`dms:session-meta:${sid}`).catch(() => {});
+  }
   req.session.destroy(() => res.redirect('/login'));
 });
 
@@ -100,8 +165,18 @@ app.use('/bi', requireAuth, require('./routes/bi'));
 require('./services/saml').configure(app);
 require('./services/expiry-job').start();
 require('./services/retention').start();
+require('./services/offline-sync').start(parseInt(process.env.OFFLINE_SYNC_INTERVAL_SEC || '15', 10));
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
+
+// Node 18+ defaults headersTimeout=60s and requestTimeout=300s, which is
+// too tight for our long-running proxy routes (LLM analyze, glossary
+// regenerate, multi-page OCR). Bump both to 10 minutes so the HTTP layer
+// stops enforcing a shorter ceiling than our pyCall / axios defaults.
+server.headersTimeout = 10 * 60 * 1000;
+server.requestTimeout = 10 * 60 * 1000;
+server.keepAliveTimeout = 65_000;
+
 ws.attach(server);
 server.listen(PORT, () => console.log(`NBE DMS running on http://localhost:${PORT}`));

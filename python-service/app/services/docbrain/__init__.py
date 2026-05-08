@@ -17,7 +17,7 @@ from .classify import classify_document, ClassificationResult, DOC_CLASSES
 from .extract import extract_entities, ExtractionResult
 from .embed import embed_text, EMBED_DIM
 from .vectors import upsert_document, vector_search
-from .rag import rag_answer, RagAnswer, Citation
+from .rag import rag_answer, rag_answer_stream, RagAnswer, Citation
 
 __all__ = [
     "ocr_document", "OcrResult", "OcrPage",
@@ -25,5 +25,5 @@ __all__ = [
     "extract_entities", "ExtractionResult",
     "embed_text", "EMBED_DIM",
     "upsert_document", "vector_search",
-    "rag_answer", "RagAnswer", "Citation",
+    "rag_answer", "rag_answer_stream", "RagAnswer", "Citation",
 ]

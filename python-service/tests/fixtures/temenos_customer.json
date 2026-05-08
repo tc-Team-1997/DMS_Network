@@ -1,0 +1,29 @@
+{
+  "body": {
+    "id": "CIF001",
+    "shortName": "MOSTAFA",
+    "customerName": "Fatima Al-Zahraa Mostafa",
+    "dateOfBirth": "19990101",
+    "nationality": "EG",
+    "language": "AR",
+    "sector": "1001",
+    "industry": "9001",
+    "residence": "EG",
+    "status": "CUSTOMER",
+    "mnemonic": "FATMOSTAFA",
+    "phoneNumber": "+201001234567",
+    "emailAddress": "fatima.mostafa@example.nbe.eg",
+    "kycStatus": "VERIFIED",
+    "riskBand": "LOW",
+    "nationalId": "29901010123456",
+    "accounts": [
+      {
+        "accountId": "0011234560101",
+        "currency": "EGP",
+        "category": "1001",
+        "productCode": "SAVCUR",
+        "openingDate": "20200315"
+      }
+    ]
+  }
+}

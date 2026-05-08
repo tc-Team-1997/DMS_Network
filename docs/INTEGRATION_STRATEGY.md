@@ -397,3 +397,88 @@ Things we will NOT do on the integration front:
 | I2 | Whether to include a lightweight ETL engine for migrations, or rely on partners | Leaning in-house for v1; revisit Q3 2027 |
 | I3 | Whether to offer a "universal JDBC" adapter for home-grown CBSs | Against; would dilute quality claim |
 | I4 | Partner revenue share: flat 20% or tiered | Open; GTM decides by Q4 2026 |
+
+---
+
+## 16. Temenos T24 adapter — implementation reference
+
+**Status:** GA (shipped). Closes BoB compliance Req 27 (Open APIs / CBS integration) and Req 34 (KYC/CIF CBS link). Both requirements advance from PARTIAL/STUB to FULL.
+
+### 16.1 Env vars
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `TEMENOS_BASE_URL` | No (mock used if absent) | — | Base URL of the T24 IRIS REST API, e.g. `https://t24.bank.local` |
+| `TEMENOS_AUTH_MODE` | No | `oauth2` | Auth scheme: `oauth2` (client credentials) or `aa_signed` (HMAC header) |
+| `TEMENOS_CLIENT_ID` | oauth2 only | — | OAuth2 client_id |
+| `TEMENOS_CLIENT_SECRET` | oauth2 only | — | OAuth2 client_secret — never logged |
+| `TEMENOS_TOKEN_URL` | oauth2 only | — | OAuth2 token endpoint |
+| `TEMENOS_AA_KEY_ID` | aa_signed only | — | Temenos AA-* key identifier |
+| `TEMENOS_AA_SECRET` | aa_signed only | — | Temenos AA-* signing secret — never logged |
+| `TEMENOS_TIMEOUT_S` | No | `15` | HTTP timeout in seconds |
+| `TEMENOS_RATE_LIMIT_RPS` | No | `10` | Max outbound requests per second per adapter instance |
+| `DEFAULT_CBS_ADAPTER` | No | `temenos_t24` | Active CBS adapter name used by the CBS router + KYC/CIF service |
+| `INTEGRATIONS_USE_MOCKS` | No | `false` | Set `true` to force mock adapters globally (CI / local dev) |
+
+No credential appears in source code. All secrets are read from environment variables or (in production) from Vault at `secret/tenants/{tenant_id}/integrations/temenos_t24`.
+
+### 16.2 Auth modes
+
+**`oauth2` (default)**
+Standard OAuth2 client-credentials grant. The adapter fetches a token from `TEMENOS_TOKEN_URL` on first use and caches it until 30 seconds before expiry. No credential appears in request logs.
+
+**`aa_signed`**
+Temenos AA-* HMAC signed header scheme. Each request carries three headers:
+- `AA-KeyId` — the key identifier
+- `AA-Timestamp` — Unix epoch seconds
+- `AA-Signature` — SHA-256 of `{key_id}:{timestamp}:{secret}`
+
+### 16.3 Endpoint mappings (T24 IRIS v2)
+
+| DocManager operation | T24 endpoint | HTTP method |
+|---|---|---|
+| `pull_customer(cif)` | `/api/v2.0.0/holdings/customers/{cif}` | GET |
+| `pull_account(account_no)` | `/api/v2.0.0/holdings/accounts/{account_no}` | GET |
+| `pull_documents(cif)` | `/api/v2.0.0/holdings/customers/{cif}/documents` | GET |
+| `list_customer_documents(cif)` | `/api/v2.0.0/holdings/customers/{cif}/documents` | GET |
+| `post_document_link(cif, doc_id)` | `/api/v2.0.0/holdings/customers/{cif}/documents` | POST |
+| `push_document(doc, target)` | `/api/v2.0.0/holdings/customers/{cif}/documents` | POST |
+| `health()` | `/api/v2.0.0/meta/healthcheck` | GET |
+
+### 16.4 Fixture-based local dev mode
+
+When `TEMENOS_BASE_URL` is unset (or `INTEGRATIONS_USE_MOCKS=true`), the factory `get_temenos_adapter()` returns `MockTemenosT24` which reads deterministic fixture data from:
+
+- `python-service/tests/fixtures/temenos_customer.json` — customer record for CIF001 (Fatima Al-Zahraa Mostafa)
+- `python-service/tests/fixtures/temenos_account.json` — account `0011234560101`, EGP, ACTIVE, balance 125 000
+- `python-service/tests/fixtures/temenos_documents.json` — two document links (NATIONAL_ID, ACCOUNT_STATEMENT)
+
+No network call is made in mock mode.
+
+### 16.5 Health-check behaviour
+
+| Condition | `health()` result |
+|---|---|
+| `TEMENOS_BASE_URL` unset | `ok=True`, `detail="mock — no network call"` |
+| Base URL reachable, endpoint responds | `ok=True`, `detail="version={T24 version}"` |
+| Base URL set but unreachable | `ok=False`, `detail="{exception class}: {message}"` |
+| Circuit breaker open (5 consecutive 5xx) | `ok=False`, `detail="circuit_open: …"` |
+
+The circuit breaker resets on the first successful call.
+
+### 16.6 CBS router surface
+
+Mounted at `/api/v1/cbs/*` (Python service) and mirrored under `/spa/api/cbs/*` (Node proxy).
+
+| Endpoint | RBAC (SPA) | Description |
+|---|---|---|
+| `GET  /api/v1/cbs/health` | `admin` | Health of all registered adapters |
+| `GET  /api/v1/cbs/customers/{cif}` | `capture` | Pull customer from CBS, upsert local cache |
+| `GET  /api/v1/cbs/customers/{cif}/accounts` | `capture` | List accounts for a CIF |
+| `POST /api/v1/cbs/customers/{cif}/link-document` | `admin` | Link a DMS document to a customer in CBS |
+
+### 16.7 Capability matrix row
+
+| Adapter | Customer lookup | Customer sync | Document push | Document pull | Status feedback | Health | Circuit breaker | Idempotency |
+|---|---|---|---|---|---|---|---|---|
+| **Temenos T24** | GA | — | GA | GA | — | GA | GA | GA |

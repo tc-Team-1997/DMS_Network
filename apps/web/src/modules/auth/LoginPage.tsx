@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { FileText, ShieldCheck, Workflow as WorkflowIcon, Search as SearchIcon, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/store/auth';
 import { HttpError } from '@/lib/http';
@@ -155,9 +155,15 @@ function CarouselPanel() {
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const login = useAuth((s) => s.login);
   const status = useAuth((s) => s.status);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  // Parse the ?next= return URL set by the 401 interceptor or expiry redirect.
+  const searchParams = new URLSearchParams(location.search);
+  const nextParam = searchParams.get('next');
+  const returnTo = nextParam && nextParam.startsWith('/') ? nextParam : '/';
 
   const {
     register,
@@ -165,13 +171,13 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  if (status === 'authenticated') return <Navigate to="/" replace />;
+  if (status === 'authenticated') return <Navigate to={returnTo} replace />;
 
   const onSubmit = handleSubmit(async ({ username, password }) => {
     setServerError(null);
     try {
       await login(username, password);
-      navigate('/', { replace: true });
+      navigate(returnTo, { replace: true });
     } catch (err) {
       if (err instanceof HttpError && err.status === 401) setServerError('Invalid credentials. Please try again.');
       else if (err instanceof HttpError && err.status === 403) setServerError('Account is locked. Contact your administrator.');

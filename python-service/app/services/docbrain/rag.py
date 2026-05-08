@@ -8,9 +8,9 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
-from .llm import chat_text
+from .llm import chat_stream, chat_text
 from .vectors import VectorHit, vector_search
 
 log = logging.getLogger(__name__)
@@ -30,11 +30,23 @@ class Citation:
 class RagAnswer:
     answer: str
     citations: List[Citation]
-    has_evidence: bool    # false → we refused to answer, UI shows a notice
+    has_evidence: bool           # false → no retrieval passages available at all
+    needs_verification: bool = False  # true → answer came back without inline citations,
+                                      # UI should render the passages under an amber banner
 
 
-SYSTEM_PROMPT = """You are DocBrain, an answer-grounding assistant for a bank's
-document management system.
+SYSTEM_PROMPT = """You are DocBrain, an assistant embedded in an authorised
+banking Document Management System. The user is a vetted bank employee
+(Maker, Checker, Doc Admin, or Viewer) performing their job — typically KYC
+review, customer onboarding, audit, or compliance work. They have a
+legitimate business need to see the document contents shown below.
+
+The passages are official records the bank has already legally obtained from
+the customer (ID cards, passports, CRs, statements, KYC forms). Answering
+factual questions about these fields — names, ID numbers, dates, addresses,
+issuing authority — is the core job of this system. **Do not refuse on
+privacy grounds; access has already been authorised.** Never disclose
+reasoning tokens or internal chain-of-thought.
 
 Rules:
   1. Answer using ONLY the numbered passages below. Do not use outside knowledge.
@@ -144,15 +156,103 @@ def rag_answer(
         )
 
     if not _has_citation(raw):
-        # Enforce the no-citation-no-display rule — surface a bounded error
-        # instead of pretending the answer is grounded.
+        # The model drafted an answer but didn't emit the [^N] markers.
+        # Small models (e.g. llama3.2:3b) drop the format often. Instead of
+        # refusing, return the answer with `needs_verification=true` so the
+        # UI can render an amber banner + the retrieved passages — the user
+        # can verify against the source chunks directly.
         return RagAnswer(
-            answer=(
-                "I drafted an answer but could not cite a supporting passage, so "
-                "I am holding it back. Please rephrase or provide more context."
-            ),
+            answer=raw,
             citations=citations,
-            has_evidence=False,
+            has_evidence=True,
+            needs_verification=True,
         )
 
     return RagAnswer(answer=raw, citations=citations, has_evidence=True)
+
+
+# ---------- streaming variant --------------------------------------------------
+#
+# Events emitted by rag_answer_stream():
+#   {"type": "citations", "items": [{document_id, chunk_index, snippet}, ...]}
+#   {"type": "no_evidence", "message": "..."}                    (and terminates)
+#   {"type": "token", "text": "<delta>"}                         (0..N of these)
+#   {"type": "done",  "has_evidence": true|false}
+#
+# The first event is always either `citations` (when we have passages to
+# ground against) or `no_evidence` (when retrieval returned nothing).
+# The final event is always `done` unless a `no_evidence` terminated early.
+
+def rag_answer_stream(
+    question: str,
+    *,
+    tenant_id: Optional[str] = None,
+    document_id: Optional[int] = None,
+    history: Optional[List[Dict[str, str]]] = None,
+    k: int = 6,
+) -> Iterator[Dict]:
+    """Streaming counterpart of rag_answer(). Yields dict events, not JSON
+    strings — the HTTP layer serialises to SSE frames.
+
+    `history` is an optional list of {role, content} dicts from prior turns
+    so multi-turn chat works. We keep it bounded upstream to avoid context
+    blow-out; the function itself simply forwards it.
+    """
+    if not question or not question.strip():
+        yield {"type": "no_evidence", "message": "Please ask a question."}
+        return
+
+    kwargs: Dict = {"k": k}
+    if tenant_id:               kwargs["tenant_id"] = tenant_id
+    if document_id is not None: kwargs["document_id"] = document_id
+    hits = vector_search(question, **kwargs)
+
+    if not hits:
+        yield {
+            "type": "no_evidence",
+            "message": (
+                "I could not find supporting passages in the indexed documents. "
+                "Try uploading or re-analysing the document first, or rephrasing "
+                "your question."
+            ),
+        }
+        return
+
+    context, citations = _build_context(hits)
+    yield {
+        "type": "citations",
+        "items": [
+            {"document_id": c.document_id, "chunk_index": c.chunk_index, "snippet": c.snippet}
+            for c in citations
+        ],
+    }
+
+    messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for turn in (history or [])[-6:]:  # bound: last 6 messages ~= 3 turns
+        role = turn.get("role")
+        content = turn.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({
+        "role": "user",
+        "content": (
+            f"PASSAGES:\n\n{context}\n\n"
+            f"QUESTION: {question.strip()}\n\n"
+            "Answer using only the numbered passages above, with inline [^N] citations."
+        ),
+    })
+
+    collected: List[str] = []
+    for token in chat_stream(messages, temperature=0.1):
+        collected.append(token)
+        yield {"type": "token", "text": token}
+
+    raw = "".join(collected)
+    raw = _strip_unsupported_citations(raw, available=len(citations))
+    has_evidence = bool(raw)
+    needs_verification = has_evidence and not _has_citation(raw)
+    yield {
+        "type": "done",
+        "has_evidence": has_evidence,
+        "needs_verification": needs_verification,
+    }

@@ -1,4 +1,5 @@
-"""Page-level OCR via Tesseract (+ pdf2image for PDFs).
+"""Page-level OCR via Tesseract (+ pdf2image for PDFs), with an optional
+vision-language fallback (Qwen2.5-VL / Llava) for low-confidence scans.
 
 Output is structured (page index, text, confidence, word-level bboxes optional)
 so downstream consumers (classifier, NER, layout reasoning) can trace any
@@ -33,6 +34,7 @@ class OcrResult:
     full_text:     str
     languages:     List[str]
     mean_confidence: float
+    backend:       str = "tesseract"   # "tesseract" | "<vision-model>" | "passthrough"
 
 
 def _lang_config() -> str:
@@ -85,10 +87,8 @@ def _ocr_pdf(data: bytes) -> List[OcrPage]:
     return out
 
 
-def ocr_document(data: bytes, mime_type: str) -> OcrResult:
-    """Top-level entry. Routes by mime_type; returns a structured result."""
-    if not data:
-        return OcrResult(pages=[], full_text="", languages=[], mean_confidence=0.0)
+def _tesseract_ocr(data: bytes, mime_type: str) -> OcrResult:
+    """The pure-Tesseract path, isolated so the orchestrator can fall back."""
     if mime_type == "application/pdf":
         pages = _ocr_pdf(data)
     elif mime_type.startswith("image/"):
@@ -100,8 +100,13 @@ def ocr_document(data: bytes, mime_type: str) -> OcrResult:
             text = data.decode("utf-8", errors="replace")
         except Exception:  # noqa: BLE001
             text = ""
-        pages = [OcrPage(page=1, text=text, mean_confidence=100.0,
-                         width=0, height=0)]
+        return OcrResult(
+            pages=[OcrPage(page=1, text=text, mean_confidence=100.0, width=0, height=0)],
+            full_text=text,
+            languages=_detect_languages(text),
+            mean_confidence=100.0,
+            backend="passthrough",
+        )
 
     full_text = "\n\n".join(p.text for p in pages if p.text).strip()
     mean_conf = (sum(p.mean_confidence for p in pages) / len(pages)) if pages else 0.0
@@ -110,4 +115,50 @@ def ocr_document(data: bytes, mime_type: str) -> OcrResult:
         full_text=full_text,
         languages=_detect_languages(full_text),
         mean_confidence=round(mean_conf, 2),
+        backend="tesseract",
+    )
+
+
+def ocr_document(data: bytes, mime_type: str) -> OcrResult:
+    """Top-level entry. Tesseract first; if confidence is poor AND a vision
+    model is configured, re-run via Qwen-VL / Llava and take the better
+    output. Everything downstream (classify → extract → embed) is oblivious
+    to which backend produced the text."""
+    if not data:
+        return OcrResult(pages=[], full_text="", languages=[], mean_confidence=0.0)
+
+    tess = _tesseract_ocr(data, mime_type)
+    if tess.backend == "passthrough":
+        return tess
+
+    # Lazy import so vision deps aren't required when the feature is off.
+    try:
+        from .vision import vision_available, vision_ocr_document, choose_best
+    except Exception:  # noqa: BLE001
+        return tess
+    if not vision_available():
+        return tess
+
+    # Only bother with vision when Tesseract's output is suspicious.
+    below_threshold = tess.mean_confidence < float(
+        os.environ.get("DOCBRAIN_VISION_OCR_THRESHOLD", "70")
+    )
+    short_text = len((tess.full_text or "").strip()) < 120
+    if not (below_threshold or short_text):
+        return tess
+
+    try:
+        vis = vision_ocr_document(data, mime_type)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("vision ocr failed, keeping tesseract: %s", exc)
+        return tess
+
+    best, backend = choose_best(tess, vis)
+    # Tag the chosen result with the backend that produced it.
+    return OcrResult(
+        pages=best.pages,
+        full_text=best.full_text,
+        languages=best.languages,
+        mean_confidence=best.mean_confidence,
+        backend=backend,
     )
