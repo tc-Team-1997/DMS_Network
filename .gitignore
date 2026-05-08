@@ -13,6 +13,10 @@ python-service/storage/
 python-service/*.db
 .pytest_cache/
 
+# Runtime state
+.run/
+storage/
+
 # Generated artifacts
 *.sig
 *.sig.json
