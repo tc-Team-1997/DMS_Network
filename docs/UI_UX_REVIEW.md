@@ -10,6 +10,23 @@
 > **Companion artifacts:**
 > - `DocManager-Fortune50-Mockup.html` — interactive 17-screen mockup at repo root (272 KB, single self-contained file, opens in any browser).
 > - `docs/VISION.md`, `docs/ARCHITECTURE.md`, `docs/INTEGRATION_STRATEGY.md` — strategic documents referenced throughout.
+>
+> **Implementation status (2026-05-10)** — Top-15 P0 items from §8 progress report:
+> - **Items 1, 2, 3, 4, 6, 8, 9, 11, 12, 13, 14 shipped** via Foundation + Wave A + Wave B.
+>   - #1 (Dashboard customization): Wave A Dashboard v2, customize drawer with KPI tile picker
+>   - #2 (Viewer scroll-to-span): Wave A Viewer v2 + AiConfidenceBadge component, viewer:scroll-to-span event bus
+>   - #3 (Search filters): Wave A Search v2, FTS5 snippet/bm25, operator-token chips, facets sidebar
+>   - #4 (Workflows maker-checker): Wave A Workflows v2, step-up enforcement, Approve/Reject/Escalate buttons
+>   - #6 (DataTable with sort/filter): Foundation CC4 Design system v1, DataTable v1 with virtualization, column visibility, mobile card mode
+>   - #8 (Live dashboards): Wave A Dashboard v2, live KPI polling + charts (throughput, funnel, heatmap)
+>   - #9 (Demo product visible): Foundation CC5 demo-strip with feature carousel + quarantined seed.js
+>   - #11 (User CRUD + MFA): Wave B Users v2, 4-tab UsersPage, MFA factor management, SAML admin, magic-link invite
+>   - #12 (Document type learner): Wave B DocTypes + Learn Wizard v2, 6-step wizard with visual bbox labeler
+>   - #13 (Indexing QA station): Wave B Indexing station, 3-pane claimable queue with confidence overlay
+>   - #14 (Expiry alerts): Wave B DocTypes per-doctype notify_days CSV, services/expiry-job.js rewritten
+> - **Item 5** (Dzongkha + RTL locale pack) and **Item 15** (Mobile capture) planned for Wave D
+> - **Item 10** (Login front-door redesign) deferred per direction; current session-cookie auth sufficient
+> - **Items 7, 16–20** (lower-priority axis lifts) deferred to Wave C+
 
 ---
 

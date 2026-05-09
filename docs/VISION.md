@@ -2,7 +2,23 @@
 
 > **What we're building, who it's for, what it is not, and why anyone would pay for it.**
 >
+> Last updated: **2026-05-10** (post-Wave-B). For shipped state see [CHANGELOG.md](../CHANGELOG.md); for active config surface see [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md).
+>
 > Companion docs: [ROADMAP.md](./ROADMAP.md) · [TARGET_ARCHITECTURE.md](./TARGET_ARCHITECTURE.md) · [INTEGRATION_STRATEGY.md](./INTEGRATION_STRATEGY.md) · [AI_STRATEGY.md](./AI_STRATEGY.md) · [SECURITY_COMPLIANCE.md](./SECURITY_COMPLIANCE.md) · [ENGINEERING_PRINCIPLES.md](./ENGINEERING_PRINCIPLES.md)
+
+---
+
+## Shipping today (snapshot 2026-05-10)
+
+The platform is **bank-agnostic, local-first, and admin-controlled**. The first deployment is for the Bank of Bhutan (regulator: Royal Monetary Authority); every brand string, threshold, enum, locale, and provider choice resolves through a per-tenant key-value store rather than code.
+
+- **Configuration-first** — 16 admin namespaces in `tenant_config` (branding, integrations, capture, ocr, doctypes, workflows, viewer, search, dashboard, indexing, aml, customer_360, retention, abac, rbac, auth, notifications). Every write is hash-chained with a ≥20-char reason. See [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md).
+- **Local-first stack** — Ollama (OCR / LLM / Translate) + Tesseract + dlib face-match + per-tenant KEK envelope encryption + content-addressed FS storage. AWS adapters are registered as integration slots but seeded off; flipping them on is a tenant_config edit, not a redeploy. See [ADR-0009](./adr/0009-local-first-adapter-registry.md).
+- **Admin-controlled** — every operational knob lives in the `/admin/settings/*` UI behind `requireNamespacePermJson`. There are no hardcoded business values in module code.
+- **Modules shipped** — Foundation (7 cross-cutting modules, commit `ebae97e`), Wave A (Dashboard / Workflows / Viewer+AI / Search / Capture, commit `06d3967`), Wave B (Users / DocTypes+LearnWizard / Templates / Indexing / AML+Customer-360 / ABAC / Retention, commit `9bbae4a`).
+- **Carried-forward debt** — WebAuthn assertion validation and workflow audit-trail unification. Both flagged in [SECURITY_COMPLIANCE.md §18](./SECURITY_COMPLIANCE.md) and scheduled for Wave C.
+
+The vision below describes the steady-state product. The "Shipping today" section is the honest line between what runs in production and what remains aspirational.
 
 ---
 
@@ -16,11 +32,11 @@ A **vertical SaaS** purpose-built for the banking document lifecycle. Three prim
 
 | Verb | Meaning |
 |---|---|
-| **Capture** | Multi-channel ingestion (branch scanner, mobile, email, portal, partner API) + pre-processing + OCR (multilingual, Arabic-aware) |
-| **Understand** | AI classification, entity extraction, forgery detection, signature verification, face match, duplicate detection — all on-prem-capable |
-| **Govern** | Maker-checker workflows, retention policies, WORM archival, cryptographic audit, DSAR automation, regulator reporting |
+| **Capture** | Multi-channel ingestion (branch scanner, mobile, email, portal, partner API) + pre-processing + OCR (multilingual; the seeded provider is Ollama vision with Tesseract fallback, swappable per-tenant) |
+| **Understand** | AI classification, entity extraction, forgery detection, signature verification, face match, duplicate detection — all local-first by default; AWS-class adapters are registered but seeded off |
+| **Govern** | Maker-checker workflows with reason codes + WebAuthn step-up gates + bulk all-or-nothing transactions, retention policies + WORM extend-only locks + legal-hold orthogonal to retention, cryptographic audit (hash-chained config + audit log), DSAR automation, regulator reporting |
 
-Around those three verbs sit: enterprise search, case management, customer-360 document views, e-signature, compliance dashboards, and an integration hub that speaks to every major core banking system, CRM, loan origination, AML, IFRS 9, and regulator endpoint in the world.
+Around those three verbs sit: FTS5 enterprise search with operator tokens + facets + saved searches, case management, customer-360 right-drawer with PII reveal + 60s TTL audit, e-signature, compliance dashboards keyed to VISION §6 KPIs, and an integration hub registered behind a 13-provider abstraction (`OcrProvider`, `LlmProvider`, `KmsProvider`, etc.) so a tenant flipping from local to managed-cloud is one config edit.
 
 ## 3. What we are NOT
 

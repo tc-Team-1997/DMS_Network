@@ -5,6 +5,8 @@
 > Implementation timeline: [ROADMAP.md Track F](./ROADMAP.md).
 > Architecture context: [TARGET_ARCHITECTURE.md §11](./TARGET_ARCHITECTURE.md#11-security-posture-summary).
 
+Last updated: 2026-05-10 (post-Foundation + Wave A + Wave B) · 8 new controls shipped (tenant_config, Admin Settings, magic-link, SoD, ABAC, PII reveal audit, hash-chained config, WORM extend-only, step-up)
+
 ---
 
 ## 1. The commitment
@@ -60,6 +62,15 @@ Every control we implement maps to one or more standards. A single control usual
 | Biometric KYC | CC1.2, CC6.1, CC7.2 | A.9, A.10, A.12.4 | 8.3 | 2-1, 2-4, 2-8 | ✓ | Offline dlib face_recognition, 128-dim encodings only (no raw images), 90-day encoding cache, consent audit trail, DPIA-style review, audit trail (BIOMETRIC_MATCH_PERFORMED, BIOMETRIC_CONSENT_GRANTED) |
 | Offline sync queue | CC1.4, CC7.2 | A.12.4 | n/a | 2-8 | ✓ | IndexedDB outbox encryption, Service Worker background sync, 24h idempotency-key deduplication, audit trail (OFFLINE_SYNC_REPLAY, IDEMPOTENCY_CONFLICT) |
 | Offline translation | CC6.1, CC7.2 | A.10, A.12.4 | n/a | 2-4, 2-8 | ✓ | Meta NLLB-200-distilled-600M model (fully offline, no API calls), 7-day translation cache, SHA-256 source dedup, audit trail (DOCUMENT_TRANSLATED, TRANSLATION_DELETED) |
+| Tenant config spine | CC6, CC8 | A.9, A.12 | 6 | 2-1, 2-5 | ✓ | Unified tenant_config key-value JSON namespace, per-namespace RBAC (requireNamespacePermJson), hash-chained history (CC1 tenant_config_history table), 16 namespaces published as JSON Schemas, audit trail (CONFIG_CHANGED with reason ≥20 chars). Shipped Foundation (commit ebae97e). |
+| Admin Settings UI | CC6, CC8 | A.9, A.12 | 6 | 2-1, 2-5 | ✓ | Generic ConfigPanel renders JSON Schemas auto-generated; per-namespace RBAC gates; no direct DB access; all changes logged. Shipped Foundation (commit ebae97e). |
+| Magic-link invite | CC6 | A.9 | 8 | 2-1 | ✓ | Users v2 Wave B: 32-byte hex token, email delivery via tenant_config.notifications.smtp, token TTL from tenant_config.auth.magic_link_ttl_hours, anonymous /set-password handler, no plaintext password storage. Audit trail (USER_INVITED, PASSWORD_SET). |
+| SoD enforcement | CC6 | A.9 | 7 | 2-1 | ✓ | Users v2 Wave B: PATCH /spa/api/users/:id rejects 400 sod_violation if role change creates forbidden pair (tenant_config.rbac.sod_forbidden_pairs). Enforced at server, not client. Audit trail (SOD_VIOLATION_BLOCKED). |
+| ABAC visual editor | CC6 | A.9 | 7 | 2-1 | ✓ | Wave B: Closed-enum field paths (subject.role, resource.doc_type, context.stepup_valid, etc.), JSON-to-Rego compiler (scripts/abac-compile.js), atomic file write, fire-and-forget OPA push (non-fatal if OPA down, dms.rego untouched). Audit trail (ABAC_RULE_CHANGED). |
+| PII reveal audit | CC6.1, CC7.2 | A.10, A.12.4 | 3.1 | 2-4, 2-8 | ✓ | Wave B Customer-360: phone/email/national-id/dob masked by default, click reveal → reason ≥20 chars → 60s TTL countdown → auto-remask. Audited to customer_pii_reveals table (who, what, when, how long). Audit trail (PII_REVEALED, PII_REMASKED). |
+| Hash-chained config history | CC7.2 | A.12.4 | 6 | 2-8 | ✓ | Foundation CC1: tenant_config_history table, deterministic SHA-256 hash chain (version_hash = SHA256(prev_hash || namespace || canonical_json(data))), tampering breaks chain. Supports rollback to any point in history (Wave C). Audit trail (CONFIG_VERSION_HASH). |
+| WORM extend-only | CC6.5, CC7.2 | A.8, A.12.4 | 3.4 | 2-7, 2-8 | ✓ | Wave B Retention admin: WORM lock can only extend, never shorten (POST /api/v1/documents/{id}/worm/extend validates new unlock_at ≥ current). Documents on WORM excluded from retention sweep. Audit trail (WORM_EXTENDED, WORM_EXTEND_REJECTED). |
+| Step-up enforcement | CC6 | A.9 | 8 | 2-1 | ✓ | Wave A Workflows v2 + Wave B AML v2: Server REJECTS 403 step_up_required if threshold met but webauthn_assertion_id missing. **SOX debt**: assertion is stored but not cryptographically validated server-side (Wave C must proxy to POST /py/api/v1/stepup/verify). Audit trail (STEPUP_REQUIRED, STEPUP_COMPLETED). |
 
 ---
 
@@ -365,7 +376,37 @@ Pre-built, in-product:
 
 ---
 
-## 18. What we will NOT do
+## 18. Carried-forward SOX control gaps (Wave C)
+
+Two material weaknesses are acknowledged and committed to closure in Wave C (before tier-1 production go-live):
+
+### SOX-1: WebAuthn Assertion Cryptographic Validation
+
+**What:** webauthn_assertion_id is stored in `wf_actions` (Wave A Workflows v2) and `aml_hit_suppressions` (Wave B AML v2) for high-risk action approvals and AML hit decisions. The threshold check (step_up_risk_band / step_up_amount_threshold) IS enforced — server returns 403 step_up_required when assertion is missing — but the stored assertion is NOT cryptographically validated server-side.
+
+**Risk:** A determined attacker could forge the assertion_id field, bypassing the high-risk gate.
+
+**Wave C closure:** Server must proxy to `POST /py/api/v1/stepup/verify` before storing the assertion, validating the credential signature matches the user's registered passkey. TODO markers in `routes/spa-api/workflows.js` + `routes/spa-api/aml.js` mark the exact lines.
+
+**Evidence:** [CHANGELOG.md SOX-1 debt](../../CHANGELOG.md#sox-1-webauthn-assertion-cryptographic-validation-wave-c), [ADR-0013 step-up enforcement](../adr/0013-stepup-enforcement-contract.md).
+
+### SOX-2: Workflow Audit Trail Bifurcation
+
+**What:** Workflow state transitions are logged in two places:
+- Node-side `wf_actions` table: records reason, comment, webauthn assertion (SOX audit trail)
+- Python-side `workflow_steps` table: records state machine progression (operational logs)
+
+Both are written during a workflow advance (approve / reject / escalate) but they're parallel logs, not unified. This bifurcation means audit evidence for a workflow decision lives in two places, requiring dual reconciliation for regulatory review.
+
+**Risk:** If one table is corrupted or tampered, the audit trail is incomplete.
+
+**Wave C closure:** Implement workflow event sourcing on Temporal (or Camunda Zeebe) to collapse both streams into a single immutable ledger. Every workflow action (intake → maker submission → checker review → approval → archival) becomes a single event with full context.
+
+**Evidence:** [CHANGELOG.md SOX-2 debt](../../CHANGELOG.md#sox-2-workflow-audit-trail-bifurcation-wave-c).
+
+---
+
+## 19. What we will NOT do
 
 - **No security by obscurity.** Our architecture is documented; our code is reviewable (on-prem customers get full source access).
 - **No skipping compliance because we're fast.** A missed cert blocks tier-1 deals — not worth the shortcut.
