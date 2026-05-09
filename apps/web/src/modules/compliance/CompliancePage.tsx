@@ -3,6 +3,7 @@ import { Download, ShieldCheck, ShieldAlert, ShieldX, CheckCircle2, AlertTriangl
 import { DataTable, MetricCard, Panel, type Column } from '@/components/ui';
 import { fetchComplianceSummary, fetchComplianceControls, type ComplianceSummary, type Control } from './api';
 import { cn } from '@/lib/cn';
+import { AmlSummaryCard } from '@/modules/aml-screening/components/AmlSummaryCard';
 
 /** Compute overall score: pass=100pts, warn=60pts, fail=0pts per control */
 function overallScore(controls: Control[]): number {
@@ -146,30 +147,57 @@ export function CompliancePage() {
           {cq.isError && (
             <p className="col-span-2 text-xs text-danger py-4">Failed to load compliance controls.</p>
           )}
-          {controls.map((ctrl) => (
-            <div
-              key={ctrl.id}
-              className={cn(
-                'rounded-card border p-4 space-y-2',
-                ctrl.status === 'pass' && 'border-success/30 bg-success-bg/20',
-                ctrl.status === 'warn' && 'border-warning/30 bg-warning-bg/20',
-                ctrl.status === 'fail' && 'border-danger/30 bg-danger-bg/20',
-              )}
-              data-testid={`control-${ctrl.id}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-md font-semibold text-ink">{ctrl.name}</p>
-                  <p className="text-xs text-muted">{ctrl.framework}</p>
+          {controls.map((ctrl) => {
+            // The AML screening control uses a live summary card instead of
+            // the static status pill.
+            if (ctrl.id === 'aml-screening') {
+              return (
+                <div
+                  key={ctrl.id}
+                  className={cn(
+                    'rounded-card border p-4 space-y-2',
+                    ctrl.status === 'pass' && 'border-success/30 bg-success-bg/20',
+                    ctrl.status === 'warn' && 'border-warning/30 bg-warning-bg/20',
+                    ctrl.status === 'fail' && 'border-danger/30 bg-danger-bg/20',
+                  )}
+                  data-testid={`control-${ctrl.id}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-md font-semibold text-ink">{ctrl.name}</p>
+                      <p className="text-xs text-muted">{ctrl.framework}</p>
+                    </div>
+                    <ControlStatusBadge status={ctrl.status} />
+                  </div>
+                  <AmlSummaryCard />
                 </div>
-                <ControlStatusBadge status={ctrl.status} />
+              );
+            }
+            return (
+              <div
+                key={ctrl.id}
+                className={cn(
+                  'rounded-card border p-4 space-y-2',
+                  ctrl.status === 'pass' && 'border-success/30 bg-success-bg/20',
+                  ctrl.status === 'warn' && 'border-warning/30 bg-warning-bg/20',
+                  ctrl.status === 'fail' && 'border-danger/30 bg-danger-bg/20',
+                )}
+                data-testid={`control-${ctrl.id}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-md font-semibold text-ink">{ctrl.name}</p>
+                    <p className="text-xs text-muted">{ctrl.framework}</p>
+                  </div>
+                  <ControlStatusBadge status={ctrl.status} />
+                </div>
+                <p className="text-xs text-ink leading-relaxed">{ctrl.evidence}</p>
+                <p className="text-[11px] text-muted">
+                  Audited: {new Date(ctrl.lastAudit).toLocaleString()}
+                </p>
               </div>
-              <p className="text-xs text-ink leading-relaxed">{ctrl.evidence}</p>
-              <p className="text-[11px] text-muted">
-                Audited: {new Date(ctrl.lastAudit).toLocaleString()}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Panel>
 

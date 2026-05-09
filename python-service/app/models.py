@@ -1,5 +1,6 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Float, Boolean, LargeBinary, UniqueConstraint
+from typing import Any
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Float, Boolean, LargeBinary, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from .db import Base
 
@@ -540,3 +541,96 @@ class AuditLog(Base):
     resource_id   = Column(String(128), index=True)
     detail        = Column(Text)
     created_at    = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ---------------------------------------------------------------------------
+# AML Screening models (BHU-67, Phase 2, migration 0021)
+# ---------------------------------------------------------------------------
+
+
+class AmlWatchlist(Base):
+    """Metadata record for one AML watchlist source (OFAC SDN, EU Consolidated, etc.)."""
+
+    __tablename__ = "aml_watchlists"
+
+    id              = Column(Integer, primary_key=True)
+    tenant_id       = Column(String(64), nullable=False, index=True)
+    list_name       = Column(String(256), nullable=False)
+    source_url      = Column(String(512), nullable=True)
+    match_threshold = Column(Float, nullable=False, default=0.85)
+    last_updated    = Column(DateTime, nullable=True)
+    entry_count     = Column(Integer, nullable=False, default=0)
+    active          = Column(Integer, nullable=False, default=1)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+    entries = relationship(
+        "AmlWatchlistEntry",
+        back_populates="watchlist",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "list_name", name="uq_aml_watchlist_tenant_name"),
+    )
+
+
+class AmlWatchlistEntry(Base):
+    """One flat record from an AML watchlist (individual or entity)."""
+
+    __tablename__ = "aml_watchlist_entries"
+
+    id              = Column(Integer, primary_key=True)
+    watchlist_id    = Column(Integer, ForeignKey("aml_watchlists.id", ondelete="CASCADE"), nullable=False, index=True)
+    normalized_name = Column(String(512), nullable=False, index=True)
+    dob             = Column(String(10), nullable=True)
+    country         = Column(String(3), nullable=True)
+    original_record = Column(JSON, nullable=False, default=dict)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+    watchlist = relationship("AmlWatchlist", back_populates="entries")
+    hits      = relationship(
+        "AmlHit",
+        back_populates="watchlist_entry",
+        cascade="all, delete-orphan",
+    )
+
+
+class AmlScreening(Base):
+    """One screening run for a single customer."""
+
+    __tablename__ = "aml_screenings"
+
+    id             = Column(Integer, primary_key=True)
+    tenant_id      = Column(String(64), nullable=False, index=True)
+    customer_cid   = Column(String(64), nullable=False, index=True)
+    screened_at    = Column(DateTime, default=datetime.utcnow, index=True)
+    status         = Column(String(32), nullable=False, default="pending")
+    hit_count      = Column(Integer, nullable=False, default=0)
+    trigger_reason = Column(String(64), nullable=True)
+    started_at     = Column(DateTime, nullable=True)
+    completed_at   = Column(DateTime, nullable=True)
+
+    hits = relationship(
+        "AmlHit",
+        back_populates="screening",
+        cascade="all, delete-orphan",
+    )
+
+
+class AmlHit(Base):
+    """One matched watchlist entry within a screening run."""
+
+    __tablename__ = "aml_hits"
+
+    id                 = Column(Integer, primary_key=True)
+    screening_id       = Column(Integer, ForeignKey("aml_screenings.id", ondelete="CASCADE"), nullable=False, index=True)
+    watchlist_entry_id = Column(Integer, ForeignKey("aml_watchlist_entries.id", ondelete="CASCADE"), nullable=False)
+    score              = Column(Float, nullable=False)
+    decision           = Column(String(32), nullable=False, default="open")
+    reviewed_by        = Column(Integer, nullable=True)
+    reviewed_at        = Column(DateTime, nullable=True)
+    review_notes       = Column(Text, nullable=True)
+    created_at         = Column(DateTime, default=datetime.utcnow)
+
+    screening       = relationship("AmlScreening", back_populates="hits")
+    watchlist_entry = relationship("AmlWatchlistEntry", back_populates="hits")

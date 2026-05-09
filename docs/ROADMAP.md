@@ -66,7 +66,8 @@ Last updated: 2026-04-17 · Horizon: **7 quarters (Q2 2026 → Q4 2027)**
 - ✓ Security & RBAC (user CRUD, role assignment, lock/unlock, session list).
 - ✓ MFA enrolment in the SPA (TOTP via speakeasy; webauthn-ready).
 - ✓ Compliance / Audit screen (events + filters + export).
-- ✓ Integration status dashboard (read-only health of CBS/LOS/AML stubs).
+- ✓ Integration status dashboard (read-only health of CBS/LOS adapters).
+- ✓ AML watchlist screening (OFAC/EU/UN with compliance officer review queue, shipped 2026-05-09).
 
 **Platform foundations**
 

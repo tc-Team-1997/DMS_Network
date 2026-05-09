@@ -11,7 +11,7 @@
 | Feature | `aml-screening` |
 | Spec ID | `BHU-67` (AML compliance screening) |
 | Owner | `python-engineer` + `db-migrator` |
-| Status | `draft` |
+| Status | `shipped` |
 | Risk class | `high` (regulatory, false positives impact customers, PII sensitivity) |
 | Contract published | `2026-05-09` |
 | Last updated | `2026-05-09` |

@@ -1,0 +1,27 @@
+{
+  "list_name": "UN_SC",
+  "source_url": "https://scsanctions.un.org/resources/xml/en/consolidated.xml",
+  "entries": [
+    {
+      "name": "Usama bin Laden",
+      "dob": "1957-03-10",
+      "country": "SA",
+      "category": "individual",
+      "source": "UN"
+    },
+    {
+      "name": "Al-Qaida",
+      "dob": null,
+      "country": "AF",
+      "category": "entity",
+      "source": "UN"
+    },
+    {
+      "name": "Ahmad Said Al-Shikha",
+      "dob": null,
+      "country": "SY",
+      "category": "individual",
+      "source": "UN"
+    }
+  ]
+}

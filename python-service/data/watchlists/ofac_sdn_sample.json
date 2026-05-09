@@ -1,0 +1,46 @@
+{
+  "list_name": "OFAC_SDN",
+  "source_url": "https://www.treasury.gov/ofac/downloads/sdn.csv",
+  "entries": [
+    {
+      "name": "Jon Smith",
+      "dob": null,
+      "country": "US",
+      "category": "SDN",
+      "source": "OFAC",
+      "program": "SDGT"
+    },
+    {
+      "name": "Ali Hassan Mohammed",
+      "dob": "1972-03-15",
+      "country": "SD",
+      "category": "SDN",
+      "source": "OFAC",
+      "program": "SUDAN"
+    },
+    {
+      "name": "Ibrahim Khalil Al-Rashid",
+      "dob": null,
+      "country": "SY",
+      "category": "SDN",
+      "source": "OFAC",
+      "program": "SYRIA"
+    },
+    {
+      "name": "Mohamed Al Qahtani",
+      "dob": "1985-06-20",
+      "country": "SA",
+      "category": "SDN",
+      "source": "OFAC",
+      "program": "SDGT"
+    },
+    {
+      "name": "Fatima Zahra Benali",
+      "dob": null,
+      "country": "MA",
+      "category": "SDN",
+      "source": "OFAC",
+      "program": "IRAN"
+    }
+  ]
+}

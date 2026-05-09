@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_FF_OCR_CONFIDENCE_TUNING?: string;
+  readonly VITE_FF_AML_LIVE?: string;
 }
 
 interface ImportMeta {

@@ -3,7 +3,7 @@
 > How the system is organised, how requests flow, and where the boundaries are.
 > Companion docs: [TECHNICAL.md](./TECHNICAL.md) · [PROJECT.md](./PROJECT.md).
 
-Last updated: 2026-04-17
+Last updated: 2026-05-09
 
 ---
 
@@ -356,6 +356,12 @@ The target AI architecture is in [AI_STRATEGY.md](./AI_STRATEGY.md) — vLLM, Qd
 **Contract stability:** every swap above is a config + single-file change. The SPA, the `/spa/api/docbrain/*` surface, and the `docbrain/{llm,classify,extract,embed,vectors,rag}.py` module signatures are the stable contract; what backs them rotates with deployment tier.
 
 **Why this matters architecturally:** bank procurement wants to hear "your AI layer runs locally on our own hardware, with open-weight models, no phone-home." The pilot is literal proof of that — one laptop, no cloud, no API keys to Anthropic/OpenAI. The same code path scales to a silo or dedicated datacenter by swapping serving engine + vector store.
+
+---
+
+## 10a. Compliance layer — AML screening
+
+**AML watchlist screening** ([contract](./contracts/aml-screening.md), [ADR 0001](./adr/0001-aml-screening-architecture.md)) runs synchronously on every customer create/update. The Python service's `aml` router (`python-service/app/routers/aml.py`) loads OFAC SDN, EU Consolidated, and UN watchlists at startup (refreshable via `POST /api/v1/aml/watchlists/refresh`). When a customer is created, an async task enqueues to match the customer name against all watchlist entries using Levenshtein distance (threshold 0.85, configurable). Hits create `aml_hits` rows and assign a workflow task to compliance officers for human review and decision (cleared/escalated/blocked). Every decision is audited with action names `AML_SCREENING_TRIGGERED`, `AML_SCREENING_COMPLETED`, `AML_HIT_DECIDED`, `AML_HIT_ESCALATED`. The Compliance card on the dashboard queries `/spa/api/aml/stats` to show pending review counts. This is local-first (no PII egress to third-party SaaS) with full explainability (Levenshtein score + original record visible to auditors).
 
 ---
 

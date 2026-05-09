@@ -23,6 +23,7 @@ import { AdminPage } from '@/modules/admin/AdminPage';
 import { DedupSettingsPage } from '@/modules/admin/DedupSettingsPage';
 import { DocumentTypesPage } from '@/modules/document-types/DocumentTypesPage';
 import { GlossaryPage } from '@/modules/ai/GlossaryPage';
+import { AmlScreeningPage } from '@/modules/aml-screening/AmlScreeningPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +74,7 @@ export function App() {
             <Route path="/admin/document-types" element={<DocumentTypesPage />} />
             <Route path="/admin/dedup-settings" element={<DedupSettingsPage />} />
             <Route path="/admin/ai-glossary" element={<GlossaryPage />} />
+            <Route path="/admin/aml" element={<AmlScreeningPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

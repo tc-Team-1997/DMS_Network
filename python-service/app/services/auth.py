@@ -32,11 +32,11 @@ ALGO = "HS256"
 PERMISSIONS = {
     "capture":    {"maker", "doc_admin"},
     "index":      {"maker", "doc_admin"},
-    "approve":    {"checker", "doc_admin"},
+    "approve":    {"checker", "doc_admin", "compliance"},
     "admin":      {"doc_admin"},
-    "audit_read": {"auditor", "doc_admin"},
+    "audit_read": {"auditor", "doc_admin", "compliance"},
     "sign":       {"checker", "doc_admin"},
-    "view":       {"viewer", "maker", "checker", "doc_admin", "auditor"},
+    "view":       {"viewer", "maker", "checker", "doc_admin", "auditor", "compliance"},
 }
 
 

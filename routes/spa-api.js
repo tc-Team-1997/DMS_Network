@@ -41,5 +41,6 @@ router.use(require('./spa-api/ai-glossary'));
 router.use(require('./spa-api/docbrain'));
 router.use(require('./spa-api/offline'));
 router.use(require('./spa-api/cbs'));
+router.use(require('./spa-api/aml-screening'));
 
 module.exports = router;

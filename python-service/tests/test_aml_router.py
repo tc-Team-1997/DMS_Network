@@ -37,15 +37,19 @@ def test_stats_requires_api_key(client):
 
 
 def test_stats_returns_expected_shape(client):
-    """Stats endpoint returns the four count fields."""
-    # We need a valid JWT too (require("audit_read")).  Mock the auth dependency
-    # so we can focus on the router logic.
+    """Stats endpoint returns count fields.
+
+    The /api/v1/aml/stats route is now owned by aml_screening_router
+    (registered before the legacy aml_router). The response shape reflects
+    the new screening-based stats rather than the old match-based fields.
+    """
     from app.services.auth import require
-    from app.routers.aml import router
 
     fake_principal = MagicMock()
     fake_principal.sub = "tester"
     fake_principal.tenant = "default"
+    fake_principal.has = lambda p: True
+    fake_principal.roles = ["doc_admin"]
 
     from app.main import app
     app.dependency_overrides[require("audit_read")] = lambda: fake_principal
@@ -54,11 +58,11 @@ def test_stats_returns_expected_shape(client):
         resp = client.get("/api/v1/aml/stats", headers=HEADERS)
         assert resp.status_code == 200
         body = resp.json()
-        assert "total_matches" in body
-        assert "pending_review" in body
-        assert "cleared_today" in body
-        assert "escalated_open" in body
-        assert all(isinstance(v, int) for v in body.values())
+        # New shape from aml_screening_router
+        assert "screenings_today" in body
+        assert "hits_found_today" in body
+        assert "hits_cleared_today" in body
+        assert "hits_pending_today" in body
     finally:
         app.dependency_overrides.pop(require("audit_read"), None)
 

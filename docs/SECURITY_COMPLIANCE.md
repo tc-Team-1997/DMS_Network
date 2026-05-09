@@ -53,6 +53,7 @@ Every control we implement maps to one or more standards. A single control usual
 | Secure SDLC | CC7.1 | A.14 | 6.3, 6.5 | 2-5 | ✓ | SAST, DAST, dependency scan, secrets scan |
 | Physical security | CC6.4 | A.11 | 9 | 2-10 | n/a | Inherited from cloud provider (AWS, Azure) |
 | Data residency | Custom | A.18 | n/a | 2-7 | ✓ | Per-tenant region pinning, DSAR automation |
+| AML screening | CC1.4, CC7.2 | A.12.4, A.18.1 | n/a | 2-6, 2-8 | ✓ | OFAC/EU/UN watchlist matching, human-reviewed hits, audit trail (AML_SCREENING_TRIGGERED, AML_HIT_DECIDED, AML_HIT_ESCALATED) |
 
 ---
 

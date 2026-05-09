@@ -214,6 +214,67 @@ try {
     'tested_with_sample_id',
     'tested_with_sample_id INTEGER REFERENCES document_type_samples(id) ON DELETE SET NULL',
   );
+  // AML screening: 4 tables for watchlist + screening + hit lifecycle.
+  // The Node side proxies all reads to Python; these tables exist so future
+  // Node-only compliance card queries can hit local SQLite without a Python
+  // round trip. Mirrors python-service/app/models.py {AmlWatchlist, AmlWatchlistEntry,
+  // AmlScreening, AmlHit} and Alembic revision 0021_aml_screening.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS aml_watchlists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      list_name TEXT NOT NULL,
+      source_url TEXT,
+      match_threshold REAL NOT NULL DEFAULT 0.85,
+      last_updated TEXT,
+      entry_count INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(tenant_id, list_name)
+    );
+    CREATE INDEX IF NOT EXISTS idx_aml_watchlists_tenant ON aml_watchlists(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS aml_watchlist_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      watchlist_id INTEGER NOT NULL REFERENCES aml_watchlists(id) ON DELETE CASCADE,
+      normalized_name TEXT NOT NULL,
+      dob TEXT,
+      country TEXT,
+      original_record TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_aml_entries_wl   ON aml_watchlist_entries(watchlist_id);
+    CREATE INDEX IF NOT EXISTS idx_aml_entries_name ON aml_watchlist_entries(normalized_name);
+
+    CREATE TABLE IF NOT EXISTS aml_screenings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      customer_cid TEXT NOT NULL,
+      screened_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      status TEXT NOT NULL DEFAULT 'pending',
+      hit_count INTEGER NOT NULL DEFAULT 0,
+      trigger_reason TEXT,
+      started_at TEXT,
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_aml_screenings_tenant ON aml_screenings(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_aml_screenings_cid    ON aml_screenings(tenant_id, customer_cid);
+    CREATE INDEX IF NOT EXISTS idx_aml_screenings_at     ON aml_screenings(screened_at DESC);
+
+    CREATE TABLE IF NOT EXISTS aml_hits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      screening_id INTEGER NOT NULL REFERENCES aml_screenings(id) ON DELETE CASCADE,
+      watchlist_entry_id INTEGER NOT NULL REFERENCES aml_watchlist_entries(id) ON DELETE CASCADE,
+      score REAL NOT NULL,
+      decision TEXT NOT NULL DEFAULT 'open',
+      reviewed_by INTEGER REFERENCES users(id),
+      reviewed_at TEXT,
+      review_notes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_aml_hits_screening ON aml_hits(screening_id);
+    CREATE INDEX IF NOT EXISTS idx_aml_hits_decision  ON aml_hits(decision);
+  `);
   seedDefaultTypeSchemas();
 } catch (err) {
   // Never block boot on migration chatter; log for operators.
