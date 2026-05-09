@@ -135,6 +135,19 @@ Owner: `node-engineer`. File: `routes/spa-api/<feature>.js`, mounted from `serve
 
 Divergence from Python shape (if any): **none** by default. Note deviations here. The SPA mirror MUST never expose the upstream `X-API-Key` to the browser.
 
+### Field forwarding matrix (mandatory)
+
+Every field the Node mirror VALIDATES from the request body must be classified.
+A field validated but neither forwarded NOR audited is a bug — it silently disappears.
+
+| Body field | Forwarded to Python? | Written to audit_log? | Notes |
+| --- | --- | --- | --- |
+| `<field-1>` | yes | no | passed through unchanged |
+| `<field-2>` | no | yes | audit-only (Node-collected, Python doesn't know) |
+| `<field-3>` | yes | yes | forwarded AND audited |
+
+If a row says `no/no` you have validation theatre. Either drop the validation or add a destination.
+
 ---
 
 ## 6. SPA module

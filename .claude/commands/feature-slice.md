@@ -45,6 +45,39 @@ Spawn these in parallel, each pointing at the published contract:
 - `qa-engineer` — task:
   > Ship `apps/web/e2e/$ARGUMENTS.spec.ts` (one Playwright test per acceptance criterion in §2, with `test.describe` titles referencing AC IDs) + `apps/web/e2e/$ARGUMENTS.errors.spec.ts` (one test per row in §11) + extend `apps/web/e2e/a11y.spec.ts` with axe-core scan of the new page. Run the full Playwright suite (`npx playwright test --reporter=line`) to confirm no regressions. Add a smoke entry to `loadtest/k6.js` if the feature has a hot path.
 
+## Phase 2.5 — Reconciliation gate (you, the team lead, before Phase 3)
+
+Phase 2 agents have shipped self-reports. **Do not trust those reports** — they have lied in the past (db-migrator's "added X to file" with empty `git diff`; qa-engineer's "components are empty" while spa shipped four). Spend ~3 minutes on this gate. It is the cheapest bug you'll ever catch.
+
+Run these checks yourself:
+
+```bash
+# 1. Files actually landed
+git status --short
+git diff --stat HEAD | tail -20
+
+# 2. DB tables really exist (if the slice added schema)
+node -e "require('./db/index.js'); console.log('boot OK')"
+sqlite3 db/nbe-dms.db ".tables" | tr ' ' '\n' | grep -E '^<feature>' | sort
+
+# 3. Test IDs match between SPA and Playwright spec
+grep -rh 'data-testid=' apps/web/src/modules/$ARGUMENTS/ | sed -E "s/.*data-testid=\"([^\"]+)\".*/\\1/" | sort -u > /tmp/shipped-ids.txt
+grep -rh "getByTestId\|data-testid" apps/web/e2e/$ARGUMENTS*.spec.ts | sed -E "s/.*['\"]([a-z][a-z0-9-]+)['\"].*/\\1/" | sort -u > /tmp/test-ids.txt
+diff /tmp/shipped-ids.txt /tmp/test-ids.txt | head -20
+
+# 4. Wire-shape consistency: every field §5 (Node) validates is either forwarded to Python OR explicitly audit-only
+grep -E "body\.[a-z_]+" routes/spa-api/$ARGUMENTS.js | head -20
+grep -E "class .*Request\(BaseModel\):" python-service/app/routers/$ARGUMENTS*.py
+```
+
+If any check fails, **fix at the source** before Phase 3:
+- File didn't land → re-run that agent OR edit yourself
+- Table missing → add `addColumnIfMissing` / `db.exec(CREATE TABLE …)` to `db/index.js`
+- Test IDs drift → update the Playwright spec to use the SHIPPED IDs (sed-replace across all *.spec.ts)
+- Wire-shape gap → extend the Python pydantic model to accept the dropped fields, or document them as audit-only in §5
+
+Only when every check is clean do you proceed to Phase 3.
+
 ## Phase 3 — Security & docs gate (serial)
 
 When all five Phase 2 teammates report done, spawn two more in parallel:

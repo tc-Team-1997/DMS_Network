@@ -24,3 +24,15 @@ Per feature: one happy-path Playwright spec under `apps/web/e2e/<feature>.spec.t
 
 ## Coordination
 If the wire shape changes mid-flight, update `docs/contracts/<feature>.md` and post the diff in the team task list. Engineers pick up the change on their next edit.
+
+## MANDATORY canonical-test-id publication
+
+A repeated failure mode in past slices: spa ships test IDs that diverge from contract §6.4, qa-engineer writes against contract IDs, all the tests fail. Prevent this:
+
+1. Pick the test IDs you'll ship BEFORE writing components. Add them as comments in `Page.tsx` so they're discoverable.
+2. As soon as your components are written, run:
+   ```bash
+   grep -rh 'data-testid=' apps/web/src/modules/<feature>/ | sed -E "s/.*data-testid=\"([^\"]+)\".*/\\1/" | sort -u
+   ```
+   Paste the result into `docs/contracts/<feature>.md` §6.4 — REPLACE the existing list, do not append. The contract becomes the source of truth for qa-engineer.
+3. In your final report, include this same list. Team lead diffs it against `qa-engineer`'s reported list — if they differ, the slice is reconciled before Phase 3.

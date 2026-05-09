@@ -44,7 +44,21 @@
       "Bash(curl -sS -b /tmp/vite-cookies.txt 'http://localhost:5174/spa/api/search?q=Passport')",
       "Bash(curl -sS -b /tmp/vite-cookies.txt -X POST http://localhost:5174/spa/api/logout)",
       "Bash(curl -sS -o /dev/null -w \"SPA: %{http_code}\\\\n\" http://localhost:5174/)",
-      "Bash(curl -sS http://localhost:5174/spa/api/me)"
+      "Bash(curl -sS http://localhost:5174/spa/api/me)",
+      "Bash(node -c *)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx playwright test *)",
+      "Bash(npx playwright install *)",
+      "Bash(npx playwright show-report*)",
+      "Bash(.venv/bin/pytest *)",
+      "Bash(pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(alembic upgrade head)",
+      "Bash(alembic current)",
+      "Bash(alembic history *)",
+      "Bash(alembic revision --autogenerate *)",
+      "Bash(sqlite3 db/nbe-dms.db .tables)"
     ]
   },
   "teammateMode": "tmux"
