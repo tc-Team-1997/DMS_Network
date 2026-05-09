@@ -44,6 +44,7 @@ import { AbacPanel } from '@/modules/admin/settings/panels/AbacPanel';
 import { AmlPanel } from '@/modules/admin/settings/panels/AmlPanel';
 import { RetentionPanel } from '@/modules/admin/settings/panels/RetentionPanel';
 import { AuditPanel } from '@/modules/admin/settings/panels/AuditPanel';
+import { DocbrainPanel } from '@/modules/admin/settings/panels/DocbrainPanel';
 import { NotificationsPanel } from '@/modules/admin/settings/panels/NotificationsPanel';
 import { MobilePanel } from '@/modules/admin/settings/panels/MobilePanel';
 import { IntegrationsPanel } from '@/modules/admin/settings/panels/IntegrationsPanel';
@@ -54,6 +55,17 @@ import { UsersPanel } from '@/modules/admin/settings/panels/UsersPanel';
 import { SetPasswordPage } from '@/pages/SetPasswordPage';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useTenant } from '@/store/tenant';
+// Wave C — Audit Log v2
+import { AuditLogPage } from '@/modules/audit/AuditLogPage';
+// Wave C — DSAR Console
+import { DSARPage } from '@/modules/dsar/DSARPage';
+import { DsarPanel } from '@/modules/admin/settings/panels/DsarPanel';
+// Wave C — Regulator Reports
+import { RegulatorReportsPage } from '@/modules/regulator-reports/Page';
+import { TemplateDetail } from '@/modules/regulator-reports/TemplateDetail';
+import { RegulatorReportsPanel } from '@/modules/admin/settings/panels/RegulatorReportsPanel';
+// Wave C — Notifications feed
+import { NotificationsPage } from '@/modules/notifications/Page';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -139,9 +151,17 @@ export function App() {
               <Route path="/admin/document-types" element={<DocumentTypesPage />} />
               <Route path="/admin/dedup-settings" element={<DedupSettingsPage />} />
               <Route path="/admin/retention" element={<RetentionPage />} />
+              <Route path="/admin/audit" element={<AuditLogPage />} />
               <Route path="/admin/ai-glossary" element={<GlossaryPage />} />
               <Route path="/admin/aml" element={<AmlScreeningPage />} />
               <Route path="/admin/kyc/face-match" element={<FaceMatchPage />} />
+              {/* Wave C — DSAR Console */}
+              <Route path="/admin/dsar" element={<DSARPage />} />
+              {/* Wave C — Notifications feed */}
+              <Route path="/notifications" element={<NotificationsPage />} />
+              {/* Wave C — Regulator Reports */}
+              <Route path="/regulator-reports" element={<RegulatorReportsPage />} />
+              <Route path="/regulator-reports/:id" element={<TemplateDetail />} />
 
               {/* CC3 — Admin Settings */}
               <Route path="/admin/settings" element={<SettingsLayout />}>
@@ -164,6 +184,9 @@ export function App() {
                 <Route path="notifications" element={<NotificationsPanel />} />
                 <Route path="mobile"        element={<MobilePanel />} />
                 <Route path="search"        element={<SearchPanel />} />
+                <Route path="docbrain"      element={<DocbrainPanel />} />
+                <Route path="dsar"                element={<DsarPanel />} />
+                <Route path="regulator-reports"  element={<RegulatorReportsPanel />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />

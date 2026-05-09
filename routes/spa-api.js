@@ -61,5 +61,13 @@ router.use(require('./spa-api/admin-tenants'));
 router.use(require('./spa-api/abac'));
 router.use(require('./spa-api/dashboard'));
 router.use(require('./spa-api/customer-360'));
+// Wave C — Audit log v2
+router.use(require('./spa-api/audit'));
+// Wave C — DSAR Console
+router.use(require('./spa-api/dsar'));
+// Wave C — Regulator Reports
+router.use(require('./spa-api/regulator-reports'));
+// Wave C — Notifications feed + admin test-send
+router.use(require('./spa-api/notifications'));
 
 module.exports = router;

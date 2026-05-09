@@ -15,14 +15,21 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER,
-  channel TEXT,
-  subject TEXT,
-  body TEXT,
-  status TEXT DEFAULT 'sent',
-  sent_at TEXT DEFAULT CURRENT_TIMESTAMP
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER,
+  channel     TEXT,
+  subject     TEXT,
+  body        TEXT,
+  status      TEXT    DEFAULT 'sent',
+  sent_at     TEXT    DEFAULT CURRENT_TIMESTAMP,
+  -- Migration 0042 — in-app feed + event type tracking
+  is_read     INTEGER NOT NULL DEFAULT 0,
+  read_at     TEXT,
+  event_type  TEXT,
+  template_id TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
 
 CREATE TABLE IF NOT EXISTS document_versions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -427,6 +434,10 @@ CREATE TABLE IF NOT EXISTS wf_actions (
   webauthn_assertion_id TEXT,
   attachment_id         INTEGER,
   tenant_id             TEXT    NOT NULL DEFAULT 'nbe',
+  -- Migration 0032 (Wave C SOX-2): python_step_id links to Python workflow_steps.id.
+  -- Written by Node after Python's /advance call succeeds (two-phase commit).
+  -- NULL means the row was written by the pre-Wave-C path.
+  python_step_id        INTEGER,
   created_at            TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (workflow_id) REFERENCES workflows(id),
   FOREIGN KEY (user_id)     REFERENCES users(id)
@@ -705,3 +716,129 @@ CREATE INDEX IF NOT EXISTS idx_pii_reveals_user
   ON customer_pii_reveals(tenant_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_pii_reveals_created
   ON customer_pii_reveals(created_at);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0038 — Audit log v2 (Wave C)
+--
+-- 1. Five new columns on audit_log:
+--      entity_type  — document | customer | workflow | user | config | system
+--      detail       — JSON object with before/after/context (replaces freetext details)
+--      prev_hash    — SHA-256 of the preceding row's hash (NULL for id=1)
+--      hash         — SHA-256( (prev_hash||'') + canonical_json(row) )
+--      result       — allow | deny | error
+--
+-- 2. FTS5 virtual table audit_log_fts over (detail, action, entity_type) with
+--    content-table mapping so DELETE/UPDATE rebuild the index correctly.
+--
+-- 3. AFTER INSERT / UPDATE / DELETE triggers keep the FTS index in sync.
+--
+-- Existing rows are backfilled with the hash chain at boot time by
+-- db/index.js (see migration 0038 guard). Chain is unbroken from id=1 forward.
+-- ---------------------------------------------------------------------------
+
+-- New columns (idempotent when run via db/index.js addColumnIfMissing):
+-- These are applied programmatically in db/index.js so that the ALTER TABLE
+-- succeeds on both a fresh DB and an existing populated DB.
+
+-- FTS5 virtual table. Uses content='audit_log', content_rowid='id' so
+-- fts5 can perform DELETE operations correctly without storing a copy.
+CREATE VIRTUAL TABLE IF NOT EXISTS audit_log_fts
+  USING fts5(
+    detail,
+    action,
+    entity_type,
+    content='audit_log',
+    content_rowid='id',
+    tokenize='unicode61'
+  );
+
+-- AFTER INSERT: add new row to FTS index.
+CREATE TRIGGER IF NOT EXISTS audit_log_fts_ai
+  AFTER INSERT ON audit_log
+BEGIN
+  INSERT INTO audit_log_fts(rowid, detail, action, entity_type)
+    VALUES (new.id, new.detail, new.action, new.entity_type);
+END;
+
+-- AFTER UPDATE: delete old FTS entry, insert new.
+CREATE TRIGGER IF NOT EXISTS audit_log_fts_au
+  AFTER UPDATE ON audit_log
+BEGIN
+  INSERT INTO audit_log_fts(audit_log_fts, rowid, detail, action, entity_type)
+    VALUES ('delete', old.id, old.detail, old.action, old.entity_type);
+  INSERT INTO audit_log_fts(rowid, detail, action, entity_type)
+    VALUES (new.id, new.detail, new.action, new.entity_type);
+END;
+
+-- AFTER DELETE: remove from FTS index.
+CREATE TRIGGER IF NOT EXISTS audit_log_fts_ad
+  AFTER DELETE ON audit_log
+BEGIN
+  INSERT INTO audit_log_fts(audit_log_fts, rowid, detail, action, entity_type)
+    VALUES ('delete', old.id, old.detail, old.action, old.entity_type);
+END;
+
+-- ---------------------------------------------------------------------------
+-- Migration 0039 — Regulator Reports (Wave C)
+--
+-- regulator_reports: template registry for each supported regulatory body.
+--   Each template encodes the format (pdf|csv|jsonld), a JSON Schema for its
+--   required parameters, and an optional cron schedule for recurring generation.
+--
+-- submission_receipts: immutable audit log of every generated report with a
+--   SHA-256 content hash + RSA-PSS detached signature manifest for
+--   non-repudiation. Live submission to regulator portals is stubbed in v1 —
+--   the row records the would-be endpoint URL and captures the response once
+--   the operator manually triggers the submit action.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS regulator_reports (
+  id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id              TEXT    NOT NULL DEFAULT 'default',
+  regulator              TEXT    NOT NULL,
+  name                   TEXT    NOT NULL,
+  -- JSON Schema string for the parameters the template accepts.
+  parameters_schema_json TEXT    NOT NULL DEFAULT '{}',
+  -- SQL query template; may use :as_of_date plus schema-defined named params.
+  query_template         TEXT    NOT NULL DEFAULT '',
+  -- Path to a Jinja2/plain-text output template (relative to STORAGE_DIR).
+  output_template_path   TEXT,
+  -- pdf | csv | jsonld   (XLSX absent: SheetJS not in package.json → CSV used)
+  format                 TEXT    NOT NULL DEFAULT 'pdf',
+  is_active              INTEGER NOT NULL DEFAULT 1,
+  created_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+  -- Cron expression for scheduled generation, e.g. '0 6 1 * *' (1st of month).
+  schedule_cron          TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rr_tenant_regulator
+  ON regulator_reports(tenant_id, regulator);
+
+CREATE INDEX IF NOT EXISTS idx_rr_active
+  ON regulator_reports(tenant_id, is_active);
+
+CREATE TABLE IF NOT EXISTS submission_receipts (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id            TEXT    NOT NULL DEFAULT 'default',
+  report_template_id   INTEGER NOT NULL REFERENCES regulator_reports(id) ON DELETE CASCADE,
+  generated_at         TEXT    NOT NULL DEFAULT (datetime('now')),
+  generated_by         TEXT,          -- username / principal
+  -- JSON snapshot of the params used at generation time.
+  params_json          TEXT    NOT NULL DEFAULT '{}',
+  file_path            TEXT,          -- path under STORAGE_DIR to the generated file
+  sha256               TEXT,          -- hex SHA-256 of the generated file bytes
+  -- JSON manifest from services/signing.py::sign_detached
+  -- fields: sha256, signed_at, signer, cert_fingerprint_sha256, algorithm
+  signature            TEXT,
+  submitted_at         TEXT,          -- ISO-8601 UTC when submit-to-regulator was called
+  regulator_endpoint   TEXT,          -- URL that would be POSTed in live submission
+  response_code        INTEGER,       -- HTTP status returned (stubbed: 202)
+  response_body        TEXT           -- raw response body (stubbed)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sr_tenant_template
+  ON submission_receipts(tenant_id, report_template_id);
+
+CREATE INDEX IF NOT EXISTS idx_sr_generated_at
+  ON submission_receipts(generated_at);

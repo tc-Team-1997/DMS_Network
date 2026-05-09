@@ -2,6 +2,10 @@
 
 Provider tests exercise the no-op paths (no env creds → ok=False, graceful).
 Router tests hit /health and /preferences with a faked session.
+
+Wave C: SMS and WhatsApp providers are now CC6 TwilioSms / NoopSms registered
+in the integration provider registry. The old notify/sms.py and
+notify/whatsapp.py shims have been deleted (approach a — no bifurcation).
 """
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ import pytest
 
 
 def test_email_provider_no_op():
-    """EmailProvider returns ok=False when SMTP_HOST is not set."""
+    """EmailProvider (notify package) returns ok=False when SMTP_HOST is not set."""
     from app.services.notify.email import EmailProvider
 
     provider = EmailProvider()
@@ -33,32 +37,26 @@ def test_email_provider_no_op():
     assert "error" in result
 
 
-def test_sms_provider_no_op():
-    """SmsProvider returns ok=False when TWILIO_ACCOUNT_SID is not set."""
-    from app.services.notify.sms import SmsProvider
+def test_twilio_sms_no_op():
+    """TwilioSms CC6 provider returns ok=False when TWILIO_ACCOUNT_SID is not set."""
+    from app.services.integrations.providers.local.twilio_sms import TwilioSms
 
-    provider = SmsProvider()
+    provider = TwilioSms()
     assert not provider.configured
 
-    result = asyncio.run(
-        provider.send(to="+1234567890", subject="Test", body="Hello")
-    )
-    assert result["ok"] is False
-    assert "error" in result
+    result = provider.send(to="+1234567890", body="Hello")
+    assert result.ok is False
+    assert result.detail  # error detail populated
 
 
-def test_whatsapp_provider_no_op():
-    """WhatsAppProvider returns ok=False when TWILIO_WA_FROM is not set."""
-    from app.services.notify.whatsapp import WhatsAppProvider
+def test_noop_sms_always_ok():
+    """NoopSms CC6 provider always returns ok=True (log-only, no network call)."""
+    from app.services.integrations.providers.local.noop_sms import NoopSms
 
-    provider = WhatsAppProvider()
-    assert not provider.configured
-
-    result = asyncio.run(
-        provider.send(to="+1234567890", subject="Test", body="Hello")
-    )
-    assert result["ok"] is False
-    assert "error" in result
+    provider = NoopSms()
+    result = provider.send(to="+97517123456", body="Test message")
+    assert result.ok is True
+    assert result.message_id == "noop"
 
 
 def test_send_no_address():
@@ -106,20 +104,15 @@ def test_provider_status_no_creds():
 
     # Re-instantiate providers to pick up stripped env
     from app.services.notify.email import EmailProvider
-    from app.services.notify.sms import SmsProvider
-    from app.services.notify.whatsapp import WhatsAppProvider
     notify_svc._providers = {
         "email": EmailProvider(),
-        "sms": SmsProvider(),
-        "whatsapp": WhatsAppProvider(),
+        # SMS and WhatsApp are now CC6 providers — not in _providers dict.
+        # provider_status() only reports on what is in _providers.
     }
 
     status = notify_svc.provider_status()
     assert "email" in status
-    assert "sms" in status
-    assert "whatsapp" in status
-    for ch, info in status.items():
-        assert info["configured"] is False, f"Expected {ch} unconfigured but got {info}"
+    assert status["email"]["configured"] is False
 
 
 def test_unknown_channel():
@@ -159,8 +152,6 @@ def test_notify_health():
     assert r.status_code == 200
     data = r.json()
     assert "email" in data
-    assert "sms" in data
-    assert "whatsapp" in data
     # No auth tokens or passwords should appear in the response
     body_str = r.text
     for secret_key in ("SMTP_PASS", "TWILIO_AUTH_TOKEN", "password", "token", "secret"):
@@ -175,7 +166,6 @@ def test_notify_health_requires_api_key():
 
 def test_notify_preferences_get_default():
     """GET /api/v1/notify/preferences returns default channels for a fresh user."""
-    # Authenticate via X-API-Key (grants doc_admin / principal sub="api-key")
     r = client.get("/api/v1/notify/preferences", headers=H)
     assert r.status_code == 200
     data = r.json()

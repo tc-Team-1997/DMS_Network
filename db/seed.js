@@ -634,4 +634,339 @@ for (const [key, value] of rbacConfigDefaults) {
 }
 console.log(`RBAC tenant_config seeded (${rbacConfigDefaults.length} keys).`);
 
+// ---------------------------------------------------------------------------
+// Migration 0039 — Regulator Reports: 7 seeded templates (idempotent)
+// INSERT OR IGNORE ensures re-running seed.js is safe.
+// Templates are scoped to tenant 'nbe' by default; the BoB tenant 'bhu'
+// inherits RMA quarterly (its primary regulator).
+// ---------------------------------------------------------------------------
+const insertRegReport = db.prepare(`
+  INSERT OR IGNORE INTO regulator_reports
+    (tenant_id, regulator, name, parameters_schema_json, query_template, format, is_active, schedule_cron)
+  VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+`);
+
+/**
+ * 7 templates defined per §32 of UI_UX_REVIEW.md / Bhutan F#32.
+ * parameters_schema_json follows JSON Schema draft-07 — ParamForm renders
+ * dynamic inputs from this schema on the Report Detail page.
+ * query_template is a SQL string stub; the Python router executes it against
+ * the tenant DB with named params (e.g. :as_of_date, :branch).
+ * schedule_cron: null = manual only; otherwise a standard 5-field cron expr.
+ */
+const REGULATOR_TEMPLATES = [
+  {
+    tenant_id: 'nbe',
+    regulator: 'RMA',
+    name: 'RMA Quarterly Compliance Report',
+    parameters_schema_json: JSON.stringify({
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      required: ['as_of_date', 'quarter'],
+      properties: {
+        as_of_date: { type: 'string', format: 'date', description: 'Report as-of date (quarter end)' },
+        quarter:    { type: 'string', enum: ['Q1', 'Q2', 'Q3', 'Q4'], description: 'Fiscal quarter' },
+        branch:     { type: 'string', description: 'Branch code (leave blank for all branches)' },
+      },
+    }),
+    query_template: `SELECT doc_type, status, COUNT(*) AS count, branch
+  FROM documents
+  WHERE tenant_id = :tenant_id
+    AND date(uploaded_at) <= date(:as_of_date)
+  GROUP BY doc_type, status, branch
+  ORDER BY doc_type, status`,
+    format: 'pdf',
+    schedule_cron: '0 6 1 1,4,7,10 *', // 06:00 on 1st of Jan/Apr/Jul/Oct
+  },
+  {
+    tenant_id: 'nbe',
+    regulator: 'CBE',
+    name: 'CBE Quarterly KYC Compliance Report',
+    parameters_schema_json: JSON.stringify({
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      required: ['as_of_date', 'quarter'],
+      properties: {
+        as_of_date: { type: 'string', format: 'date', description: 'Quarter end date' },
+        quarter:    { type: 'string', enum: ['Q1', 'Q2', 'Q3', 'Q4'] },
+        include_expired: { type: 'boolean', description: 'Include expired KYC documents', default: true },
+      },
+    }),
+    query_template: `SELECT branch, doc_type, status, COUNT(*) AS count
+  FROM documents
+  WHERE tenant_id = :tenant_id
+    AND doc_type IN ('passport','national_id','driving_license')
+    AND date(uploaded_at) <= date(:as_of_date)
+  GROUP BY branch, doc_type, status`,
+    format: 'pdf',
+    schedule_cron: '0 6 1 1,4,7,10 *',
+  },
+  {
+    tenant_id: 'nbe',
+    regulator: 'SAMA',
+    name: 'SAMA Monthly Document Inventory',
+    parameters_schema_json: JSON.stringify({
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      required: ['as_of_date'],
+      properties: {
+        as_of_date:  { type: 'string', format: 'date', description: 'Month-end date' },
+        doc_type:    { type: 'string', description: 'Filter by document type (optional)' },
+        risk_band:   { type: 'string', enum: ['low', 'medium', 'high', ''], description: 'Customer risk band filter' },
+      },
+    }),
+    query_template: `SELECT doc_type, status, COUNT(*) AS count
+  FROM documents
+  WHERE tenant_id = :tenant_id
+    AND date(uploaded_at) <= date(:as_of_date)
+  GROUP BY doc_type, status`,
+    format: 'csv',
+    schedule_cron: '0 7 1 * *', // 07:00 on 1st of every month
+  },
+  {
+    tenant_id: 'nbe',
+    regulator: 'RBI',
+    name: 'RBI Document Audit Trail',
+    parameters_schema_json: JSON.stringify({
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      required: ['from_date', 'to_date'],
+      properties: {
+        from_date:   { type: 'string', format: 'date', description: 'Period start (inclusive)' },
+        to_date:     { type: 'string', format: 'date', description: 'Period end (inclusive)' },
+        doc_type:    { type: 'string', description: 'Restrict to a single document type' },
+        customer_cid:{ type: 'string', description: 'Restrict to a single CID' },
+      },
+    }),
+    query_template: `SELECT al.action, al.entity, al.created_at, al.user_id, d.doc_type, d.customer_cid
+  FROM audit_log al
+  LEFT JOIN documents d ON d.id = al.entity_id
+  WHERE al.tenant_id = :tenant_id
+    AND date(al.created_at) BETWEEN date(:from_date) AND date(:to_date)
+  ORDER BY al.created_at DESC`,
+    format: 'csv',
+    schedule_cron: null,
+  },
+  {
+    tenant_id: 'nbe',
+    regulator: 'SOC2',
+    name: 'SOC 2 Type II Evidence Pack',
+    parameters_schema_json: JSON.stringify({
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      required: ['from_date', 'to_date'],
+      properties: {
+        from_date:   { type: 'string', format: 'date', description: 'Audit period start' },
+        to_date:     { type: 'string', format: 'date', description: 'Audit period end' },
+        control_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'SOC 2 control IDs to include (empty = all)',
+          default: [],
+        },
+      },
+    }),
+    query_template: `SELECT al.id, al.action, al.entity_type, al.created_at, al.user_id, al.result
+  FROM audit_log al
+  WHERE al.tenant_id = :tenant_id
+    AND date(al.created_at) BETWEEN date(:from_date) AND date(:to_date)
+  ORDER BY al.created_at ASC`,
+    format: 'pdf',
+    schedule_cron: null,
+  },
+  {
+    tenant_id: 'nbe',
+    regulator: 'GDPR',
+    name: 'GDPR Art-30 Record of Processing Activities (RoPA)',
+    parameters_schema_json: JSON.stringify({
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      required: ['as_of_date'],
+      properties: {
+        as_of_date:        { type: 'string', format: 'date', description: 'As-of date for RoPA snapshot' },
+        controller_name:   { type: 'string', description: 'Data controller legal name', default: 'National Bank of Egypt' },
+        controller_email:  { type: 'string', format: 'email', description: 'DPO contact email' },
+        include_transfers: { type: 'boolean', description: 'Include cross-border transfer entries', default: true },
+      },
+    }),
+    query_template: `SELECT doc_type, COUNT(*) AS count, MIN(uploaded_at) AS earliest, MAX(uploaded_at) AS latest
+  FROM documents
+  WHERE tenant_id = :tenant_id AND date(uploaded_at) <= date(:as_of_date)
+  GROUP BY doc_type`,
+    format: 'jsonld',
+    schedule_cron: null,
+  },
+  {
+    tenant_id: 'nbe',
+    regulator: 'PDPL',
+    name: 'PDPL Data Breach Notification Report',
+    parameters_schema_json: JSON.stringify({
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      required: ['breach_detected_at', 'breach_description'],
+      properties: {
+        breach_detected_at:  { type: 'string', format: 'date-time', description: 'Timestamp when breach was detected (ISO-8601)' },
+        breach_description:  { type: 'string', minLength: 20, description: 'Brief description of the personal data incident' },
+        affected_categories: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Categories of personal data affected',
+          default: [],
+        },
+        estimated_subjects:  { type: 'integer', minimum: 0, description: 'Estimated number of data subjects affected' },
+        containment_steps:   { type: 'string', description: 'Steps taken to contain the breach' },
+        notified_authority:  { type: 'boolean', description: 'Has the supervisory authority been notified?', default: false },
+      },
+    }),
+    query_template: `SELECT 'breach_notification' AS report_type, :breach_detected_at AS detected_at, COUNT(*) AS total_docs
+  FROM documents WHERE tenant_id = :tenant_id`,
+    format: 'jsonld',
+    schedule_cron: null,
+  },
+];
+
+// Also seed BoB tenant (bhu) with the RMA template (its primary regulator).
+const BHU_RMA_TEMPLATE = {
+  ...REGULATOR_TEMPLATES[0],
+  tenant_id: 'bhu',
+};
+
+for (const t of [...REGULATOR_TEMPLATES, BHU_RMA_TEMPLATE]) {
+  insertRegReport.run(
+    t.tenant_id,
+    t.regulator,
+    t.name,
+    t.parameters_schema_json,
+    t.query_template,
+    t.format,
+    t.schedule_cron ?? null,
+  );
+}
+console.log(`Regulator report templates seeded (${REGULATOR_TEMPLATES.length} nbe + 1 bhu = ${REGULATOR_TEMPLATES.length + 1} total).`);
+
+// ── regulator_reports namespace defaults for tenant_config ──────────────────
+// These values populate the Admin Settings → Regulator Reports panel via
+// the generic ConfigPanel (namespace = 'regulator_reports').
+const regulatorReportsConfigDefaults = [
+  ['seeded_regulators',          JSON.stringify(['RMA', 'CBE', 'SAMA', 'RBI', 'SOC2', 'GDPR', 'PDPL'])],
+  ['signed_receipt_required',    'true'],
+  ['auto_submit_enabled',        'false'],
+  ['default_format',             'pdf'],
+  ['pre_flight_checks_enabled',  'true'],
+  ['retention_days_for_submissions', '2555'],  // 7 years
+  ['webhook_token',              ''],           // filled by operator before enabling auto-submit
+];
+const insertRRConfig = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'regulator_reports', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of regulatorReportsConfigDefaults) {
+  insertRRConfig.run(key, value);
+}
+// Seed bhu with same defaults.
+const insertRRConfigBhu = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('bhu', 'regulator_reports', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of regulatorReportsConfigDefaults) {
+  insertRRConfigBhu.run(key, value);
+}
+console.log(`Regulator reports tenant_config seeded (${regulatorReportsConfigDefaults.length} keys × 2 tenants).`);
+
+// ---------------------------------------------------------------------------
+// Migration 0042 — Notifications Wave C
+// Add 4 columns to notifications table (idempotent ALTER TABLE guards).
+// Add index for in-app feed queries.
+// Seed notifications namespace tenant_config keys.
+// ---------------------------------------------------------------------------
+
+// 0042-a: column additions (SQLite requires separate ALTER TABLE per column).
+const notifCols = db.prepare(`PRAGMA table_info(notifications)`).all().map((r) => r.name);
+if (!notifCols.includes('is_read')) {
+  db.exec("ALTER TABLE notifications ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0");
+}
+if (!notifCols.includes('read_at')) {
+  db.exec("ALTER TABLE notifications ADD COLUMN read_at TEXT");
+}
+if (!notifCols.includes('event_type')) {
+  db.exec("ALTER TABLE notifications ADD COLUMN event_type TEXT");
+}
+if (!notifCols.includes('template_id')) {
+  db.exec("ALTER TABLE notifications ADD COLUMN template_id TEXT");
+}
+// Index is safe to re-run (IF NOT EXISTS).
+db.exec("CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read)");
+console.log('[0042] notifications table columns + index ensured.');
+
+// 0042-b: notifications namespace tenant_config defaults (idempotent INSERT OR IGNORE).
+// Preserves the 5 existing SMTP keys seeded by Wave B Users v2.
+// Event-type templates use {{var}} interpolation resolved in services/notify.js.
+const notifConfigDefaults = [
+  // ── Channel enabled toggles (default: email + in_app on; others off) ──
+  ['channels.email.enabled',      'true'],
+  ['channels.sms.enabled',        'false'],
+  ['channels.whatsapp.enabled',   'false'],
+  ['channels.in_app.enabled',     'true'],
+  ['channels.push.enabled',       'false'],
+  // ── Provider selection per channel ────────────────────────────────────
+  ['email.provider',              '"local"'],
+  ['sms.provider',                '"noop"'],
+  // ── Throttle — email ─────────────────────────────────────────────────
+  ['email.throttle.per_user_per_minute',   '5'],
+  ['email.throttle.per_tenant_per_minute', '100'],
+  ['email.throttle.burst',                 '10'],
+  // ── Throttle — sms ───────────────────────────────────────────────────
+  ['sms.throttle.per_user_per_minute',     '2'],
+  ['sms.throttle.per_tenant_per_minute',   '50'],
+  ['sms.throttle.burst',                   '5'],
+  // ── Templates: expiry_alert ──────────────────────────────────────────
+  ['templates.expiry_alert.subject',       '"[DMS] Document expiry alert"'],
+  ['templates.expiry_alert.body',          '"Hello,\\n\\n{{count}} document(s) of type {{doc_type}} are expiring within {{band}} days. Please review and renew them promptly.\\n\\nDMS System"'],
+  ['templates.expiry_alert.channels',      '["email","in_app"]'],
+  ['templates.expiry_alert.locales',       '["en","dz"]'],
+  // ── Templates: workflow_assigned ─────────────────────────────────────
+  ['templates.workflow_assigned.subject',  '"[DMS] Workflow assigned to you"'],
+  ['templates.workflow_assigned.body',     '"Hello,\\n\\nWorkflow {{ref_code}} ({{title}}) has been assigned to you for review. Please action it promptly.\\n\\nDMS System"'],
+  ['templates.workflow_assigned.channels', '["email","in_app"]'],
+  ['templates.workflow_assigned.locales',  '["en","dz"]'],
+  // ── Templates: aml_hit ───────────────────────────────────────────────
+  ['templates.aml_hit.subject',            '"[DMS] AML screening hit"'],
+  ['templates.aml_hit.body',               '"Hello,\\n\\nAML screening for customer {{customer_cid}} returned {{hit_count}} hit(s). Please review in the AML module.\\n\\nDMS System"'],
+  ['templates.aml_hit.channels',           '["email","in_app"]'],
+  ['templates.aml_hit.locales',            '["en","dz"]'],
+  // ── Templates: user_invite ───────────────────────────────────────────
+  ['templates.user_invite.subject',        '"You have been invited to DocManager"'],
+  ['templates.user_invite.body',           '"Hello,\\n\\n{{inviter_name}} has invited you to access DocManager as a {{role}}.\\n\\nClick the link below to set your password:\\n{{invite_link}}\\n\\nThis link expires in {{ttl_hours}} hours.\\n\\nDMS System"'],
+  ['templates.user_invite.channels',       '["email"]'],
+  ['templates.user_invite.locales',        '["en","dz"]'],
+  // ── Templates: dsar_completed ────────────────────────────────────────
+  ['templates.dsar_completed.subject',     '"[DMS] Your data request is ready"'],
+  ['templates.dsar_completed.body',        '"Hello,\\n\\nYour DSAR request (ref: {{request_id}}) has been completed. Please log in to download your data package.\\n\\nDMS System"'],
+  ['templates.dsar_completed.channels',    '["email","in_app"]'],
+  ['templates.dsar_completed.locales',     '["en","dz"]'],
+  // ── Routing: which roles receive each event type ──────────────────────
+  ['routing.expiry_alert',        '["Doc Admin"]'],
+  ['routing.workflow_assigned',   '["Maker","Checker"]'],
+  ['routing.aml_hit',             '["Doc Admin","Checker"]'],
+  ['routing.user_invite',         '[]'],
+  ['routing.dsar_completed',      '[]'],
+];
+
+const insertNotifConfig = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'notifications', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of notifConfigDefaults) {
+  insertNotifConfig.run(key, value);
+}
+// Seed bhu tenant with same defaults.
+const insertNotifConfigBhu = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('bhu', 'notifications', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of notifConfigDefaults) {
+  insertNotifConfigBhu.run(key, value);
+}
+console.log(`[0042] Notifications tenant_config seeded (${notifConfigDefaults.length} keys × 2 tenants).`);
+
 db.close();

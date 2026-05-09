@@ -37,7 +37,7 @@ from .providers_base import (
 )
 from .providers.local import (
     OllamaOcr, LocalEmbedding, OllamaLlm, OllamaTranslate, LocalFaceMatch,
-    LocalSmtp, NoopSms, LocalFsStorage, LocalKms, OfacJsonWatchlist,
+    LocalSmtp, NoopSms, TwilioSms, LocalFsStorage, LocalKms, OfacJsonWatchlist,
     LocalParquetBi, NoopCdn, LocalLruCache,
 )
 
@@ -104,8 +104,9 @@ PROVIDERS: dict[str, dict[str, type | object]] = {
         "aws":   _aws("aws_rekognition", "RekognitionFaceMatch"),
     },
     "sms": {
-        "noop": NoopSms,
-        "aws":  _aws("aws_sns", "SnsSms"),
+        "noop":   NoopSms,
+        "twilio": TwilioSms,
+        "aws":    _aws("aws_sns", "SnsSms"),
     },
     "email": {
         "local": LocalSmtp,

@@ -484,4 +484,166 @@ try {
   console.error('[db] tenant_id migration skipped:', err.message);
 }
 
+// ---------------------------------------------------------------------------
+// Migration 0038 — Audit log v2 (Wave C)
+// Adds hash-chain columns + FTS5 virtual table + sync triggers to audit_log.
+// Existing rows are backfilled with a computed chain at migration time.
+// Chain is unbroken from id=1 forward: "Existing rows backfilled at migration
+// time; chain unbroken from id=1 forward." (approved plan §A)
+//
+// Design note: FTS5 DDL and hash-chain backfill are in separate try/catch
+// blocks so that a pre-existing FTS shadow table (from schema.sql on a fresh
+// seed) cannot prevent the backfill from running.
+// ---------------------------------------------------------------------------
+
+// Step 1 — additive columns (always safe, idempotent via addColumnIfMissing).
+try {
+  addColumnIfMissing('audit_log', 'entity_type', 'entity_type TEXT');
+  addColumnIfMissing('audit_log', 'detail',      'detail TEXT');
+  addColumnIfMissing('audit_log', 'prev_hash',   'prev_hash TEXT');
+  addColumnIfMissing('audit_log', 'hash',        'hash TEXT');
+  addColumnIfMissing('audit_log', 'result',      "result TEXT DEFAULT 'allow'");
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.error('[db] migration 0038 column alter skipped:', err.message);
+}
+
+// Step 2 — FTS5 virtual table + sync triggers.
+// Each DDL statement is executed individually so that an already-existing
+// table or trigger does not abort the rest.
+for (const stmt of [
+  `CREATE VIRTUAL TABLE IF NOT EXISTS audit_log_fts
+     USING fts5(
+       detail,
+       action,
+       entity_type,
+       content='audit_log',
+       content_rowid='id',
+       tokenize='unicode61'
+     )`,
+  `CREATE TRIGGER IF NOT EXISTS audit_log_fts_ai
+     AFTER INSERT ON audit_log
+   BEGIN
+     INSERT INTO audit_log_fts(rowid, detail, action, entity_type)
+       VALUES (new.id, new.detail, new.action, new.entity_type);
+   END`,
+  `CREATE TRIGGER IF NOT EXISTS audit_log_fts_au
+     AFTER UPDATE ON audit_log
+   BEGIN
+     INSERT INTO audit_log_fts(audit_log_fts, rowid, detail, action, entity_type)
+       VALUES ('delete', old.id, old.detail, old.action, old.entity_type);
+     INSERT INTO audit_log_fts(rowid, detail, action, entity_type)
+       VALUES (new.id, new.detail, new.action, new.entity_type);
+   END`,
+  `CREATE TRIGGER IF NOT EXISTS audit_log_fts_ad
+     AFTER DELETE ON audit_log
+   BEGIN
+     INSERT INTO audit_log_fts(audit_log_fts, rowid, detail, action, entity_type)
+       VALUES ('delete', old.id, old.detail, old.action, old.entity_type);
+   END`,
+]) {
+  try { db.exec(stmt); } catch (_) { /* already exists — safe to ignore */ }
+}
+
+// Step 3 — backfill the hash chain for all rows that lack a hash.
+// Walk rows id ASC; skip rows where hash is already set (idempotent).
+try {
+  const { computeHash } = require('./hash-chain');
+  const rows = db.prepare(
+    'SELECT id, user_id, action, entity, entity_type, entity_id, detail, details, tenant_id, created_at, result FROM audit_log ORDER BY id ASC',
+  ).all();
+
+  if (rows.length > 0) {
+    const updateHash = db.prepare(
+      'UPDATE audit_log SET prev_hash = ?, hash = ? WHERE id = ? AND hash IS NULL',
+    );
+
+    const backfill = db.transaction(() => {
+      let prevHash = null;
+      let backfilled = 0;
+      for (const row of rows) {
+        const rowDict = {
+          action:      row.action,
+          created_at:  row.created_at,
+          detail:      row.detail ?? row.details ?? null,
+          entity:      row.entity,
+          entity_id:   row.entity_id,
+          entity_type: row.entity_type,
+          id:          row.id,
+          result:      row.result ?? 'allow',
+          tenant_id:   row.tenant_id,
+          user_id:     row.user_id,
+        };
+        const h = computeHash(prevHash, rowDict);
+        const info = updateHash.run(prevHash, h, row.id);
+        if (info.changes > 0) backfilled += 1;
+        // Always advance prevHash even if this row was already hashed,
+        // so the chain walks correctly over already-backfilled rows.
+        prevHash = h;
+      }
+      // eslint-disable-next-line no-console
+      console.log(`[db] migration 0038: backfilled hash chain for ${backfilled} audit_log row(s).`);
+    });
+
+    backfill();
+  }
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.error('[db] migration 0038 backfill skipped:', err.message);
+}
+
+// ---------------------------------------------------------------------------
+// Migration 0039 — Regulator Reports (Wave C)
+// Creates regulator_reports + submission_receipts tables idempotently.
+// Tables defined in db/schema.sql; this block ensures they exist on any DB
+// created before the schema.sql append was deployed.
+// ---------------------------------------------------------------------------
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS regulator_reports (
+      id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id              TEXT    NOT NULL DEFAULT 'default',
+      regulator              TEXT    NOT NULL,
+      name                   TEXT    NOT NULL,
+      parameters_schema_json TEXT    NOT NULL DEFAULT '{}',
+      query_template         TEXT    NOT NULL DEFAULT '',
+      output_template_path   TEXT,
+      format                 TEXT    NOT NULL DEFAULT 'pdf',
+      is_active              INTEGER NOT NULL DEFAULT 1,
+      created_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at             TEXT    NOT NULL DEFAULT (datetime('now')),
+      schedule_cron          TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_rr_tenant_regulator
+      ON regulator_reports(tenant_id, regulator);
+    CREATE INDEX IF NOT EXISTS idx_rr_active
+      ON regulator_reports(tenant_id, is_active);
+
+    CREATE TABLE IF NOT EXISTS submission_receipts (
+      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id            TEXT    NOT NULL DEFAULT 'default',
+      report_template_id   INTEGER NOT NULL REFERENCES regulator_reports(id) ON DELETE CASCADE,
+      generated_at         TEXT    NOT NULL DEFAULT (datetime('now')),
+      generated_by         TEXT,
+      params_json          TEXT    NOT NULL DEFAULT '{}',
+      file_path            TEXT,
+      sha256               TEXT,
+      signature            TEXT,
+      submitted_at         TEXT,
+      regulator_endpoint   TEXT,
+      response_code        INTEGER,
+      response_body        TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_sr_tenant_template
+      ON submission_receipts(tenant_id, report_template_id);
+    CREATE INDEX IF NOT EXISTS idx_sr_generated_at
+      ON submission_receipts(generated_at);
+  `);
+  // eslint-disable-next-line no-console
+  console.log('[db] migration 0039: regulator_reports + submission_receipts ready.');
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.error('[db] migration 0039 (regulator_reports) skipped:', err.message);
+}
+
 module.exports = db;

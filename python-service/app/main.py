@@ -12,7 +12,7 @@ from .db import Base, engine
 
 _startup_time: float = time.monotonic()
 from .services import tasks as _tasks_model  # noqa: F401 (registers TaskRun on Base)
-from .routers import documents, ocr, workflow, duplicates, integrations, search, dashboard, alerts, signatures, tasks as tasks_router, ws, auth, bi, saml as saml_router, anchor as anchor_router, face as face_router, eforms as eforms_router, siem as siem_router, fraud as fraud_router, vector as vector_router, copilot as copilot_router, portal as portal_router, redaction as redaction_router, retention as retention_router, dsar as dsar_router, cbe as cbe_router, stepup as stepup_router, summarize as summarize_router, customer_risk as customer_risk_router, fx as fx_router, ifrs9 as ifrs9_router, replication as replication_router, provenance as prov_router, campaigns as campaigns_router, aisp as aisp_router, ocr_arabic as ocr_ar_router, dp as dp_router, oidc as oidc_router, adversarial as adversarial_router, encryption as encryption_router, graph as graph_router, voice as voice_router, zkkyc as zk_router, ledger as ledger_router, sustainability as sustainability_router, coach as coach_router, journey as journey_router, live as live_router, usage as usage_router, moderation as moderation_router, remediation as remediation_router, passkeys as passkeys_router, federated as federated_router, watchlist as watchlist_router, covenants as covenants_router, lineage as lineage_router, tenant_keys as tenant_keys_router, abac as abac_router, stamp_search as stamp_router, compliance as compliance_router, workflow_designer as wfd_router, retention_nl as retention_nl_router, test_data as test_data_router, transparency as transparency_router, redteam as redteam_router, doc_diff as doc_diff_router, exec_report as exec_report_router, blast_radius as blast_router, stride as stride_router, lang_router as lang_router_r, notify as notify_router, cbs as cbs_router, aml as aml_router, aml_screening as aml_screening_router, face_match as face_match_router, worm as worm_router, users_admin as users_admin_router
+from .routers import documents, ocr, workflow, duplicates, integrations, search, dashboard, alerts, signatures, tasks as tasks_router, ws, auth, bi, saml as saml_router, anchor as anchor_router, face as face_router, eforms as eforms_router, siem as siem_router, fraud as fraud_router, vector as vector_router, copilot as copilot_router, portal as portal_router, redaction as redaction_router, retention as retention_router, dsar as dsar_router, cbe as cbe_router, stepup as stepup_router, summarize as summarize_router, customer_risk as customer_risk_router, fx as fx_router, ifrs9 as ifrs9_router, replication as replication_router, provenance as prov_router, campaigns as campaigns_router, aisp as aisp_router, ocr_arabic as ocr_ar_router, dp as dp_router, oidc as oidc_router, adversarial as adversarial_router, encryption as encryption_router, graph as graph_router, voice as voice_router, zkkyc as zk_router, ledger as ledger_router, sustainability as sustainability_router, coach as coach_router, journey as journey_router, live as live_router, usage as usage_router, moderation as moderation_router, remediation as remediation_router, passkeys as passkeys_router, federated as federated_router, watchlist as watchlist_router, covenants as covenants_router, lineage as lineage_router, tenant_keys as tenant_keys_router, abac as abac_router, stamp_search as stamp_router, compliance as compliance_router, workflow_designer as wfd_router, retention_nl as retention_nl_router, test_data as test_data_router, transparency as transparency_router, redteam as redteam_router, doc_diff as doc_diff_router, exec_report as exec_report_router, blast_radius as blast_router, stride as stride_router, lang_router as lang_router_r, notify as notify_router, cbs as cbs_router, aml as aml_router, aml_screening as aml_screening_router, face_match as face_match_router, worm as worm_router, users_admin as users_admin_router, regulator_reports as regulator_reports_router
 from .services import task_handlers  # noqa: F401 (register handlers)
 from .services.tasks import start_workers
 from .services.metrics import PrometheusMiddleware, metrics_response
@@ -227,6 +227,9 @@ app.include_router(document_redaction_router.router)
 # DocBrain (AI) — OCR + classify + extract + embed + RAG chat.
 from .routers import docbrain as docbrain_router  # noqa: E402
 app.include_router(docbrain_router.router)
+# DocBrain Chat v2 — conversation persistence, FTS, pin, folder, edit, regenerate.
+from .routers import docbrain_v2 as docbrain_v2_router  # noqa: E402
+app.include_router(docbrain_v2_router.router)
 # Offline translation — NLLB-200 Dzongkha/Arabic/English (BHU-14).
 from .routers import translate as translate_router  # noqa: E402
 app.include_router(translate_router.router)
@@ -238,6 +241,7 @@ from .routers import document_types as document_types_router  # noqa: E402
 app.include_router(document_types_router.router)
 from .routers import integrations_admin as integrations_admin_router  # noqa: E402
 app.include_router(integrations_admin_router.router)
+app.include_router(regulator_reports_router.router)
 
 
 setup_tracing(app, engine)

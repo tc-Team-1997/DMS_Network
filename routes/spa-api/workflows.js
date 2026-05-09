@@ -17,22 +17,25 @@
  *   reject   → Checker, Doc Admin
  *   escalate → Doc Admin only
  *
- * Step-up enforcement (revised plan (c)):
+ * Step-up enforcement (Wave C — SOX-1 + SOX-2 closed):
  *   If tenant_config.workflows.step_up_risk_band !== 'never' AND the workflow
  *   meets the risk/amount threshold, the request MUST include a
  *   webauthn_assertion_id. If missing the handler returns 403 step_up_required.
- *   The assertion_id is stored in wf_actions but NOT cryptographically verified
- *   by this Node handler (see TODO(SOX) below).
+ *   When present, the assertion_id is cryptographically validated via
+ *   POST /py/api/v1/stepup/verify before any write occurs (SOX-1 closed).
  *
- * Known v1 gap (SOX):
- *   webauthn_assertion_id is stored but not server-side validated. Wave C must
- *   add POST /py/api/v1/stepup/verify proxy call before go-live.
+ * Audit unification (Wave C — SOX-2 closed):
+ *   Workflow advances call Python POST /api/v1/workflow/:doc_id/advance FIRST.
+ *   Python commits workflow_steps and returns step_id.  Node then commits
+ *   wf_actions with python_step_id = step_id.  If Python fails, Node writes
+ *   nothing.  Both sides are always in sync.
  */
 
 const express = require('express');
 const db = require('../../db');
-const { requirePermJson, tenantScope } = require('./_shared');
+const { requirePermJson, tenantScope, pyCall } = require('./_shared');
 const { getNamespace } = require('../../db/tenant-config');
+const { verifyStepUpAssertion } = require('../../services/stepup-verify');
 
 const router = express.Router();
 
@@ -143,21 +146,23 @@ function validateActionBody(action, body, cfg) {
 
 /**
  * Write a wf_actions row and the shared audit_log entry.
+ * python_step_id is set from the Python /advance response (SOX-2 two-phase commit).
  */
-function recordAction({ workflowId, userId, action, reasonCode, comment, assertionId, attachmentId, tenantId }) {
+function recordAction({ workflowId, userId, action, reasonCode, comment, assertionId, attachmentId, tenantId, pythonStepId }) {
   db.prepare(
     `INSERT INTO wf_actions
-       (workflow_id, user_id, action, reason_code, comment, webauthn_assertion_id, attachment_id, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (workflow_id, user_id, action, reason_code, comment, webauthn_assertion_id, attachment_id, tenant_id, python_step_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     workflowId,
     userId,
     action,
-    reasonCode   != null ? reasonCode   : null,
-    comment      != null ? comment      : null,
-    assertionId  != null ? assertionId  : null,
-    attachmentId != null ? attachmentId : null,
+    reasonCode    != null ? reasonCode    : null,
+    comment       != null ? comment       : null,
+    assertionId   != null ? assertionId   : null,
+    attachmentId  != null ? attachmentId  : null,
     tenantId,
+    pythonStepId  != null ? pythonStepId  : null,
   );
 
   writeAudit({
@@ -165,7 +170,13 @@ function recordAction({ workflowId, userId, action, reasonCode, comment, asserti
     action:   `workflow_${action}`,
     entity:   'workflow',
     entityId: workflowId,
-    details:  { action, reason_code: reasonCode, comment, webauthn_assertion_id: assertionId != null ? assertionId : null },
+    details:  {
+      action,
+      reason_code: reasonCode,
+      comment,
+      webauthn_assertion_id: assertionId != null ? assertionId : null,
+      python_step_id: pythonStepId != null ? pythonStepId : null,
+    },
     tenantId,
   });
 }
@@ -425,11 +436,14 @@ router.get('/workflows/:id', (req, res) => {
 
 // ---------------------------------------------------------------------------
 // Shared single-action handler factory
+// SOX-1: verify assertion_id cryptographically before storing.
+// SOX-2: call Python /advance first (two-phase commit); only write wf_actions
+//         on Python success, linking the rows via python_step_id.
 // ---------------------------------------------------------------------------
 function makeSingleActionHandlers(action) {
   const guard = requirePermJson('workflow');
 
-  const handler = (req, res) => {
+  const handler = async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid_id' });
 
@@ -458,12 +472,21 @@ function makeSingleActionHandlers(action) {
         amount:    wf.amount    != null ? wf.amount    : null,
       });
     }
-    // TODO(SOX): validate webauthn_assertion_id by proxying to
-    // POST /py/api/v1/stepup/verify (or equivalent) before storing.
-    // Current v1 stores the opaque id without server-side cryptographic check —
-    // the threshold check above still forces the client to complete the step-up
-    // flow and leaves an audit trail, but a determined attacker could forge
-    // the id field. Wave C must close this loop before go-live.
+
+    // SOX-1: cryptographic validation of the assertion_id via Python.
+    // Must happen before any write.  Failure → 401 step_up_invalid.
+    if (needsStepUp && assertionId) {
+      try {
+        await verifyStepUpAssertion(
+          assertionId,
+          req.session.user.username || String(req.session.user.id),
+          tenantId,
+          `workflow.${action}`,
+        );
+      } catch (verifyErr) {
+        return res.status(401).json({ error: 'step_up_invalid', detail: verifyErr.detail || null });
+      }
+    }
 
     const validation = validateActionBody(action, body, cfg);
     if (!validation.ok) return res.status(validation.status).json(validation.body);
@@ -481,23 +504,49 @@ function makeSingleActionHandlers(action) {
       }
     }
 
+    // SOX-2: two-phase commit — Python writes workflow_steps first.
+    // Node writes wf_actions only on Python success.
+    let pythonStepId = null;
+    if (wf.doc_id) {
+      try {
+        const pyResult = await pyCall(`/api/v1/workflow/${wf.doc_id}/advance`, {
+          method: 'POST',
+          body: {
+            stage:        STAGE_MAP[action] || action,
+            action,
+            actor:        req.session.user.username || String(req.session.user.id),
+            comment:      comment      != null ? comment      : null,
+            reason_code:  reason_code  != null ? reason_code  : null,
+            assertion_id: assertionId,
+          },
+          timeout: 10_000,
+        });
+        pythonStepId = pyResult && pyResult.step_id != null ? pyResult.step_id : null;
+      } catch (pyErr) {
+        console.error('[workflows] Python /advance failed — aborting Node write:', pyErr.message);
+        return res.status(502).json({ error: 'workflow_advance_failed', detail: pyErr.message });
+      }
+    }
+
+    // Python succeeded — commit Node side atomically.
     const stage = db.transaction(() => {
       const s = advanceWorkflow(id, action, wf.doc_id, wf);
       recordAction({
         workflowId:  id,
         userId:      req.session.user.id,
         action,
-        reasonCode:  reason_code != null ? reason_code : null,
-        comment:     comment     != null ? comment     : null,
+        reasonCode:  reason_code  != null ? reason_code  : null,
+        comment:     comment      != null ? comment      : null,
         assertionId,
         attachmentId: attachment_id != null ? attachment_id : null,
         tenantId,
+        pythonStepId,
       });
       return s;
     })();
 
     const updated = fetchWorkflowRow(id);
-    return res.json({ ok: true, stage, workflow: updated });
+    return res.json({ ok: true, stage, workflow: updated, python_step_id: pythonStepId });
   };
 
   return [guard, handler];
@@ -510,7 +559,7 @@ router.post('/workflows/:id/escalate', ...makeSingleActionHandlers('escalate'));
 // ---------------------------------------------------------------------------
 // Legacy /action(s) paths — backward-compat with v1 SPA calls
 // ---------------------------------------------------------------------------
-function legacyActionMiddleware(req, res) {
+async function legacyActionMiddleware(req, res) {
   const body   = req.body != null ? req.body : {};
   const action = body.action;
   if (!action || !STAGE_MAP[action]) {
@@ -529,8 +578,11 @@ router.post('/workflows/:id/action',  requirePermJson('workflow'), legacyActionM
 // NOTE: must be registered BEFORE /:id routes to avoid id='bulk' conflict.
 // This works because Express matches in registration order and 'bulk' is a
 // literal segment, but we register it explicitly here as a safety measure.
+//
+// SOX-1: assertion verified once for the batch (single assertion covers all rows).
+// SOX-2: Python /advance called per-row; Node TX commits only on full Python success.
 // ---------------------------------------------------------------------------
-router.post('/workflows/bulk', requirePermJson('workflow'), (req, res) => {
+router.post('/workflows/bulk', requirePermJson('workflow'), async (req, res) => {
   const body = req.body != null ? req.body : {};
   const { ids, action, reason_code, comment, target } = body;
   const assertionId  = body.webauthn_assertion_id != null ? String(body.webauthn_assertion_id) : null;
@@ -572,38 +624,85 @@ router.post('/workflows/bulk', requirePermJson('workflow'), (req, res) => {
     }
   }
 
-  // All-or-nothing transaction.
+  // Pre-flight: check step-up requirement across all rows before any write.
+  // If any row needs step-up and assertion is missing, reject the whole batch.
+  for (const rawId of ids) {
+    const id = parseInt(String(rawId), 10);
+    if (!Number.isFinite(id)) continue;
+    const wf = fetchWorkflowRow(id);
+    if (!wf) continue;
+    const { needsStepUp } = resolveStepUp(tenantId, wf);
+    if (needsStepUp && !assertionId) {
+      return res.status(403).json({
+        error:     'step_up_required',
+        message:   'WebAuthn step-up required for one or more workflows in this batch',
+        risk_band: wf.risk_band != null ? wf.risk_band : null,
+        amount:    wf.amount    != null ? wf.amount    : null,
+      });
+    }
+  }
+
+  // SOX-1: verify assertion once for the whole batch.
+  if (assertionId) {
+    try {
+      await verifyStepUpAssertion(
+        assertionId,
+        req.session.user.username || String(req.session.user.id),
+        tenantId,
+        `workflow.bulk.${action}`,
+      );
+    } catch (verifyErr) {
+      return res.status(401).json({ error: 'step_up_invalid', detail: verifyErr.detail || null });
+    }
+  }
+
+  // SOX-2: call Python /advance for each row before committing Node rows.
+  // Collect results; if any Python call fails, abort all Node writes.
+  const pyResults = [];
+  for (const rawId of ids) {
+    const id = parseInt(String(rawId), 10);
+    if (!Number.isFinite(id)) {
+      pyResults.push({ id: rawId, ok: false, error: 'invalid_id', pythonStepId: null });
+      continue;
+    }
+    const wf = fetchWorkflowRow(id);
+    if (!wf) {
+      pyResults.push({ id, ok: false, error: 'not_found', pythonStepId: null });
+      continue;
+    }
+    if (wf.doc_id) {
+      try {
+        const pyResult = await pyCall(`/api/v1/workflow/${wf.doc_id}/advance`, {
+          method: 'POST',
+          body: {
+            stage:        STAGE_MAP[action] || action,
+            action,
+            actor:        req.session.user.username || String(req.session.user.id),
+            comment:      comment     != null ? comment     : null,
+            reason_code:  reason_code != null ? reason_code : null,
+            assertion_id: assertionId,
+          },
+          timeout: 10_000,
+        });
+        pyResults.push({ id, wf, ok: true, pythonStepId: pyResult && pyResult.step_id != null ? pyResult.step_id : null });
+      } catch (pyErr) {
+        console.error(`[workflows/bulk] Python /advance failed for doc_id=${wf.doc_id}:`, pyErr.message);
+        return res.status(502).json({ error: 'workflow_advance_failed', workflow_id: id, detail: pyErr.message });
+      }
+    } else {
+      pyResults.push({ id, wf, ok: true, pythonStepId: null });
+    }
+  }
+
+  // All Python writes succeeded — commit Node side as one transaction.
   const runBulk = db.transaction(() => {
     const results = [];
-    for (const rawId of ids) {
-      const id = parseInt(String(rawId), 10);
-      if (!Number.isFinite(id)) {
-        results.push({ id: rawId, ok: false, error: 'invalid_id' });
+    for (const entry of pyResults) {
+      if (!entry.ok) {
+        results.push({ id: entry.id, ok: false, error: entry.error });
         continue;
       }
-
-      const wf = fetchWorkflowRow(id);
-      if (!wf) {
-        results.push({ id, ok: false, error: 'not_found' });
-        continue;
-      }
-
-      // Per-row step-up check — aborts entire TX if any row requires it.
-      const { needsStepUp } = resolveStepUp(tenantId, wf);
-      if (needsStepUp && !assertionId) {
-        const err = new Error('step_up_required');
-        // Attach structured detail for the catch block.
-        err.stepUpDetail = {
-          error:     'step_up_required',
-          message:   'WebAuthn step-up required for one or more workflows in this batch',
-          risk_band: wf.risk_band != null ? wf.risk_band : null,
-          amount:    wf.amount    != null ? wf.amount    : null,
-        };
-        throw err;
-      }
-      // TODO(SOX): same as single-row handler — assertion_id stored but not
-      // cryptographically validated. Wave C must close this before go-live.
-
+      const { id, wf, pythonStepId } = entry;
       const stage = advanceWorkflow(id, action, wf.doc_id, wf);
       recordAction({
         workflowId:  id,
@@ -614,8 +713,9 @@ router.post('/workflows/bulk', requirePermJson('workflow'), (req, res) => {
         assertionId,
         attachmentId,
         tenantId,
+        pythonStepId,
       });
-      results.push({ id, ok: true, stage });
+      results.push({ id, ok: true, stage, python_step_id: pythonStepId });
     }
     return results;
   });
@@ -624,10 +724,7 @@ router.post('/workflows/bulk', requirePermJson('workflow'), (req, res) => {
     const rows = runBulk();
     return res.json({ ok: true, results: rows });
   } catch (err) {
-    if (err.stepUpDetail) {
-      return res.status(403).json(err.stepUpDetail);
-    }
-    console.error('[workflows/bulk] transaction error:', err);
+    console.error('[workflows/bulk] Node transaction error:', err);
     return res.status(500).json({ error: 'internal_error' });
   }
 });

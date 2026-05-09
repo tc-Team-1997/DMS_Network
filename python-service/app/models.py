@@ -61,6 +61,10 @@ class WorkflowStep(Base):
     actor = Column(String(128))
     action = Column(String(32))
     comment = Column(Text)
+    # SOX-2 audit unification — filled in by the Wave C two-phase commit flow.
+    # node_wf_action_id is advisory (Node writes this back to wf_actions as python_step_id).
+    reason_code = Column(String(128))
+    assertion_id = Column(String(256))
     created_at = Column(DateTime, default=datetime.utcnow)
 
     document = relationship("Document", back_populates="workflow_steps")
@@ -317,6 +321,22 @@ class StepUpChallenge(Base):
     used = Column(Integer, default=0)
     expires_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class StepupUsedAssertion(Base):
+    """Replay-prevention table for verified WebAuthn assertion_ids.
+
+    Each assertion_id may be used at most once within its 5-minute TTL.
+    Once consumed the row is inserted here; subsequent verify calls for
+    the same assertion_id are rejected with verified=False, reason='replayed'.
+
+    Migration: 0043_stepup_validation
+    """
+    __tablename__ = "stepup_used_assertions"
+    assertion_id = Column(String(256), primary_key=True)
+    user_sub = Column(String(128), nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, default="nbe", index=True)
+    used_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class RetentionPolicy(Base):
@@ -990,3 +1010,58 @@ class TenantConfigHistory(Base):
     changed_at     = Column(String(32), nullable=False)   # ISO-8601 UTC; set client-side, no server default
     prev_hash      = Column(String(64), nullable=True)
     hash           = Column(String(64), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# DSAR Console models (migration 0040_dsar_requests — Wave C)
+# ---------------------------------------------------------------------------
+
+class DsarRequest(Base):
+    """One Data Subject Access Request, created by an admin on behalf of a data subject.
+
+    action  — article15_export | article17_cryptoshred | litigation_hold | fulfillment_letter
+    status  — NEW | IN_PROGRESS | COMPLETED | OVERDUE
+    regulator — GDPR | PDPL | RMA  (drives the SLA calendar from tenant_config)
+    signed_receipt — JSON blob stored after fulfillment confirming what was done.
+    """
+    __tablename__ = "dsar_requests"
+
+    id                       = Column(String(36), primary_key=True)   # UUID
+    tenant_id                = Column(String(64), nullable=False, index=True)
+    customer_cid             = Column(String(64), nullable=False, index=True)
+    action                   = Column(String(64), nullable=False)
+    status                   = Column(String(32), nullable=False, default="NEW", index=True)
+    requested_by             = Column(String(128), nullable=False)
+    requested_at             = Column(DateTime, nullable=False, default=datetime.utcnow)
+    sla_due_at               = Column(DateTime, nullable=False)
+    completed_at             = Column(DateTime, nullable=True)
+    regulator                = Column(String(32), nullable=True)
+    params_json              = Column(Text, nullable=True)
+    fulfillment_artifact_path = Column(String(512), nullable=True)
+    signed_receipt           = Column(Text, nullable=True)
+
+    artifacts = relationship(
+        "DsarArtifact",
+        back_populates="request",
+        cascade="all, delete-orphan",
+    )
+
+
+class DsarArtifact(Base):
+    """One artifact record snapshotted into a DSAR request.
+
+    kind — document | ai_trace | audit_event | workflow | cbs_record
+    ref_type / ref_id — pointer to the source row (e.g. 'document', '42')
+    snapshot_json — denormalised copy of the row at fulfillment time.
+    """
+    __tablename__ = "dsar_artifacts"
+
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    request_id    = Column(String(36), ForeignKey("dsar_requests.id", ondelete="CASCADE"),
+                           nullable=False, index=True)
+    kind          = Column(String(32), nullable=False, index=True)
+    ref_type      = Column(String(64), nullable=True)
+    ref_id        = Column(String(128), nullable=True)
+    snapshot_json = Column(Text, nullable=True)
+
+    request = relationship("DsarRequest", back_populates="artifacts")

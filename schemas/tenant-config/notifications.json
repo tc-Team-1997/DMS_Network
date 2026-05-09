@@ -34,6 +34,182 @@
       "type": "string",
       "enum": ["starttls", "ssl", "none"],
       "description": "TLS mode: starttls (default), ssl (implicit), or none"
+    },
+    "channels.email.enabled": {
+      "type": "boolean",
+      "description": "Enable email channel globally for this tenant"
+    },
+    "channels.sms.enabled": {
+      "type": "boolean",
+      "description": "Enable SMS channel globally for this tenant"
+    },
+    "channels.whatsapp.enabled": {
+      "type": "boolean",
+      "description": "Enable WhatsApp channel globally for this tenant"
+    },
+    "channels.in_app.enabled": {
+      "type": "boolean",
+      "description": "Enable in-app feed channel globally for this tenant"
+    },
+    "channels.push.enabled": {
+      "type": "boolean",
+      "description": "Enable push notification channel globally for this tenant (stub)"
+    },
+    "email.provider": {
+      "type": "string",
+      "enum": ["local", "aws"],
+      "description": "Email provider: local (SMTP) or aws (SES)"
+    },
+    "sms.provider": {
+      "type": "string",
+      "enum": ["noop", "aws", "twilio"],
+      "description": "SMS provider: noop (log-only), aws (SNS), or twilio"
+    },
+    "email.throttle.per_user_per_minute": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "description": "Max email notifications per user per minute"
+    },
+    "email.throttle.per_tenant_per_minute": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000,
+      "description": "Max email notifications per tenant per minute"
+    },
+    "email.throttle.burst": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500,
+      "description": "Token-bucket burst allowance for email"
+    },
+    "sms.throttle.per_user_per_minute": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "description": "Max SMS notifications per user per minute"
+    },
+    "sms.throttle.per_tenant_per_minute": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "description": "Max SMS notifications per tenant per minute"
+    },
+    "sms.throttle.burst": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "description": "Token-bucket burst allowance for SMS"
+    },
+    "templates.expiry_alert.subject": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Subject for expiry_alert (supports {{var}} placeholders)"
+    },
+    "templates.expiry_alert.body": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "Body for expiry_alert (supports {{var}} placeholders)"
+    },
+    "templates.expiry_alert.channels": {
+      "type": "string",
+      "description": "JSON array of channels for expiry_alert e.g. [\"email\",\"in_app\"]"
+    },
+    "templates.expiry_alert.locales": {
+      "type": "string",
+      "description": "JSON array of supported locales for expiry_alert e.g. [\"en\",\"dz\"]"
+    },
+    "templates.workflow_assigned.subject": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Subject for workflow_assigned"
+    },
+    "templates.workflow_assigned.body": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "Body for workflow_assigned"
+    },
+    "templates.workflow_assigned.channels": {
+      "type": "string",
+      "description": "JSON array of channels for workflow_assigned"
+    },
+    "templates.workflow_assigned.locales": {
+      "type": "string",
+      "description": "JSON array of supported locales for workflow_assigned"
+    },
+    "templates.aml_hit.subject": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Subject for aml_hit"
+    },
+    "templates.aml_hit.body": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "Body for aml_hit"
+    },
+    "templates.aml_hit.channels": {
+      "type": "string",
+      "description": "JSON array of channels for aml_hit"
+    },
+    "templates.aml_hit.locales": {
+      "type": "string",
+      "description": "JSON array of supported locales for aml_hit"
+    },
+    "templates.user_invite.subject": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Subject for user_invite"
+    },
+    "templates.user_invite.body": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "Body for user_invite"
+    },
+    "templates.user_invite.channels": {
+      "type": "string",
+      "description": "JSON array of channels for user_invite"
+    },
+    "templates.user_invite.locales": {
+      "type": "string",
+      "description": "JSON array of supported locales for user_invite"
+    },
+    "templates.dsar_completed.subject": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "Subject for dsar_completed"
+    },
+    "templates.dsar_completed.body": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "Body for dsar_completed"
+    },
+    "templates.dsar_completed.channels": {
+      "type": "string",
+      "description": "JSON array of channels for dsar_completed"
+    },
+    "templates.dsar_completed.locales": {
+      "type": "string",
+      "description": "JSON array of supported locales for dsar_completed"
+    },
+    "routing.expiry_alert": {
+      "type": "string",
+      "description": "JSON array of role names that receive expiry_alert"
+    },
+    "routing.workflow_assigned": {
+      "type": "string",
+      "description": "JSON array of role names that receive workflow_assigned"
+    },
+    "routing.aml_hit": {
+      "type": "string",
+      "description": "JSON array of role names that receive aml_hit"
+    },
+    "routing.user_invite": {
+      "type": "string",
+      "description": "JSON array of role names for user_invite (empty = direct address only)"
+    },
+    "routing.dsar_completed": {
+      "type": "string",
+      "description": "JSON array of role names for dsar_completed (empty = direct address only)"
     }
   }
 }

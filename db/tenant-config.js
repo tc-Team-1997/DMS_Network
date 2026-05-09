@@ -25,10 +25,10 @@
 
 'use strict';
 
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('./index');
+const { canonicalJson: _canonicalJson, computeHash: _computeHash } = require('./hash-chain');
 
 // ---------------------------------------------------------------------------
 // Schema registry
@@ -205,34 +205,9 @@ function _validate(namespace, key, value) {
 }
 
 // ---------------------------------------------------------------------------
-// Hash chain
+// Hash chain — delegated to db/hash-chain.js (shared with audit_log)
 // ---------------------------------------------------------------------------
-
-/**
- * Canonical JSON: keys sorted lexicographically, no whitespace.
- * Matches Python's json.dumps(obj, sort_keys=True, separators=(',',':')).
- */
-function _canonicalJson(obj) {
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-    return JSON.stringify(obj);
-  }
-  const sorted = Object.keys(obj).sort().reduce((acc, k) => {
-    acc[k] = obj[k];
-    return acc;
-  }, {});
-  // Use a replacer that recurses — simple objects only at this level.
-  return JSON.stringify(sorted, (_, v) => {
-    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-      return Object.keys(v).sort().reduce((acc, k) => { acc[k] = v[k]; return acc; }, {});
-    }
-    return v;
-  });
-}
-
-function _computeHash(prevHash, rowDict) {
-  const payload = (prevHash || '') + _canonicalJson(rowDict);
-  return crypto.createHash('sha256').update(payload, 'utf8').digest('hex');
-}
+// _canonicalJson and _computeHash are imported from db/hash-chain.js above.
 
 function _prevHash(tenantId, namespace, key) {
   const row = db.prepare(`

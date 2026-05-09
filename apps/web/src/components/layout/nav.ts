@@ -18,6 +18,7 @@ import {
   BookOpen,
   CopyX,
   Archive,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -46,6 +47,7 @@ export const navItems: NavItem[] = [
   { label: 'Alerts',         path: '/alerts',      icon: Bell,            section: 'Governance', perm: 'view' },
   { label: 'Reports & BI',   path: '/reports',     icon: BarChart3,       section: 'Governance', perm: 'view' },
   { label: 'Compliance',     path: '/compliance',  icon: ScrollText,      section: 'Governance', perm: 'view' },
+  { label: 'Audit Log',      path: '/admin/audit', icon: ClipboardList,   section: 'Governance', perm: 'admin' },
 
   { label: 'Integration',    path: '/integration', icon: Plug,            section: 'Platform',   perm: 'view' },
   { label: 'Security & RBAC',path: '/security',    icon: ShieldCheck,     section: 'Platform',   perm: 'admin' },

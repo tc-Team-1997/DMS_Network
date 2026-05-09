@@ -13,6 +13,11 @@
  *   4. Writes an audit_log row for every mutation (try/catch so audit failure
  *      cannot roll back the proxied write that already succeeded on Python).
  *
+ * Wave C SOX-1 closure:
+ *   The suppress endpoint accepts an optional webauthn_assertion_id for
+ *   high-risk false-positive suppressions.  When present it is cryptographically
+ *   validated via POST /py/api/v1/stepup/verify before being forwarded.
+ *
  * Python base path:  /api/v1/aml/*
  * Mounted at:        /spa/api/aml/*  (via routes/spa-api.js)
  *
@@ -21,6 +26,7 @@
 const express = require('express');
 const db = require('../../db');
 const { pyCall, requirePermJson, tenantScope } = require('./_shared');
+const { verifyStepUpAssertion } = require('../../services/stepup-verify');
 
 const router = express.Router();
 
@@ -491,9 +497,26 @@ router.post('/aml/hits/:id/suppress', requirePermJson('aml:review'), async (req,
     return res.status(400).json({ error: 'validation_failed', details: check.details });
   }
 
+  // SOX-1: if a webauthn_assertion_id is supplied (required by tenant policy
+  // for suppressions), validate it cryptographically before forwarding.
+  const assertionId = body.webauthn_assertion_id != null ? String(body.webauthn_assertion_id) : null;
+  if (assertionId) {
+    try {
+      await verifyStepUpAssertion(
+        assertionId,
+        req.session.user.username || String(req.session.user.id),
+        tenant,
+        'aml.suppress',
+      );
+    } catch (verifyErr) {
+      return res.status(401).json({ error: 'step_up_invalid', detail: verifyErr.detail || null });
+    }
+  }
+
   const pyBody = {
-    reason:       body.reason.trim(),
-    suppress_days: body.suppress_days ?? null,
+    reason:            body.reason.trim(),
+    suppress_days:     body.suppress_days ?? null,
+    webauthn_assertion_id: assertionId,   // forwarded for Python audit trail
   };
 
   try {
@@ -504,7 +527,12 @@ router.post('/aml/hits/:id/suppress', requirePermJson('aml:review'), async (req,
     });
 
     auditLog(userId, 'AML_HIT_SUPPRESSED', 'aml_hits', id,
-      { hit_id: id, suppression_reason: body.reason.slice(0, 200), suppress_days: body.suppress_days ?? null },
+      {
+        hit_id: id,
+        suppression_reason: body.reason.slice(0, 200),
+        suppress_days: body.suppress_days ?? null,
+        webauthn_assertion_id: assertionId,
+      },
       tenant);
 
     res.json(data);

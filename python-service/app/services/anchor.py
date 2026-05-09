@@ -119,3 +119,20 @@ def verify_anchor(file_path: str) -> dict:
             if rec.get("digest") == digest:
                 return {"found": True, "digest": digest, "block": rec}
     return {"found": False, "digest": digest}
+
+
+def anchor_chain_head(head_hash: Optional[str] = None, signer: str = "system") -> dict:
+    """Anchor the audit-log chain head into the local tamper-evident chain.
+
+    If head_hash is not supplied (e.g. first-ever anchor), records a zero digest
+    so the chain entry is still created and a block_hash is returned.
+
+    Returns the chain record: { prev, digest, ts, meta, block_hash }.
+    """
+    digest = head_hash or ("0" * 64)
+    meta = {
+        "type": "audit_chain_head",
+        "signer": signer,
+    }
+    record = _append_local(digest, meta)
+    return record

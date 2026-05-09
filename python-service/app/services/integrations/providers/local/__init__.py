@@ -6,6 +6,7 @@ from .ollama_translate import OllamaTranslate
 from .local_face_match import LocalFaceMatch
 from .local_smtp import LocalSmtp
 from .noop_sms import NoopSms
+from .twilio_sms import TwilioSms
 from .local_fs_storage import LocalFsStorage
 from .local_kms import LocalKms
 from .ofac_json_watchlist import OfacJsonWatchlist
@@ -21,6 +22,7 @@ __all__ = [
     "LocalFaceMatch",
     "LocalSmtp",
     "NoopSms",
+    "TwilioSms",
     "LocalFsStorage",
     "LocalKms",
     "OfacJsonWatchlist",

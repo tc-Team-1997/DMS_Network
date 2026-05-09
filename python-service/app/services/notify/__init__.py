@@ -16,6 +16,10 @@ Public API
     # returns {"email": {"ok": True, "id": "..."}, "sms": {"ok": False, "error": "..."}}
 
 Channel keys: "email" | "sms" | "whatsapp"
+
+Wave C: SMS is now routed through the CC6 provider registry (TwilioSms / NoopSms /
+SnsSms). The old notify/sms.py and notify/whatsapp.py shims have been deleted.
+WhatsApp remains a stub that logs the call until a WA Business API adapter ships.
 """
 from __future__ import annotations
 
@@ -25,16 +29,28 @@ from typing import Optional
 
 from .base import Provider, ProviderResult
 from .email import EmailProvider
-from .sms import SmsProvider
-from .whatsapp import WhatsAppProvider
 
 log = logging.getLogger(__name__)
 
-# Singleton provider instances (constructed once at import; reads env vars)
+
+class _WhatsAppStub(Provider):
+    """Placeholder until a WhatsApp Business API adapter ships."""
+
+    configured: bool = False
+
+    async def send(self, to: str, subject: str, body: str, **extra) -> ProviderResult:
+        log.warning("notify/whatsapp: stub provider — send to %s not delivered", to)
+        return {"ok": False, "error": "whatsapp provider not configured"}
+
+
+# Singleton provider instances (constructed once at import; reads env vars).
+# SMS is no longer here — it is resolved per-call via the CC6 provider registry
+# (get_provider(db, tenant_id, 'sms')) so the correct provider (noop/twilio/aws)
+# is selected based on tenant_config.  The email and whatsapp entries remain for
+# the legacy /api/v1/notify/* router surface.
 _providers: dict[str, Provider] = {
     "email": EmailProvider(),
-    "sms": SmsProvider(),
-    "whatsapp": WhatsAppProvider(),
+    "whatsapp": _WhatsAppStub(),
 }
 
 _DEFAULT_CHANNELS = ["email"]
@@ -75,7 +91,7 @@ def _get_address(user_id: str, channel: str, db, to_override: Optional[dict]) ->
     Lookup order:
     1. ``to_override[channel]`` if provided.
     2. ``user_notification_preferences`` DB row (email / phone columns).
-    3. Fall through — caller must provide to_override for channels other than email.
+    3. Fall through — caller must provide to_override for non-email channels.
     """
     if to_override and channel in to_override:
         return to_override[channel]
@@ -111,12 +127,35 @@ async def send(
 ) -> dict[str, ProviderResult]:
     """Fire notifications across resolved channels.
 
+    For the 'sms' channel, resolves the CC6 provider from the registry when a
+    db session is available. Falls back to a no-op result when db is None.
+
     Never raises — per-channel failures are captured in the returned dict.
     """
     resolved_channels = _get_channels(user_id, channels, db)
     results: dict[str, ProviderResult] = {}
 
     for channel in resolved_channels:
+        # SMS: delegate to CC6 provider registry.
+        if channel == "sms":
+            to_addr = _get_address(user_id, channel, db, to_override)
+            if not to_addr:
+                log.warning("notify: no phone for user=%s event=%s — skipping sms", user_id, event_type)
+                results[channel] = {"ok": False, "error": "no destination address"}
+                continue
+            if db is None:
+                results[channel] = {"ok": False, "error": "db required for CC6 sms provider lookup"}
+                continue
+            try:
+                from ..integrations.provider_registry import get_provider as _get_provider
+                sms_provider = _get_provider(db, "default", "sms")
+                sms_result = sms_provider.send(to=to_addr, body=f"[{subject}] {body}")
+                results[channel] = {"ok": sms_result.ok, "error": sms_result.detail or ""}
+            except Exception as exc:
+                log.error("notify: sms CC6 provider error for %s: %s", user_id, exc)
+                results[channel] = {"ok": False, "error": str(exc)}
+            continue
+
         provider = _providers.get(channel)
         if provider is None:
             log.warning("notify: unknown channel %r — skipping", channel)

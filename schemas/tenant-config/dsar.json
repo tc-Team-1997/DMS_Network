@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "dsar",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "sla_days_per_regulator": {
+      "type": "object",
+      "description": "SLA calendar in days per regulator. Keys: GDPR, PDPL, RMA. Value is calendar days from request date to fulfillment deadline.",
+      "properties": {
+        "GDPR": { "type": "integer", "minimum": 1, "maximum": 90 },
+        "PDPL": { "type": "integer", "minimum": 1, "maximum": 90 },
+        "RMA":  { "type": "integer", "minimum": 1, "maximum": 90 }
+      },
+      "additionalProperties": false
+    },
+    "fulfillment_letter_template_path": {
+      "type": "string",
+      "description": "Path to a Jinja2 Markdown template for the fulfillment letter. Leave empty to use the built-in default. Wave D: PDF rendering path.",
+      "maxLength": 512
+    },
+    "cryptoshred_policy": {
+      "type": "string",
+      "enum": ["immediate", "deferred-7d", "require-second-approval"],
+      "description": "Governs how Art-17 cryptoshred requests are executed. 'immediate': DEK is destroyed as soon as an admin triggers the action. 'deferred-7d': destruction is queued 7 days out, allowing reversal. 'require-second-approval': a second Doc Admin must approve before the DEK is destroyed."
+    },
+    "identity_verification_required": {
+      "type": "boolean",
+      "description": "When true, the admin must confirm subject identity (upload of government-issued ID) before any fulfillment action can be triggered."
+    },
+    "webauthn_step_up_for_fulfillment": {
+      "type": "boolean",
+      "description": "When true, the admin must complete a WebAuthn step-up challenge immediately before triggering any fulfillment action (Art-17 cryptoshred, Art-15 export). Adds a second authentication factor at the point of action."
+    }
+  }
+}

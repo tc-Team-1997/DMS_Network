@@ -29,6 +29,9 @@ import {
   ShieldCheck,
   Search,
   UserCog,
+  ShieldAlert,
+  Sparkles,
+  FileSpreadsheet,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -70,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Search',             path: '/admin/settings/search',             icon: Search     },
       { label: 'AML',       path: '/admin/settings/aml',       icon: Shield    },
       { label: 'Retention', path: '/admin/settings/retention', icon: Archive   },
+      { label: 'DocBrain',  path: '/admin/settings/docbrain',  icon: Sparkles  },
     ],
   },
   {
@@ -87,6 +91,13 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Integrations',  path: '/admin/settings/integrations',  icon: Plug       },
       { label: 'Notifications', path: '/admin/settings/notifications', icon: Bell       },
       { label: 'Mobile',        path: '/admin/settings/mobile',        icon: Smartphone },
+    ],
+  },
+  {
+    group: 'Compliance & Privacy',
+    items: [
+      { label: 'DSAR',             path: '/admin/settings/dsar',             icon: ShieldAlert     },
+      { label: 'Regulator Reports', path: '/admin/settings/regulator-reports', icon: FileSpreadsheet },
     ],
   },
 ];

@@ -274,6 +274,230 @@ router.post('/docbrain/chat', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// DocBrain Chat v2 — conversation persistence, FTS, pin, folder, edit,
+// regenerate. All proxy routes forward X-User-Id + X-Tenant-Id so the Python
+// layer can enforce ownership without its own auth stack.
+// ---------------------------------------------------------------------------
+
+/** Shared headers injected into every v2 call so Python can resolve ownership. */
+function v2Headers(req) {
+  const user = req.session && req.session.user;
+  return {
+    'X-API-Key':    PY_KEY,
+    'Content-Type': 'application/json',
+    ...(user ? {
+      'X-User-Id':   String(user.id),
+      'X-Tenant-Id': String(user.tenant_id || 'nbe'),
+    } : {
+      'X-User-Id':   '1',
+      'X-Tenant-Id': 'nbe',
+    }),
+  };
+}
+
+/** Simple async JSON proxy helper for v2 non-streaming routes.
+ * Uses a direct http.request so we can inject X-User-Id / X-Tenant-Id headers
+ * that pyCall (which only sends X-API-Key) doesn't support.
+ */
+function proxyV2(method, pyPath, body, req, res) {
+  return new Promise((resolve) => {
+    const pyUrl = new URL(pyPath, PY_BASE);
+    const lib = pyUrl.protocol === 'https:' ? https : http;
+    const payload = body !== undefined ? JSON.stringify(body) : null;
+    const headers = {
+      ...v2Headers(req),
+      'Accept': 'application/json',
+    };
+    if (payload !== null) headers['Content-Length'] = Buffer.byteLength(payload);
+    const pyReq = lib.request(pyUrl, { method, headers });
+    const chunks = [];
+    pyReq.on('response', (pyRes) => {
+      pyRes.on('data', (c) => chunks.push(c));
+      pyRes.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf-8');
+        let parsed = null;
+        try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = raw; }
+        if (pyRes.statusCode >= 200 && pyRes.statusCode < 300) {
+          res.json(parsed);
+        } else {
+          res.status(pyRes.statusCode || 502).json({ error: 'docbrain_v2_proxy_failed', detail: parsed });
+        }
+        resolve();
+      });
+    });
+    pyReq.on('error', (err) => {
+      res.status(502).json({ error: 'docbrain_v2_proxy_failed', detail: err.message });
+      resolve();
+    });
+    pyReq.setTimeout(600_000, () => { pyReq.destroy(new Error('timeout')); });
+    if (payload !== null) pyReq.write(payload);
+    pyReq.end();
+  });
+}
+
+// GET /spa/api/docbrain/v2/conversations[?q=&limit=]
+router.get('/docbrain/v2/conversations', async (req, res) => {
+  const { q, limit } = req.query;
+  const qs = [
+    q ? `q=${encodeURIComponent(q)}` : null,
+    limit ? `limit=${encodeURIComponent(limit)}` : null,
+  ].filter(Boolean).join('&');
+  const path = `/api/v1/docbrain/conversations${qs ? `?${qs}` : ''}`;
+  await proxyV2('GET', path, undefined, req, res);
+});
+
+// POST /spa/api/docbrain/v2/conversations
+router.post('/docbrain/v2/conversations', async (req, res) => {
+  const { title, persona, folder, model_used } = req.body ?? {};
+  await proxyV2('POST', '/api/v1/docbrain/conversations', { title, persona, folder, model_used }, req, res);
+});
+
+// GET /spa/api/docbrain/v2/conversations/:id
+router.get('/docbrain/v2/conversations/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
+  await proxyV2('GET', `/api/v1/docbrain/conversations/${id}`, undefined, req, res);
+});
+
+// POST /spa/api/docbrain/v2/conversations/:id/messages  — SSE stream
+router.post('/docbrain/v2/conversations/:id/messages', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid conversation id' });
+  const { question, document_id } = req.body ?? {};
+  if (!question || typeof question !== 'string') {
+    return res.status(400).json({ error: 'question required' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const pyUrl = new URL(`/api/v1/docbrain/conversations/${id}/messages`, PY_BASE);
+  const lib = pyUrl.protocol === 'https:' ? https : http;
+  const bodyStr = JSON.stringify({
+    question: String(question).trim(),
+    ...(Number.isFinite(parseInt(document_id, 10)) ? { document_id: parseInt(document_id, 10) } : {}),
+  });
+  const pyReq = lib.request(pyUrl, {
+    method: 'POST',
+    headers: {
+      ...v2Headers(req),
+      'Accept': 'text/event-stream',
+      'Content-Length': Buffer.byteLength(bodyStr),
+    },
+  });
+  pyReq.on('response', (pyRes) => {
+    if (pyRes.statusCode >= 400) {
+      res.write(`data: ${JSON.stringify({ type: 'error', status: pyRes.statusCode })}\n\n`);
+      res.end();
+      return;
+    }
+    pyRes.setEncoding('utf-8');
+    pyRes.on('data', (chunk) => res.write(chunk));
+    pyRes.on('end', () => res.end());
+    pyRes.on('error', (err) => {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      res.end();
+    });
+  });
+  pyReq.on('error', (err) => {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+    res.end();
+  });
+  req.on('close', () => { try { pyReq.destroy(); } catch { /* ignore */ } });
+  pyReq.write(bodyStr);
+  pyReq.end();
+});
+
+// PATCH /spa/api/docbrain/v2/messages/:id?conversation_id=
+router.patch('/docbrain/v2/messages/:id', async (req, res) => {
+  const msgId = parseInt(req.params.id, 10);
+  const convId = parseInt(req.query.conversation_id, 10);
+  if (!Number.isFinite(msgId) || !Number.isFinite(convId)) {
+    return res.status(400).json({ error: 'message id and conversation_id required' });
+  }
+  const { content } = req.body ?? {};
+  if (!content || typeof content !== 'string') return res.status(400).json({ error: 'content required' });
+  await proxyV2(
+    'PATCH',
+    `/api/v1/docbrain/messages/${msgId}?conversation_id=${convId}`,
+    { content },
+    req,
+    res,
+  );
+});
+
+// POST /spa/api/docbrain/v2/messages/:id/regenerate?conversation_id=  — SSE stream
+router.post('/docbrain/v2/messages/:id/regenerate', (req, res) => {
+  const msgId = parseInt(req.params.id, 10);
+  const convId = parseInt(req.query.conversation_id, 10);
+  if (!Number.isFinite(msgId) || !Number.isFinite(convId)) {
+    return res.status(400).json({ error: 'message id and conversation_id required' });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const pyUrl = new URL(
+    `/api/v1/docbrain/messages/${msgId}/regenerate?conversation_id=${convId}`,
+    PY_BASE,
+  );
+  const lib = pyUrl.protocol === 'https:' ? https : http;
+  const bodyStr = '{}';
+  const pyReq = lib.request(pyUrl, {
+    method: 'POST',
+    headers: {
+      ...v2Headers(req),
+      'Accept': 'text/event-stream',
+      'Content-Length': Buffer.byteLength(bodyStr),
+    },
+  });
+  pyReq.on('response', (pyRes) => {
+    if (pyRes.statusCode >= 400) {
+      res.write(`data: ${JSON.stringify({ type: 'error', status: pyRes.statusCode })}\n\n`);
+      res.end();
+      return;
+    }
+    pyRes.setEncoding('utf-8');
+    pyRes.on('data', (chunk) => res.write(chunk));
+    pyRes.on('end', () => res.end());
+    pyRes.on('error', (err) => {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+      res.end();
+    });
+  });
+  pyReq.on('error', (err) => {
+    res.write(`data: ${JSON.stringify({ type: 'error', message: err.message })}\n\n`);
+    res.end();
+  });
+  req.on('close', () => { try { pyReq.destroy(); } catch { /* ignore */ } });
+  pyReq.write(bodyStr);
+  pyReq.end();
+});
+
+// POST /spa/api/docbrain/v2/conversations/:id/pin
+router.post('/docbrain/v2/conversations/:id/pin', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
+  const { pinned } = req.body ?? {};
+  if (typeof pinned !== 'boolean') return res.status(400).json({ error: 'pinned (bool) required' });
+  await proxyV2('POST', `/api/v1/docbrain/conversations/${id}/pin`, { pinned }, req, res);
+});
+
+// POST /spa/api/docbrain/v2/conversations/:id/folder
+router.post('/docbrain/v2/conversations/:id/folder', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
+  const { folder } = req.body ?? {};
+  await proxyV2('POST', `/api/v1/docbrain/conversations/${id}/folder`, { folder: folder ?? null }, req, res);
+});
+
+// ---------------------------------------------------------------------------
 // Document-type learning ("learn from samples") — 8 pass-through endpoints
 // ---------------------------------------------------------------------------
 

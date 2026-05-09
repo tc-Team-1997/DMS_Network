@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "regulator_reports",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "seeded_regulators": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of regulator codes for which seed templates are installed (read-only display)"
+    },
+    "signed_receipt_required": {
+      "type": "boolean",
+      "description": "Require a SHA-256 + RSA-PSS signed receipt to be generated for every report before it can be submitted"
+    },
+    "auto_submit_enabled": {
+      "type": "boolean",
+      "description": "Automatically POST generated reports to the configured regulator endpoint (requires webhook_token)"
+    },
+    "default_format": {
+      "type": "string",
+      "enum": ["pdf", "csv", "jsonld"],
+      "description": "Default output format shown in the Report Detail generate form"
+    },
+    "pre_flight_checks_enabled": {
+      "type": "boolean",
+      "description": "Run missing-data, stale-signature, and retention-violation checks before allowing report generation"
+    },
+    "retention_days_for_submissions": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 36500,
+      "description": "How long to retain submission receipt records (days). Default 2555 = 7 years"
+    },
+    "webhook_token": {
+      "type": "string",
+      "description": "Bearer token sent in the Authorization header when auto-submitting to regulator endpoints (leave blank to disable auto-submit)"
+    }
+  }
+}

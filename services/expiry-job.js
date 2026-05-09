@@ -14,7 +14,7 @@
  */
 const cron = require('node-cron');
 const db = require('../db');
-const { broadcast } = require('./notify');
+const { broadcastByRole } = require('./notify');
 
 /**
  * Parse a comma-separated string of positive integers.
@@ -50,7 +50,7 @@ function scanExpiries() {
       title,
       'Auto scan · compliance risk',
     );
-    broadcast('Doc Admin', 'email', 'Document Expiry Alert', title);
+    broadcastByRole('nbe', 'Doc Admin', 'expiry_alert', { count: expired.changes, doc_type: 'all', band: '0 days (past expiry)' }).catch((e) => console.error('[expiry-job] notify error:', e.message));
   }
 
   // ── 2. Per-doctype notify_days bands ───────────────────────────────────────

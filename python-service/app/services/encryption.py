@@ -13,6 +13,13 @@ KMS backends (auto-selected by env):
 
 Rotating a DEK: unwrap → wrap with a new KMS key version → re-encrypt files.
 Rotating the KEK: done inside the KMS; wrapped DEKs stay valid until you re-wrap.
+
+Cryptoshred (GDPR Art-17):
+  - cryptoshred() sets wrapped_dek to _SHREDDED_DEK and kms_key_id to _SHREDDED_KID.
+  - All subsequent unwrap_dek() / plaintext_dek() calls raise CryptoshreddedError.
+  - The ciphertext blobs on disk are permanently unreadable — no key exists.
+  - The audit trail (dsar_requests, audit_log) is preserved as required by
+    banking regulators (accountability obligations survive erasure).
 """
 from __future__ import annotations
 import base64
@@ -31,9 +38,39 @@ AZURE_KEYVAULT_URL = os.environ.get("AZURE_KEYVAULT_URL", "").strip()
 AZURE_KEY_NAME = os.environ.get("AZURE_KEY_NAME", "").strip()
 LOCAL_KEK_HEX = os.environ.get("LOCAL_KEK_HEX", "").strip()
 
+# Sentinel values written into customer_deks by cryptoshred().
+# Checked at the top of every unwrap path so callers get a typed, readable error.
+_SHREDDED_DEK = "CRYPTOSHREDDED"
+_SHREDDED_KID = "SHREDDED"
+
+
+class CryptoshreddedError(Exception):
+    """Raised when code attempts to unwrap a DEK that has been cryptoshredded.
+
+    This is an explicit, typed signal so that callers (and engineers reading
+    stack traces) immediately see the root cause instead of a generic
+    decoding error.  The customer's data is permanently unreadable by design
+    — this is the correct GDPR Art-17 cryptoshred outcome.  The audit trail
+    in dsar_requests / audit_log is preserved as required.
+    """
+    def __init__(self, customer_cid: str) -> None:
+        self.customer_cid = customer_cid
+        super().__init__(
+            f"DEK for customer '{customer_cid}' has been cryptoshredded. "
+            "Documents are permanently unreadable (GDPR Art-17 compliant). "
+            "Audit trail is preserved in dsar_requests."
+        )
+
 
 def _b64(b: bytes) -> str: return base64.b64encode(b).decode()
 def _unb64(s: str) -> bytes: return base64.b64decode(s.encode())
+
+
+def _check_shredded(wrapped_dek: Optional[str], kms_key_id: Optional[str],
+                    customer_cid: str) -> None:
+    """Raise CryptoshreddedError if either sentinel is present."""
+    if wrapped_dek == _SHREDDED_DEK or kms_key_id == _SHREDDED_KID:
+        raise CryptoshreddedError(customer_cid)
 
 
 # ---------- KEK operations (wrap / unwrap) ----------
@@ -68,7 +105,9 @@ def wrap_dek(dek: bytes) -> tuple[str, str]:
     return _b64(dek), "NO-KMS-DEV-ONLY"
 
 
-def unwrap_dek(wrapped_b64: str, kms_key_id: str) -> bytes:
+def unwrap_dek(wrapped_b64: str, kms_key_id: str, customer_cid: str = "unknown") -> bytes:
+    """Unwrap a DEK.  Raises CryptoshreddedError if sentinel values are present."""
+    _check_shredded(wrapped_b64, kms_key_id, customer_cid)
     backend = _kms_backend()
     if backend == "aws":
         import boto3
@@ -119,7 +158,8 @@ def get_or_create_dek(db: Session, customer_cid: str) -> CustomerDek:
 
 def plaintext_dek(db: Session, customer_cid: str) -> bytes:
     row = get_or_create_dek(db, customer_cid)
-    return unwrap_dek(row.wrapped_dek, row.kms_key_id)
+    # Pass customer_cid so CryptoshreddedError includes it in the message.
+    return unwrap_dek(row.wrapped_dek, row.kms_key_id, customer_cid=customer_cid)
 
 
 def rotate_dek(db: Session, customer_cid: str) -> dict:
@@ -136,6 +176,35 @@ def rotate_dek(db: Session, customer_cid: str) -> dict:
         db.add(row)
     db.commit()
     return {"customer_cid": customer_cid, "kms_key_id": kid, "rotated_at": datetime.utcnow().isoformat()}
+
+
+def cryptoshred(db: Session, customer_cid: str) -> dict:
+    """GDPR Art-17 cryptoshred: destroy the DEK so encrypted documents are permanently unreadable.
+
+    Semantics:
+      - Sets wrapped_dek = _SHREDDED_DEK, kms_key_id = _SHREDDED_KID.
+      - All subsequent plaintext_dek() / unwrap_dek() calls will raise CryptoshreddedError.
+      - Encrypted blobs on disk become permanently unreadable ciphertext.
+      - This function does NOT delete blobs or audit rows (accountability survives erasure).
+      - Callers must write an AuditLog / dsar_requests row BEFORE calling this function.
+
+    Returns a receipt dict that the caller should persist in dsar_requests.signed_receipt.
+    """
+    row = db.query(CustomerDek).filter(CustomerDek.customer_cid == customer_cid).first()
+    shredded_at = datetime.utcnow().isoformat() + "Z"
+    if row:
+        row.wrapped_dek = _SHREDDED_DEK
+        row.kms_key_id = _SHREDDED_KID
+        row.rotated_at = datetime.utcnow()
+        db.commit()
+    # If no DEK row exists, the customer had no encrypted data — nothing to shred.
+    return {
+        "customer_cid": customer_cid,
+        "action": "cryptoshred",
+        "dek_destroyed": row is not None,
+        "shredded_at": shredded_at,
+        "semantic": "DEK destroyed; ciphertext on disk is permanently unreadable; audit trail preserved",
+    }
 
 
 # ---------- File encrypt / decrypt ----------

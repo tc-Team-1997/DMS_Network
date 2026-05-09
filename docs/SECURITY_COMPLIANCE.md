@@ -376,33 +376,41 @@ Pre-built, in-product:
 
 ---
 
-## 18. Carried-forward SOX control gaps (Wave C)
+## 18. SOX control gaps — closed in Wave C
 
-Two material weaknesses are acknowledged and committed to closure in Wave C (before tier-1 production go-live):
+Both material weaknesses documented in Wave A and Wave B have been closed. The section is retained for audit trail continuity.
 
 ### SOX-1: WebAuthn Assertion Cryptographic Validation
 
-**What:** webauthn_assertion_id is stored in `wf_actions` (Wave A Workflows v2) and `aml_hit_suppressions` (Wave B AML v2) for high-risk action approvals and AML hit decisions. The threshold check (step_up_risk_band / step_up_amount_threshold) IS enforced — server returns 403 step_up_required when assertion is missing — but the stored assertion is NOT cryptographically validated server-side.
+**Status: CLOSED in Wave C commit (see git log `docs/adr/0014-unified-workflow-audit.md`)**
 
-**Risk:** A determined attacker could forge the assertion_id field, bypassing the high-risk gate.
+**What was the gap:** webauthn_assertion_id was stored in `wf_actions` (Wave A Workflows v2) and AML suppressions (Wave B) for high-risk action approvals, but was NOT cryptographically validated server-side. A determined attacker could forge the assertion_id field.
 
-**Wave C closure:** Server must proxy to `POST /py/api/v1/stepup/verify` before storing the assertion, validating the credential signature matches the user's registered passkey. TODO markers in `routes/spa-api/workflows.js` + `routes/spa-api/aml.js` mark the exact lines.
+**What was shipped:**
+- `POST /api/v1/stepup/verify` endpoint added to `python-service/app/routers/stepup.py`.
+- `python-service/app/services/stepup/verify.py` — validates assertion_id against `stepup_challenges` (challenge must be `kind='authenticate'`, `used=1`, within 5-minute TTL, owned by the calling user).
+- `stepup_used_assertions` replay-prevention table (migration `0043_stepup_validation`): each assertion_id consumable exactly once.
+- `services/stepup-verify.js` — Node proxy helper that calls Python `/verify` and surfaces 401 `step_up_invalid` on failure.
+- `routes/spa-api/workflows.js` — both TODO(SOX) markers removed; verification called before every write (single-action and bulk handlers).
+- `routes/spa-api/aml-screening.js` — suppress endpoint validates assertion when present.
 
-**Evidence:** [CHANGELOG.md SOX-1 debt](../../CHANGELOG.md#sox-1-webauthn-assertion-cryptographic-validation-wave-c), [ADR-0013 step-up enforcement](../adr/0013-stepup-enforcement-contract.md).
+**Evidence:** [ADR-0013 step-up enforcement](../adr/0013-stepup-enforcement-contract.md), [ADR-0014 unified workflow audit](../adr/0014-unified-workflow-audit.md), migration `0043_stepup_validation`, `python-service/tests/test_stepup_verify.py`.
 
 ### SOX-2: Workflow Audit Trail Bifurcation
 
-**What:** Workflow state transitions are logged in two places:
-- Node-side `wf_actions` table: records reason, comment, webauthn assertion (SOX audit trail)
-- Python-side `workflow_steps` table: records state machine progression (operational logs)
+**Status: CLOSED in Wave C commit (see git log `docs/adr/0014-unified-workflow-audit.md`)**
 
-Both are written during a workflow advance (approve / reject / escalate) but they're parallel logs, not unified. This bifurcation means audit evidence for a workflow decision lives in two places, requiring dual reconciliation for regulatory review.
+**What was the gap:** `wf_actions` (Node) and `workflow_steps` (Python) were written independently. Either side could fail silently, leaving diverged audit trails.
 
-**Risk:** If one table is corrupted or tampered, the audit trail is incomplete.
+**What was shipped:**
+- `POST /api/v1/workflow/{doc_id}/advance` endpoint added — Python now writes `workflow_steps` with full SOX context (reason_code, assertion_id) and returns `step_id`.
+- Node writes `wf_actions` ONLY after Python `/advance` succeeds, storing `python_step_id` as the cross-reference FK.
+- If Python fails, Node returns 502 and writes nothing — no divergence possible.
+- `wf_actions.python_step_id` column added to Node `db/schema.sql` (migration 0032 comment block).
+- `workflow_steps.reason_code` and `workflow_steps.assertion_id` columns added (migration `0044_workflow_audit_unification`).
+- Failure mode verified in `python-service/tests/test_workflow_audit_unification.py`.
 
-**Wave C closure:** Implement workflow event sourcing on Temporal (or Camunda Zeebe) to collapse both streams into a single immutable ledger. Every workflow action (intake → maker submission → checker review → approval → archival) becomes a single event with full context.
-
-**Evidence:** [CHANGELOG.md SOX-2 debt](../../CHANGELOG.md#sox-2-workflow-audit-trail-bifurcation-wave-c).
+**Evidence:** [ADR-0014 unified workflow audit](../adr/0014-unified-workflow-audit.md), migrations `0043_stepup_validation` + `0044_workflow_audit_unification`, `python-service/tests/test_workflow_audit_unification.py`.
 
 ---
 

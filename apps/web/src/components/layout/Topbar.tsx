@@ -7,6 +7,8 @@ import { post } from '@/lib/http';
 import { z } from 'zod';
 import { navItems } from './nav';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
+import { Popover } from '@/components/ui/Popover';
+import { NotificationFeed, useUnreadCount } from '@/modules/notifications/NotificationFeed';
 
 // ---------------------------------------------------------------------------
 // Tenant chip + dropdown
@@ -139,6 +141,40 @@ function TenantChip() {
 }
 
 // ---------------------------------------------------------------------------
+// BellButton — bell icon + unread badge + notification popover
+// ---------------------------------------------------------------------------
+
+function BellButton() {
+  const [open, setOpen] = useState(false);
+  const unread = useUnreadCount();
+
+  return (
+    <Popover
+      trigger={
+        <button
+          type="button"
+          className="w-9 h-9 flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors relative"
+          aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
+        >
+          <Bell size={15} className="text-ink-sub" />
+          {unread > 0 && (
+            <span
+              className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full"
+              aria-hidden="true"
+            />
+          )}
+        </button>
+      }
+      open={open}
+      onClose={() => { setOpen(false); }}
+      placement="bottom"
+    >
+      <NotificationFeed />
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Topbar
 // ---------------------------------------------------------------------------
 
@@ -170,14 +206,7 @@ export function Topbar() {
         {/* Tenant chip — shows once the tenant branding resolves */}
         <TenantChip />
 
-        <button
-          type="button"
-          className="w-9 h-9 flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors relative"
-          aria-label="Notifications"
-        >
-          <Bell size={15} className="text-ink-sub" />
-          <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-danger rounded-full" />
-        </button>
+        <BellButton />
 
         <div className="h-9 pl-1 pr-4 rounded-full bg-brand-skyLight flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-brand-blue flex items-center justify-center">

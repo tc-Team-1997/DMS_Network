@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, CheckCircle2, BookOpen } from 'lucide-react';
+import { Sparkles, CheckCircle2, BookOpen, MessageSquarePlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { MetricCard, Panel } from '@/components/ui';
+import { MetricCard, Panel, Button } from '@/components/ui';
 import { fetchDocbrainHealth } from './api';
 import { fetchGlossary } from './glossary-api';
-import { AgentChat } from './AgentChat';
 
 export function AIEnginePage() {
   const health = useQuery({
@@ -92,7 +91,24 @@ export function AIEnginePage() {
         </div>
       </Panel>
 
-      <AgentChat />
+      {/* DocBrain Chat v2 is the canonical chat surface. Link to /ai rather than
+          embedding a second chat instance here (AgentChat deleted in Wave C). */}
+      <Panel title="Quick access">
+        <div className="flex items-center gap-4 py-2">
+          <div className="w-10 h-10 rounded-xl bg-brand-skyLight flex items-center justify-center">
+            <MessageSquarePlus size={18} className="text-brand-blue" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-ink">DocBrain Chat</p>
+            <p className="text-xs text-muted mt-0.5">
+              3-pane conversation interface with persona picker, grounded citations, and evidence rail.
+            </p>
+          </div>
+          <Link to="/ai">
+            <Button size="sm" variant="primary">Open chat</Button>
+          </Link>
+        </div>
+      </Panel>
 
       <Panel title="Capabilities">
         <ul className="space-y-3">
