@@ -2,6 +2,7 @@ import { useLocation } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { useAuth } from '@/store/auth';
 import { navItems } from './nav';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
 
 export function Topbar() {
   const user = useAuth((s) => s.user);
@@ -26,6 +27,7 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-3">
+        <OfflineIndicator />
         <button
           type="button"
           className="w-9 h-9 flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors relative"

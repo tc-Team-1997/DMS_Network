@@ -199,7 +199,22 @@ export const SyncResult = z.object({
 
 ### 6.4 Test IDs
 
-`capture-page`, `offline-indicator`, `offline-queue-badge`, `offline-queue-detail-modal`, `sync-complete-toast`.
+Canonical test IDs as shipped (updated 2026-05-09 by spa-engineer):
+
+| Test ID | Element | File |
+| --- | --- | --- |
+| `offline-indicator` | Outer pill wrapper (only rendered when visible) | `src/components/OfflineIndicator.tsx` |
+| `offline-indicator-count` | Count badge `<span>` | `src/components/OfflineIndicator.tsx` |
+| `offline-indicator-trigger-sync` | Trigger sync `<button>` | `src/components/OfflineIndicator.tsx` |
+| `sync-status-card` | Root wrapper `<div>` around SyncStatusCard | `src/modules/admin/components/SyncStatusCard.tsx` |
+| `sync-status-replayed` | Replayed count value `<span>` | `src/modules/admin/components/SyncStatusCard.tsx` |
+| `sync-status-deduped` | Deduped count value `<span>` | `src/modules/admin/components/SyncStatusCard.tsx` |
+| `sync-status-failed` | Failed count value `<span>` | `src/modules/admin/components/SyncStatusCard.tsx` |
+| `capture-offline-toast` | Offline-saved toast (`role="status"`) | `src/modules/capture/CapturePage.tsx` |
+| `capture-dropzone` | Drag-and-drop zone (pre-existing) | `src/modules/capture/CapturePage.tsx` |
+| `capture-file-input` | Hidden file input (pre-existing) | `src/modules/capture/CapturePage.tsx` |
+
+> Note: `offline-queue-badge` and `offline-queue-detail-modal` from the original draft are superseded by `offline-indicator-count` and the `offline-indicator` pill itself. The detail modal is deferred to a future iteration.
 
 ---
 

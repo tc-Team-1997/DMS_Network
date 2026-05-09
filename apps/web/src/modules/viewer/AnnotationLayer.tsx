@@ -8,6 +8,9 @@
  *   signature  — freehand canvas draw, saved as PNG data-URL overlay
  *
  * Coordinates are stored normalised (0–1) so they survive container resize.
+ *
+ * Additionally hosts the document-redaction module when FF_REDACTION is on
+ * and the user has `documents:redact` permission.
  */
 
 import {
@@ -18,11 +21,19 @@ import {
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Highlighter, Square, Stamp, PenLine, Trash2, Download, Save } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui';
 import { saveAnnotations, type Annotation, type AnnotationKind } from './api';
+import { RedactionToolbar } from './components/RedactionToolbar';
+import { RedactionCanvas } from './components/RedactionCanvas';
+import { RedactionConfirmDialog } from './components/RedactionConfirmDialog';
+import { useRedactionState } from './redaction/hooks/useRedactionState';
+import { redactDocument } from './redaction/api';
+import { HttpError } from '@/lib/http';
+import type { Reason } from './redaction/schemas';
 
 // ── types ─────────────────────────────────────────────────────────────────
 
@@ -75,6 +86,8 @@ export interface AnnotationLayerProps {
   isPdf: boolean;
   /** Raw src URL passed to the viewer's iframe/img */
   src: string;
+  /** Current user's role — passed down for RBAC gating of redaction */
+  userRole?: string | null | undefined;
   /** className forwarded to the outer wrapper */
   className?: string;
   children: React.ReactNode;
@@ -84,11 +97,14 @@ export function AnnotationLayer({
   documentId,
   isPdf,
   src,
+  userRole,
   className,
   children,
 }: AnnotationLayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sigCanvasRef  = useRef<HTMLCanvasElement>(null);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
   const [tool, setTool]           = useState<Tool>('select');
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -96,6 +112,12 @@ export function AnnotationLayer({
   const [sigDrawing, setSigDrawing]   = useState(false);
   const [drag, setDrag]           = useState<DragState | null>(null);
   const [exportBusy, setExportBusy]   = useState(false);
+
+  // ── redaction state ───────────────────────────────────────────────────
+  const redaction = useRedactionState();
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [redactError, setRedactError] = useState<string | null>(null);
+  const [redactLoading, setRedactLoading] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: () => saveAnnotations(documentId, annotations),
@@ -107,10 +129,14 @@ export function AnnotationLayer({
     containerRef.current?.getBoundingClientRect() ?? null
   , []);
 
-  // ── drag-rect (highlight / redact) ───────────────────────────────────
+  // ── drag-rect (highlight / annotation-redact) ─────────────────────────
+  // Note: this is the annotation-layer "redact" tool (visual overlay only).
+  // The document-redaction module has its own canvas (RedactionCanvas).
 
   const onPointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      // In document-redaction mode the RedactionCanvas handles its own events
+      if (redaction.redactModeActive) return;
       if (tool !== 'highlight' && tool !== 'redact') return;
       e.currentTarget.setPointerCapture(e.pointerId);
       setDrag({
@@ -121,7 +147,7 @@ export function AnnotationLayer({
         active: true,
       });
     },
-    [tool],
+    [tool, redaction.redactModeActive],
   );
 
   const onPointerMove = useCallback(
@@ -310,6 +336,34 @@ export function AnnotationLayer({
     }
   }, [isPdf, src, annotations, getRect]);
 
+  // ── document-redaction confirm/submit ─────────────────────────────────
+
+  const handleRedactConfirm = useCallback(
+    async (reason: Reason) => {
+      setRedactError(null);
+      setRedactLoading(true);
+      try {
+        const result = await redactDocument(documentId, redaction.regions, reason);
+        setShowConfirm(false);
+        redaction.setRedactMode(false);
+        // Invalidate document cache so repository + viewer refresh
+        void qc.invalidateQueries({ queryKey: ['documents'] });
+        void qc.invalidateQueries({ queryKey: ['document', documentId] });
+        // Navigate to the newly created redacted document
+        navigate(`/viewer/${result.redacted_document_id}`);
+      } catch (err) {
+        const msg =
+          err instanceof HttpError
+            ? err.message
+            : 'Redaction failed. Please try again.';
+        setRedactError(msg);
+      } finally {
+        setRedactLoading(false);
+      }
+    },
+    [documentId, redaction, qc, navigate],
+  );
+
   // ── live drag ghost ───────────────────────────────────────────────────
 
   const dragGhost = drag && drag.active ? (() => {
@@ -327,174 +381,222 @@ export function AnnotationLayer({
   const hasRedact = annotations.some((a) => a.kind === 'redact');
 
   return (
-    <div className={cn('flex flex-col gap-0', className)}>
-      {/* Floating toolbar */}
-      <div
-        className={cn(
-          'flex items-center gap-1 flex-wrap px-3 py-1.5',
-          'rounded-t-card border border-b-0 border-divider bg-white',
-        )}
-        data-testid="annotation-toolbar"
-      >
-        <ToolButton
-          active={tool === 'highlight'}
-          onClick={() => setTool(tool === 'highlight' ? 'select' : 'highlight')}
-          title="Highlight"
-          data-testid="ann-tool-highlight"
+    <>
+      <div className={cn('flex flex-col gap-0', className)}>
+        {/* Floating toolbar */}
+        <div
+          className={cn(
+            'flex items-center gap-1 flex-wrap px-3 py-1.5',
+            'rounded-t-card border border-b-0 border-divider bg-white',
+          )}
+          data-testid="annotation-toolbar"
         >
-          <Highlighter size={14} />
-          <span className="text-xs">Highlight</span>
-        </ToolButton>
+          {/* Annotation tools — hidden while in document-redaction mode */}
+          {!redaction.redactModeActive && (
+            <>
+              <ToolButton
+                active={tool === 'highlight'}
+                onClick={() => setTool(tool === 'highlight' ? 'select' : 'highlight')}
+                title="Highlight"
+                data-testid="ann-tool-highlight"
+              >
+                <Highlighter size={14} />
+                <span className="text-xs">Highlight</span>
+              </ToolButton>
 
-        <ToolButton
-          active={tool === 'redact'}
-          onClick={() => setTool(tool === 'redact' ? 'select' : 'redact')}
-          title="Redact"
-          data-testid="ann-tool-redact"
-        >
-          <Square size={14} className="fill-ink" />
-          <span className="text-xs">Redact</span>
-        </ToolButton>
+              <ToolButton
+                active={tool === 'redact'}
+                onClick={() => setTool(tool === 'redact' ? 'select' : 'redact')}
+                title="Redact overlay"
+                data-testid="ann-tool-redact"
+              >
+                <Square size={14} className="fill-ink" />
+                <span className="text-xs">Redact</span>
+              </ToolButton>
 
-        <ToolButton
-          active={tool === 'stamp'}
-          onClick={() => setTool(tool === 'stamp' ? 'select' : 'stamp')}
-          title="Stamp"
-          data-testid="ann-tool-stamp"
-        >
-          <Stamp size={14} />
-          <span className="text-xs">Stamp</span>
-        </ToolButton>
+              <ToolButton
+                active={tool === 'stamp'}
+                onClick={() => setTool(tool === 'stamp' ? 'select' : 'stamp')}
+                title="Stamp"
+                data-testid="ann-tool-stamp"
+              >
+                <Stamp size={14} />
+                <span className="text-xs">Stamp</span>
+              </ToolButton>
 
-        {tool === 'stamp' && (
-          <select
-            value={selectedStamp}
-            onChange={(e) => setSelectedStamp(e.target.value as StampLabel)}
-            className="h-7 rounded-input border border-border bg-white px-2 text-xs"
-            data-testid="ann-stamp-select"
-          >
-            {STAMP_OPTIONS.map((s) => (
-              <option key={s.label} value={s.label}>{s.label}</option>
-            ))}
-          </select>
-        )}
+              {tool === 'stamp' && (
+                <select
+                  value={selectedStamp}
+                  onChange={(e) => setSelectedStamp(e.target.value as StampLabel)}
+                  className="h-7 rounded-input border border-border bg-white px-2 text-xs"
+                  data-testid="ann-stamp-select"
+                >
+                  {STAMP_OPTIONS.map((s) => (
+                    <option key={s.label} value={s.label}>{s.label}</option>
+                  ))}
+                </select>
+              )}
 
-        <ToolButton
-          active={tool === 'signature'}
-          onClick={() => setTool(tool === 'signature' ? 'select' : 'signature')}
-          title="Signature"
-          data-testid="ann-tool-signature"
-        >
-          <PenLine size={14} />
-          <span className="text-xs">Sign</span>
-        </ToolButton>
+              <ToolButton
+                active={tool === 'signature'}
+                onClick={() => setTool(tool === 'signature' ? 'select' : 'signature')}
+                title="Signature"
+                data-testid="ann-tool-signature"
+              >
+                <PenLine size={14} />
+                <span className="text-xs">Sign</span>
+              </ToolButton>
 
-        <div className="flex-1" />
+              <div className="flex-1" />
 
-        {annotations.length > 0 && (
-          <>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => { saveMutation.mutate(); }}
-              loading={saveMutation.isPending}
-              data-testid="ann-save"
-            >
-              <Save size={12} /> Save
-            </Button>
+              {annotations.length > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => { saveMutation.mutate(); }}
+                    loading={saveMutation.isPending}
+                    data-testid="ann-save"
+                  >
+                    <Save size={12} /> Save
+                  </Button>
 
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setAnnotations([])}
-              data-testid="ann-clear"
-            >
-              <Trash2 size={12} /> Clear
-            </Button>
-          </>
-        )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setAnnotations([])}
+                    data-testid="ann-clear"
+                  >
+                    <Trash2 size={12} /> Clear
+                  </Button>
+                </>
+              )}
 
-        {isPdf && hasRedact && (
-          <Button
-            size="sm"
-            onClick={exportRedacted}
-            loading={exportBusy}
-            data-testid="ann-export-redacted"
-          >
-            <Download size={12} /> Export redacted
-          </Button>
-        )}
-      </div>
+              {isPdf && hasRedact && (
+                <Button
+                  size="sm"
+                  onClick={exportRedacted}
+                  loading={exportBusy}
+                  data-testid="ann-export-redacted"
+                >
+                  <Download size={12} /> Export redacted
+                </Button>
+              )}
+            </>
+          )}
 
-      {/* Preview container + overlay */}
-      <div
-        ref={containerRef}
-        className={cn(
-          'relative overflow-hidden rounded-b-card border border-divider bg-page',
-          tool !== 'select' && tool !== 'signature' && 'cursor-crosshair',
-        )}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onClick={onOverlayClick}
-        data-testid="annotation-container"
-      >
-        {/* Document content (iframe / img / fallback) */}
-        {children}
-
-        {/* Existing annotation overlays */}
-        {annotations.map((ann) => (
-          <AnnotationOverlay
-            key={ann.id}
-            ann={ann}
-            onRemove={removeAnnotation}
-          />
-        ))}
-
-        {/* Live drag ghost */}
-        {dragGhost && (
-          <div
-            className={cn(
-              'absolute pointer-events-none',
-              tool === 'highlight' ? 'bg-warning/40 border border-warning' : 'bg-ink border border-ink',
-            )}
-            style={{
-              left:   dragGhost.x1,
-              top:    dragGhost.y1,
-              width:  dragGhost.w,
-              height: dragGhost.h,
+          {/* Document-redaction toolbar — only shown when FF is on + user has perm */}
+          <RedactionToolbar
+            userRole={userRole}
+            active={redaction.redactModeActive}
+            regionCount={redaction.regions.length}
+            onToggle={() => {
+              if (redaction.redactModeActive) {
+                redaction.setRedactMode(false);
+              } else {
+                // Disable annotation tool and enter redact mode
+                setTool('select');
+                redaction.setRedactMode(true);
+              }
             }}
+            onSave={() => setShowConfirm(true)}
           />
+        </div>
+
+        {/* Preview container — wraps in RedactionCanvas when in redact mode */}
+        {redaction.redactModeActive ? (
+          <RedactionCanvas
+            regions={redaction.regions}
+            active
+            onAddRegion={redaction.addRegion}
+            onRemoveRegion={redaction.removeRegion}
+            onSetReason={redaction.setRegionReason}
+            className="rounded-b-card border border-divider bg-page"
+          >
+            {children}
+          </RedactionCanvas>
+        ) : (
+          <div
+            ref={containerRef}
+            className={cn(
+              'relative overflow-hidden rounded-b-card border border-divider bg-page',
+              tool !== 'select' && tool !== 'signature' && 'cursor-crosshair',
+            )}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onClick={onOverlayClick}
+            data-testid="annotation-container"
+          >
+            {/* Document content (iframe / img / fallback) */}
+            {children}
+
+            {/* Existing annotation overlays */}
+            {annotations.map((ann) => (
+              <AnnotationOverlay
+                key={ann.id}
+                ann={ann}
+                onRemove={removeAnnotation}
+              />
+            ))}
+
+            {/* Live drag ghost */}
+            {dragGhost && (
+              <div
+                className={cn(
+                  'absolute pointer-events-none',
+                  tool === 'highlight' ? 'bg-warning/40 border border-warning' : 'bg-ink border border-ink',
+                )}
+                style={{
+                  left:   dragGhost.x1,
+                  top:    dragGhost.y1,
+                  width:  dragGhost.w,
+                  height: dragGhost.h,
+                }}
+              />
+            )}
+
+            {/* Signature canvas — shown on top when signature tool active */}
+            {tool === 'signature' && (
+              <canvas
+                ref={sigCanvasRef}
+                width={containerRef.current?.clientWidth  ?? 800}
+                height={containerRef.current?.clientHeight ?? 600}
+                className="absolute inset-0 cursor-crosshair touch-none"
+                style={{ zIndex: 20 }}
+                onPointerDown={sigPointerDown}
+                onPointerMove={sigPointerMove}
+                onPointerUp={sigPointerUp}
+                data-testid="ann-sig-canvas"
+              />
+            )}
+          </div>
         )}
 
-        {/* Signature canvas — shown on top when signature tool active */}
-        {tool === 'signature' && (
-          <canvas
-            ref={sigCanvasRef}
-            width={containerRef.current?.clientWidth  ?? 800}
-            height={containerRef.current?.clientHeight ?? 600}
-            className="absolute inset-0 cursor-crosshair touch-none"
-            style={{ zIndex: 20 }}
-            onPointerDown={sigPointerDown}
-            onPointerMove={sigPointerMove}
-            onPointerUp={sigPointerUp}
-            data-testid="ann-sig-canvas"
-          />
+        {/* Save status feedback */}
+        {saveMutation.isSuccess && (
+          <p className="text-xs text-success mt-1" data-testid="ann-save-ok">
+            Annotations saved.
+          </p>
+        )}
+        {saveMutation.isError && (
+          <p className="text-xs text-danger mt-1" data-testid="ann-save-err">
+            Save failed — annotations are preserved locally.
+          </p>
         )}
       </div>
 
-      {/* Save status feedback */}
-      {saveMutation.isSuccess && (
-        <p className="text-xs text-success mt-1" data-testid="ann-save-ok">
-          Annotations saved.
-        </p>
+      {/* Document-redaction confirm dialog — rendered as a portal-like overlay */}
+      {showConfirm && (
+        <RedactionConfirmDialog
+          regions={redaction.regions}
+          loading={redactLoading}
+          error={redactError}
+          onConfirm={handleRedactConfirm}
+          onCancel={() => { setShowConfirm(false); setRedactError(null); }}
+        />
       )}
-      {saveMutation.isError && (
-        <p className="text-xs text-danger mt-1" data-testid="ann-save-err">
-          Save failed — annotations are preserved locally.
-        </p>
-      )}
-    </div>
+    </>
   );
 }
 

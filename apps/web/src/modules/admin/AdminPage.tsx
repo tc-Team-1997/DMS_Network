@@ -9,6 +9,7 @@ import {
   type AuditRow,
 } from './api';
 import { CbsHealthBadge } from '@/modules/cbs/components/CbsHealthBadge';
+import { SyncStatusCard } from './components/SyncStatusCard';
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -107,6 +108,8 @@ export function AdminPage() {
           <MetricCard label="Alerts"      value={h?.counts.alerts ?? '—'}    tone="danger"  sub="Emitted" />
         </div>
       </Panel>
+
+      <SyncStatusCard />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_2fr] gap-6">
         <Panel

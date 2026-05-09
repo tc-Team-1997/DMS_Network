@@ -1,11 +1,20 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Download, ArrowLeft, Sparkles, Braces, Table as TableIcon, Copy, Check, ShieldCheck, ShieldAlert, ShieldX, ChevronDown, ChevronUp } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Download, ArrowLeft, Sparkles, Braces, Table as TableIcon, Copy, Check, ShieldCheck, ShieldAlert, ShieldX, ChevronDown, ChevronUp, Lock, LockOpen } from 'lucide-react';
 import { Badge, Button, Panel, statusTone } from '@/components/ui';
 import { AIPanel } from '@/modules/docbrain/AIPanel';
 import { RagChat } from '@/modules/docbrain/RagChat';
 import { fetchDocumentTypes, tamperCheck, type DocumentType } from '@/modules/document-types/api';
+import { TranslateButton, SideBySideView } from '@/modules/translate';
+import { translateDocument } from '@/modules/translate/api';
+import type { TranslationResult, TargetLang } from '@/modules/translate/schemas';
+import { useAuth } from '@/store/auth';
+import { WormBadge } from '@/modules/worm/components/WormBadge';
+import { WormLockDialog } from '@/modules/worm/components/WormLockDialog';
+import { WormUnlockDialog } from '@/modules/worm/components/WormUnlockDialog';
+import { fetchWormStatus, FF_WORM } from '@/modules/worm/api';
+import { t } from '@/lib/i18n';
 import { fetchDocument } from './api';
 import { AnnotationLayer } from './AnnotationLayer';
 
@@ -23,6 +32,46 @@ export function ViewerPage() {
     queryKey: ['document-types', { active: false }],
     queryFn: () => fetchDocumentTypes(false),
   });
+
+  // ── WORM state — hoisted above early returns (Rules of Hooks) ──────────────
+  const role = useAuth((s) => s.user?.role);
+  const isAdmin = role === 'Doc Admin';
+  const [wormDialog, setWormDialog] = useState<'lock' | 'unlock' | null>(null);
+
+  const wormStatus = useQuery({
+    queryKey: ['worm', 'status', docId],
+    queryFn: () => fetchWormStatus(docId),
+    enabled: FF_WORM && Number.isFinite(docId),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Translation state — hoisted above early returns (Rules of Hooks).
+  const [showSideBySide, setShowSideBySide] = useState(false);
+  const [translationResult, setTranslationResult] = useState<TranslationResult | null>(null);
+
+  // Cache key ref: when docId changes, clear any prior translation result.
+  const prevDocId = useRef<number | null>(null);
+  if (prevDocId.current !== docId) {
+    prevDocId.current = docId;
+    if (translationResult !== null) setTranslationResult(null);
+    if (showSideBySide) setShowSideBySide(false);
+  }
+
+  const translateMutation = useMutation({
+    // 7-day stale time is enforced server-side; client-side we rely on the
+    // server cache hit (cache_hit: true) rather than a query cache entry.
+    mutationFn: ({ target }: { target: TargetLang }) =>
+      translateDocument(docId, target),
+    onSuccess: (result) => {
+      setTranslationResult(result);
+      setShowSideBySide(true);
+    },
+  });
+
+  const handleTranslate = (target: TargetLang) => {
+    translateMutation.mutate({ target });
+    setShowSideBySide(true);
+  };
 
   // Hoist blob-fetch state above early returns to satisfy Rules of Hooks —
   // hooks must be called unconditionally every render.
@@ -67,6 +116,27 @@ export function ViewerPage() {
   const src = `/uploads/${d.filename}`;
   const isImage = (d.mime_type ?? '').startsWith('image/');
 
+  // The document preview node is shared between single-pane and side-by-side.
+  const docPreview = (
+    <div className="min-h-[520px] flex items-center justify-center">
+      {isPdf && blobUrl && (
+        <iframe title="Document preview" src={blobUrl} className="w-full h-[620px] border-0" />
+      )}
+      {isPdf && !blobUrl && (
+        <p className="text-sm text-muted">Loading PDF…</p>
+      )}
+      {isImage && (
+        <img src={src} alt="" className="max-h-[620px] max-w-full object-contain" />
+      )}
+      {!isPdf && !isImage && (
+        <div className="text-center text-muted p-8">
+          <p className="text-md mb-2">Preview not available for {d.mime_type ?? 'this file type'}.</p>
+          <a href={src} download><Button size="sm">Download</Button></a>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
       {/* Left: preview + chat */}
@@ -74,39 +144,39 @@ export function ViewerPage() {
         <Panel
           title={d.original_name ?? d.filename}
           action={
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>
                 <ArrowLeft size={14} /> Back
               </Button>
+              {/* TranslateButton is hidden by FF; rendered here so it sits in
+                  the header action area alongside Back + Download. */}
+              <TranslateButton
+                onTranslate={handleTranslate}
+                loading={translateMutation.isPending}
+                hasResult={translationResult !== null}
+              />
               <a href={src} download>
                 <Button size="sm"><Download size={14} /> Download</Button>
               </a>
             </div>
           }
         >
-          <AnnotationLayer
-            documentId={docId}
-            isPdf={isPdf}
-            src={src}
-          >
-            <div className="min-h-[520px] flex items-center justify-center">
-              {isPdf && blobUrl && (
-                <iframe title="Document preview" src={blobUrl} className="w-full h-[620px] border-0" />
-              )}
-              {isPdf && !blobUrl && (
-                <p className="text-sm text-muted">Loading PDF…</p>
-              )}
-              {isImage && (
-                <img src={src} alt="" className="max-h-[620px] max-w-full object-contain" />
-              )}
-              {!isPdf && !isImage && (
-                <div className="text-center text-muted p-8">
-                  <p className="text-md mb-2">Preview not available for {d.mime_type ?? 'this file type'}.</p>
-                  <a href={src} download><Button size="sm">Download</Button></a>
-                </div>
-              )}
-            </div>
-          </AnnotationLayer>
+          {showSideBySide ? (
+            <SideBySideView
+              originalContent={
+                <AnnotationLayer documentId={docId} isPdf={isPdf} src={src} userRole={role}>
+                  {docPreview}
+                </AnnotationLayer>
+              }
+              translation={translationResult}
+              loading={translateMutation.isPending}
+              onClose={() => setShowSideBySide(false)}
+            />
+          ) : (
+            <AnnotationLayer documentId={docId} isPdf={isPdf} src={src} userRole={role}>
+              {docPreview}
+            </AnnotationLayer>
+          )}
         </Panel>
 
         <RagChat documentId={docId} />
@@ -135,11 +205,64 @@ export function ViewerPage() {
                 <TamperChip documentId={d.id} schemaId={d.schema_id} />
               </Row>
             )}
+            {FF_WORM && (
+              <Row label="Retention lock">
+                <WormBadge documentId={d.id} />
+              </Row>
+            )}
           </dl>
+
+          {/* Admin: Lock / Unlock buttons — shown only to Doc Admin when FF is on */}
+          {FF_WORM && isAdmin && (
+            <div className="mt-4 pt-3 border-t border-divider flex gap-2 justify-end">
+              {wormStatus.data?.worm_locked === true ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="worm-unlock-button"
+                  onClick={() => setWormDialog('unlock')}
+                >
+                  <LockOpen size={13} aria-hidden="true" />
+                  {t('worm.unlock_button')}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  data-testid="worm-lock-button"
+                  onClick={() => setWormDialog('lock')}
+                >
+                  <Lock size={13} aria-hidden="true" />
+                  {t('worm.lock_button')}
+                </Button>
+              )}
+            </div>
+          )}
         </Panel>
 
         <CapturedMetadataPanel doc={d} types={types.data ?? null} />
       </div>
+
+      {/* WORM dialogs — portalled outside the grid columns */}
+      {FF_WORM && wormDialog === 'lock' && (
+        <WormLockDialog
+          documentId={d.id}
+          documentName={d.original_name ?? d.filename}
+          onClose={() => setWormDialog(null)}
+          onLocked={() => setWormDialog(null)}
+        />
+      )}
+      {FF_WORM && wormDialog === 'unlock' && (
+        <WormUnlockDialog
+          documentId={d.id}
+          documentName={d.original_name ?? d.filename}
+          unlockAfter={wormStatus.data?.unlock_after ?? null}
+          onClose={() => setWormDialog(null)}
+          onUnlocked={() => setWormDialog(null)}
+        />
+      )}
     </div>
   );
 }

@@ -336,7 +336,9 @@ export type ConsentToken = z.infer<typeof ConsentToken>;
 
 ### 6.4 Test IDs (for Playwright / Detox)
 
-`kyc-start-button`, `consent-modal`, `consent-checkbox`, `consent-continue-button`, `id-photo-capture-button`, `id-photo-retake-button`, `id-photo-next-button`, `selfie-capture-button`, `selfie-retake-button`, `selfie-match-button`, `match-result-success`, `match-result-failure`, `match-result-poor-geometry`, `confidence-bar`.
+**Mobile (Expo — original):** `kyc-start-button`, `consent-modal`, `consent-checkbox`, `consent-continue-button`, `id-photo-capture-button`, `id-photo-retake-button`, `id-photo-next-button`, `selfie-capture-button`, `selfie-retake-button`, `selfie-match-button`, `match-result-success`, `match-result-failure`, `match-result-poor-geometry`, `confidence-bar`.
+
+**Web SPA (`apps/web/src/modules/face-match/`) — added 2026-05-09:** `face-match-page`, `face-match-cid-input`, `face-match-id-slot`, `face-match-live-slot`, `face-match-id-preview`, `face-match-live-preview`, `face-match-submit`, `face-match-result-card`, `face-match-result-decision`, `face-match-result-confidence`, `face-match-quality-fail`, `consent-dialog`, `consent-accept-checkbox`, `consent-accept-button`.
 
 ---
 

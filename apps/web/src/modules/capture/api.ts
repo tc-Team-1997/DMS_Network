@@ -1,4 +1,4 @@
-import { get, postForm } from '@/lib/http';
+import { get, postForm, http } from '@/lib/http';
 import { FolderSchema } from '@/lib/schemas';
 import { z } from 'zod';
 
@@ -20,6 +20,20 @@ export type AutoRouted = z.infer<typeof AutoRoutedSchema>;
 
 export const uploadDocument = (form: FormData): Promise<UploadResponse> =>
   postForm('/spa/api/documents', form, UploadResponseSchema);
+
+/**
+ * Upload a document with an explicit Idempotency-Key header.
+ * Required for all uploads so the server can deduplicate offline replays.
+ */
+export const uploadDocumentWithKey = async (
+  form: FormData,
+  idempotencyKey: string,
+): Promise<UploadResponse> => {
+  const { data } = await http.post<unknown>('/spa/api/documents', form, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  });
+  return UploadResponseSchema.parse(data);
+};
 
 // ---------- AI preview (pre-upload auto-fill) ------------------------------
 

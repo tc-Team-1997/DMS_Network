@@ -38,7 +38,7 @@ const FF_CBS_LIVE: boolean =
 import {
   fetchFolders,
   previewDocument,
-  uploadDocument,
+  uploadDocumentWithKey,
   type AutoRouted,
   type Extraction,
   type PreviewResponse,
@@ -52,6 +52,11 @@ import {
   type DocumentType,
   type FieldDef,
 } from '@/modules/document-types/api';
+import {
+  enqueue as outboxEnqueue,
+  isIndexedDbAvailable,
+  type EnqueueInput,
+} from '@/lib/offline-outbox';
 
 const DEFAULT_AUTOFILL_FLOOR = 0.4;
 const DEFAULT_CONFIDENCE_HIGH = 0.7;
@@ -357,6 +362,10 @@ export function CapturePage() {
   const [uploadedOcr, setUploadedOcr] = useState<number | null>(null);
   const [uploadedOcrText, setUploadedOcrText] = useState<string | null>(null);
 
+  // Offline queue state
+  const [offlineToast, setOfflineToast] = useState<string | null>(null);
+  const sessionUser = useAuth((s) => s.user);
+
   // CBS state
   const cbsRole = useAuth((s) => s.user?.role);
   const [cbsDialogOpen, setCbsDialogOpen] = useState(false);
@@ -483,7 +492,8 @@ export function CapturePage() {
   // ── single-file upload ──────────────────────────────────────────────
 
   const uploadMutation = useMutation({
-    mutationFn: uploadDocument,
+    mutationFn: ({ form, idempotencyKey }: { form: FormData; idempotencyKey: string }) =>
+      uploadDocumentWithKey(form, idempotencyKey),
     onSuccess: (r) => {
       setLastUploadId(r.id);
       setLastAutoRouted(r.auto_routed ?? null);
@@ -529,13 +539,61 @@ export function CapturePage() {
 
   const confirmUpload = () => {
     if (!file || !selectedType) return;
+    const idempotencyKey = crypto.randomUUID();
     const fd = new FormData();
     fd.set('file', file);
     fd.set('doc_type', selectedType.name);
     if (folderId) fd.set('folder_id', folderId);
     if (branch) fd.set('branch', branch);
     fd.set('metadata_json', JSON.stringify(form));
-    uploadMutation.mutate(fd);
+    // Attempt upload; on network failure, queue to IndexedDB outbox.
+    uploadMutation.mutate(
+      { form: fd, idempotencyKey },
+      {
+        onError: (err) => {
+          // Detect offline error: TypeError with "Failed to fetch" message or
+          // HttpError with status 0 (no response received).
+          const errAsUnknown: unknown = err;
+          const errStatus: unknown = typeof errAsUnknown === 'object' && errAsUnknown !== null
+            ? (errAsUnknown as Record<string, unknown>)['status']
+            : undefined;
+          const isOffline =
+            (err instanceof TypeError && err.message.toLowerCase().includes('failed to fetch')) ||
+            (err instanceof Error && err.message.toLowerCase().includes('network error')) ||
+            (errStatus === 0);
+
+          if (isOffline && isIndexedDbAvailable()) {
+            const entry: EnqueueInput = {
+              id: crypto.randomUUID(),
+              idempotency_key: idempotencyKey,
+              endpoint: '/spa/api/documents',
+              sensitive: {
+                customer_cid: (form['customer_cid'] as string | undefined) ?? null,
+                doc_number: (form['doc_number'] as string | undefined) ?? null,
+                customer_name: (form['customer_name'] as string | undefined) ?? null,
+              },
+              request_body: {
+                original_name: file.name,
+                doc_type: selectedType.name,
+                metadata_json: JSON.stringify(form),
+                notes: (form['notes'] as string | undefined) ?? null,
+              },
+              enqueued_at: new Date().toISOString(),
+            };
+            // Use session user ID as session token proxy for key derivation.
+            // The session ID is not persisted — it lives only in memory.
+            const sessionToken = String(sessionUser?.id ?? 'anon');
+            outboxEnqueue(entry, sessionToken).then(() => {
+              setOfflineToast(`Saved for sync — will upload when online`);
+              setTimeout(() => setOfflineToast(null), 6_000);
+            }).catch(() => {
+              setOfflineToast('Could not save offline — IndexedDB unavailable.');
+              setTimeout(() => setOfflineToast(null), 4_000);
+            });
+          }
+        },
+      },
+    );
     setConfirming(false);
   };
 
@@ -752,7 +810,7 @@ export function CapturePage() {
       fd.set('metadata_json', JSON.stringify(card.form));
 
       try {
-        const result = await uploadDocument(fd);
+        const result = await uploadDocumentWithKey(fd, crypto.randomUUID());
         analyzeDocument(result.id).catch(() => { /* background */ });
         setCards((prev) => prev.map((c) =>
           c.id === card.id ? { ...c, status: { tag: 'done', uploadId: result.id, autoRouted: result.auto_routed ?? null } } : c,
@@ -1132,6 +1190,18 @@ export function CapturePage() {
           onCancel={() => setConfirming(false)}
           onConfirm={confirmUpload}
         />
+      )}
+
+      {/* Offline sync toast */}
+      {offlineToast !== null && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-badge border border-warning/40 bg-warning/10 px-4 py-2 text-sm font-medium text-warning shadow-card"
+          data-testid="capture-offline-toast"
+        >
+          {offlineToast}
+        </div>
       )}
     </div>
   );

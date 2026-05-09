@@ -291,7 +291,22 @@ Color-coded: green (>= 0.8), yellow (0.6–0.79), red (< 0.6). Hover shows "Conf
 
 ### 6.4 Test IDs (for Playwright)
 
-`translate-button-dzongkha`, `translate-modal`, `translate-original-text`, `translate-translated-text`, `translate-confidence-badge`, `translate-copy-button`, `translate-loading-spinner`, `translate-close-button`, `translate-low-confidence-warning`.
+Canonical IDs shipped in `apps/web/src/modules/translate/` (updated 2026-05-09):
+
+| Test ID | Component | Notes |
+|---|---|---|
+| `translate-button` | `TranslateButton` | The trigger pill button |
+| `translate-target-select` | `TranslateButton` | `<select>` for target language |
+| `translate-loading` | `TranslateButton` | Spinner or "Loading..." text shown while request in-flight |
+| `side-by-side-original` | `SideBySideView` | Left pane `<section>` |
+| `side-by-side-translated` | `SideBySideView` | Right pane `<section>` |
+| `side-by-side-toggle` | `SideBySideView` | "Single pane" close button |
+| `translate-copy-button` | `SideBySideView` | Copy translated text to clipboard |
+| `translate-confidence-badge` | `ConfidenceBadge` | Color-coded confidence indicator |
+| `translate-inline-{key}` | `TranslateInline` | Per-field "Translate this" link (key = field identifier) |
+| `translate-original-toggle-{key}` | `TranslateInline` | "show original" revert link (key = field identifier) |
+
+Previous IDs from the initial draft (`translate-button-dzongkha`, `translate-modal`, `translate-original-text`, `translate-translated-text`, `translate-loading-spinner`, `translate-close-button`, `translate-low-confidence-warning`) are **superseded** by the table above.
 
 ---
 

@@ -9,6 +9,8 @@ import { useAuth } from '@/store/auth';
 import { t } from '@/lib/i18n';
 import { deleteDocument, fetchDocuments, fetchFolders } from './api';
 import { CbsLinkDocumentDialog } from '@/modules/cbs/components/CbsLinkDocumentDialog';
+import { WormBadge } from '@/modules/worm/components/WormBadge';
+import { FF_WORM } from '@/modules/worm/api';
 
 // ── CBS feature flag ──────────────────────────────────────────────────────
 const FF_CBS_LIVE: boolean =
@@ -48,10 +50,13 @@ export function RepositoryPage() {
     () => [
       { key: 'name', header: 'Document',
         render: (d) => (
-          <div className="flex flex-col">
-            <Link to={`/viewer/${d.id}`} className="text-brand-blue hover:underline text-md font-medium">
-              {d.original_name ?? d.filename}
-            </Link>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Link to={`/viewer/${d.id}`} className="text-brand-blue hover:underline text-md font-medium">
+                {d.original_name ?? d.filename}
+              </Link>
+              {FF_WORM && <WormBadge documentId={d.id} />}
+            </div>
             <span className="text-xs text-muted">{d.doc_type ?? '—'}</span>
           </div>
         ) },

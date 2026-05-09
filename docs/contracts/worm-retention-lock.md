@@ -169,38 +169,65 @@ No new Node endpoints. WORM status is read-only; admin unlock via Python service
 
 ## 6. SPA module
 
-Owner: `spa-engineer`. Folder: `apps/web/src/modules/repository/` (extend existing with WORM indicators).
+Owner: `spa-engineer`. Folder: `apps/web/src/modules/worm/`.
 
 ### 6.1 Files
 
-- `components/WormBadge.tsx` — read-only indicator showing lock status
-- `hooks/useWormStatus.ts` — fetch + poll lock status
+| File | Purpose |
+| --- | --- |
+| `schemas.ts` | Zod schemas: `WormStatusSchema`, `WormLockResponseSchema`, `WormUnlockResponseSchema`, retention period presets |
+| `api.ts` | Zod-validated fetches via `lib/http.ts`: `fetchWormStatus`, `lockDocument`, `unlockDocument`; exports `FF_WORM` flag |
+| `components/WormBadge.tsx` | Read-only status pill: Locked / Unlocked / Tampered. Tooltip shows lock date + unlock-after date (SHA-256 hashes NOT shown). |
+| `components/WormLockDialog.tsx` | Admin-only modal: preset retention period dropdown + confirm. POST `/spa/api/worm/{id}/lock`. |
+| `components/WormUnlockDialog.tsx` | Admin-only modal: reason select + approver notes (min 10 chars) + legal-hold-lift checkbox. POST `/spa/api/worm/{id}/unlock`. |
+
+**Embed points:**
+- `modules/repository/RepositoryPage.tsx` — WormBadge rendered next to document name in the table row (guarded by `FF_WORM`).
+- `modules/viewer/ViewerPage.tsx` — WormBadge in "Core metadata" panel; Lock/Unlock buttons (Doc Admin only) open the corresponding dialog.
 
 ### 6.2 Schemas
 
 ```ts
 import { z } from "zod";
 
-export const WormStatus = z.object({
+// Status response — sha256_baseline / sha256_current are intentionally omitted
+// (forensic data; must not surface in the UI).
+export const WormStatusSchema = z.object({
   document_id: z.number(),
   worm_locked: z.boolean(),
-  locked_at: z.string().datetime().nullable(),
-  unlock_after: z.string().datetime().nullable(),
+  locked_at: z.string().datetime({ offset: true }).nullable(),
+  unlock_after: z.string().datetime({ offset: true }).nullable(),
   tampered: z.boolean(),
   os_flag_set: z.boolean(),
 });
-export type WormStatus = z.infer<typeof WormStatus>;
+export type WormStatus = z.infer<typeof WormStatusSchema>;
 ```
 
 ### 6.3 UI flow
 
-- Document row in list shows lock icon (padlock) if `worm_locked = true`.
-- Hover → tooltip "Immutable until 2027-05-09" + hash mismatch warning if tampered.
-- No inline unlock UI in the SPA (unlock is admin API only, done via Node admin panel or CLI).
+- Document row in Repository list shows WormBadge (Locked / Unlocked / Tampered pill) next to the document name when `FF_WORM=true`.
+- Viewer page "Core metadata" panel shows a "Retention lock" row with WormBadge.
+- Hover over Locked badge → tooltip shows `Locked on: <date>` and `Immutable until: <date>`. SHA-256 hashes are NOT displayed.
+- Tampered state renders a danger badge + screen-reader `role="alert"` announcement.
+- Doc Admin sees Lock / Unlock buttons below the metadata list (guarded by role + `FF_WORM`).
+- Lock dialog: preset dropdown (30d / 90d / 1y / 7y / indefinite) → confirm → POST lock.
+- Unlock dialog: reason select + approver notes (≥10 chars) → enabled when unlock date passed OR legal-hold-lift checkbox checked → POST unlock.
 
-### 6.4 Test IDs
+### 6.4 Test IDs (canonical — source of truth for qa-engineer)
 
-`document-row-{id}`, `worm-badge-locked`, `worm-badge-unlocked`, `worm-tamper-alert`.
+| Test ID | Element | Notes |
+| --- | --- | --- |
+| `worm-badge-{id}` | WormBadge root span | `{id}` = document ID; present in both Repository row and Viewer page |
+| `worm-status-tampered` | Hidden `role="alert"` span | Only rendered when `tampered: true` |
+| `worm-lock-button` | Lock button in Viewer admin section | Visible to Doc Admin only when document is unlocked |
+| `worm-unlock-button` | Unlock button in Viewer admin section | Visible to Doc Admin only when document is locked |
+| `worm-lock-dialog` | WormLockDialog root div | `role="dialog"` |
+| `worm-lock-period` | Retention period `<select>` | Inside WormLockDialog |
+| `worm-lock-submit` | Submit button inside WormLockDialog | Disabled until period selected |
+| `worm-unlock-dialog` | WormUnlockDialog root div | `role="dialog"` |
+| `worm-unlock-reason` | Reason `<select>` and approver notes `<textarea>` | Both share this testid (select for reason, textarea for notes) |
+| `worm-unlock-legal-hold-lift` | Legal-hold-lift `<input type="checkbox">` | Only rendered when unlock date has not yet passed |
+| `worm-unlock-submit` | Submit button inside WormUnlockDialog | Disabled until conditions met |
 
 ---
 

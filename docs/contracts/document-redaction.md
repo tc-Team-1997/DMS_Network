@@ -244,7 +244,30 @@ export const RedactResponse = z.object({
 
 ### 6.4 Test IDs
 
-`viewer-page`, `viewer-redact-button`, `redaction-toolbar`, `redaction-canvas`, `redaction-region-{index}`, `redaction-region-delete-{index}`, `redaction-modal`, `redaction-reason-select`, `redaction-save-button`.
+Canonical test IDs shipped in `apps/web/src/modules/viewer/` (updated 2026-05-09):
+
+| Test ID | Element | Component |
+| --- | --- | --- |
+| `redact-toolbar-button` | "Redact" toggle button in annotation toolbar | `RedactionToolbar` |
+| `redact-mode-active` | Active-mode label showing region count | `RedactionToolbar` |
+| `redact-confirm-button` | "Save redacted copy" CTA in toolbar (visible when ≥1 region) | `RedactionToolbar` |
+| `redact-canvas` | Overlay container that receives pointer draw events | `RedactionCanvas` |
+| `redact-region-{idx}` | Individual placed region (0-based index) | `RedactionCanvas` |
+| `redact-region-reason-{idx}` | Per-region reason `<select>` | `RedactionCanvas` |
+| `redact-region-delete-{idx}` | Delete button for a region | `RedactionCanvas` |
+| `redact-manual-toggle` | "Manual mode" toggle button | `RedactionCanvas` |
+| `redact-manual-x` | Manual X coordinate input (percent) | `RedactionCanvas` |
+| `redact-manual-y` | Manual Y coordinate input (percent) | `RedactionCanvas` |
+| `redact-manual-w` | Manual width input (percent) | `RedactionCanvas` |
+| `redact-manual-h` | Manual height input (percent) | `RedactionCanvas` |
+| `redact-confirm-dialog` | Confirmation dialog root (`role="dialog"`) | `RedactionConfirmDialog` |
+| `redact-confirm-reason` | Overall reason `<select>` in dialog | `RedactionConfirmDialog` |
+| `redact-confirm-notes` | Justification `<textarea>` (min 20 chars) | `RedactionConfirmDialog` |
+| `redact-confirm-checkbox` | Irreversibility acknowledgement checkbox | `RedactionConfirmDialog` |
+| `redact-confirm-submit` | Final submit button | `RedactionConfirmDialog` |
+| `redacted-badge-{id}` | "Redacted" pill on repository rows (doc id suffix) | `RedactedBadge` |
+
+**Previous draft IDs** (`viewer-page`, `viewer-redact-button`, `redaction-toolbar`, `redaction-canvas`, `redaction-region-{index}`, `redaction-region-delete-{index}`, `redaction-modal`, `redaction-reason-select`, `redaction-save-button`) are superseded by the table above.
 
 ---
 
