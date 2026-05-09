@@ -328,3 +328,58 @@ CREATE TABLE IF NOT EXISTS dedup_decisions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_dedup_decisions_doc ON dedup_decisions(doc_id);
+
+-- ---------------------------------------------------------------------------
+-- CC1 — Tenant registry + configuration store
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS tenants (
+  tenant_id        TEXT PRIMARY KEY,
+  slug             TEXT UNIQUE NOT NULL,
+  display_name     TEXT NOT NULL,
+  regulator_name   TEXT NOT NULL,
+  regulator_short  TEXT NOT NULL,
+  default_locale   TEXT NOT NULL DEFAULT 'en',
+  allowed_locales  TEXT NOT NULL DEFAULT '["en"]',
+  primary_color    TEXT NOT NULL DEFAULT '#0D2B6A',
+  monogram         TEXT NOT NULL DEFAULT 'DM',
+  logo_path        TEXT,
+  favicon_path     TEXT,
+  login_banner     TEXT,
+  footer_text      TEXT,
+  environment_label TEXT,
+  is_active        INTEGER NOT NULL DEFAULT 1,
+  created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tenant_config (
+  tenant_id      TEXT NOT NULL,
+  namespace      TEXT NOT NULL,
+  key            TEXT NOT NULL,
+  value          TEXT NOT NULL,
+  schema_version INTEGER NOT NULL DEFAULT 1,
+  updated_by     INTEGER,
+  updated_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (tenant_id, namespace, key),
+  FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id)
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_config_ns ON tenant_config(tenant_id, namespace);
+
+CREATE TABLE IF NOT EXISTS tenant_config_history (
+  history_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id      TEXT NOT NULL,
+  namespace      TEXT NOT NULL,
+  key            TEXT NOT NULL,
+  value          TEXT NOT NULL,
+  schema_version INTEGER NOT NULL,
+  changed_by     INTEGER,
+  reason         TEXT NOT NULL,
+  -- changed_at is set explicitly by the service layer (never server-default)
+  -- so that the hash computed pre-INSERT matches what a verifier recomputes
+  -- post-SELECT. Do not rely on DEFAULT CURRENT_TIMESTAMP here.
+  changed_at     TEXT NOT NULL,
+  prev_hash      TEXT,
+  hash           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tcfg_hist ON tenant_config_history(tenant_id, namespace, key, changed_at DESC);

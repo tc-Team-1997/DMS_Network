@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/_tenant_meta",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "display_name":      { "type": "string", "minLength": 1, "maxLength": 120 },
+    "regulator_name":    { "type": "string", "minLength": 1, "maxLength": 200 },
+    "regulator_short":   { "type": "string", "minLength": 1, "maxLength": 20  },
+    "default_locale":    { "type": "string", "minLength": 2, "maxLength": 10  },
+    "allowed_locales":   { "type": "string", "minLength": 2               },
+    "primary_color":     { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "monogram":          { "type": "string", "minLength": 1, "maxLength": 8  },
+    "logo_path":         { "type": "string" },
+    "favicon_path":      { "type": "string" },
+    "login_banner":      { "type": "string" },
+    "footer_text":       { "type": "string" },
+    "environment_label": { "type": "string" },
+    "is_active":         { "type": "string", "enum": ["0", "1"] }
+  }
+}

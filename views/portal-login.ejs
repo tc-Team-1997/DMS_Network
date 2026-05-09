@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"/><title>NBE Customer Portal</title>
+<html><head><meta charset="UTF-8"/><title><%= tenant ? tenant.display_name : 'DMS' %> Customer Portal</title>
 <link rel="stylesheet" href="/css/app.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=DM+Sans&display=swap" rel="stylesheet"/>
 </head>
@@ -7,7 +7,7 @@
 <div style="background:#0f2044;padding:40px;border-radius:14px;width:420px;border:1px solid rgba(201,168,76,.2)">
   <div style="text-align:center;margin-bottom:28px">
     <div style="font-family:'Cormorant Garamond',serif;font-size:24px;color:#e8c96b;font-weight:700">Customer Self-Service</div>
-    <div style="font-size:10px;color:#8da0b8;letter-spacing:2px;text-transform:uppercase">National Bank of Egypt</div>
+    <div style="font-size:10px;color:#8da0b8;letter-spacing:2px;text-transform:uppercase"><%= tenant ? tenant.display_name : 'Document Management' %></div>
   </div>
   <% if (error) { %><div style="background:rgba(224,92,92,.15);border:1px solid rgba(224,92,92,.3);color:#e05c5c;padding:10px;border-radius:8px;margin-bottom:14px;font-size:12px"><%= error %></div><% } %>
   <form method="POST" action="/portal/verify">

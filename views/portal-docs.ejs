@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"/><title>My Documents - NBE Customer Portal</title>
+<html><head><meta charset="UTF-8"/><title>My Documents - <%= tenant ? tenant.display_name : 'DMS' %> Customer Portal</title>
 <link rel="stylesheet" href="/css/app.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=DM+Sans&display=swap" rel="stylesheet"/>
 </head>
@@ -39,7 +39,7 @@
     </table>
   </div>
   <div style="text-align:center;margin-top:24px;font-size:11px;color:var(--silver)">
-    For assistance, call 19623 or visit any NBE branch · This portal is a simulated demo
+    For assistance, contact any <%= tenant ? tenant.display_name : 'DMS' %> branch
   </div>
 </div>
 </body></html>

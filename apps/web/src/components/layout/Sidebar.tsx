@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { FileText, LogOut } from 'lucide-react';
 import { useAuth } from '@/store/auth';
+import { useTenant } from '@/store/tenant';
 import { canAccess, navItems, sections } from './nav';
 import { cn } from '@/lib/cn';
 
@@ -8,6 +9,7 @@ export function Sidebar() {
   const { pathname } = useLocation();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
+  const tenant = useTenant();
 
   if (!user) return null;
 
@@ -19,6 +21,10 @@ export function Sidebar() {
       .slice(0, 2)
       .toUpperCase();
 
+  // Tenant monogram: use loaded value, fall back to first two chars of display_name.
+  const monogram = tenant.monogram ||
+    (tenant.display_name ? tenant.display_name.slice(0, 2).toUpperCase() : 'DM');
+
   const onLogout = async () => {
     await logout();
     window.location.href = '/login';
@@ -26,7 +32,7 @@ export function Sidebar() {
 
   return (
     <aside className="w-[220px] h-screen bg-sidebar flex flex-col flex-shrink-0">
-      {/* Logo */}
+      {/* Logo + tenant monogram */}
       <div className="px-4 pt-5 pb-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg bg-brand-blue flex items-center justify-center flex-shrink-0">
@@ -37,6 +43,17 @@ export function Sidebar() {
             <p className="text-sidebar-text text-[10px] leading-tight opacity-80">Document Platform</p>
           </div>
         </div>
+        {/* Tenant monogram chip — only render once branding has resolved */}
+        {tenant.display_name && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-[9px] font-bold leading-none">{monogram}</span>
+            </div>
+            <span className="text-sidebar-text text-[10px] leading-tight opacity-70 truncate">
+              {tenant.display_name}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Nav */}

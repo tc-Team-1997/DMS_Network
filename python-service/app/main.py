@@ -230,6 +230,8 @@ from .routers import doctypes as doctypes_router  # noqa: E402
 app.include_router(doctypes_router.router)
 from .routers import document_types as document_types_router  # noqa: E402
 app.include_router(document_types_router.router)
+from .routers import integrations_admin as integrations_admin_router  # noqa: E402
+app.include_router(integrations_admin_router.router)
 
 
 setup_tracing(app, engine)

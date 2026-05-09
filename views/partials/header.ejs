@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>NBE - Document Management System</title>
+<title><%= tenant ? tenant.display_name : 'DMS' %> - Document Management System</title>
 <link rel="stylesheet" href="/css/app.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -13,7 +13,7 @@
   <div class="bank-logo">
     <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
     <div>
-      <div class="bank-name">National Bank of Egypt</div>
+      <div class="bank-name"><%= tenant ? tenant.display_name : 'Document Management' %></div>
       <div class="bank-sub">Document Management System</div>
     </div>
   </div>

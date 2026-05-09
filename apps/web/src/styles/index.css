@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tenant-driven CSS custom property (CC2).
+   Set at :root as a static fallback (Bank of Bhutan primary colour).
+   App.tsx overrides this once the tenant payload resolves, so any
+   bg-brand-primary / text-brand-primary classes pick up the real value
+   without a flash. */
+:root {
+  --brand-primary: #0D2B6A;
+}
+
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
   html { font-size: 14px; }

@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/integrations",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "ocr.provider":        { "type": "string", "enum": ["ollama", "aws"] },
+    "embedding.provider":  { "type": "string", "enum": ["local",  "aws"] },
+    "llm.provider":        { "type": "string", "enum": ["ollama", "aws"] },
+    "llm.model":           { "type": "string", "minLength": 1, "maxLength": 64 },
+    "translate.provider":  { "type": "string", "enum": ["ollama", "aws"] },
+    "face_match.provider": { "type": "string", "enum": ["local",  "aws"] },
+    "sms.provider":        { "type": "string", "enum": ["noop",   "aws"] },
+    "email.provider":      { "type": "string", "enum": ["local",  "aws"] },
+    "storage.provider":    { "type": "string", "enum": ["local",  "aws"] },
+    "kms.provider":        { "type": "string", "enum": ["local",  "aws"] },
+    "watchlist.provider":  { "type": "string", "enum": ["ofac_json", "aws"] },
+    "watchlist.path":      { "type": "string", "minLength": 1 },
+    "bi.provider":         { "type": "string", "enum": ["local",  "aws"] },
+    "cdn.provider":        { "type": "string", "enum": ["noop",   "aws"] },
+    "cache.provider":      { "type": "string", "enum": ["local",  "aws"] }
+  }
+}

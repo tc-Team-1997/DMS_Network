@@ -17,9 +17,13 @@ router.use('/auth', require('./spa-api/auth'));
 // Legacy aliases kept for backward-compat with existing SPA calls to
 // /spa/api/login, /spa/api/logout, /spa/api/me.
 router.use(require('./spa-api/auth'));
+// Anonymous tenant branding endpoint used by the login page before auth.
+router.use(require('./spa-api/tenant-public'));
 
 // Everything below requires a logged-in session.
 router.use(requireAuthJson);
+// Tenant-switch endpoint (requires session; returns 403 until Wave B Users-v2).
+router.use(require('./spa-api/me-switch-tenant'));
 
 router.use(require('./spa-api/stats'));
 router.use(require('./spa-api/folders'));
@@ -47,5 +51,7 @@ router.use(require('./spa-api/worm'));
 router.use(require('./spa-api/redaction'));
 router.use(require('./spa-api/face-match'));
 router.use(require('./spa-api/translate'));
+router.use(require('./spa-api/admin-config'));
+router.use(require('./spa-api/admin-tenants'));
 
 module.exports = router;

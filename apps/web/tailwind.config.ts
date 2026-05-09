@@ -16,6 +16,10 @@ export default {
           blueHover: '#104a94',
           sky:       '#2196F3',
           skyLight:  '#E3EFFF',
+          // Tenant-driven token (CC2). Reads the CSS custom property set by
+          // App.tsx once the tenant payload resolves. Existing brand.* tokens
+          // are static fallbacks and remain unchanged.
+          primary:   'var(--brand-primary)',
         },
 
         // Sidebar + action aliases

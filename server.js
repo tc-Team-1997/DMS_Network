@@ -83,6 +83,26 @@ app.use((req, res, next) => {
   next();
 });
 
+// Tenant branding middleware — populates res.locals.tenant for all EJS
+// templates (login, portal-login, authenticated views).
+// Rules (per CC2 plan):
+//   • If the session has a tenant_id → load that specific tenant.
+//   • Otherwise → load the first active tenant (same deterministic query
+//     used by GET /spa/api/tenant-public).
+// The loaders cache their results in module scope so unauthenticated requests
+// (e.g. login page paints) don't hit SQLite on every render.
+{
+  // loadTenant and loadDefaultTenant are named properties on the router export.
+  const tenantPublic = require('./routes/spa-api/tenant-public');
+  const loadTenant = tenantPublic.loadTenant;
+  const loadDefaultTenant = tenantPublic.loadDefaultTenant;
+  app.use((req, res, next) => {
+    const tenantId = req.session?.user?.tenant_id;
+    res.locals.tenant = tenantId ? loadTenant(tenantId) : loadDefaultTenant();
+    next();
+  });
+}
+
 app.get('/login', (req, res) => res.render('login', { error: null, mfaRequired: false, username: '' }));
 
 app.post('/login', (req, res) => {

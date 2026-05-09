@@ -1,12 +1,13 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { FileText, ShieldCheck, Workflow as WorkflowIcon, Search as SearchIcon, type LucideIcon } from 'lucide-react';
+import { FileText, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/store/auth';
 import { HttpError } from '@/lib/http';
 import { Button, Input } from '@/components/ui';
+import { fetchTenantPublic, type Tenant } from '@/store/tenant';
 
 const schema = z.object({
   username: z.string().min(1, 'Username required'),
@@ -14,62 +15,13 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-// ── Carousel content — DocManager value props ─────────────────────────────
-interface Slide {
-  icon: LucideIcon;
-  title: string;
-  body: string;
-}
-const SLIDES: readonly Slide[] = [
-  {
-    icon: FileText,
-    title: 'Capture, classify, index.',
-    body: 'Multi-channel capture from branch scanners, mobile, email, and portal — OCR and AI classification in one pipeline.',
-  },
-  {
-    icon: WorkflowIcon,
-    title: 'Maker–checker workflows.',
-    body: 'Configurable approval chains with full audit, escalation, and step-up authentication for high-risk documents.',
-  },
-  {
-    icon: SearchIcon,
-    title: 'Enterprise search across branches.',
-    body: 'Full-text across OCR, metadata, and customer records — results scoped by branch, role, and risk band.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Banking-grade compliance.',
-    body: 'CBE retention policies, WORM archival, signature chain of custody, and tenant-isolated encryption at rest.',
-  },
-] as const;
+// ---------------------------------------------------------------------------
+// Static hero panel — shows tenant branding from the anonymous endpoint
+// ---------------------------------------------------------------------------
 
-const SLIDE_INTERVAL_MS = 5200;
-
-function CarouselPanel() {
-  const [idx, setIdx] = useState(0);
-  const [prevIdx, setPrevIdx] = useState<number | null>(null);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setIdx((i) => {
-        setPrevIdx(i);
-        return (i + 1) % SLIDES.length;
-      });
-    }, SLIDE_INTERVAL_MS);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    if (prevIdx === null) return;
-    const t = setTimeout(() => setPrevIdx(null), 950);
-    return () => clearTimeout(t);
-  }, [prevIdx]);
-
-  const jump = (next: number) => {
-    if (next === idx) return;
-    setPrevIdx(idx);
-    setIdx(next);
-  };
+function StaticHeroPanel({ tenant }: { tenant: Tenant | null }) {
+  const displayName = tenant?.display_name ?? '';
+  const banner = tenant?.login_banner ?? 'Document operations that survive scrutiny.';
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-brand-navy">
@@ -96,62 +48,34 @@ function CarouselPanel() {
             <FileText size={16} className="text-white" strokeWidth={2.25} />
           </div>
           <div>
-            <p className="text-white text-[13px] font-semibold leading-tight">DocManager</p>
+            <p className="text-white text-[13px] font-semibold leading-tight">
+              {displayName || 'DocManager'}
+            </p>
             <p className="text-white/60 text-[10px] leading-tight">Enterprise Document Management</p>
           </div>
         </div>
 
-        <div className="relative min-h-[220px]">
-          {SLIDES.map((slide, i) => {
-            const Icon = slide.icon;
-            const state = i === idx ? 'is-active' : i === prevIdx ? 'is-leaving' : '';
-            return (
-              <div key={i} className={`auth-slide ${state}`}>
-                <div className="auth-slide-child auth-slide-child--icon w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mb-5 shadow-xl shadow-black/20">
-                  <Icon size={24} className="text-white" strokeWidth={1.75} />
-                </div>
-                <h2 className="auth-slide-child auth-slide-child--title text-white text-[26px] font-semibold leading-[1.15] tracking-tight mb-3 max-w-md">
-                  {slide.title}
-                </h2>
-                <p className="auth-slide-child auth-slide-child--body text-white/70 text-[13px] leading-relaxed max-w-md">
-                  {slide.body}
-                </p>
-              </div>
-            );
-          })}
+        <div className="relative min-h-[220px] flex flex-col justify-center">
+          <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mb-5 shadow-xl shadow-black/20">
+            <FileText size={24} className="text-white" strokeWidth={1.75} />
+          </div>
+          <h2 className="text-white text-[26px] font-semibold leading-[1.15] tracking-tight mb-3 max-w-md">
+            {displayName ? `Welcome to ${displayName}.` : 'Capture, classify, index.'}
+          </h2>
+          <p className="text-white/70 text-[13px] leading-relaxed max-w-md">
+            {banner}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {SLIDES.map((_, i) => {
-            const active = i === idx;
-            const style = active
-              ? ({ '--auth-interval': `${SLIDE_INTERVAL_MS}ms` } as CSSProperties)
-              : undefined;
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => jump(i)}
-                aria-label={`Slide ${i + 1}`}
-                className={`relative h-1.5 rounded-full overflow-hidden transition-all duration-500 ease-out ${
-                  active ? 'w-10 bg-white/25' : 'w-1.5 bg-white/40 hover:bg-white/60'
-                }`}
-              >
-                {active && (
-                  <span
-                    key={`bar-${idx}`}
-                    className="auth-dot-active-bar absolute inset-0 bg-white rounded-full"
-                    style={style}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <div />
       </div>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Login page
+// ---------------------------------------------------------------------------
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -159,6 +83,17 @@ export function LoginPage() {
   const login = useAuth((s) => s.login);
   const status = useAuth((s) => s.status);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [publicTenant, setPublicTenant] = useState<Tenant | null>(null);
+
+  // Fetch public tenant branding — anonymous, before user is authenticated.
+  // This powers the hero panel's display_name and login_banner.
+  useEffect(() => {
+    fetchTenantPublic()
+      .then(setPublicTenant)
+      .catch(() => {
+        // Silently ignore — the panel falls back to generic copy.
+      });
+  }, []);
 
   // Parse the ?next= return URL set by the 401 interceptor or expiry redirect.
   const searchParams = new URLSearchParams(location.search);
@@ -185,10 +120,12 @@ export function LoginPage() {
     }
   });
 
+  const displayName = publicTenant?.display_name ?? '';
+
   return (
     <div className="min-h-screen flex bg-white">
       <div className="hidden lg:block lg:w-1/2">
-        <CarouselPanel />
+        <StaticHeroPanel tenant={publicTenant} />
       </div>
 
       <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-4 relative bg-white overflow-hidden">
@@ -211,7 +148,9 @@ export function LoginPage() {
               <FileText size={14} className="text-white" strokeWidth={2.25} />
             </div>
             <div>
-              <p className="text-ink text-sm font-semibold leading-tight">DocManager</p>
+              <p className="text-ink text-sm font-semibold leading-tight">
+                {displayName || 'DocManager'}
+              </p>
               <p className="text-muted text-[11px]">Enterprise Document Management</p>
             </div>
           </div>
@@ -221,7 +160,11 @@ export function LoginPage() {
           </div>
 
           <h2 className="text-xl font-semibold text-ink mb-1 tracking-tight">Sign in</h2>
-          <p className="text-[13px] text-sub mb-5">Document operations for authorised staff only</p>
+          <p className="text-[13px] text-sub mb-5">
+            {displayName
+              ? `${displayName} document operations for authorised staff only`
+              : 'Document operations for authorised staff only'}
+          </p>
 
           <form onSubmit={onSubmit} className="space-y-3" noValidate>
             <Input
@@ -252,25 +195,6 @@ export function LoginPage() {
               Sign in
             </Button>
           </form>
-
-          <div className="mt-4 pt-4 border-t border-divider space-y-2">
-            <p className="text-center text-[11px] text-muted font-medium uppercase tracking-wide">Demo credentials</p>
-            <div className="grid grid-cols-1 gap-1.5">
-              {[
-                { user: 'admin',    pass: 'admin123',   role: 'Doc Admin' },
-                { user: 'sara',     pass: 'sara123',    role: 'Maker' },
-                { user: 'mohamed',  pass: 'mohamed123', role: 'Checker' },
-              ].map(({ user, pass, role }) => (
-                <div
-                  key={user}
-                  className="flex items-center justify-between rounded-input border border-divider bg-raised px-3 py-1.5 text-[11px]"
-                >
-                  <span className="font-mono text-ink font-medium">{user} / {pass}</span>
-                  <span className="text-muted">{role}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

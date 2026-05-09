@@ -5,6 +5,10 @@ const bcrypt = require('bcryptjs');
 const db = require('../../db');
 const { publicUser, requirePermJson } = require('./_shared');
 const { redis: sessionRedis } = require('../../services/session-store');
+// Tenant loaders — attached as named properties on the tenant-public router so
+// we reuse the module-level cache without a second DB hit for the default row.
+const { loadTenant } = require('./tenant-public');
+const { getNamespace } = require('../../db/tenant-config');
 
 const router = express.Router();
 
@@ -169,18 +173,50 @@ router.get('/me', (req, res) => {
     return res.status(401).json({ error: 'unauthenticated' });
   }
   const u = req.session.user;
-  // Return both the flat shape the SPA expects AND the legacy wrapper so
-  // older callers keep working.
-  res.json({
-    id:       u.id,
-    username: u.username,
-    role:     u.role,
-    fullName: u.full_name || u.fullName || null,
+  const tenantId = u.tenant_id || 'nbe';
+
+  // Resolve the tenant row for this user. Falls back to the default active
+  // tenant when tenant_id is absent or doesn't match any row.
+  let tenant = loadTenant(tenantId);
+
+  // CC7 fix: merge tenant_config branding overrides on top of the base tenant row.
+  // This ensures that changes made via Settings → Branding panel reach the SPA
+  // without requiring a server restart.
+  if (tenant) {
+    const brandingOverrides = getNamespace(tenant.tenant_id, 'branding') || {};
+    tenant = { ...tenant, ...brandingOverrides };
+  }
+
+  // available_tenants: the users table has a single tenant_id column with no
+  // many-to-many join table yet. Return only the current tenant.
+  // TODO Wave B Users-v2: replace with a real user_tenants query.
+  const available_tenants = tenant
+    ? [{ tenant_id: tenant.tenant_id, slug: tenant.slug, display_name: tenant.display_name }]
+    : [];
+
+  const userPayload = {
+    id:        u.id,
+    username:  u.username,
     full_name: u.full_name || u.fullName || null,
-    branch:   u.branch || null,
-    tenant_id: u.tenant_id || 'nbe',
-    // Legacy wrapper field — kept for backward compat.
-    user: u,
+    role:      u.role,
+    branch:    u.branch || null,
+    tenant_id: tenantId,
+  };
+
+  res.json({
+    // New canonical shape consumed by the SPA tenant store.
+    user:              userPayload,
+    tenant:            tenant ?? null,
+    available_tenants,
+    // Legacy flat fields — kept for backward compat with older callers that
+    // read top-level id/username/role/etc. directly from the /me response.
+    id:        u.id,
+    username:  u.username,
+    role:      u.role,
+    fullName:  u.full_name || u.fullName || null,
+    full_name: u.full_name || u.fullName || null,
+    branch:    u.branch || null,
+    tenant_id: tenantId,
   });
 });
 

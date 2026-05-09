@@ -377,6 +377,62 @@ try {
   `);
 
   seedDefaultTypeSchemas();
+
+  // CC1 — Tenant registry + configuration store.
+  // schema.sql already contains these CREATE TABLE IF NOT EXISTS blocks; the
+  // exec below is the boot-time idempotency guard for existing DBs that
+  // predate the schema.sql append (mirrors the pattern used above for
+  // ai_conversations, redaction_log, cbs_document_links, etc.).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tenants (
+      tenant_id        TEXT PRIMARY KEY,
+      slug             TEXT UNIQUE NOT NULL,
+      display_name     TEXT NOT NULL,
+      regulator_name   TEXT NOT NULL,
+      regulator_short  TEXT NOT NULL,
+      default_locale   TEXT NOT NULL DEFAULT 'en',
+      allowed_locales  TEXT NOT NULL DEFAULT '["en"]',
+      primary_color    TEXT NOT NULL DEFAULT '#0D2B6A',
+      monogram         TEXT NOT NULL DEFAULT 'DM',
+      logo_path        TEXT,
+      favicon_path     TEXT,
+      login_banner     TEXT,
+      footer_text      TEXT,
+      environment_label TEXT,
+      is_active        INTEGER NOT NULL DEFAULT 1,
+      created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS tenant_config (
+      tenant_id      TEXT NOT NULL,
+      namespace      TEXT NOT NULL,
+      key            TEXT NOT NULL,
+      value          TEXT NOT NULL,
+      schema_version INTEGER NOT NULL DEFAULT 1,
+      updated_by     INTEGER,
+      updated_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (tenant_id, namespace, key),
+      FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_tenant_config_ns ON tenant_config(tenant_id, namespace);
+
+    CREATE TABLE IF NOT EXISTS tenant_config_history (
+      history_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id      TEXT NOT NULL,
+      namespace      TEXT NOT NULL,
+      key            TEXT NOT NULL,
+      value          TEXT NOT NULL,
+      schema_version INTEGER NOT NULL,
+      changed_by     INTEGER,
+      reason         TEXT NOT NULL,
+      changed_at     TEXT NOT NULL,
+      prev_hash      TEXT,
+      hash           TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tcfg_hist
+      ON tenant_config_history(tenant_id, namespace, key, changed_at DESC);
+  `);
 } catch (err) {
   // Never block boot on migration chatter; log for operators.
   // eslint-disable-next-line no-console

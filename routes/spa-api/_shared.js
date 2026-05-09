@@ -96,11 +96,16 @@ function tenantScope(req) {
   return req.session?.user?.tenant_id || 'nbe';
 }
 
+// Re-export requireNamespacePermJson from services/rbac so routers only need
+// to import from this single shared module.
+const { requireNamespacePermJson } = require('../../services/rbac');
+
 module.exports = {
   pyCall,
   publicUser,
   requireAuthJson,
   requirePermJson,
+  requireNamespacePermJson,
   branchScope,
   tenantScope,
 };

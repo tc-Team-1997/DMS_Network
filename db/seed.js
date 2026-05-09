@@ -1,3 +1,9 @@
+// Production guard — refuse to run in production unless explicitly overridden.
+if (process.env.NODE_ENV === 'production' && !process.env.DMS_FORCE_SEED) {
+  console.error('[seed] refused to run in production. Use db/tenant-init.js to bootstrap a real tenant.');
+  process.exit(1);
+}
+
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
@@ -361,5 +367,29 @@ if (cbsLinkDoc && cbsLinkUser) {
   const cbsLinkCount = db.prepare('SELECT COUNT(*) c FROM cbs_document_links').get().c;
   console.log(`CBS document links seeded (${cbsLinkCount} total rows).`);
 }
+
+// ---------------------------------------------------------------------------
+// CC1 — Tenant registry seed (idempotent via INSERT OR IGNORE)
+// tenant_id='nbe' is the historical identifier preserved across all existing
+// rows. display_name='Bank of Bhutan' surfaces in the UI so users never see
+// the internal 'nbe' slug.
+// ---------------------------------------------------------------------------
+db.prepare(
+  `INSERT OR IGNORE INTO tenants
+     (tenant_id, slug, display_name, regulator_name, regulator_short,
+      default_locale, allowed_locales, primary_color, monogram, is_active)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+).run(
+  'nbe',
+  'bob',
+  'Bank of Bhutan',
+  'Royal Monetary Authority',
+  'RMA',
+  'en',
+  '["en","dz"]',
+  '#0D2B6A',
+  'BoB'
+);
+console.log('Tenant seeded (nbe / Bank of Bhutan).');
 
 db.close();

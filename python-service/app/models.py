@@ -798,3 +798,86 @@ class RedactionLog(Base):
     reason             = Column(String(128), nullable=False)
     created_at         = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     tenant_id          = Column(String(64), nullable=False, default="default", index=True)
+
+
+# ---------------------------------------------------------------------------
+# CC1 — Tenant registry + configuration store (migration 0027_tenant_config)
+# ---------------------------------------------------------------------------
+
+
+class Tenant(Base):
+    """Registry of tenant organisations.
+
+    tenant_id is the stable internal key ('nbe', 'xyz-bank', …).
+    slug is the URL-friendly alias shown in the UI (e.g. 'bob' for Bank of Bhutan).
+    display_name is the human-readable bank name surfaced everywhere in the UI.
+    allowed_locales is a JSON-encoded list of locale codes, e.g. '["en","dz"]'.
+    """
+    __tablename__ = "tenants"
+
+    tenant_id        = Column(String(64), primary_key=True)
+    slug             = Column(String(128), unique=True, nullable=False)
+    display_name     = Column(String(256), nullable=False)
+    regulator_name   = Column(String(256), nullable=False)
+    regulator_short  = Column(String(32), nullable=False)
+    default_locale   = Column(String(16), nullable=False, default="en")
+    allowed_locales  = Column(Text, nullable=False, default='["en"]')
+    primary_color    = Column(String(16), nullable=False, default="#0D2B6A")
+    monogram         = Column(String(8), nullable=False, default="DM")
+    logo_path        = Column(Text, nullable=True)
+    favicon_path     = Column(Text, nullable=True)
+    login_banner     = Column(Text, nullable=True)
+    footer_text      = Column(Text, nullable=True)
+    environment_label = Column(String(64), nullable=True)
+    is_active        = Column(Integer, nullable=False, default=1)
+    created_at       = Column(DateTime, default=datetime.utcnow)
+    updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    configs = relationship("TenantConfig", back_populates="tenant", cascade="all, delete-orphan")
+
+
+class TenantConfig(Base):
+    """Live configuration values for a tenant, keyed by (tenant_id, namespace, key).
+
+    value is always JSON-encoded text — use json.loads/dumps.
+    updated_by is the Node user id (integer) from the session that wrote the
+    change; no FK enforced here since user rows live in the Node SQLite.
+    """
+    __tablename__ = "tenant_config"
+
+    tenant_id      = Column(String(64), ForeignKey("tenants.tenant_id"), nullable=False, primary_key=True)
+    namespace      = Column(String(64), nullable=False, primary_key=True)
+    key            = Column(String(128), nullable=False, primary_key=True)
+    value          = Column(Text, nullable=False)
+    schema_version = Column(Integer, nullable=False, default=1)
+    updated_by     = Column(Integer, nullable=True)
+    updated_at     = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    tenant = relationship("Tenant", back_populates="configs")
+
+
+class TenantConfigHistory(Base):
+    """Append-only SHA-256 hash-chain audit log for tenant_config changes.
+
+    Hash chain rule (see services/tenant_config.py for canonical implementation):
+      canonical_json = json.dumps(row_dict, sort_keys=True, separators=(',', ':'))
+      hash = sha256((prev_hash or '') + canonical_json).hexdigest()
+
+    IMPORTANT: changed_at carries no server default. The service layer sets it
+    explicitly (datetime.utcnow().isoformat() + 'Z') BEFORE computing the hash.
+    This ensures the hash stored in the row equals the hash a verifier computes
+    from the row after SELECT. Never let the DB supply this timestamp.
+    """
+    __tablename__ = "tenant_config_history"
+
+    history_id     = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id      = Column(String(64), nullable=False, index=True)
+    namespace      = Column(String(64), nullable=False)
+    key            = Column(String(128), nullable=False)
+    value          = Column(Text, nullable=False)
+    schema_version = Column(Integer, nullable=False)
+    changed_by     = Column(Integer, nullable=True)
+    reason         = Column(Text, nullable=False)
+    changed_at     = Column(String(32), nullable=False)   # ISO-8601 UTC; set client-side, no server default
+    prev_hash      = Column(String(64), nullable=True)
+    hash           = Column(String(64), nullable=False)
