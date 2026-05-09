@@ -218,6 +218,13 @@ try {
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_documents_worm_locked_at    ON documents(worm_locked_at)"); } catch (e) {}
   try { db.exec("CREATE INDEX IF NOT EXISTS idx_documents_worm_unlock_after ON documents(worm_unlock_after)"); } catch (e) {}
 
+  // Wave C — notifications feed columns (mirrors alembic 0042).
+  addColumnIfMissing('notifications', 'is_read',     'is_read INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing('notifications', 'read_at',     'read_at TEXT');
+  addColumnIfMissing('notifications', 'event_type',  'event_type TEXT');
+  addColumnIfMissing('notifications', 'template_id', 'template_id TEXT');
+  try { db.exec('CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read)'); } catch (e) {}
+
   // Document redaction — version chain + audit log (BHU-46).
   addColumnIfMissing('documents', 'parent_id', 'parent_id INTEGER REFERENCES documents(id)');
   addColumnIfMissing('documents', 'redacted',  'redacted INTEGER DEFAULT 0');
