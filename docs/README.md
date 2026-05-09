@@ -10,7 +10,7 @@
 
 We are **purely a Document Management System** for banking — not a core banking system, not a loan origination system, not an AML transaction-monitoring product. We are the specialist; we integrate with everyone else.
 
-> **What's live on a laptop today (2026-04-17):** NBE pilot SPA (18 screens, 227 KB gzipped), Node session gateway, Python FastAPI service, MinIO content-addressed storage, and **DocBrain running 100% locally on Ollama** (`llama3.2:3b` + `nomic-embed-text`). 22/22 Playwright tests green in ~3s. One command brings it up: `./start.sh`.
+> **What's live on a laptop today (2026-05-09):** NBE pilot SPA (18 screens, 227 KB gzipped), Node session gateway, Python FastAPI service, MinIO content-addressed storage, and **DocBrain running 100% locally on Ollama** (`llama3.2:3b` + `nomic-embed-text`). 81/81 Playwright tests green (26 spec files, 25 skipped) in ~20s. AML document-level screening and scheduled retention services shipped. One command brings it up: `./start.sh`.
 > The `docs/` set distinguishes **today's pilot architecture** (see [ARCHITECTURE.md](./ARCHITECTURE.md), [TECHNICAL.md](./TECHNICAL.md)) from the **target multi-tenant SaaS** ([TARGET_ARCHITECTURE.md](./TARGET_ARCHITECTURE.md)). Don't confuse them.
 
 ## 2. The documentation set
@@ -105,3 +105,4 @@ Trivial edits (typos, link fixes, formatting) can go in normal PRs without an RF
 | 2026-04-17 | All | Initial strategic document set: VISION, ROADMAP, TARGET_ARCHITECTURE, INTEGRATION_STRATEGY, AI_STRATEGY, SECURITY_COMPLIANCE, ENGINEERING_PRINCIPLES |
 | 2026-04-17 | PROJECT.md, ARCHITECTURE.md, TECHNICAL.md | Pre-existing tactical docs — carried forward |
 | 2026-04-17 | README, TECHNICAL, ARCHITECTURE, AI_STRATEGY | **DocBrain v0 shipped locally**: Ollama + `llama3.2:3b` + `nomic-embed-text`, MinIO CAS, numpy-cosine vector search, RAG with mandatory citations. 4 new Playwright specs green; docs annotated with "what's live today" sections. |
+| 2026-05-09 | TECHNICAL.md, PROJECT.md, ARCHITECTURE.md, README.md | **AML document-screening router + retention scheduler shipped**. 81/81 Playwright tests passing (26 spec files, 25 skipped), ~159 pytest functions. Clarified AML scope: we do not build transaction-monitoring AML, but we DO provide document-level sanctions/watchlist screening as an integration surface. |

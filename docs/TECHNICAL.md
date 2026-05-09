@@ -30,7 +30,7 @@ Last updated: 2026-04-17
 | Object storage | MinIO (S3-compatible) | `RELEASE.2024-*` | Content-addressed blob store (`tenants/…/sha256/aa/bb/full`); filesystem fallback when the daemon is down |
 | Local LLM runtime | Ollama | 0.5.x | Serves `llama3.2:3b` (chat, JSON-mode) and `nomic-embed-text` (768-dim embeddings) |
 | Vector search | sqlite3 BLOB + numpy | — | Float32 cosine similarity over rows; **not** pgvector / sqlite-vec in dev (Homebrew Python 3.14 ships without `enable_load_extension`) |
-| E2E | Playwright | 1.59.x | 22 specs (18 M1 + 4 DocBrain), chromium project, green |
+| E2E | Playwright | 1.59.x | 26 spec files, 81 tests passing, 25 skipped, chromium project, green |
 
 ---
 
@@ -129,7 +129,7 @@ apps/web/
 │       ├── search/SearchPage.tsx
 │       ├── alerts/AlertsPage.tsx
 │       └── _placeholder/ComingSoonPage.tsx
-└── e2e/                          # Playwright specs (18 tests)
+└── e2e/                          # Playwright specs (26 files, 81 tests passing)
     ├── helpers.ts
     ├── auth.spec.ts
     ├── dashboard.spec.ts
@@ -264,7 +264,7 @@ Typecheck: `npm run typecheck` (`tsc --noEmit`). ESLint: `npm run lint` (zero wa
 
 ```bash
 cd apps/web
-npx playwright test              # 22 tests, ~3s on a warm runner
+npx playwright test              # 81 tests passing, 25 skipped, ~20s on a warm runner
 npx playwright test e2e/docbrain.spec.ts
 npx playwright test --grep "login"
 ```
@@ -285,15 +285,15 @@ DocBrain specs mock `**/spa/api/docbrain/*` with `page.route()` — tests stay d
 ### Python (existing)
 
 ```bash
-cd python-service && pytest -q   # 7 tests, all green
+cd python-service && pytest -q   # ~159 test functions, all green
 ```
 
 ### Build gates
 
 - `tsc --noEmit` → 0 errors
 - `vite build` → succeeds
-- `pytest` → 7/7
-- `playwright test` → 18/18
+- `pytest` → ~159/159
+- `playwright test` → 81/81 passing, 25 skipped
 - CI additionally runs `python -m compileall`, `terraform fmt -check`, `helm lint`.
 
 ---
@@ -355,7 +355,12 @@ capture  ──▶  OCR (tesseract + pdf2image)  ──▶  OcrResult { text, la
 - **MinIO locally, S3 in prod** — same S3 client code (`storage_s3.py`) talks to both. MinIO makes the on-prem / air-gapped story real on day one.
 - **`llama3.2:3b` not 70B** — 3B runs fast on a MacBook, and for the Egypt-pilot document classes (passports, national IDs, utility bills) the quality gap against 70B on extraction is small. The prod path swaps the model name in config; no code changes.
 
-### 10.6 Observability today
+### 10.6 Recently shipped services
+
+- `routers/aml.py` — document-level AML risk-scoring and watchlist screening. Shipped 2026-05-09; integrates with AML vendor endpoints for sanctions list matching.
+- `services/retention_scheduler.py` — scheduled document retention and purge service. Shipped 2026-05-09; enforces retention policies and audit logging.
+
+### 10.7 Observability today
 
 - Ollama request log: `.run/ollama.log`.
 - Python request log: `.run/python.log` — every DocBrain call logs `{document_id, op, latency_ms, model, has_evidence}`.
@@ -363,7 +368,7 @@ capture  ──▶  OCR (tesseract + pdf2image)  ──▶  OcrResult { text, la
 
 ---
 
-## 11. Conventions
+## 12. Conventions
 
 1. **No raw hex in TSX.** Use tokens (see §5).
 2. **No bearer tokens in localStorage.** Session cookie only.

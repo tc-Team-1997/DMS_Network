@@ -15,22 +15,22 @@ Last updated: 2026-04-17
 ## 2. Product stance
 
 - **Standalone product** — not a module of `apex_core_cbs`. We share design language (see the apex UI mirror in [TECHNICAL.md §5](./TECHNICAL.md#5-design-system)), not a codebase.
-- **Pure DMS focus** — we do not build CBS, LOS, AML, or card rails. See [VISION.md §3](./VISION.md#3-what-we-are-not) for the full anti-list.
+- **Pure DMS focus** — we do not build CBS, LOS, transaction-monitoring AML, or card rails. We DO provide document-level AML screening (watchlist/sanctions matching) as a compliance integration surface. See [VISION.md §3](./VISION.md#3-what-we-are-not) for the full anti-list.
 - **Integration-first** — 10 pre-built, contract-tested adapters at GA (Temenos, FLEXCUBE, Finastra, Mambu, Thought Machine, Oracle Banking, FIS Profile, Salesforce FS, DocuSign, Microsoft Fabric). See [INTEGRATION_STRATEGY.md](./INTEGRATION_STRATEGY.md).
 - **AI-native, on-prem-capable** — DocBrain runs Llama 3.1 on Ollama / vLLM inside the bank's own perimeter. See [AI_STRATEGY.md](./AI_STRATEGY.md).
 - **Triple deployment** — Pooled SaaS (tier-3), Silo SaaS (tier-2), Dedicated / on-prem (tier-1). Same codebase, three Helm configurations.
 
 ## 3. Where we are today
 
-### 3.1 Shipped (Milestone 1, 2026-04-17)
+### 3.1 Shipped (Milestone 1, 2026-05-09)
 
-Single-tenant NBE pilot, 18 Playwright tests green, ~224 KB gzipped SPA bundle, `tsc --noEmit` clean.
+Single-tenant NBE pilot, 81 Playwright tests passing (26 spec files, 25 skipped), ~224 KB gzipped SPA bundle, `tsc --noEmit` clean.
 
 | Surface | What exists |
 |---|---|
 | **DocManager Web (SPA)** | React 18 + TypeScript + Vite + Tailwind. 7 shipped screens (Login, Dashboard, Capture, Repository, Viewer, Search, Alerts) + 9 coming-soon placeholders. Apex-aligned design system. |
 | **Node gateway** | Express 4, session-cookie auth, SQLite + FTS5, 15+ JSON routes under `/spa/api/*`, security headers, `/py` proxy session-guarded. |
-| **Python FastAPI** | 60+ routers (OCR, workflow, duplicate detection, fraud, face match, redaction, DSAR, CBE reports, step-up, IFRS 9, ledger, anchor, federated learning, zkKYC, OPA ABAC, vector search, copilot, adversarial testing, STRIDE, transparency, tenant_keys…). Most are stubs; the full list is our M2–M4 surface area. |
+| **Python FastAPI** | 60+ routers (OCR, workflow, duplicate detection, fraud, face match, redaction, DSAR, CBE reports, step-up, IFRS 9, ledger, anchor, federated learning, zkKYC, OPA ABAC, vector search, copilot, adversarial testing, STRIDE, transparency, tenant_keys, **AML document-level screening, retention scheduler**…). Core routers (documents, OCR, duplicate detection, AML, retention) are shipped; the remaining list is our M2–M4 surface area. |
 | **Mobile** | Expo app in `mobile/` — branch officer capture + OCR + document push. MVP. |
 | **DevX** | `./start.sh` / `./stop.sh` / `./restart.sh`, Helm charts in `python-service/helm/`, Terraform in `python-service/terraform/`, Dockerfiles, CI workflows in `.github/workflows/` (Python + Node + Terraform + Helm + Playwright). |
 
@@ -105,8 +105,8 @@ DMS_Network/                                    ← this repo
 
 - `tsc --noEmit` — 0 errors
 - `vite build` — succeeds (~224 KB gzipped; budget 300 KB)
-- `pytest -q` (python-service) — 7/7 green
-- `npx playwright test` (apps/web/e2e) — **18/18 green in ~3s**
+- `pytest -q` (python-service) — ~159/159 green
+- `npx playwright test` (apps/web/e2e) — **81/81 passing, 25 skipped in ~20s**
 - ESLint — `@typescript-eslint/no-explicit-any: error`, zero warnings allowed
 - No raw hex in TSX (enforced at code review; apex design-token discipline)
 
@@ -135,7 +135,7 @@ Stop with `./stop.sh`. Restart with `./restart.sh`. Logs in `.run/{node,python,w
 Summary of the pivot from "enterprise DMS for NBE" to "SaaS DMS for any bank":
 
 1. **Positioning is now a product platform,** not a bank-specific deployment. NBE is the first customer, not the final target.
-2. **Pure DMS** — we build document operations deep. We do not build CBS or AML; we integrate.
+2. **Pure DMS** — we build document operations deep. We do not build CBS or transaction-monitoring AML; we provide document-level AML screening as an integration surface and build the DMS itself.
 3. **Three deployment modes** — same codebase, pooled / silo / dedicated Helm values.
 4. **AI is first-class** — DocBrain with in-house Llama + LangChain + LangSmith; no SaaS LLM dependency for tier-1 customers.
 5. **Integration is a product, not plumbing** — 10 adapters shipped, tested nightly against vendor sandboxes.

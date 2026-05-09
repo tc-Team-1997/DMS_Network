@@ -56,12 +56,13 @@ Last updated: 2026-04-17
  │                       FastAPI :8001 (Python 3.14)                            │
  │                                                                              │
  │   60+ routers: documents · ocr · workflow · search · duplicates · face ·     │
- │   redaction · retention · dsar · cbe · stepup · customer_risk · fraud ·      │
+ │   redaction · **aml** · **retention** · dsar · cbe · stepup · customer_risk · fraud ·      │
  │   vector · copilot · ledger · zkkyc · **docbrain** · … (see app/routers/)    │
  │                                                                              │
  │   services: storage (SHA-256 CAS) · tasks (queue) · metrics · tracing ·      │
  │             kafka_bus · opa (ABAC) · signing (PAdES) · etl · provenance      │
  │             **docbrain (llm · ocr · classify · extract · embed · rag)**      │
+ │             **aml** · **retention_scheduler**                               │
  │                                                                              │
  │   ┌──────────────────────────────┐     ┌─────────────────────────────┐       │
  │   │ SQLAlchemy                   │     │ MinIO S3 bucket "docmanager" │       │
