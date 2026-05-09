@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/workflows",
+  "type": "object",
+  "properties": {
+    "reason_codes.approve": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "reason_codes.reject": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "reason_codes.escalate": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "min_comment_length": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "step_up_risk_band": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical", "never"]
+    },
+    "step_up_amount_threshold": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "escalation_targets": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "sla_breach_action": {
+      "type": "string",
+      "enum": ["notify", "auto_escalate", "auto_reject", "none"]
+    },
+    "bulk_action_max": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    }
+  },
+  "additionalProperties": false
+}

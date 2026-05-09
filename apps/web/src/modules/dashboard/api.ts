@@ -1,24 +1,43 @@
+/**
+ * Dashboard v2 API module.
+ *
+ * Replaces the v1 multi-fetch pattern (5 separate endpoints) with a single
+ * GET /spa/api/dashboard/kpis call that returns all tile + chart data.
+ */
+
+import { useQuery } from '@tanstack/react-query';
 import { get } from '@/lib/http';
-import { AlertSchema, StatsSchema, WorkflowSchema } from '@/lib/schemas';
-import { z } from 'zod';
+import { KpisResponseSchema, type Comparator, type KpisResponse, type Timeframe } from './schemas';
 
-export const fetchStats = () => get('/spa/api/stats', StatsSchema);
+export type { KpisResponse };
 
-export const fetchRecentWorkflows = () =>
-  get('/spa/api/workflows', z.array(WorkflowSchema), { limit: 5 });
+// ─── Query key factory ────────────────────────────────────────────────────────
 
-export const fetchRecentAlerts = () =>
-  get('/spa/api/alerts', z.array(AlertSchema), { limit: 5 });
+export const dashboardKeys = {
+  kpis: (tf: Timeframe, compare: Comparator) =>
+    ['dashboard', 'kpis', tf, compare] as const,
+};
 
-export const ExpiryBucketsSchema = z.object({
-  labels: z.array(z.string()),
-  counts: z.array(z.number().int()),
-});
-export type ExpiryBuckets = z.infer<typeof ExpiryBucketsSchema>;
-export const fetchExpiryBuckets = () => get('/spa/api/stats/expiry', ExpiryBucketsSchema);
+// ─── Fetcher ──────────────────────────────────────────────────────────────────
 
-export const DocTypeBreakdownSchema = z.array(
-  z.object({ doc_type: z.string(), count: z.number().int() }),
-);
-export const fetchDocTypeBreakdown = () =>
-  get('/spa/api/stats/doc-types', DocTypeBreakdownSchema);
+export function fetchKpis(tf: Timeframe, compare: Comparator): Promise<KpisResponse> {
+  return get('/spa/api/dashboard/kpis', KpisResponseSchema, {
+    tf,
+    compare,
+  });
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useKpis(
+  tf: Timeframe,
+  compare: Comparator,
+  refreshIntervalMs: number,
+) {
+  return useQuery({
+    queryKey:        dashboardKeys.kpis(tf, compare),
+    queryFn:         () => fetchKpis(tf, compare),
+    staleTime:       refreshIntervalMs,
+    refetchInterval: refreshIntervalMs,
+  });
+}

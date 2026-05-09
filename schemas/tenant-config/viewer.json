@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Viewer namespace configuration",
+  "description": "Controls which annotation tools are available and to which roles, plus viewer-level download/print gates and stamp library.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tools.highlight.enabled": {
+      "type": "boolean",
+      "description": "Allow users to draw highlight rectangles on documents.",
+      "default": true
+    },
+    "tools.comment.enabled": {
+      "type": "boolean",
+      "description": "Allow users to place comment annotations.",
+      "default": true
+    },
+    "tools.stamp.enabled": {
+      "type": "boolean",
+      "description": "Allow users to place stamp overlays (Approved, Rejected, etc.).",
+      "default": true
+    },
+    "tools.sign.enabled": {
+      "type": "boolean",
+      "description": "Allow users to draw freehand signatures on documents.",
+      "default": true
+    },
+    "tools.redact.enabled": {
+      "type": "boolean",
+      "description": "Allow users to create redaction regions.",
+      "default": false
+    },
+    "tools.highlight.roles": {
+      "type": "array",
+      "description": "Roles allowed to use the highlight tool.",
+      "items": { "type": "string" },
+      "default": ["Doc Admin", "Maker", "Checker"]
+    },
+    "tools.comment.roles": {
+      "type": "array",
+      "description": "Roles allowed to use the comment tool.",
+      "items": { "type": "string" },
+      "default": ["Doc Admin", "Maker", "Checker"]
+    },
+    "tools.stamp.roles": {
+      "type": "array",
+      "description": "Roles allowed to use the stamp tool.",
+      "items": { "type": "string" },
+      "default": ["Doc Admin", "Maker", "Checker"]
+    },
+    "tools.sign.roles": {
+      "type": "array",
+      "description": "Roles allowed to use the sign tool.",
+      "items": { "type": "string" },
+      "default": ["Doc Admin", "Maker", "Checker"]
+    },
+    "tools.redact.roles": {
+      "type": "array",
+      "description": "Roles allowed to use the redact tool.",
+      "items": { "type": "string" },
+      "default": ["Doc Admin", "Maker", "Checker"]
+    },
+    "stamp_library": {
+      "type": "array",
+      "description": "Bank-specific stamp definitions rendered in the stamp picker.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "additionalProperties": false,
+        "properties": {
+          "id":       { "type": "string" },
+          "label":    { "type": "string" },
+          "svg_path": { "type": "string" }
+        }
+      },
+      "default": []
+    },
+    "redaction_burn_in_immediate": {
+      "type": "boolean",
+      "description": "When true, client-side pdf-lib burn-in fires immediately on export; when false, server-side Python pipeline is used exclusively.",
+      "default": true
+    },
+    "version_compare_retention_days": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of days to retain old document versions for comparison. 0 = unlimited.",
+      "default": 0
+    },
+    "print_enabled": {
+      "type": "boolean",
+      "description": "Allow users to print documents from the viewer.",
+      "default": true
+    },
+    "download_enabled": {
+      "type": "boolean",
+      "description": "Allow users to download documents from the viewer.",
+      "default": true
+    }
+  }
+}

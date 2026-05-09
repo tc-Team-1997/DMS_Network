@@ -26,6 +26,7 @@ import {
   Plug,
   Lock,
   ShieldCheck,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -63,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'OCR',       path: '/admin/settings/ocr',       icon: ScanLine  },
       { label: 'Doc Types', path: '/admin/settings/doctypes',  icon: FileType2 },
       { label: 'Workflows', path: '/admin/settings/workflows', icon: Workflow  },
+      { label: 'Search',    path: '/admin/settings/search',    icon: Search    },
       { label: 'AML',       path: '/admin/settings/aml',       icon: Shield    },
       { label: 'Retention', path: '/admin/settings/retention', icon: Archive   },
     ],

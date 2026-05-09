@@ -44,6 +44,8 @@ import { AuditPanel } from '@/modules/admin/settings/panels/AuditPanel';
 import { NotificationsPanel } from '@/modules/admin/settings/panels/NotificationsPanel';
 import { MobilePanel } from '@/modules/admin/settings/panels/MobilePanel';
 import { IntegrationsPanel } from '@/modules/admin/settings/panels/IntegrationsPanel';
+import { SearchPanel } from '@/modules/admin/settings/panels/SearchPanel';
+import { CommandPalette } from '@/components/CommandPalette';
 import { useTenant } from '@/store/tenant';
 
 const queryClient = new QueryClient({
@@ -148,11 +150,15 @@ export function App() {
                 <Route path="integrations"  element={<IntegrationsPanel />} />
                 <Route path="notifications" element={<NotificationsPanel />} />
                 <Route path="mobile"        element={<MobilePanel />} />
+                <Route path="search"        element={<SearchPanel />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
+
+          {/* Global Cmd-K command palette — mounted after Routes so useNavigate is available */}
+          <CommandPalette />
         </BrowserRouter>
       </ToastProvider>
     </QueryClientProvider>

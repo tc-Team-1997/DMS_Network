@@ -239,21 +239,32 @@ CREATE INDEX IF NOT EXISTS idx_ai_glossary_category ON ai_glossary_terms(categor
 CREATE INDEX IF NOT EXISTS idx_ai_glossary_approved ON ai_glossary_terms(tenant_id, approved);
 
 -- ---------------------------------------------------------------------------
--- BRD #20 — Saved Searches
+-- BRD #20 — Saved Searches (Search v2 / migration 0030)
+--
+-- Migration strategy: SQLite cannot ALTER CHECK constraints.
+-- On a fresh DB this CREATE TABLE runs directly.
+-- On an existing DB with the old schema (scope CHECK 'private'|'public'),
+-- db/seed.js runs the rename-recreate-copy-drop sequence below via a
+-- conditional migration guard keyed on the sqlite_master definition.
+-- FK check before authoring: grep found zero inbound references —
+-- saved_searches is a leaf table; rename-copy-drop is safe.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS saved_searches (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id    INTEGER NOT NULL,
-  name       TEXT NOT NULL,
-  query_json TEXT NOT NULL,
-  scope      TEXT NOT NULL DEFAULT 'private' CHECK (scope IN ('private', 'public')),
-  tenant_id  TEXT NOT NULL DEFAULT 'nbe',
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id   TEXT NOT NULL DEFAULT 'nbe',
+  user_id     INTEGER NOT NULL,
+  name        TEXT NOT NULL,
+  query_json  TEXT NOT NULL,
+  scope       TEXT NOT NULL DEFAULT 'private'
+                CHECK (scope IN ('private', 'team', 'tenant')),
+  branch      TEXT,
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_run_at TEXT,
+  FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id),
+  FOREIGN KEY (user_id)   REFERENCES users(id)
 );
-CREATE INDEX IF NOT EXISTS idx_saved_searches_user   ON saved_searches(user_id);
-CREATE INDEX IF NOT EXISTS idx_saved_searches_tenant ON saved_searches(tenant_id, scope);
+CREATE INDEX IF NOT EXISTS idx_saved_searches_user         ON saved_searches(user_id);
+CREATE INDEX IF NOT EXISTS idx_saved_searches_tenant_scope ON saved_searches(tenant_id, scope);
 
 -- ---------------------------------------------------------------------------
 -- BRD #26 — Custom Dashboards
@@ -383,3 +394,60 @@ CREATE TABLE IF NOT EXISTS tenant_config_history (
   hash           TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_tcfg_hist ON tenant_config_history(tenant_id, namespace, key, changed_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0028 — Workflow action audit log (Workflows v2)
+-- Separate from Python's workflow_steps (state-machine journal).
+-- wf_actions records every approve/reject/escalate decision including the
+-- SOX-required reason_code, freetext comment, optional step-up assertion id,
+-- and optional attachment reference.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS wf_actions (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  workflow_id           INTEGER NOT NULL,
+  user_id               INTEGER NOT NULL,
+  action                TEXT    NOT NULL,
+  reason_code           TEXT,
+  comment               TEXT,
+  webauthn_assertion_id TEXT,
+  attachment_id         INTEGER,
+  tenant_id             TEXT    NOT NULL DEFAULT 'nbe',
+  created_at            TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (workflow_id) REFERENCES workflows(id),
+  FOREIGN KEY (user_id)     REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wf_actions_workflow ON wf_actions(workflow_id);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0029 — multi-page redactions
+-- redactions: parent record per redaction event
+-- redaction_pages: per-page bounding boxes so burn-in covers every page
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS redactions (
+  redaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  document_id  INTEGER NOT NULL,
+  created_by   INTEGER,
+  created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reason       TEXT,
+  FOREIGN KEY (document_id) REFERENCES documents(id),
+  FOREIGN KEY (created_by)  REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_redactions_document ON redactions(document_id);
+
+CREATE TABLE IF NOT EXISTS redaction_pages (
+  redaction_id INTEGER NOT NULL,
+  page         INTEGER NOT NULL,
+  x            INTEGER NOT NULL,
+  y            INTEGER NOT NULL,
+  w            INTEGER NOT NULL,
+  h            INTEGER NOT NULL,
+  PRIMARY KEY (redaction_id, page),
+  FOREIGN KEY (redaction_id) REFERENCES redactions(redaction_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_redaction_pages_rid ON redaction_pages(redaction_id);
+CREATE INDEX IF NOT EXISTS idx_wf_actions_tenant   ON wf_actions(tenant_id);

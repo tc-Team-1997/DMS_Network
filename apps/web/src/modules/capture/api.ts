@@ -83,3 +83,22 @@ export const previewDocument = (file: File): Promise<PreviewResponse> => {
   form.set('file', file);
   return postForm('/spa/api/docbrain/preview', form, PreviewResponseSchema);
 };
+
+// ---------- dedup matches (post-upload summary) ------------------------------
+
+const DedupMatchSchema = z.object({
+  id: z.number().int(),
+  matched_doc_id: z.number().int().nullable(),
+  score: z.number().nullable(),
+  /** 'duplicate' | 'near' | 'unique' */
+  decision: z.string().nullable(),
+  created_at: z.string(),
+});
+export type DedupMatch = z.infer<typeof DedupMatchSchema>;
+
+const DedupResponseSchema = z.object({
+  matches: z.array(DedupMatchSchema),
+});
+
+export const fetchDedupMatches = (docId: number): Promise<{ matches: DedupMatch[] }> =>
+  get(`/spa/api/documents/${docId}/dedup`, DedupResponseSchema);

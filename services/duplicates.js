@@ -1,10 +1,16 @@
 /**
  * Node-side duplicate detection helpers.
  *
- * Thresholds are read live from `dedup_settings` per tenant so admin changes
- * take effect on the next comparison without a restart.  When the row is
- * missing the defaults 0.8 (fuzzy) / 10 (phash) are used — identical to the
- * hard-coded constants that existed before Req 44-45.
+ * Threshold precedence (highest → lowest):
+ *   1. tenant_config namespace 'capture', keys 'dedup.fuzzy_min_ratio' and
+ *      'dedup.phash_max_distance'  (CC1 source of truth — set via Admin UI)
+ *   2. dedup_settings table (legacy per-tenant row, managed via
+ *      PUT /spa/api/admin/dedup-settings)
+ *   3. DEFAULTS constants below
+ *
+ * Wave B cleanup flag: dedup_settings is now legacy. Values should migrate
+ * into tenant_config.capture.dedup.* during Wave B and the table dropped in a
+ * follow-up migration once all tenants have been migrated.
  *
  * The heavy-lifting SHA-256 / pHash comparison lives in the Python service.
  * This module supplies the tunable constants to Node-side code that needs them
@@ -13,6 +19,7 @@
 'use strict';
 
 const db = require('../db');
+const { getNamespace } = require('../db/tenant-config');
 
 const DEFAULTS = {
   fuzzy_threshold: 0.8,
@@ -23,18 +30,35 @@ const DEFAULTS = {
  * Return the effective dedup thresholds for a given tenant.
  * Always returns {fuzzy_threshold, phash_distance}.
  *
+ * Precedence: tenant_config (CC1) > dedup_settings table (legacy) > DEFAULTS.
+ * dedup_settings is owed a migration into tenant_config; flagged for Wave B.
+ *
  * @param {string} [tenantId='nbe']
  * @returns {{ fuzzy_threshold: number, phash_distance: number }}
  */
 function getThresholds(tenantId = 'nbe') {
   try {
-    const row = db.prepare(
+    // (1) CC1 tenant_config namespace 'capture'
+    const cfg = getNamespace(tenantId, 'capture') || {};
+    const fuzzyTC = typeof cfg['dedup.fuzzy_min_ratio'] === 'number'
+      ? cfg['dedup.fuzzy_min_ratio']
+      : undefined;
+    const phashTC = typeof cfg['dedup.phash_max_distance'] === 'number'
+      ? cfg['dedup.phash_max_distance']
+      : undefined;
+
+    // (2) Legacy dedup_settings table
+    const legacyRow = db.prepare(
       'SELECT fuzzy_threshold, phash_distance FROM dedup_settings WHERE tenant_id = ?'
     ).get(tenantId);
-    if (!row) return { ...DEFAULTS };
+
     return {
-      fuzzy_threshold: typeof row.fuzzy_threshold === 'number' ? row.fuzzy_threshold : DEFAULTS.fuzzy_threshold,
-      phash_distance:  typeof row.phash_distance  === 'number' ? row.phash_distance  : DEFAULTS.phash_distance,
+      fuzzy_threshold: fuzzyTC
+        ?? (typeof legacyRow?.fuzzy_threshold === 'number' ? legacyRow.fuzzy_threshold : undefined)
+        ?? DEFAULTS.fuzzy_threshold,
+      phash_distance: phashTC
+        ?? (typeof legacyRow?.phash_distance === 'number' ? legacyRow.phash_distance : undefined)
+        ?? DEFAULTS.phash_distance,
     };
   } catch {
     return { ...DEFAULTS };

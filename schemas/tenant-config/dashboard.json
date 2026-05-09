@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "targets.kyc_cycle_p50_hours": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 168,
+      "description": "KYC cycle time p50 target in hours. Docs approved within this window are on-track."
+    },
+    "targets.percent_automated": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Target percentage of documents classified by OCR/AI without manual indexing."
+    },
+    "targets.ai_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Target percentage of documents whose AI extraction confidence is at or above the confidence threshold."
+    },
+    "targets.confidence_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Minimum AI confidence score (0–1) that counts as a high-confidence extraction. Drives the AI confidence tile. Default: 0.7."
+    },
+    "targets.expiring_30d_alert": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of documents expiring within 30 days that triggers an at-risk status. Default: 50."
+    },
+    "targets.expiring_30d_breach": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of documents expiring within 30 days that triggers a breach status. Default: 100."
+    },
+    "targets.audit_failures_alert": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Audit failure count YTD that triggers an at-risk status. Default: 5."
+    },
+    "targets.audit_failures_breach": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Audit failure count YTD that triggers a breach status. Default: 20."
+    },
+    "refresh_interval_seconds": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 3600,
+      "description": "How often the dashboard auto-refreshes KPI data (seconds). Default: 300."
+    },
+    "default_timeframe": {
+      "type": "string",
+      "enum": ["1d", "7d", "30d", "90d", "ytd", "custom"],
+      "description": "Default timeframe shown when a user first loads the dashboard."
+    },
+    "default_comparator": {
+      "type": "string",
+      "enum": ["prior_period", "prior_year", "target", "none"],
+      "description": "Default comparator mode for tile deltas."
+    },
+    "tile_catalog": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "kyc_cycle",
+          "percent_automated",
+          "ai_confidence",
+          "expiring_30d",
+          "audit_failures_ytd"
+        ]
+      },
+      "description": "Ordered list of tiles available to all users. Admins can remove tiles from the catalog to hide them tenant-wide."
+    }
+  }
+}

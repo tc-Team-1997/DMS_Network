@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
+// Dev: SPA served by Vite (port 5175 when 5174 is taken); CI: built SPA on Node.
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5175';
 
 export default defineConfig({
   testDir: './e2e',
@@ -15,12 +16,12 @@ export default defineConfig({
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  webServer: {
-    command: 'node server.js',
+  webServer: process.env.CI ? {
+    command: 'node /Users/cosmicintelligence/Documents/DMS_Network/server.js',
     url: 'http://localhost:3000',
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-  },
+  } : undefined,
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],

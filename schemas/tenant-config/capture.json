@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "capture",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "allowed_mime_types": {
+      "type": "array",
+      "description": "MIME types accepted for upload",
+      "items": {
+        "type": "string",
+        "enum": [
+          "application/pdf",
+          "image/jpeg",
+          "image/png",
+          "image/tiff",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/msword"
+        ]
+      }
+    },
+    "max_file_size_mb": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1024,
+      "description": "Maximum file size in megabytes"
+    },
+    "batch_limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "description": "Maximum number of files in a single batch upload"
+    },
+    "dedup.sha_exact_enabled": {
+      "type": "boolean",
+      "description": "Enable SHA-256 exact-match deduplication"
+    },
+    "dedup.phash_enabled": {
+      "type": "boolean",
+      "description": "Enable perceptual hash near-duplicate detection"
+    },
+    "dedup.phash_max_distance": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 64,
+      "description": "Maximum Hamming distance for pHash near-duplicate match"
+    },
+    "dedup.fuzzy_enabled": {
+      "type": "boolean",
+      "description": "Enable fuzzy text similarity deduplication"
+    },
+    "dedup.fuzzy_min_ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Minimum Levenshtein similarity ratio (0–1) to flag as near-duplicate"
+    },
+    "camera_capture_enabled": {
+      "type": "boolean",
+      "description": "Show camera capture input on mobile devices"
+    },
+    "scanner_import_enabled": {
+      "type": "boolean",
+      "description": "Forward-compat flag; gates the scanner import UI button"
+    },
+    "auto_classify_enabled": {
+      "type": "boolean",
+      "description": "Run AI classification on every uploaded file"
+    },
+    "auto_link_to_cif_policy": {
+      "type": "string",
+      "enum": ["never", "exact_only", "exact_and_high_confidence", "always"],
+      "description": "When to automatically link an uploaded document to an existing CIF record"
+    },
+    "extraction_confidence_floor_low": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confidence below this value is displayed as low (warn user to verify)"
+    },
+    "extraction_confidence_floor_high": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confidence at or above this value is displayed as high (auto-fill without warning)"
+    }
+  }
+}

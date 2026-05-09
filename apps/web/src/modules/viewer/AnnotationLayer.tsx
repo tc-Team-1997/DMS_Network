@@ -88,6 +88,12 @@ export interface AnnotationLayerProps {
   src: string;
   /** Current user's role — passed down for RBAC gating of redaction */
   userRole?: string | null | undefined;
+  /**
+   * 1-based current page number from usePdfDocument.
+   * Used to tag annotations with the correct page so multi-page
+   * redaction burn-in applies to the right page (fixes page-0 data-leak).
+   */
+  currentPage?: number | undefined;
   /** className forwarded to the outer wrapper */
   className?: string;
   children: React.ReactNode;
@@ -98,6 +104,7 @@ export function AnnotationLayer({
   isPdf,
   src,
   userRole,
+  currentPage = 1,
   className,
   children,
 }: AnnotationLayerProps) {
@@ -305,9 +312,12 @@ export function AnnotationLayer({
 
       const redacts = annotations.filter((a) => a.kind === 'redact');
       for (const ann of redacts) {
-        // Apply redaction to every page (single-page assumption for now;
-        // the overlay is full-container so we can only target page 0 reliably)
-        const pg    = pages[0];
+        // Each annotation carries the page it was drawn on (0-based).
+        // Falls back to currentPage - 1 for annotations created before this fix.
+        const pageIndex = 'page' in ann && typeof (ann as { page?: unknown }).page === 'number'
+          ? (ann as { page: number }).page
+          : currentPage - 1;
+        const pg = pages[pageIndex] ?? pages[0];
         if (!pg) continue;
         const { width, height } = pg.getSize();
         pg.drawRectangle({

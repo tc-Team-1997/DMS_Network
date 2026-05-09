@@ -393,5 +393,84 @@ router.post('/documents/:id/rollback/:versionId', (req, res) => {
   return res.json({ ok: true, new_version_id: newVersionId, new_version_number: newVersionLabel });
 });
 
+/**
+ * GET /spa/api/documents/:id/dedup
+ *
+ * Returns dedup decision rows for the given document (as the incoming doc).
+ * Used by the SPA's batch summary panel to surface SHA-exact / pHash-near /
+ * fuzzy-near match badges after upload.
+ *
+ * Response shape:
+ *   { matches: Array<{ id, matched_doc_id, score, decision, created_at }> }
+ *
+ * Requires 'capture' permission (same as the upload endpoint).
+ */
+router.get('/documents/:id/dedup', requirePermJson('capture'), (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid_id' });
+
+  const doc = db.prepare('SELECT id, tenant_id FROM documents WHERE id = ?').get(id);
+  if (!doc) return res.status(404).json({ error: 'not_found' });
+
+  const user = req.session.user;
+  const tenant = user.tenant_id || 'nbe';
+  if (doc.tenant_id && doc.tenant_id !== tenant) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+
+  const matches = db.prepare(
+    `SELECT id, matched_doc_id, score, decision, created_at
+       FROM dedup_decisions
+      WHERE doc_id = ? AND tenant_id = ?
+      ORDER BY id DESC
+      LIMIT 50`
+  ).all(id, tenant);
+
+  res.json({ matches });
+});
+
+// ── GET /documents/:id/versions ──────────────────────────────────────────────
+
+router.get('/:id/versions', requirePermJson('documents:read'), (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: 'invalid document id' });
+  }
+
+  const rows = db.prepare(
+    `SELECT id, doc_id, version, filename, size, changed_by, change_note, created_at
+       FROM document_versions
+      WHERE doc_id = ?
+      ORDER BY id DESC`,
+  ).all(id);
+
+  return res.json(rows);
+});
+
+// ── GET /documents/:id/audit ──────────────────────────────────────────────────
+
+router.get('/:id/audit', requirePermJson('documents:read'), (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: 'invalid document id' });
+  }
+  const tenantId = tenantScope(req);
+
+  const rows = db.prepare(
+    `SELECT al.id, al.user_id, al.action, al.entity, al.entity_id,
+            al.details, al.tenant_id, al.created_at,
+            u.username
+       FROM audit_log al
+       LEFT JOIN users u ON al.user_id = u.id
+      WHERE al.entity IN ('document', 'annotation')
+        AND al.entity_id = ?
+        AND al.tenant_id = ?
+      ORDER BY al.id DESC
+      LIMIT 200`,
+  ).all(String(id), tenantId);
+
+  return res.json(rows);
+});
+
 module.exports = router;
 module.exports.uploadsDir = uploadsDir;

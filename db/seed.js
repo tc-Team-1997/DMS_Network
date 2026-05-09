@@ -392,4 +392,82 @@ db.prepare(
 );
 console.log('Tenant seeded (nbe / Bank of Bhutan).');
 
+// ---------------------------------------------------------------------------
+// Migration 0028 — wf_actions table (idempotent boot-time CREATE via schema.sql
+// already handled above via db.exec(schema)).  No ALTER needed — new table.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Workflows v2 — tenant_config namespace 'workflows' defaults (idempotent).
+// Each key uses INSERT OR IGNORE so a re-seed never stomps admin edits.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Capture v2 — tenant_config namespace 'capture' defaults (idempotent).
+// Each key uses INSERT OR IGNORE so a re-seed never stomps admin edits.
+// ---------------------------------------------------------------------------
+const captureConfigDefaults = [
+  ['allowed_mime_types',             JSON.stringify(['application/pdf','image/jpeg','image/png','image/tiff','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/msword'])],
+  ['max_file_size_mb',               '50'],
+  ['batch_limit',                    '25'],
+  ['dedup.sha_exact_enabled',        'true'],
+  ['dedup.phash_enabled',            'true'],
+  ['dedup.phash_max_distance',       '10'],
+  ['dedup.fuzzy_enabled',            'true'],
+  ['dedup.fuzzy_min_ratio',          '0.8'],
+  ['camera_capture_enabled',         'true'],
+  ['scanner_import_enabled',         'false'],
+  ['auto_classify_enabled',          'true'],
+  ['auto_link_to_cif_policy',        '"exact_only"'],
+  ['extraction_confidence_floor_low',  '0.4'],
+  ['extraction_confidence_floor_high', '0.7'],
+];
+
+const insertCaptureConfig = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'capture', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of captureConfigDefaults) {
+  insertCaptureConfig.run(key, value);
+}
+
+// Also seed for Bank of Bhutan (bhu) tenant if it exists.
+const bhuExists = db.prepare("SELECT COUNT(*) c FROM users WHERE tenant_id = 'bhu'").get().c > 0
+  || db.prepare("SELECT COUNT(*) c FROM tenant_config WHERE tenant_id = 'bhu'").get().c > 0;
+if (bhuExists) {
+  const insertBhuCapture = db.prepare(
+    `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+     VALUES ('bhu', 'capture', ?, ?, 1, datetime('now'))`
+  );
+  for (const [key, value] of captureConfigDefaults) {
+    insertBhuCapture.run(key, value);
+  }
+}
+
+console.log(`Capture tenant_config seeded (${captureConfigDefaults.length} keys).`);
+
+// ---------------------------------------------------------------------------
+// Workflows v2 — tenant_config namespace 'workflows' defaults (idempotent).
+// Each key uses INSERT OR IGNORE so a re-seed never stomps admin edits.
+// ---------------------------------------------------------------------------
+const wfConfigDefaults = [
+  ['reason_codes.approve',  JSON.stringify(['Compliant', 'Verified', 'Meets policy', 'Risk accepted'])],
+  ['reason_codes.reject',   JSON.stringify(['Incomplete documentation', 'Data mismatch', 'Expired document', 'Duplicate submission', 'Policy violation'])],
+  ['reason_codes.escalate', JSON.stringify(['Requires branch manager review', 'Compliance escalation', 'AML flag', 'Unusual amount'])],
+  ['min_comment_length',    '20'],
+  ['step_up_risk_band',     '"high"'],
+  ['step_up_amount_threshold', '500000'],
+  ['escalation_targets',    JSON.stringify(['Branch Manager', 'Compliance Officer', 'Head of KYC', 'Chief Risk Officer'])],
+  ['sla_breach_action',     '"notify"'],
+  ['bulk_action_max',       '50'],
+];
+
+const insertWfConfig = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'workflows', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of wfConfigDefaults) {
+  insertWfConfig.run(key, value);
+}
+console.log(`Workflows tenant_config seeded (${wfConfigDefaults.length} keys).`);
+
 db.close();

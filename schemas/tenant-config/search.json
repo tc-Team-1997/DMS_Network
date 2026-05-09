@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/search",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "searchable_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["original_name", "customer_name", "customer_cid", "doc_number", "ocr_text", "notes"]
+      },
+      "description": "FTS5-indexed columns. Change takes effect after rebuilding the FTS index via the Rebuild FTS button."
+    },
+    "saved_search_scopes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["private", "team", "tenant"]
+      },
+      "description": "Which saved-search scopes are available to users."
+    },
+    "default_operators": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["AND", "OR", "NEAR", "NOT"]
+      },
+      "description": "FTS5 operators suggested in the search input autocomplete."
+    },
+    "snippet_length": {
+      "type": "integer",
+      "minimum": 8,
+      "maximum": 200,
+      "description": "Number of tokens shown in the FTS5 highlight snippet (minimum 8, maximum 200)."
+    },
+    "max_results_per_page": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 1000,
+      "description": "Maximum page_size the search endpoint will honour."
+    },
+    "facet_fields": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["doc_type", "branch", "risk_band", "status", "customer_branch"]
+      },
+      "description": "Facet dimensions shown in the search sidebar."
+    },
+    "cmdk_enabled": {
+      "type": "boolean",
+      "description": "When false the Cmd-K command palette is hidden for all users of this tenant."
+    },
+    "cmdk_recents_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 50,
+      "description": "How many recent searches to store per user in localStorage for the palette."
+    }
+  }
+}

@@ -10,7 +10,8 @@ export async function login(
   await page.getByLabel('Username').fill(username);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  // After login the SPA navigates to "/"; wait for the Dashboard topbar.
+  // After login the SPA navigates to "/"; wait for any post-login chrome to render.
+  // Don't depend on a specific page heading — module headings change across waves.
   await page.waitForURL('**/');
-  await page.getByRole('heading', { name: 'Dashboard' }).waitFor({ timeout: 10_000 });
+  await page.waitForLoadState('networkidle');
 }
