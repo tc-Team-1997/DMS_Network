@@ -13,6 +13,8 @@ const H = { "X-API-Key": KEY, "Content-Type": "application/json" };
 const kpiLatency = new Trend("kpi_latency", true);
 const searchLatency = new Trend("search_latency", true);
 const uploadErrors = new Counter("upload_errors");
+const cbsCustomerLatency = new Trend("cbs_customer_latency", true);
+const cbsHealthLatency = new Trend("cbs_health_latency", true);
 
 export const options = {
   thresholds: {
@@ -20,6 +22,8 @@ export const options = {
     "http_req_duration{name:kpis}":     ["p(95)<300"],
     "http_req_duration{name:search}":   ["p(95)<500"],
     "http_req_duration{name:upload}":   ["p(95)<800"],
+    "http_req_duration{name:cbs_customer}":   ["p(95)<250"],
+    "http_req_duration{name:cbs_health}":     ["p(95)<250"],
   },
   scenarios: {
     reads: {
@@ -49,6 +53,20 @@ export function readPath() {
   const s = http.get(`${BASE}/api/v1/search?q=passport&limit=20`, { headers: H, tags: { name: "search" } });
   searchLatency.add(s.timings.duration);
   check(s, { "search 200": (r) => r.status === 200 });
+
+  // CBS health check (smoke test for the mock adapter).
+  const cbsHealth = http.get(`${BASE}/api/v1/cbs/health`, { headers: H, tags: { name: "cbs_health" } });
+  cbsHealthLatency.add(cbsHealth.timings.duration);
+  check(cbsHealth, { "cbs_health 200": (r) => r.status === 200 });
+
+  // CBS pull customer (smoke test for the mock adapter).
+  const cbsCustomer = http.post(
+    `${BASE}/api/v1/cbs/pull-customer`,
+    JSON.stringify({ cif: `CIF-LOAD-${String(__VU).padStart(4, "0")}` }),
+    { headers: H, tags: { name: "cbs_customer" } }
+  );
+  cbsCustomerLatency.add(cbsCustomer.timings.duration);
+  check(cbsCustomer, { "cbs_customer 200": (r) => r.status === 200 });
 
   sleep(Math.random() * 1.5);
 }

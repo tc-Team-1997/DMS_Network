@@ -155,6 +155,7 @@ Last updated: 2026-04-17 · Horizon: **7 quarters (Q2 2026 → Q4 2027)**
 - [ ] p95 latency for classification: < 3 seconds on a 5-page PDF.
 - [ ] Two tenants serving in production simultaneously; load test at 500 concurrent users sustained for 1 hour.
 - [ ] SOC 2 Type I delivered; ISO 27001 Stage 1 passed.
+- [ ] **Temenos T24 adapter shipped and contract-tested (moved from Q4 2026 to Q2 completion).**
 
 ---
 
@@ -191,7 +192,7 @@ Last updated: 2026-04-17 · Horizon: **7 quarters (Q2 2026 → Q4 2027)**
 
 **Track E — Integration Hub kickoff**
 
-- First 3 adapters shipped: Temenos T24, FLEXCUBE, Finastra (the three largest CBS platforms by bank count).
+- Temenos T24 adapter shipped in Q2 2026; FLEXCUBE and Finastra adapters complete in Q4 2026 (the three largest CBS platforms by bank count).
 - Visual field-mapper MVP.
 - Adapter contract-testing framework (record/replay against vendor sandboxes).
 
@@ -205,7 +206,7 @@ Last updated: 2026-04-17 · Horizon: **7 quarters (Q2 2026 → Q4 2027)**
 - [ ] 35%+ of incoming documents processed end-to-end with zero human touch at ≥ 95% confidence.
 - [ ] RAG chat answers with mandatory citations; measured hallucination rate < 2%.
 - [ ] Forgery detector: false-positive rate < 5% on a curated test set, recall > 80% on known tampered docs.
-- [ ] 3 CBS adapters contract-tested in CI nightly.
+- [ ] 3 CBS adapters contract-tested in CI nightly (Temenos shipped; FLEXCUBE + Finastra in progress).
 - [ ] Mobile app passes iOS App Store + Google Play private-distribution review.
 
 ---

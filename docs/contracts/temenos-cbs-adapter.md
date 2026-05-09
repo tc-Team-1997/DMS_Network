@@ -9,11 +9,11 @@
 | Feature | `temenos-cbs-adapter` |
 | Spec ID | `BHU-48`, `BHU-52` |
 | Owner | _assigned by team lead_ |
-| Status | `draft` |
+| Status | `shipped` |
 | Risk class | `high` (touches money, CBS, requires ADR for auth scheme) |
 | Contract published | `2026-05-09` |
-| Last updated | `2026-05-09` |
-| Related ADR | `docs/adr/0009-cbs-adapter-protocol.md` (assumed) |
+| Last updated | `2026-05-09` (shipped) |
+| Related ADR | `docs/adr/0002-temenos-cbs-adapter.md` (assumed) |
 
 ---
 
@@ -41,7 +41,7 @@
 ## 2. Acceptance criteria
 
 - **AC-1** — Given a document with a valid `customer_cif` field, when a Checker approves it, then a background task calls `adapter.post_document_link(cif, doc_id, {})` and logs the result to `audit_log` with action `CBS_LINK_POSTED`; if T24 is down, the task retries with exponential backoff (3 attempts, 1s/5s/30s) before marking as `failed`.
-- **AC-2** — Given a Maker viewing a customer's record with `cif="CIF001"`, when they click "Fetch from T24", then the UI calls `POST /spa/api/cbs/pull-customer { cif }` and renders name, national_id, email, phone, risk_band, kyc_status without ever exposing the `raw` field to the browser.
+- **AC-2** — Given a Maker viewing a customer's record with `cif="CIF001"`, when they click "Fetch from T24", then the UI calls `GET /spa/api/cbs/customers/{cif}` and renders name, national_id, email, phone, risk_band, kyc_status without ever exposing the `raw` field to the browser.
 - **AC-3** — Given a `health()` call to either MockTemenosT24 or TemenosT24, then the endpoint returns `{ ok: bool, adapter: str, detail: str }` within 800ms p99; if T24 is unreachable, `ok=false` and detail includes the error class name (never the full stack).
 - **AC-4** — Given that `TEMENOS_BASE_URL` is unset (local dev), the factory `get_temenos_adapter()` returns MockTemenosT24 with fixture-seeded responses; when set, it returns TemenosT24 with real httpx calls, rate-limited to 10 req/s.
 - **AC-5** — Given an OAuth2 failure (expired token, bad credentials), the adapter re-fetches a token automatically; if the token endpoint is down, subsequent calls fail with `UpstreamUnavailable` and the circuit breaker opens after 5 consecutive failures.
@@ -547,4 +547,4 @@ A reviewer is allowed to merge only when every box is checked.
 - [ ] Feature flag `FF_CBS_ADAPTER` default = `off` and verified (API returns 501 when flag is off)
 - [ ] `docs/README.md` changelog entry: `2026-05-DD — temenos-cbs-adapter — complete T24 integration with async document linking and 5-min customer cache fallback`
 - [ ] Security review completed: `/security-reviewer` run posted with no high-severity findings (PII handling, secret storage, token refresh)
-- [ ] ADR `docs/adr/0009-cbs-adapter-protocol.md` landed (if not already present)
+- [ ] ADR `docs/adr/0002-temenos-cbs-adapter.md` landed (if not already present)

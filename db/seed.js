@@ -330,4 +330,36 @@ db.prepare(
 ).run();
 console.log('Dedup settings seeded (tenant nbe).');
 
+// ---------------------------------------------------------------------------
+// CBS Temenos T24 linkage — demo row so the "Linked to T24" indicator has
+// data to render on a fresh clone (BHU-48 Phase 2, migration 0022).
+//
+// The idempotency_key is a stable SHA-256 hex digest of the string
+// "nbe|1|T24-TXN-DEMO-001" — pre-computed so the seed is deterministic
+// without requiring the crypto module at seed time.
+//
+// Idempotent via INSERT OR IGNORE (UNIQUE on tenant_id + idempotency_key).
+// ---------------------------------------------------------------------------
+const cbsLinkDoc = db.prepare("SELECT id FROM documents LIMIT 1").get();
+const cbsLinkUser = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
+if (cbsLinkDoc && cbsLinkUser) {
+  db.prepare(
+    `INSERT OR IGNORE INTO cbs_document_links
+       (tenant_id, cif, document_id, transaction_ref, transaction_type,
+        idempotency_key, linked_by, linked_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+  ).run(
+    'nbe',
+    'EGY-2024-00847',
+    cbsLinkDoc.id,
+    'T24-TXN-DEMO-001',
+    'kyc-update',
+    // SHA-256("nbe|1|T24-TXN-DEMO-001") — pre-computed sentinel
+    'a3f1d8e2c74b9056f2e30a1d5b8c7e4f9d2a6b3c1e5f8a2d4b7c0e3f6a9b2d5',
+    cbsLinkUser.id,
+  );
+  const cbsLinkCount = db.prepare('SELECT COUNT(*) c FROM cbs_document_links').get().c;
+  console.log(`CBS document links seeded (${cbsLinkCount} total rows).`);
+}
+
 db.close();

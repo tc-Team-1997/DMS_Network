@@ -8,6 +8,7 @@ import {
   triggerRetention,
   type AuditRow,
 } from './api';
+import { CbsHealthBadge } from '@/modules/cbs/components/CbsHealthBadge';
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -112,6 +113,12 @@ export function AdminPage() {
           title="Operations"
           action={<HardDrive size={14} className="text-muted" />}
         >
+          {/* CBS health indicator */}
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-xs text-muted">CBS (T24) status</p>
+            <CbsHealthBadge />
+          </div>
+
           <p className="text-md text-ink mb-3">Retention job</p>
           <p className="text-xs text-muted mb-3">
             Runs on cron. Trigger manually to force a pass and record it in the audit log.

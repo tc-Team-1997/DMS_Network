@@ -634,3 +634,54 @@ class AmlHit(Base):
 
     screening       = relationship("AmlScreening", back_populates="hits")
     watchlist_entry = relationship("AmlWatchlistEntry", back_populates="hits")
+
+
+# ---------------------------------------------------------------------------
+# CBS Temenos T24 linkage + circuit-breaker models (migration 0022)
+# ---------------------------------------------------------------------------
+
+
+class CbsDocumentLink(Base):
+    """Durable audit record of every successful T24 document linkage.
+
+    idempotency_key is derived as hash(tenant_id || document_id || transaction_ref)
+    and enforced UNIQUE on (tenant_id, idempotency_key) so a duplicate call at
+    the application layer cannot produce a second row for the same linkage event.
+
+    cif is the T24 customer identifier — not a FK to documents.customer_cid because
+    T24 CIFs are opaque strings managed by the CBS, not the DMS.
+    """
+    __tablename__ = "cbs_document_links"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id        = Column(String(64), nullable=False, index=True)
+    cif              = Column(String(64), nullable=False)
+    document_id      = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    transaction_ref  = Column(String(256), nullable=False)
+    transaction_type = Column(String(64), nullable=True)   # kyc-update | loan-application | account-opening | compliance-review
+    idempotency_key  = Column(String(128), nullable=False)  # hash(tenant_id || document_id || transaction_ref)
+    linked_by        = Column(Integer, nullable=False)   # users.id from Node schema — no FK in Python model
+    linked_at        = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "idempotency_key", name="uq_cbs_link_tenant_idem"),
+    )
+
+
+class CbsCircuitEvent(Base):
+    """Append-only log for ops visibility into circuit-breaker state transitions.
+
+    Every transition (closed → open, open → half_open, half_open → closed, etc.)
+    appends one row.  No rows are ever updated or deleted — this is a pure
+    event log used by ops dashboards and the Grafana "CBS Integration" panel.
+    """
+    __tablename__ = "cbs_circuit_events"
+
+    id                = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id         = Column(String(64), nullable=False, index=True)
+    adapter           = Column(String(64), nullable=False, default="temenos")
+    state_from        = Column(String(16), nullable=False)   # closed | open | half_open
+    state_to          = Column(String(16), nullable=False)   # closed | open | half_open
+    reason            = Column(String(64), nullable=True)    # consecutive_errors | half_open_success | half_open_failure | manual_reset
+    consecutive_errors = Column(Integer, nullable=False, default=0)
+    event_at          = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)

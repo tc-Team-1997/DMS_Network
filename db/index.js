@@ -275,6 +275,41 @@ try {
     CREATE INDEX IF NOT EXISTS idx_aml_hits_screening ON aml_hits(screening_id);
     CREATE INDEX IF NOT EXISTS idx_aml_hits_decision  ON aml_hits(decision);
   `);
+
+  // CBS integration tables — Temenos T24 linkage audit + circuit-breaker log.
+  // Mirrors python-service/app/models.py {CbsDocumentLink, CbsCircuitEvent}
+  // and Alembic revision 0022_cbs_document_links.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cbs_document_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      cif TEXT NOT NULL,
+      document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+      transaction_ref TEXT NOT NULL,
+      transaction_type TEXT,
+      idempotency_key TEXT NOT NULL,
+      linked_by INTEGER NOT NULL REFERENCES users(id),
+      linked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(tenant_id, idempotency_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cbs_links_tenant    ON cbs_document_links(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_cbs_links_doc       ON cbs_document_links(document_id);
+    CREATE INDEX IF NOT EXISTS idx_cbs_links_cif       ON cbs_document_links(tenant_id, cif);
+    CREATE INDEX IF NOT EXISTS idx_cbs_links_linked_at ON cbs_document_links(linked_at DESC);
+
+    CREATE TABLE IF NOT EXISTS cbs_circuit_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      adapter TEXT NOT NULL DEFAULT 'temenos',
+      state_from TEXT NOT NULL,
+      state_to TEXT NOT NULL,
+      reason TEXT,
+      consecutive_errors INTEGER NOT NULL DEFAULT 0,
+      event_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_cbs_circuit_tenant ON cbs_circuit_events(tenant_id, event_at DESC);
+  `);
+
   seedDefaultTypeSchemas();
 } catch (err) {
   // Never block boot on migration chatter; log for operators.

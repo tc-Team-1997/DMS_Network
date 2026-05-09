@@ -110,6 +110,84 @@
     "error_generic": "An error occurred. Please try again.",
     "error_invalid_threshold": "Threshold must be a number between 0 and 1."
   },
+  "cbs": {
+    "lookup_title": "Look up customer in T24",
+    "link_title": "Link to T24 transaction",
+    "close": "Close",
+    "cancel": "Cancel",
+    "fetch_button": "Look up",
+    "refresh_button": "Refresh",
+    "refresh_label": "Refresh customer data from T24",
+    "retry": "Retry",
+    "loading": "Fetching from T24…",
+    "slow_fetch": "This is taking longer than expected. Still waiting…",
+
+    "cif_label": "Customer ID (CIF)",
+    "cif_placeholder": "e.g. CIF001",
+    "cif_hint": "4–64 uppercase letters and digits.",
+
+    "field_name": "Name",
+    "field_national_id": "National ID",
+    "field_email": "Email",
+    "field_phone": "Phone",
+    "field_kyc": "KYC status",
+    "field_risk_band": "Risk band",
+    "not_available": "—",
+
+    "cached_pill": "From cache (5 min TTL)",
+    "customer_loaded": "Loaded customer: {{name}}",
+    "cache_invalidated": "Cache cleared. Refreshing from T24.",
+
+    "accounts_toggle": "T24 accounts",
+    "accounts_empty": "No accounts found for this CIF.",
+    "accounts_error": "Could not load accounts. Retry.",
+
+    "risk_low": "Low",
+    "risk_medium": "Medium",
+    "risk_high": "High",
+
+    "stale_banner_prefix": "Data may be out of date — last refreshed",
+    "stale_banner_suffix": ". CBS upstream is unavailable.",
+
+    "health_closed": "CBS healthy",
+    "health_half_open": "CBS degraded",
+    "health_open": "CBS down",
+    "health_unknown": "CBS unknown",
+    "health_flag_off": "CBS off (feature flag)",
+    "health_tooltip": "Cache hit rate: {{pct}}%",
+
+    "link_ref_label": "T24 transaction reference",
+    "link_ref_placeholder": "e.g. TXN-20260509-001",
+    "link_ref_hint": "Reference from the T24 transaction you want to link.",
+    "link_type_label": "Transaction type",
+    "link_submit": "Link document",
+    "link_success_announce": "Linked to T24 transaction {{ref}}",
+
+    "tx_type_loan_disbursement": "Loan disbursement",
+    "tx_type_account_opening": "Account opening",
+    "tx_type_kyc_document": "KYC document",
+    "tx_type_trade_finance": "Trade finance",
+
+    "error_cif_required": "CIF is required.",
+    "error_cif_format": "CIF must be 4–64 uppercase letters and digits.",
+    "error_not_found": "Customer not found in T24. Check the CIF and try again.",
+    "error_forbidden": "You don't have permission to access CBS data. Contact your admin.",
+    "error_unavailable": "T24 is currently unavailable. Try again shortly.",
+    "error_rate_limited": "Too many CBS calls. Please wait {{s}} seconds.",
+    "error_proxy": "CBS proxy error. Please contact support.",
+    "error_timeout": "Temenos T24 is slow. Please try again.",
+    "error_network": "Network error. Check your connection and retry.",
+    "error_generic": "An unexpected error occurred. Please contact support.",
+    "error_ref_required": "Transaction reference is required.",
+    "error_link_invalid": "Invalid link request. Check your inputs.",
+    "error_link_conflict": "This link already exists.",
+
+    "feature_disabled": "CBS integration is not enabled in this environment.",
+    "feature_disabled_hint": "Set VITE_FF_CBS_LIVE=true to enable.",
+
+    "pull_from_cbs_button": "Pull from CBS",
+    "link_to_t24_button": "Link to T24 transaction"
+  },
   "doctype": {
     "thresholds_tab": "Thresholds",
     "autofill_floor_label": "Confidence floor for auto-fill",

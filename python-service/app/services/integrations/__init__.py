@@ -32,7 +32,7 @@ from .base import (
 )
 from .legacy import call_system, BASES, MOCK_RESPONSES
 from .registry import get_adapter, list_adapters
-from .temenos_t24 import MockTemenosT24, TemenosT24
+from .temenos_t24 import MockTemenosT24, TemenosT24, UpstreamUnavailable, CustomerNotFound, get_temenos_adapter
 
 __all__ = [
     # Protocol + dataclasses
@@ -46,6 +46,9 @@ __all__ = [
     # Temenos T24
     "MockTemenosT24",
     "TemenosT24",
+    "UpstreamUnavailable",
+    "CustomerNotFound",
+    "get_temenos_adapter",
     # Registry
     "get_adapter",
     "list_adapters",

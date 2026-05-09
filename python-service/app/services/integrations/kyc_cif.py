@@ -132,6 +132,43 @@ async def link_document_to_customer(
 
     latency_ms = int((time.monotonic() - t0) * 1000)
 
+    # Durable record in cbs_document_links — required by contract §8 for
+    # banking-grade auditability and DB-layer idempotency enforcement.
+    # Fail-soft: a DB write failure here must not roll back a successful
+    # adapter call, but we surface it in audit_log so ops can recover.
+    if success:
+        try:
+            from ..models import CbsDocumentLink  # local import avoids cycle
+
+            existing = (
+                db.query(CbsDocumentLink)
+                .filter(
+                    CbsDocumentLink.tenant_id == tenant_id,
+                    CbsDocumentLink.idempotency_key == idem_key,
+                )
+                .one_or_none()
+            )
+            if existing is None:
+                link_row = CbsDocumentLink(
+                    tenant_id=tenant_id,
+                    cif=cif,
+                    document_id=doc_id,
+                    transaction_ref=metadata.get("transaction_ref") or remote_ref or idem_key,
+                    transaction_type=metadata.get("transaction_type"),
+                    idempotency_key=idem_key,
+                    linked_by=metadata.get("linked_by") or 0,
+                )
+                db.add(link_row)
+                db.commit()
+        except Exception as link_exc:
+            # Log + continue; audit_log below preserves the trail.
+            logger.error(
+                '{"tenant": "%s", "op": "cbs_document_link_persist_failed", '
+                '"cif": "%s", "doc_id": %d, "error_class": "%s"}',
+                tenant_id, cif, doc_id, type(link_exc).__name__,
+            )
+            db.rollback()
+
     # Audit log
     _write_audit(
         db=db,
@@ -144,6 +181,8 @@ async def link_document_to_customer(
             "cif": cif,
             "doc_id": doc_id,
             "remote_ref": remote_ref,
+            "transaction_ref": metadata.get("transaction_ref"),
+            "transaction_type": metadata.get("transaction_type"),
             "success": success,
             "latency_ms": latency_ms,
         }),

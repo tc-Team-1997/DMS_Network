@@ -21,18 +21,18 @@ When a buyer evaluates DocManager vs a legacy DMS, the decisive question is not 
 
 ### 2.1 GA launch (end of Q2 2027) — 10 adapters
 
-| # | System | Vendor | Category | Interaction pattern |
-|--:|---|---|---|---|
-| 1 | **Temenos T24** | Temenos | Core banking (largest in MENA + EMEA) | REST + IRIS event stream |
-| 2 | **FLEXCUBE** | Oracle | Core banking (large in GCC + India) | REST + JMS / webhook |
-| 3 | **Finastra Fusion** | Finastra | Core banking + trade finance | REST + Kafka |
-| 4 | **Mambu** | Mambu | Cloud-native core banking (neobanks) | REST + webhooks |
-| 5 | **Thought Machine Vault** | Thought Machine | Cloud-native core (tier-1 modernisers) | REST + Kafka streams |
-| 6 | **Oracle Banking Platform** | Oracle | Core banking (N.A., India) | REST + SOAP + JMS |
-| 7 | **FIS Profile** | FIS | Core banking (US + Canada) | REST + batch SFTP |
-| 8 | **Salesforce Financial Services Cloud** | Salesforce | CRM (customer master, cases) | REST + Platform Events |
-| 9 | **DocuSign** | DocuSign | E-signature | REST + webhooks |
-| 10 | **Microsoft Fabric** | Microsoft | Analytics / DW (data export) | OneLake / Delta tables |
+| # | System | Vendor | Category | Interaction pattern | Status |
+|--:|---|---|---|---|---|
+| 1 | **Temenos T24** | Temenos | Core banking (largest in MENA + EMEA) | REST + IRIS event stream | ✓ Production (shipped 2026-05-09) |
+| 2 | **FLEXCUBE** | Oracle | Core banking (large in GCC + India) | REST + JMS / webhook | Planned Q4 2026 |
+| 3 | **Finastra Fusion** | Finastra | Core banking + trade finance | REST + Kafka | Planned Q4 2026 |
+| 4 | **Mambu** | Mambu | Cloud-native core banking (neobanks) | REST + webhooks | Planned Q1 2027 |
+| 5 | **Thought Machine Vault** | Thought Machine | Cloud-native core (tier-1 modernisers) | REST + Kafka streams | Planned Q1 2027 |
+| 6 | **Oracle Banking Platform** | Oracle | Core banking (N.A., India) | REST + SOAP + JMS | Planned Q2 2027 |
+| 7 | **FIS Profile** | FIS | Core banking (US + Canada) | REST + batch SFTP | Planned Q2 2027 |
+| 8 | **Salesforce Financial Services Cloud** | Salesforce | CRM (customer master, cases) | REST + Platform Events | Planned Q1 2027 |
+| 9 | **DocuSign** | DocuSign | E-signature | REST + webhooks | Planned Q1 2027 |
+| 10 | **Microsoft Fabric** | Microsoft | Analytics / DW (data export) | OneLake / Delta tables | Planned Q2 2027 |
 
 ### 2.2 Post-GA roadmap
 

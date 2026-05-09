@@ -20,11 +20,21 @@ import {
   Eye,
   X,
   RefreshCw,
+  Database,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Input, Panel } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { HttpError } from '@/lib/http';
+import { t } from '@/lib/i18n';
+import { useAuth } from '@/store/auth';
+import { CbsLookupDialog } from '@/modules/cbs/components/CbsLookupDialog';
+
+// ── CBS feature flag ──────────────────────────────────────────────────────
+const FF_CBS_LIVE: boolean =
+  import.meta.env['VITE_FF_CBS_LIVE'] !== undefined
+    ? import.meta.env['VITE_FF_CBS_LIVE'] !== 'false'
+    : false;
 import {
   fetchFolders,
   previewDocument,
@@ -346,6 +356,12 @@ export function CapturePage() {
   const [uploadedDocType, setUploadedDocType] = useState<string | null>(null);
   const [uploadedOcr, setUploadedOcr] = useState<number | null>(null);
   const [uploadedOcrText, setUploadedOcrText] = useState<string | null>(null);
+
+  // CBS state
+  const cbsRole = useAuth((s) => s.user?.role);
+  const [cbsDialogOpen, setCbsDialogOpen] = useState(false);
+  // Maker or Doc Admin can pull from CBS
+  const canCbs = FF_CBS_LIVE && (cbsRole === 'Maker' || cbsRole === 'Doc Admin');
 
   // Multi-file mode state
   const [cards, setCards] = useState<FileCard[]>([]);
@@ -1062,16 +1078,38 @@ export function CapturePage() {
             </div>
           )}
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={reset}>Reset</Button>
-            <AiSubmitButton
-              loading={uploadMutation.isPending}
-              disabled={!file || previewMutation.isPending || !selectedType}
-              analysing={previewMutation.isPending}
-            />
+          <div className="flex justify-between items-center gap-2">
+            {canCbs && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-testid="cbs-lookup-button"
+                onClick={() => setCbsDialogOpen(true)}
+              >
+                <Database size={13} />
+                {t('cbs.pull_from_cbs_button')}
+              </Button>
+            )}
+            <div className="flex gap-2 ms-auto">
+              <Button type="button" variant="secondary" onClick={reset}>Reset</Button>
+              <AiSubmitButton
+                loading={uploadMutation.isPending}
+                disabled={!file || previewMutation.isPending || !selectedType}
+                analysing={previewMutation.isPending}
+              />
+            </div>
           </div>
         </form>
       </Panel>
+
+      {cbsDialogOpen && (
+        <CbsLookupDialog
+          initialCif={form['customer_cif'] ?? ''}
+          canAdmin={cbsRole === 'Doc Admin'}
+          onClose={() => setCbsDialogOpen(false)}
+        />
+      )}
 
       <DocumentSummaryPanel
         file={file}
