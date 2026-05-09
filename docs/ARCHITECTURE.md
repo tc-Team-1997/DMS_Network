@@ -351,6 +351,8 @@ The target AI architecture is in [AI_STRATEGY.md](./AI_STRATEGY.md) — vLLM, Qd
 | Observability | `.run/*.log` + structured request logs | LangSmith traces + Prometheus + Arize |
 | Guardrails | `has_evidence` flag + `_strip_unsupported_citations` + display gate | + Presidio PII pre/post + prompt-injection classifier + toxicity filter |
 
+**OCR confidence thresholds:** Document Type admins can now tune per-doctype OCR confidence thresholds (autofill_floor and high_confidence) via a dual-range slider in the Document Types admin tab, with live sample preview. See [docs/contracts/ocr-confidence-tuning.md](./contracts/ocr-confidence-tuning.md) §6 for UI spec.
+
 **Contract stability:** every swap above is a config + single-file change. The SPA, the `/spa/api/docbrain/*` surface, and the `docbrain/{llm,classify,extract,embed,vectors,rag}.py` module signatures are the stable contract; what backs them rotates with deployment tier.
 
 **Why this matters architecturally:** bank procurement wants to hear "your AI layer runs locally on our own hardware, with open-weight models, no phone-home." The pilot is literal proof of that — one laptop, no cloud, no API keys to Anthropic/OpenAI. The same code path scales to a silo or dedicated datacenter by swapping serving engine + vector store.

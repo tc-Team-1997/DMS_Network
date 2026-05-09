@@ -18,6 +18,7 @@ import {
 import { fetchFolders } from '@/modules/capture/api';
 import { LearnWizard } from './LearnWizard';
 import { SamplesTab } from './SamplesTab';
+import { ThresholdsTab } from './ThresholdsTab';
 
 const BLANK_FIELD: FieldDef = { key: '', label: '', type: 'text', required: false };
 
@@ -25,7 +26,7 @@ function blankInput(): DocumentTypeInput {
   return { name: '', description: '', fields: [{ ...BLANK_FIELD }], active: true, default_folder_id: null };
 }
 
-type EditTab = 'fields' | 'samples';
+type EditTab = 'fields' | 'samples' | 'thresholds';
 
 export function DocumentTypesPage() {
   const qc = useQueryClient();
@@ -273,11 +274,28 @@ export function DocumentTypesPage() {
                   >
                     Samples
                   </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={editTab === 'thresholds'}
+                    onClick={() => setEditTab('thresholds')}
+                    className={cn(
+                      'px-3 py-1.5 text-xs border-l border-border',
+                      editTab === 'thresholds'
+                        ? 'bg-brand-blue text-white'
+                        : 'bg-white text-ink hover:bg-divider',
+                    )}
+                    data-testid="doctype-thresholds-tab"
+                  >
+                    Thresholds
+                  </button>
                 </div>
               )}
 
-              {/* Samples tab content */}
-              {editTab === 'samples' && typeof selected === 'number' && editingType ? (
+              {/* Thresholds tab content */}
+              {editTab === 'thresholds' && typeof selected === 'number' && editingType ? (
+                <ThresholdsTab docType={editingType} />
+              ) : editTab === 'samples' && typeof selected === 'number' && editingType ? (
                 <SamplesTab docType={editingType} />
               ) : (
                 <>

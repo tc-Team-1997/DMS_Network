@@ -210,6 +210,8 @@ from .routers import ai_glossary as ai_glossary_router  # noqa: E402
 app.include_router(ai_glossary_router.router)
 from .routers import doctypes as doctypes_router  # noqa: E402
 app.include_router(doctypes_router.router)
+from .routers import document_types as document_types_router  # noqa: E402
+app.include_router(document_types_router.router)
 
 
 setup_tracing(app, engine)

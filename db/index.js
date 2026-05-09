@@ -206,6 +206,14 @@ try {
     'default_folder_id',
     'default_folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL',
   );
+  // OCR confidence tuning: per-doctype thresholds + last sample tested.
+  addColumnIfMissing('document_type_schemas', 'autofill_floor',  'autofill_floor REAL DEFAULT 0.4');
+  addColumnIfMissing('document_type_schemas', 'high_confidence', 'high_confidence REAL DEFAULT 0.7');
+  addColumnIfMissing(
+    'document_type_schemas',
+    'tested_with_sample_id',
+    'tested_with_sample_id INTEGER REFERENCES document_type_samples(id) ON DELETE SET NULL',
+  );
   seedDefaultTypeSchemas();
 } catch (err) {
   // Never block boot on migration chatter; log for operators.

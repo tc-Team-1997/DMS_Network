@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { del, get, http, post } from '@/lib/http';
+import { del, get, http, patch, post } from '@/lib/http';
 import { OkSchema } from '@/lib/schemas';
 
 export const FIELD_TYPES = ['text', 'textarea', 'date', 'number', 'email', 'tel'] as const;
@@ -35,6 +35,7 @@ export const DocumentTypeSchema = z.object({
   inference_status: z.enum(['manual', 'draft', 'live']).optional(),
   autofill_floor: z.number().min(0).max(1).optional(),
   high_confidence: z.number().min(0).max(1).optional(),
+  tested_with_sample_id: z.number().int().nullable().optional(),
   default_folder_id: z.number().int().positive().nullable().optional(),
   default_folder_name: z.string().nullable().optional(),
 });
@@ -172,10 +173,8 @@ export const fetchDocumentType = (id: number) =>
 export const createDocumentType = (body: DocumentTypeInput) =>
   post('/spa/api/document-types', DocumentTypeInputSchema.parse(body), DocumentTypeSchema);
 
-export const patchDocumentType = async (id: number, body: Partial<DocumentTypeInput>) => {
-  const { data } = await http.patch(`/spa/api/document-types/${id}`, body);
-  return DocumentTypeSchema.parse(data);
-};
+export const patchDocumentType = (id: number, body: Partial<DocumentTypeInput>) =>
+  patch(`/spa/api/document-types/${id}`, body, DocumentTypeSchema);
 
 export const deleteDocumentType = (id: number) =>
   del(`/spa/api/document-types/${id}`, OkSchema);
@@ -225,4 +224,62 @@ export const tamperCheck = (schemaId: number, documentId: number): Promise<Tampe
     `/spa/api/docbrain/doctypes/${schemaId}/tamper-check`,
     { document_id: documentId },
     TamperCheckResponseSchema,
+  );
+
+// ── OCR confidence threshold tuning ──────────────────────────────────────────
+
+/**
+ * Validated threshold update payload.
+ * autofill_floor must be strictly less than high_confidence — the Python
+ * backend rejects equality, so we keep the SPA constraint identical.
+ */
+export const ThresholdUpdateSchema = z
+  .object({
+    autofill_floor: z.number().min(0).max(1),
+    high_confidence: z.number().min(0).max(1),
+    tested_with_sample_id: z.number().int().nullable().optional(),
+  })
+  .refine((d) => d.autofill_floor < d.high_confidence, {
+    message: 'autofill_floor must be strictly less than high_confidence',
+    path: ['autofill_floor'],
+  });
+export type ThresholdUpdate = z.infer<typeof ThresholdUpdateSchema>;
+
+/** A single field result from the test-thresholds endpoint. */
+export const ExtractedFieldSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+  confidence: z.number().min(0).max(1),
+});
+export type ExtractedField = z.infer<typeof ExtractedFieldSchema>;
+
+/** Response from POST /spa/api/document-types/:id/test-thresholds */
+export const TestThresholdsResponseSchema = z.object({
+  extracted_fields: z.array(ExtractedFieldSchema),
+  /** Number of fields at or above autofill_floor */
+  at_floor: z.number().int(),
+  /** Number of fields at or above high_confidence */
+  at_high: z.number().int(),
+});
+export type TestThresholdsResponse = z.infer<typeof TestThresholdsResponseSchema>;
+
+/** Patch thresholds only — typed wrapper using validated schema. */
+export const patchThresholds = (id: number, payload: ThresholdUpdate) =>
+  patch(
+    `/spa/api/document-types/${id}`,
+    ThresholdUpdateSchema.parse(payload),
+    DocumentTypeSchema,
+  );
+
+/** POST /spa/api/document-types/:id/test-thresholds */
+export const testThresholds = (
+  id: number,
+  sampleId: number,
+  autofill_floor: number,
+  high_confidence: number,
+): Promise<TestThresholdsResponse> =>
+  post(
+    `/spa/api/document-types/${id}/test-thresholds`,
+    { sample_id: sampleId, autofill_floor, high_confidence },
+    TestThresholdsResponseSchema,
   );
