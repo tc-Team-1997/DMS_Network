@@ -38,6 +38,9 @@ export const DocumentTypeSchema = z.object({
   tested_with_sample_id: z.number().int().nullable().optional(),
   default_folder_id: z.number().int().positive().nullable().optional(),
   default_folder_name: z.string().nullable().optional(),
+  // DocTypes v2 (migration 0032)
+  notify_days: z.string().optional(),
+  translate_extracted_to_dz: z.boolean().optional(),
 });
 export type DocumentType = z.infer<typeof DocumentTypeSchema>;
 
@@ -49,8 +52,142 @@ export const DocumentTypeInputSchema = z.object({
   autofill_floor: z.number().min(0).max(1).optional(),
   high_confidence: z.number().min(0).max(1).optional(),
   default_folder_id: z.number().int().positive().nullable().optional(),
+  // DocTypes v2 (migration 0032)
+  notify_days: z.string().optional(),
+  translate_extracted_to_dz: z.boolean().optional(),
 });
 export type DocumentTypeInput = z.infer<typeof DocumentTypeInputSchema>;
+
+// ── Schema versioning (migration 0032) ───────────────────────────────────────
+
+export const DOCTYPE_VERSION_STATUSES = ['draft', 'live', 'archived'] as const;
+export type DoctypeVersionStatus = (typeof DOCTYPE_VERSION_STATUSES)[number];
+
+export const DoctypeVersionSchema = z.object({
+  id: z.number().int(),
+  doctype_id: z.number().int(),
+  version: z.number().int(),
+  schema_json: z.string(),
+  created_by: z.string().nullable(),
+  created_at: z.string(),
+  status: z.enum(DOCTYPE_VERSION_STATUSES),
+});
+export type DoctypeVersion = z.infer<typeof DoctypeVersionSchema>;
+
+export const BboxSourceValues = ['confirmed', 'ai_proposed'] as const;
+export type BboxSource = (typeof BboxSourceValues)[number];
+
+export const DoctypeFieldBboxSchema = z.object({
+  id: z.number().int(),
+  doctype_version_id: z.number().int(),
+  field_name: z.string(),
+  page: z.number().int(),
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  source: z.enum(BboxSourceValues),
+});
+export type DoctypeFieldBbox = z.infer<typeof DoctypeFieldBboxSchema>;
+
+export const DoctypeVersionDiffSchema = z.object({
+  version_a: z.object({ id: z.number().int(), version: z.number().int(), status: z.string() }),
+  version_b: z.object({ id: z.number().int(), version: z.number().int(), status: z.string() }),
+  diff: z.object({
+    added: z.array(z.record(z.string(), z.unknown())),
+    removed: z.array(z.record(z.string(), z.unknown())),
+    modified: z.array(z.record(z.string(), z.unknown())),
+  }),
+});
+export type DoctypeVersionDiff = z.infer<typeof DoctypeVersionDiffSchema>;
+
+export const AbTestResultSchema = z.object({
+  version_a: z.object({
+    version: z.number().int(),
+    results: z.array(z.record(z.string(), z.unknown())),
+  }),
+  version_b: z.object({
+    version: z.number().int(),
+    results: z.array(z.record(z.string(), z.unknown())),
+  }),
+  note: z.string().optional(),
+});
+export type AbTestResult = z.infer<typeof AbTestResultSchema>;
+
+// ── Version API calls ─────────────────────────────────────────────────────────
+
+export const listVersions = (doctypeId: number): Promise<DoctypeVersion[]> =>
+  get(`/spa/api/document-types/${doctypeId}/versions`, z.array(DoctypeVersionSchema));
+
+export const createVersion = (doctypeId: number, schemaJson: string): Promise<DoctypeVersion> =>
+  post(
+    `/spa/api/document-types/${doctypeId}/versions`,
+    { schema_json: schemaJson },
+    DoctypeVersionSchema,
+  );
+
+export const publishVersion = (
+  doctypeId: number,
+  versionId: number,
+  reason: string,
+): Promise<DoctypeVersion> =>
+  post(
+    `/spa/api/document-types/${doctypeId}/versions/${versionId}/publish`,
+    { reason },
+    DoctypeVersionSchema,
+  );
+
+export const rollbackVersion = (
+  doctypeId: number,
+  versionId: number,
+  reason: string,
+): Promise<DoctypeVersion> =>
+  post(
+    `/spa/api/document-types/${doctypeId}/versions/${versionId}/rollback`,
+    { reason },
+    DoctypeVersionSchema,
+  );
+
+export const diffVersions = (
+  doctypeId: number,
+  versionId: number,
+  compareId?: number,
+): Promise<DoctypeVersionDiff> =>
+  get(
+    `/spa/api/document-types/${doctypeId}/versions/${versionId}/diff`,
+    DoctypeVersionDiffSchema,
+    compareId !== undefined ? { compare: compareId } : undefined,
+  );
+
+// ── Bbox API calls ────────────────────────────────────────────────────────────
+
+export const listBboxes = (doctypeId: number, versionId: number): Promise<DoctypeFieldBbox[]> =>
+  get(
+    `/spa/api/document-types/${doctypeId}/versions/${versionId}/bbox`,
+    z.array(DoctypeFieldBboxSchema),
+  );
+
+export const saveBbox = (
+  doctypeId: number,
+  versionId: number,
+  bbox: { field_name: string; page: number; x: number; y: number; w: number; h: number; source: BboxSource },
+): Promise<DoctypeFieldBbox> =>
+  post(
+    `/spa/api/document-types/${doctypeId}/versions/${versionId}/bbox`,
+    bbox,
+    DoctypeFieldBboxSchema,
+  );
+
+export const deleteBbox = (doctypeId: number, versionId: number, bboxId: number): Promise<{ ok: boolean }> =>
+  del(`/spa/api/document-types/${doctypeId}/versions/${versionId}/bbox/${bboxId}`, z.object({ ok: z.boolean() }));
+
+// ── A/B test API call ─────────────────────────────────────────────────────────
+
+export const runAbTest = (
+  doctypeId: number,
+  payload: { sample_doc_ids: number[]; version_a: number; version_b: number },
+): Promise<AbTestResult> =>
+  post(`/spa/api/document-types/${doctypeId}/ab-test`, payload, AbTestResultSchema);
 
 // ── Infer / commit ────────────────────────────────────────────────────────────
 

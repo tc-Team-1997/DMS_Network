@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..security import require_api_key
-from ..services.alerts import expiring_documents, low_confidence_ocr, create_alert
+from ..services.alerts import (
+    expiring_documents,
+    expiring_documents_per_doctype,
+    low_confidence_ocr,
+    create_alert,
+)
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"], dependencies=[Depends(require_api_key)])
 
@@ -14,6 +19,16 @@ router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"], dependencies=[Depen
 @router.get("/expiring")
 def expiring(within_days: int = 30, db: Session = Depends(get_db)):
     return expiring_documents(db, within_days)
+
+
+@router.get("/expiring-per-doctype")
+def expiring_per_doctype(db: Session = Depends(get_db)):
+    """Return documents approaching expiry grouped by per-doctype notify_days bands.
+
+    Replaces the hardcoded 30-day / 90-day defaults — each document type
+    controls its own notification thresholds via notify_days (migration 0031).
+    """
+    return expiring_documents_per_doctype(db)
 
 
 @router.get("/ocr-low-confidence")

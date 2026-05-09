@@ -108,7 +108,88 @@
     "error_ticket_id": "Ticket",
     "error_conflict": "This record was recently updated. Refresh to see the latest state.",
     "error_generic": "An error occurred. Please try again.",
-    "error_invalid_threshold": "Threshold must be a number between 0 and 1."
+    "error_invalid_threshold": "Threshold must be a number between 0 and 1.",
+
+    "v2": {
+      "modal_title": "AML Hit Review",
+      "hit_id_label": "Hit",
+      "tab_compare": "Compare",
+      "tab_history": "History",
+      "tab_adverse": "Adverse Media",
+      "tab_action": "Action",
+
+      "subject_pane": "Subject (Customer)",
+      "watchlist_pane": "Watchlist Entry",
+      "name_label": "Name",
+      "dob_label": "DOB",
+      "country_label": "Country",
+      "unknown": "Unknown",
+
+      "score_breakdown_label": "Match score breakdown",
+      "score_name": "Name",
+      "score_dob": "Date of birth",
+      "score_country": "Country",
+      "score_composite": "Composite",
+
+      "token_match": "Match",
+      "token_partial": "Partial",
+      "token_miss": "No match",
+
+      "high_risk_stepup_notice": "Risk band HIGH — WebAuthn step-up is required for this action.",
+
+      "notes_placeholder": "Add reviewer notes (minimum 20 characters)…",
+
+      "action_cleared": "Cleared",
+      "action_cleared_suppress": "Cleared + Suppress",
+      "action_edd": "Escalate to EDD",
+      "action_sar": "True Match — Generate SAR",
+      "action_hint": "All decisions are logged in the audit trail.",
+
+      "decided_cleared": "Hit cleared successfully.",
+      "decided_edd": "Hit escalated to Enhanced Due Diligence.",
+      "decided_suppressed": "Hit cleared and suppression recorded.",
+      "sar_submitted": "SAR draft submitted to compliance.",
+
+      "history_decisions_label": "Prior decisions",
+      "history_suppressions_label": "Suppressions",
+      "history_no_decisions": "No prior decisions recorded.",
+      "history_no_suppressions": "No suppressions recorded.",
+      "history_by": "by",
+
+      "apply_verdict_button": "Apply",
+      "apply_verdict_tip": "Re-apply this verdict to the current hit.",
+      "apply_verdict_disabled_tip": "Cannot apply — an active suppression is in effect.",
+      "apply_verdict_auto_note": "Prior verdict applied from history entry dated",
+
+      "suppression_active": "Active",
+      "suppression_expired": "Expired",
+      "suppression_until": "Suppressed until",
+
+      "suppress_dialog_title": "Cleared + Suppress",
+      "suppress_duration_label": "Suppress for",
+      "suppress_reason_label": "Reason",
+      "suppress_reason_placeholder": "Explain why this match should be suppressed (minimum 20 characters)…",
+      "suppress_submit_button": "Save suppression",
+
+      "adverse_media_stub_notice": "Adverse media results are in stub mode. Live screening will be available in a future release.",
+      "adverse_media_subject": "Searching for",
+      "adverse_media_sources_label": "Sources configured",
+      "adverse_media_results_label": "Results",
+      "adverse_media_no_high_risk": "No high-risk adverse media found in this screening.",
+
+      "sar_modal_title": "SAR Draft",
+      "sar_draft_notice": "DRAFT — Not for submission without Compliance Officer review and approval.",
+      "sar_institution": "Institution",
+      "sar_subject": "Subject",
+      "sar_hit_id": "Hit ID",
+      "sar_watchlist": "Watchlist",
+      "sar_score": "Match score",
+      "sar_reviewer": "Prepared by",
+      "sar_narrative_label": "Narrative",
+      "sar_download_button": "Download PDF",
+      "sar_submit_button": "Submit to Compliance",
+      "sar_submitted_ok": "SAR stub submitted. Compliance team has been notified."
+    }
   },
   "cbs": {
     "lookup_title": "Look up customer in T24",
@@ -353,6 +434,55 @@
     "upload_sample_cta": "Upload a sample",
     "feature_disabled": "Confidence tuning is not enabled in this environment.",
     "ticks_aria_label": "Scale tick at {{pct}}%"
+  },
+  "customer360": {
+    "drawer_aria_label": "Customer 360 — {{cid}}",
+    "close": "Close",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "prev": "Previous",
+    "next": "Next",
+    "opened": "Opened",
+
+    "tab_master": "Master",
+    "tab_accounts": "Accounts",
+    "tab_documents": "Documents",
+    "tab_transactions": "Transactions",
+    "tab_workflows": "Workflows",
+    "tab_activity": "Activity",
+
+    "attr_cid": "CID",
+    "attr_national_id": "National ID",
+    "attr_dob": "Date of Birth",
+    "attr_phone": "Phone",
+    "attr_email": "Email",
+    "attr_branch": "Branch",
+    "attr_risk_band": "Risk Band",
+    "attr_kyc_status": "KYC Status",
+    "attr_aml_status": "AML Status",
+    "attr_onboarded": "Onboarded",
+
+    "reveal_button": "Reveal",
+    "reveal_button_aria": "Reveal {{field}}",
+    "mask_button_aria": "Mask {{field}}",
+    "mask_now": "Mask now",
+    "reveal_dialog_title": "Reveal {{field}}",
+    "reveal_dialog_body": "Access to unmasked PII is audited. Please provide a business reason for this access.",
+    "reveal_reason_label": "Reason",
+    "reveal_reason_placeholder": "e.g. Customer called to verify account details (minimum 20 characters)…",
+
+    "accounts_empty": "No accounts found for this customer.",
+    "documents_empty": "No documents found for this customer.",
+    "transactions_empty": "No transactions found for this customer.",
+    "workflows_empty": "No workflows found for this customer.",
+    "activity_empty": "No activity recorded for this customer.",
+
+    "error_load": "Failed to load. Please retry.",
+    "error_generic": "An error occurred. Please try again.",
+    "error_forbidden": "You do not have permission to view Customer-360 data.",
+
+    "feature_disabled": "Customer-360 is not enabled in this environment.",
+    "feature_disabled_hint": "Contact your administrator to enable this feature."
   },
   "redaction": {
     "toolbar_button": "Redact",

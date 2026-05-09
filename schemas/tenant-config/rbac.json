@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/rbac",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "session_ttl_minutes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 1440,
+      "description": "Session lifetime in minutes (default 120)"
+    },
+    "sod_forbidden_pairs": {
+      "type": "string",
+      "description": "JSON array of role pairs that may not be held by the same user — e.g. [[\"Maker\",\"Checker\"]]"
+    }
+  }
+}

@@ -17,6 +17,7 @@ import {
   FileSliders,
   BookOpen,
   CopyX,
+  Archive,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -51,6 +52,7 @@ export const navItems: NavItem[] = [
   { label: 'Users',          path: '/users',       icon: Users,           section: 'Platform',   perm: 'admin' },
   { label: 'Document types', path: '/admin/document-types',  icon: FileSliders, section: 'Platform', perm: 'admin' },
   { label: 'Dedup settings', path: '/admin/dedup-settings',  icon: CopyX,       section: 'Platform', perm: 'admin' },
+  { label: 'Retention & WORM', path: '/admin/retention',     icon: Archive,     section: 'Platform', perm: 'admin' },
   { label: 'AI glossary',    path: '/admin/ai-glossary',     icon: BookOpen,    section: 'Platform', perm: 'admin' },
   { label: 'System Admin',   path: '/admin',                 icon: Settings,    section: 'Platform', perm: 'admin' },
 ];

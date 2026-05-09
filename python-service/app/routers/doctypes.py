@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text as sqltext
 from sqlalchemy.orm import Session
@@ -477,6 +478,50 @@ def get_sample(schema_id: int, sample_id: int, db: Session = Depends(get_db)):
         "ocr_text_preview": (ocr_text_full or "")[:2000],
         "thumbnail_data_url": thumbnail,
     }
+
+
+# ---------------------------------------------------------------------------
+# Endpoint 4b — GET /{schema_id}/samples/{sample_id}/pdf
+# Streams the raw sample file so the BboxLabeler can render it with PDF.js.
+# ---------------------------------------------------------------------------
+
+@router.get("/{schema_id}/samples/{sample_id}/pdf")
+def get_sample_pdf(schema_id: int, sample_id: int, db: Session = Depends(get_db)):
+    """Stream the original sample file bytes to the browser.
+
+    The BboxLabeler needs the real bytes — not a thumbnail — so PDF.js can
+    render each page at full resolution for annotation.  Content-Type is set
+    from the stored mime_type; if it is not a PDF the browser will still
+    render it as an image inside the labeler's fallback <img> element.
+    """
+    _ensure_tables(db)
+    row = db.execute(
+        sqltext(
+            "SELECT storage_key, mime_type FROM document_type_samples "
+            "WHERE id=:id AND schema_id=:sid"
+        ),
+        {"id": sample_id, "sid": schema_id},
+    ).first()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="sample not found")
+
+    storage_path = os.path.join(settings.STORAGE_DIR, row[0])
+    if not os.path.exists(storage_path):
+        raise HTTPException(status_code=404, detail="sample file missing from storage")
+
+    with open(storage_path, "rb") as fh:
+        content = fh.read()
+
+    mime = row[1] or "application/octet-stream"
+    return Response(
+        content=content,
+        media_type=mime,
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "private, max-age=3600",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

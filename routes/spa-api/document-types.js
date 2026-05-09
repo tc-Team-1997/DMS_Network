@@ -53,6 +53,9 @@ function hydrate(row) {
     autofill_floor: row.autofill_floor ?? 0.4,
     high_confidence: row.high_confidence ?? 0.7,
     tested_with_sample_id: row.tested_with_sample_id ?? null,
+    // DocTypes v2 (migration 0032)
+    notify_days: row.notify_days ?? '30,60,90',
+    translate_extracted_to_dz: row.translate_extracted_to_dz ? true : false,
   };
 }
 
@@ -183,7 +186,7 @@ router.get('/document-types/:id', (req, res) => {
 // ---------- writes (admin only) -------------------------------------------
 
 router.post('/document-types', requirePermJson('admin'), (req, res) => {
-  const { name, description, fields, active, default_folder_id } = req.body ?? {};
+  const { name, description, fields, active, default_folder_id, notify_days, translate_extracted_to_dz } = req.body ?? {};
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
@@ -203,11 +206,26 @@ router.post('/document-types', requirePermJson('admin'), (req, res) => {
   }
 
   const tenant = tenantScope(req);
+
+  // Validate notify_days if provided.
+  let resolvedNotifyDays = '30,60,90';
+  if (notify_days != null) {
+    if (typeof notify_days !== 'string') {
+      return res.status(400).json({ error: 'notify_days_must_be_string' });
+    }
+    const parts = notify_days.split(',').map((s) => parseInt(s.trim(), 10));
+    if (parts.some((n) => !Number.isFinite(n) || n <= 0)) {
+      return res.status(400).json({ error: 'notify_days_invalid' });
+    }
+    resolvedNotifyDays = notify_days.trim();
+  }
+
   try {
     const info = db.prepare(
       `INSERT INTO document_type_schemas
-         (name, description, fields_json, active, tenant_id, default_folder_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+         (name, description, fields_json, active, tenant_id, default_folder_id,
+          notify_days, translate_extracted_to_dz)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       name.trim().slice(0, 80),
       (typeof description === 'string' ? description.slice(0, 500) : null),
@@ -215,6 +233,8 @@ router.post('/document-types', requirePermJson('admin'), (req, res) => {
       active === false ? 0 : 1,
       tenant,
       resolvedDefaultFolderId,
+      resolvedNotifyDays,
+      translate_extracted_to_dz ? 1 : 0,
     );
     const row = db.prepare(
       `SELECT s.*, f.name AS default_folder_name
@@ -276,6 +296,25 @@ router.patch('/document-types/:id', requirePermJson('admin'), (req, res) => {
       sets.push('default_folder_id = ?');
       values.push(fid);
     }
+  }
+
+  // ── DocTypes v2 fields (migration 0032) ─────────────────────────────────
+  if ('notify_days' in body) {
+    const nd = body.notify_days;
+    if (typeof nd !== 'string') {
+      return res.status(400).json({ error: 'notify_days_must_be_string' });
+    }
+    // Validate: comma-separated positive integers.
+    const parts = nd.split(',').map((s) => parseInt(s.trim(), 10));
+    if (parts.some((n) => !Number.isFinite(n) || n <= 0)) {
+      return res.status(400).json({ error: 'notify_days_invalid' });
+    }
+    sets.push('notify_days = ?');
+    values.push(nd.trim());
+  }
+  if ('translate_extracted_to_dz' in body) {
+    sets.push('translate_extracted_to_dz = ?');
+    values.push(body.translate_extracted_to_dz ? 1 : 0);
   }
 
   // ── OCR confidence threshold fields (contract: ocr-confidence-tuning §5) ─

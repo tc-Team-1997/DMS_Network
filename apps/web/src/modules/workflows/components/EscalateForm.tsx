@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui';
 import { HttpError } from '@/lib/http';
 import { useTenantConfig } from '@/store/tenant-config';
-import { escalateWorkflow, stepUpStart, stepUpFinish, type EscalatePayload } from '../api';
+import { stepUpStart, stepUpFinish } from '@/lib/step-up';
+import { escalateWorkflow, type EscalatePayload } from '../api';
 import type { WorkflowRow } from '../api';
 
 interface EscalateFormProps {

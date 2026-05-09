@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/abac",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "rules": {
+      "type": "array",
+      "description": "Ordered list of ABAC rules. Compiled to opa/policies/dms.rego on save. additionalProperties: false enforced at application layer (tenant-config validator does not recurse into array items).",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

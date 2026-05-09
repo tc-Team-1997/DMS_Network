@@ -2,15 +2,21 @@ import { get, patch, post } from '@/lib/http';
 import {
   AmlSummary,
   DecideResponseSchema,
+  HitHistoryResponseSchema,
   HitsResponseSchema,
+  SarSubmitResponseSchema,
   ScreenCustomerResponseSchema,
   ScreeningsResponseSchema,
+  SuppressionResponseSchema,
   WatchlistPatchResponseSchema,
   WatchlistRefreshResponseSchema,
   WatchlistsResponseSchema,
   type DecisionEnum,
+  type HitHistoryResponse,
   type HitsResponse,
+  type SarSubmitResponse,
   type ScreeningsResponse,
+  type SuppressionResponse,
   type Watchlist,
 } from './schemas';
 
@@ -61,6 +67,39 @@ export function decideHit(
     `/spa/api/aml/hits/${hitId}/decide`,
     { decision, reviewer_notes: notes },
     DecideResponseSchema,
+  );
+}
+
+// ── v2: Hit history (for History tab in HitDecideV2Modal) ─────────────────────
+
+export function fetchHitHistory(hitId: number): Promise<HitHistoryResponse> {
+  return get(`/spa/api/aml/hits/${hitId}/history`, HitHistoryResponseSchema);
+}
+
+// ── v2: Suppress (Cleared + Suppress action) ──────────────────────────────────
+
+export function suppressHit(
+  hitId: number,
+  reason: string,
+  suppressDays?: number,
+): Promise<SuppressionResponse> {
+  return post(
+    `/spa/api/aml/hits/${hitId}/suppress`,
+    {
+      reason,
+      ...(suppressDays !== undefined ? { suppress_days: suppressDays } : {}),
+    },
+    SuppressionResponseSchema,
+  );
+}
+
+// ── v2: SAR submit (stub) ─────────────────────────────────────────────────────
+
+export function submitSar(hitId: number): Promise<SarSubmitResponse> {
+  return post(
+    `/spa/api/aml/hits/${hitId}/sar-submit`,
+    {},
+    SarSubmitResponseSchema,
   );
 }
 

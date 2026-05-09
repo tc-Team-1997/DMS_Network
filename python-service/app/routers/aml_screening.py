@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import (
     AmlHit,
+    AmlHitSuppression,
     AmlScreening,
     AmlWatchlist,
     AmlWatchlistEntry,
@@ -134,6 +135,20 @@ class HitOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class HitDecideOut(BaseModel):
+    hit_id: int
+    decision: str
+    reviewed_by: str
+    reviewed_at: datetime
+    notes: Optional[str] = None
+
+
+class ScoreBreakdown(BaseModel):
+    name: float
+    dob: float
+    country: float
+
+
 class HitDecideIn(BaseModel):
     decision: str
     notes: Optional[str] = None
@@ -141,18 +156,25 @@ class HitDecideIn(BaseModel):
     @field_validator("decision")
     @classmethod
     def validate_decision(cls, v: str) -> str:
-        allowed = {"cleared", "escalated", "blocked"}
+        allowed = {"cleared", "escalated", "blocked", "edd"}
         if v not in allowed:
             raise ValueError(f"decision must be one of {sorted(allowed)}")
         return v
 
 
-class HitDecideOut(BaseModel):
-    hit_id: int
-    decision: str
-    reviewed_by: str
-    reviewed_at: datetime
-    notes: Optional[str] = None
+class SuppressIn(BaseModel):
+    reason: str = Field(..., min_length=20, max_length=2000)
+    suppress_days: Optional[int] = Field(None, ge=1, le=3650)  # max 10y
+
+
+class SuppressOut(BaseModel):
+    suppression_id: int
+    subject_cid: str
+    watchlist_entry_id: int
+    suppression_reason: str
+    suppressed_until: Optional[datetime]
+    suppressed_by: str
+    created_at: datetime
 
 
 class SummaryOut(BaseModel):
@@ -643,6 +665,228 @@ def decide_hit(
 
 
 # ---------------------------------------------------------------------------
+# GET /hits/{id}/history — decision history for subject×entry pair
+# ---------------------------------------------------------------------------
+
+
+@router.get("/hits/{hit_id}/history")
+def hit_history(
+    hit_id: int,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(_require_compliance_or_higher()),
+) -> dict[str, Any]:
+    """Return all previous decisions and suppressions for the subject×entry pair
+    identified by this hit.  Used by the 'History' tab in HitDecideV2Modal.
+    """
+    hit = db.get(AmlHit, hit_id)
+    if hit is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hit not found")
+    screening = db.get(AmlScreening, hit.screening_id)
+    if screening is None or screening.tenant_id != p.tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hit not found")
+
+    # Sibling hits: same subject_cid × watchlist_entry_id in this tenant
+    sibling_hits = (
+        db.query(AmlHit)
+        .join(AmlScreening, AmlHit.screening_id == AmlScreening.id)
+        .filter(
+            AmlScreening.tenant_id == p.tenant,
+            AmlScreening.customer_cid == screening.customer_cid,
+            AmlHit.watchlist_entry_id == hit.watchlist_entry_id,
+            AmlHit.decision != "open",
+        )
+        .order_by(AmlHit.reviewed_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    # Active suppressions for this pair
+    suppressions = (
+        db.query(AmlHitSuppression)
+        .filter(
+            AmlHitSuppression.tenant_id == p.tenant,
+            AmlHitSuppression.subject_cid == screening.customer_cid,
+            AmlHitSuppression.watchlist_entry_id == hit.watchlist_entry_id,
+        )
+        .order_by(AmlHitSuppression.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    def _supp_to_dict(s: AmlHitSuppression) -> dict[str, Any]:
+        now = datetime.utcnow()
+        return {
+            "suppression_id":      s.id,
+            "suppression_reason":  s.suppression_reason,
+            "suppressed_until":    s.suppressed_until.isoformat() + "Z" if s.suppressed_until else None,
+            "suppressed_by":       s.suppressed_by,
+            "created_at":          s.created_at.isoformat() + "Z" if s.created_at else None,
+            "is_active":           s.suppressed_until is None or s.suppressed_until > now,
+        }
+
+    return {
+        "hit_id":             hit_id,
+        "subject_cid":        screening.customer_cid,
+        "watchlist_entry_id": hit.watchlist_entry_id,
+        "decisions": [
+            {
+                "hit_id":      h.id,
+                "decision":    h.decision,
+                "reviewed_by": h.reviewed_by,
+                "reviewed_at": h.reviewed_at.isoformat() + "Z" if h.reviewed_at else None,
+                "notes":       h.review_notes,
+                "score":       round(h.score, 4),
+            }
+            for h in sibling_hits
+        ],
+        "suppressions": [_supp_to_dict(s) for s in suppressions],
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /hits/{id}/suppress — create a false-positive suppression
+# ---------------------------------------------------------------------------
+
+
+@router.post("/hits/{hit_id}/suppress")
+def suppress_hit(
+    hit_id: int,
+    body: SuppressIn,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require("approve")),
+) -> dict[str, Any]:
+    """Record a false-positive suppression for a subject×watchlist-entry pair.
+
+    This is called when the officer chooses 'Cleared + Suppress'.  The hit
+    is also marked as cleared.  Future auto-screening of the same pair within
+    the suppression window will be auto-cleared without manual review.
+    """
+    hit = db.get(AmlHit, hit_id)
+    if hit is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hit not found")
+    screening = db.get(AmlScreening, hit.screening_id)
+    if screening is None or screening.tenant_id != p.tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hit not found")
+
+    if hit.decision != "open":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Hit already reviewed: decision={hit.decision}",
+        )
+
+    now = datetime.utcnow()
+    suppressed_until: Optional[datetime] = None
+    if body.suppress_days is not None:
+        suppressed_until = now + timedelta(days=body.suppress_days)
+
+    # Mark the hit cleared
+    hit.decision    = "cleared"
+    hit.reviewed_at = now
+    hit.review_notes = f"[SUPPRESSED] {body.reason}"
+
+    # Create suppression record
+    suppression = AmlHitSuppression(
+        tenant_id=p.tenant,
+        subject_cid=screening.customer_cid,
+        watchlist_entry_id=hit.watchlist_entry_id,
+        suppression_reason=body.reason,
+        suppressed_until=suppressed_until,
+        suppressed_by=p.sub,
+        created_at=now,
+    )
+    db.add(suppression)
+
+    _write_audit(
+        db,
+        tenant=p.tenant,
+        actor=p.sub,
+        action="AML_HIT_SUPPRESSED",
+        resource_type="aml_hit",
+        resource_id=str(hit_id),
+        detail=(
+            f"subject_cid={screening.customer_cid} "
+            f"watchlist_entry_id={hit.watchlist_entry_id} "
+            f"suppress_days={body.suppress_days}"
+        ),
+    )
+    db.commit()
+
+    AML_DECIDE_TOTAL.labels(decision="cleared").inc()
+    emit(
+        "aml.hit_suppressed",
+        hit_id=hit_id,
+        subject_cid=screening.customer_cid,
+        suppressed_by=p.sub,
+        tenant_id=p.tenant,
+    )
+
+    logger.info(
+        "aml_suppress hit_id=%d subject_cid=%s suppress_days=%s reviewer=%s tenant=%s",
+        hit_id,
+        _mask(screening.customer_cid),
+        body.suppress_days,
+        p.sub,
+        p.tenant,
+    )
+
+    return {
+        "suppression_id":      suppression.id,
+        "subject_cid":         screening.customer_cid,
+        "watchlist_entry_id":  hit.watchlist_entry_id,
+        "suppression_reason":  suppression.suppression_reason,
+        "suppressed_until":    suppressed_until.isoformat() + "Z" if suppressed_until else None,
+        "suppressed_by":       p.sub,
+        "created_at":          now.isoformat() + "Z",
+        "hit_decision_updated": "cleared",
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /hits/{id}/sar-submit — stub SAR submission
+# ---------------------------------------------------------------------------
+
+
+@router.post("/hits/{hit_id}/sar-submit")
+def sar_submit(
+    hit_id: int,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require("approve")),
+) -> dict[str, Any]:
+    """Stub SAR submission endpoint.
+
+    In production this will POST to tenant_config.aml.sar_submission_endpoint.
+    For v1 it logs the audit event and returns { ok: true, stub: true }.
+    """
+    hit = db.get(AmlHit, hit_id)
+    if hit is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hit not found")
+    screening = db.get(AmlScreening, hit.screening_id)
+    if screening is None or screening.tenant_id != p.tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Hit not found")
+
+    _write_audit(
+        db,
+        tenant=p.tenant,
+        actor=p.sub,
+        action="AML_SAR_SUBMITTED",
+        resource_type="aml_hit",
+        resource_id=str(hit_id),
+        detail=f"subject_cid={screening.customer_cid} stub=true",
+    )
+    db.commit()
+
+    emit(
+        "aml.sar_submitted",
+        hit_id=hit_id,
+        subject_cid=screening.customer_cid,
+        submitted_by=p.sub,
+        tenant_id=p.tenant,
+    )
+
+    return {"ok": True, "stub": True, "hit_id": hit_id}
+
+
+# ---------------------------------------------------------------------------
 # GET /summary (compliance card feed)
 # ---------------------------------------------------------------------------
 
@@ -808,16 +1052,105 @@ def _screening_to_dict(s: AmlScreening) -> dict[str, Any]:
     }
 
 
-def _hit_to_dict(h: AmlHit) -> dict[str, Any]:
+def _compute_score_breakdown(
+    subject_name: str,
+    subject_dob: Optional[str],
+    subject_country: Optional[str],
+    entry: Optional[AmlWatchlistEntry],
+    composite_score: float,
+    weights: Optional[dict[str, float]] = None,
+) -> dict[str, float]:
+    """Compute per-field sub-scores for name, DOB, and country.
+
+    Weights default to {name: 0.5, dob: 0.3, country: 0.2} per tenant_config.
+    The composite_score is passed in from the stored AmlHit.score.  We
+    back-calculate name_score from the composite so it's always consistent with
+    what the matcher stored.
+
+    DOB and country are binary (1.0 = match / both present, 0.0 = mismatch or
+    absent on either side).
+    """
+    if weights is None:
+        weights = {"name": 0.5, "dob": 0.3, "country": 0.2}
+
+    w_name    = float(weights.get("name", 0.5))
+    w_dob     = float(weights.get("dob", 0.3))
+    w_country = float(weights.get("country", 0.2))
+
+    # DOB sub-score
+    entry_dob = entry.dob if entry else None
+    if subject_dob and entry_dob:
+        dob_score = 1.0 if subject_dob == entry_dob else 0.0
+    else:
+        dob_score = 0.0
+
+    # Country sub-score
+    entry_country = entry.country if entry else None
+    if subject_country and entry_country:
+        country_score = 1.0 if subject_country.upper() == entry_country.upper() else 0.0
+    else:
+        country_score = 0.0
+
+    # Back-calculate name score from composite.
+    # composite = w_name * name_score + w_dob * dob_score + w_country * country_score
+    # Clamp to [0, 1].
+    denominator = w_name if w_name > 0 else 1.0
+    name_score_calc = (composite_score - w_dob * dob_score - w_country * country_score) / denominator
+    name_score = min(1.0, max(0.0, round(name_score_calc, 4)))
+
+    return {
+        "name":    round(name_score, 4),
+        "dob":     round(dob_score, 4),
+        "country": round(country_score, 4),
+    }
+
+
+def _hit_to_dict(
+    h: AmlHit,
+    subject_cid: Optional[str] = None,
+    subject_name: Optional[str] = None,
+    subject_dob: Optional[str] = None,
+    subject_country: Optional[str] = None,
+    weights: Optional[dict[str, float]] = None,
+) -> dict[str, Any]:
     entry = h.watchlist_entry
+    entry_dob     = entry.dob if entry else None
+    entry_country = entry.country if entry else None
+    entry_name    = entry.normalized_name if entry else None
+
+    score_breakdown = _compute_score_breakdown(
+        subject_name=subject_name or "",
+        subject_dob=subject_dob,
+        subject_country=subject_country,
+        entry=entry,
+        composite_score=h.score,
+        weights=weights,
+    )
+
+    # Derive watchlist_entry_name from original_record (display name) or normalized
+    original = entry.original_record if entry else {}
+    display_name = (
+        original.get("name")
+        or original.get("display_name")
+        or entry_name
+        or ""
+    )
+
     return {
         "id": h.id,
         "screening_id": h.screening_id,
         "watchlist_entry_id": h.watchlist_entry_id,
         "watchlist_name": entry.watchlist.list_name if entry and entry.watchlist else None,
-        "matched_name": entry.normalized_name if entry else None,
-        "original_record": entry.original_record if entry else {},
+        "watchlist_entry_name": display_name,
+        "matched_name": entry_name,
+        "watchlist_dob": entry_dob,
+        "watchlist_country": entry_country,
+        "original_record": original,
+        "subject_name": subject_name,
+        "subject_dob": subject_dob,
+        "subject_country": subject_country,
         "score": round(h.score, 4),
+        "score_breakdown": score_breakdown,
         "decision": h.decision,
         "reviewed_by": h.reviewed_by,
         "reviewed_at": h.reviewed_at.isoformat() + "Z" if h.reviewed_at else None,

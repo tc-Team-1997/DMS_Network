@@ -359,7 +359,46 @@ router.get('/docbrain/doctypes/:id/samples', requirePermJson('admin'),
 
 // GET /spa/api/docbrain/doctypes/:id/samples/:sid
 router.get('/docbrain/doctypes/:id/samples/:sid', requirePermJson('admin'),
-  proxyDoctype('GET', (req) => `${dtPath(req.params.id)}/samples/${encodeURIComponent(req.params.sid)}`));
+  proxyDoctype('GET', (req) => `${dtPath(req.params.id)}/samples/${encodeURIComponent(req.params.sid)}`))
+
+// GET /spa/api/docbrain/doctypes/:id/samples/:sid/pdf
+// Streams the original sample file bytes from Python storage so BboxLabeler
+// can render it with PDF.js at full resolution.
+router.get('/docbrain/doctypes/:id/samples/:sid/pdf', requirePermJson('admin'), async (req, res) => {
+  const pyUrl = new URL(
+    `${dtPath(req.params.id)}/samples/${encodeURIComponent(req.params.sid)}/pdf`,
+    PY_BASE,
+  );
+  const lib = pyUrl.protocol === 'https:' ? https : http;
+  try {
+    await new Promise((resolve, reject) => {
+      const pyReq = lib.request(pyUrl, {
+        method: 'GET',
+        headers: { 'X-API-Key': PY_KEY, Accept: 'application/octet-stream' },
+      });
+      pyReq.on('response', (pyRes) => {
+        if (pyRes.statusCode >= 400) {
+          const err = new Error(`python ${pyRes.statusCode}`);
+          err.status = pyRes.statusCode;
+          return reject(err);
+        }
+        res.status(200);
+        res.setHeader('Content-Type', pyRes.headers['content-type'] || 'application/octet-stream');
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        pyRes.pipe(res);
+        pyRes.on('end', resolve);
+        pyRes.on('error', reject);
+      });
+      pyReq.on('error', reject);
+      pyReq.setTimeout(30_000, () => pyReq.destroy(new Error('timeout')));
+      pyReq.end();
+    });
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(err.status || 502).json({ error: 'sample_pdf_failed', detail: err.message });
+    }
+  }
+});
 
 // DELETE /spa/api/docbrain/doctypes/:id/samples/:sid
 router.delete('/docbrain/doctypes/:id/samples/:sid', requirePermJson('admin'), async (req, res) => {

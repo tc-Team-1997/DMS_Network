@@ -104,7 +104,11 @@ export async function patch<S extends ZodTypeAny>(
   return schema.parse(data);
 }
 
-export async function del<S extends ZodTypeAny>(url: string, schema: S): Promise<z.infer<S>> {
-  const { data } = await http.delete<unknown>(url);
+export async function del<S extends ZodTypeAny>(
+  url: string,
+  schema: S,
+  body?: unknown,
+): Promise<z.infer<S>> {
+  const { data } = await http.delete<unknown>(url, body !== undefined ? { data: body } : undefined);
   return schema.parse(data);
 }

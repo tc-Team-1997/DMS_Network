@@ -5,7 +5,7 @@
  * Left rail groups:
  *   Branding & Tenants   — Branding, Locales, Tenants
  *   Operational          — Capture, OCR, DocTypes, Workflows, AML, Retention
- *   Access & Security    — RBAC, ABAC, Audit
+ *   Access & Security    — Users & Auth, RBAC, ABAC, Audit
  *   Platform             — Integrations, Notifications, Mobile
  */
 
@@ -18,6 +18,7 @@ import {
   ScanLine,
   FileType2,
   Workflow,
+  GitBranch,
   Shield,
   Archive,
   ClipboardList,
@@ -27,6 +28,7 @@ import {
   Lock,
   ShieldCheck,
   Search,
+  UserCog,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -63,8 +65,9 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Capture',   path: '/admin/settings/capture',   icon: Camera    },
       { label: 'OCR',       path: '/admin/settings/ocr',       icon: ScanLine  },
       { label: 'Doc Types', path: '/admin/settings/doctypes',  icon: FileType2 },
-      { label: 'Workflows', path: '/admin/settings/workflows', icon: Workflow  },
-      { label: 'Search',    path: '/admin/settings/search',    icon: Search    },
+      { label: 'Workflows',           path: '/admin/settings/workflows',           icon: Workflow   },
+      { label: 'Workflow Templates', path: '/admin/settings/workflow-templates', icon: GitBranch  },
+      { label: 'Search',             path: '/admin/settings/search',             icon: Search     },
       { label: 'AML',       path: '/admin/settings/aml',       icon: Shield    },
       { label: 'Retention', path: '/admin/settings/retention', icon: Archive   },
     ],
@@ -72,9 +75,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Access & Security',
     items: [
-      { label: 'RBAC',  path: '/admin/settings/rbac',  icon: Lock       },
-      { label: 'ABAC',  path: '/admin/settings/abac',  icon: ShieldCheck },
-      { label: 'Audit', path: '/admin/settings/audit', icon: ClipboardList },
+      { label: 'Users & Auth', path: '/admin/settings/users-auth', icon: UserCog    },
+      { label: 'RBAC',         path: '/admin/settings/rbac',       icon: Lock       },
+      { label: 'ABAC',         path: '/admin/settings/abac',       icon: ShieldCheck },
+      { label: 'Audit',        path: '/admin/settings/audit',      icon: ClipboardList },
     ],
   },
   {

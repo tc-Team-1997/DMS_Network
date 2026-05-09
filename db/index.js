@@ -378,6 +378,51 @@ try {
 
   seedDefaultTypeSchemas();
 
+  // ── Migration 0033 — Template versioning + business calendars (Wave B) ──
+  // business_calendars: tenant-scoped working-hours + holiday definitions.
+  // wf_template_versions: immutable version snapshots (BPMN, DMN, SLA, calendar).
+  // workflows.template_version_id: pins instance to the exact version live at creation.
+  //   NULL = legacy path (reads workflow_templates.steps_json).
+  //   non-NULL = new path (reads wf_template_versions.bpmn_json).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS business_calendars (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id           TEXT    NOT NULL DEFAULT 'nbe',
+      name                TEXT    NOT NULL,
+      holidays_json       TEXT    NOT NULL DEFAULT '[]',
+      business_hours_json TEXT    NOT NULL DEFAULT '{"days":[1,2,3,4,5],"start":"09:00","end":"17:00","tz":"Asia/Thimphu"}',
+      created_by          INTEGER,
+      created_at          TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_biz_cal_tenant ON business_calendars(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS wf_template_versions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,
+      version     INTEGER NOT NULL,
+      bpmn_json   TEXT    NOT NULL DEFAULT '{"nodes":[],"edges":[]}',
+      dmn_json    TEXT    NOT NULL DEFAULT '{}',
+      sla_json    TEXT    NOT NULL DEFAULT '{}',
+      calendar_id INTEGER,
+      created_by  INTEGER,
+      status      TEXT    NOT NULL DEFAULT 'draft'
+                    CHECK(status IN ('draft','published','archived')),
+      created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE,
+      FOREIGN KEY (calendar_id) REFERENCES business_calendars(id),
+      FOREIGN KEY (created_by)  REFERENCES users(id),
+      UNIQUE (template_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_wftv_template ON wf_template_versions(template_id);
+    CREATE INDEX IF NOT EXISTS idx_wftv_status   ON wf_template_versions(status);
+  `);
+  // Additive columns — safe to run on every boot.
+  addColumnIfMissing('workflow_templates', 'current_version_id',
+    'current_version_id INTEGER REFERENCES wf_template_versions(id)');
+  addColumnIfMissing('workflows', 'template_version_id',
+    'template_version_id INTEGER REFERENCES wf_template_versions(id)');
+
   // CC1 — Tenant registry + configuration store.
   // schema.sql already contains these CREATE TABLE IF NOT EXISTS blocks; the
   // exec below is the boot-time idempotency guard for existing DBs that

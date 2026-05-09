@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/indexing",
+  "type": "object",
+  "description": "Indexing Station operational settings.",
+  "properties": {
+    "claim_lock_ttl_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 480,
+      "description": "Minutes a claim lock is held before the sweeper expires it. Default: 15."
+    },
+    "per_field_confidence_threshold": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Fields with AI confidence below this value (0-100) are highlighted for review and auto-focused when the station opens. Default: 70."
+    },
+    "queue_order_policy": {
+      "type": "string",
+      "enum": ["fifo", "by_priority", "by_doctype"],
+      "description": "Order in which documents appear in the claim queue. Default: fifo."
+    },
+    "autofocus_first_low_confidence": {
+      "type": "string",
+      "enum": ["on", "off"],
+      "description": "When 'on', the station auto-focuses the first field below the confidence threshold when a document is opened. Default: on."
+    },
+    "keyboard.next_field": {
+      "type": "string",
+      "pattern": "^[A-Za-z]$",
+      "description": "Single letter key to move to the next field (default: j)."
+    },
+    "keyboard.prev_field": {
+      "type": "string",
+      "pattern": "^[A-Za-z]$",
+      "description": "Single letter key to move to the previous field (default: k)."
+    }
+  },
+  "additionalProperties": false
+}

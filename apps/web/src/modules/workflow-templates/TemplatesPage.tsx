@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Plus, Save, Trash2, X } from 'lucide-react';
+import { Copy, ExternalLink, Plus, Save, Trash2, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Badge, Button, Panel } from '@/components/ui';
 import { useAuth } from '@/store/auth';
 import {
@@ -117,6 +118,11 @@ export function TemplatesPage() {
                   <Badge tone={t.active ? 'success' : 'neutral'}>
                     {t.active ? 'Published' : 'Draft'}
                   </Badge>
+                  {t.current_version_id != null && (
+                    <Badge tone="blue" data-testid={`template-${t.id}-version-badge`}>
+                      v{t.current_version_id}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted">
                   {t.doc_type ?? 'Any type'} · {t.steps.length} stages
@@ -124,6 +130,15 @@ export function TemplatesPage() {
               </button>
               {canEdit && (
                 <>
+                  <Link
+                    to={`/workflows/templates/${t.id}/design`}
+                    aria-label="Open Designer"
+                    data-testid={`template-${t.id}-designer`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-brand-blue hover:bg-divider"
+                  >
+                    <ExternalLink size={13} />
+                  </Link>
                   <button
                     type="button"
                     aria-label="Clone"

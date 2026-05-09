@@ -354,4 +354,152 @@ router.get('/active-sessions', (req, res, next) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// DELETE /auth/sessions/:userId/:sid  — kill one session (admin only)
+// ---------------------------------------------------------------------------
+router.delete('/auth/sessions/:userId/:sid', requirePermJson('admin'), async (req, res) => {
+  const targetUserId = parseInt(req.params.userId, 10);
+  const targetSid    = req.params.sid;
+
+  if (!sessionRedis.isConnected()) {
+    return res.status(503).json({ error: 'session_store_unavailable' });
+  }
+
+  try {
+    await Promise.all([
+      sessionRedis.hdel(`dms:user-sessions:${targetUserId}`, targetSid),
+      sessionRedis.del(`dms:session-meta:${targetSid}`),
+      sessionRedis.del(`dms:sess:${targetSid}`),
+    ]);
+
+    writeAudit({
+      userId:   req.session.user.id,
+      action:   'SESSION_KILL',
+      entity:   'user',
+      entityId: targetUserId,
+      details:  JSON.stringify({ sid_last8: targetSid.slice(-8) }),
+      tenantId: req.session.user.tenant_id || 'nbe',
+    });
+
+    const { setConfig } = require('../../db/tenant-config');
+    const tenant = req.session.user.tenant_id || 'nbe';
+    try {
+      setConfig(tenant, '_user_meta', 'last_kill_session_at', new Date().toISOString(), {
+        actorUserId: req.session.user.id,
+        reason: `Admin killed session for user ${targetUserId}`,
+      });
+    } catch (_) {}
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[auth] kill-session error:', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /auth/sessions/:userId  — kill ALL sessions for a user (admin only)
+// ---------------------------------------------------------------------------
+router.delete('/auth/sessions/:userId', requirePermJson('admin'), async (req, res) => {
+  const targetUserId = parseInt(req.params.userId, 10);
+
+  if (!sessionRedis.isConnected()) {
+    return res.status(503).json({ error: 'session_store_unavailable' });
+  }
+
+  try {
+    const sessions = await sessionRedis.hgetall(`dms:user-sessions:${targetUserId}`);
+    const sids = sessions ? Object.keys(sessions) : [];
+
+    const delOps = [];
+    for (const sid of sids) {
+      delOps.push(sessionRedis.del(`dms:session-meta:${sid}`));
+      delOps.push(sessionRedis.del(`dms:sess:${sid}`));
+    }
+    delOps.push(sessionRedis.del(`dms:user-sessions:${targetUserId}`));
+    await Promise.all(delOps);
+
+    writeAudit({
+      userId:   req.session.user.id,
+      action:   'SESSION_KILL_ALL',
+      entity:   'user',
+      entityId: targetUserId,
+      details:  JSON.stringify({ sessions_killed: sids.length }),
+      tenantId: req.session.user.tenant_id || 'nbe',
+    });
+
+    const { setConfig } = require('../../db/tenant-config');
+    const tenant = req.session.user.tenant_id || 'nbe';
+    try {
+      setConfig(tenant, '_user_meta', 'last_kill_session_at', new Date().toISOString(), {
+        actorUserId: req.session.user.id,
+        reason: `Admin killed all sessions for user ${targetUserId} (${sids.length} sessions)`,
+      });
+    } catch (_) {}
+
+    res.json({ ok: true, sessions_killed: sids.length });
+  } catch (err) {
+    console.error('[auth] kill-all-sessions error:', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /auth/set-password  — anonymous (token-gated, no session required)
+// Validates magic-link token and sets the user's first password.
+// ---------------------------------------------------------------------------
+router.post('/auth/set-password', async (req, res) => {
+  const { token, password } = req.body ?? {};
+
+  if (typeof token !== 'string' || token.length < 32) {
+    return res.status(400).json({ error: 'invalid_token' });
+  }
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'password_too_short', min: 8 });
+  }
+
+  const crypto    = require('crypto');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const invite = db.prepare(
+    `SELECT * FROM user_invites
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > datetime('now')`
+  ).get(tokenHash);
+
+  if (!invite) {
+    const stale = db.prepare('SELECT used_at, expires_at FROM user_invites WHERE token_hash = ?').get(tokenHash);
+    if (stale && stale.used_at) return res.status(409).json({ error: 'token_already_used' });
+    if (stale)                  return res.status(410).json({ error: 'token_expired' });
+    return res.status(404).json({ error: 'token_not_found' });
+  }
+
+  const { getConfig } = require('../../db/tenant-config');
+  const tenant    = invite.tenant_id;
+  const minLength = Number(getConfig(tenant, 'auth', 'password_min_length', 10));
+  if (password.length < minLength) {
+    return res.status(400).json({ error: 'password_too_short', min: minLength });
+  }
+
+  const bcrypt = require('bcryptjs');
+  const hash   = bcrypt.hashSync(password, 12);
+  const now    = new Date().toISOString();
+
+  db.transaction(() => {
+    db.prepare('UPDATE user_invites SET used_at = ? WHERE token_hash = ?').run(now, tokenHash);
+    db.prepare('UPDATE users SET password = ? WHERE email = ? AND tenant_id = ?')
+      .run(hash, invite.email, tenant);
+  })();
+
+  writeAudit({
+    userId:   null,
+    action:   'SET_PASSWORD',
+    entity:   'user',
+    entityId: null,
+    details:  JSON.stringify({ email: invite.email, tenant_id: tenant }),
+    tenantId: tenant,
+  });
+
+  res.json({ ok: true });
+});
+
 module.exports = router;

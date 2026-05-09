@@ -161,6 +161,43 @@ if (folderPermCount === 0) {
   console.log(`Folder perms seeded (${folderIds.length * roleMatrix.length} rows).`);
 }
 
+// ---------------------------------------------------------------------------
+// Migration 0033 — BoB Business Calendar (idempotent)
+// Only runs when business_calendars table exists (created by db/index.js boot-migration).
+// ---------------------------------------------------------------------------
+try {
+  const bobCalCount = db.prepare(
+    "SELECT COUNT(*) c FROM business_calendars WHERE tenant_id = 'bob' AND name = 'Bank of Bhutan — Standard'"
+  ).get().c;
+  if (bobCalCount === 0) {
+    const bobHolidays = [
+      '2026-01-02',
+      '2026-02-21',
+      '2026-02-25',
+      '2026-05-02',
+      '2026-06-02',
+      '2026-09-22',
+      '2026-10-13',
+      '2026-10-15',
+      '2026-10-16',
+      '2026-10-24',
+      '2026-10-25',
+      '2026-10-26',
+      '2026-10-27',
+      '2026-12-17',
+    ];
+    const bobHours = { days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00', tz: 'Asia/Thimphu' };
+    db.prepare(
+      `INSERT OR IGNORE INTO business_calendars
+         (tenant_id, name, holidays_json, business_hours_json)
+       VALUES ('bob', 'Bank of Bhutan — Standard', ?, ?)`
+    ).run(JSON.stringify(bobHolidays), JSON.stringify(bobHours));
+    console.log('BoB business calendar seeded.');
+  }
+} catch {
+  // Table not yet created (older DB without migration 0033); skip gracefully.
+}
+
 // Glossary seed runs independently of the user seed so existing DBs get the
 // starter entries on the next `node db/seed.js`. The INSERT OR IGNORE keeps
 // it idempotent (UNIQUE on tenant_id+term).
@@ -398,6 +435,22 @@ console.log('Tenant seeded (nbe / Bank of Bhutan).');
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// Migration 0032 — DocTypes v2: new columns on existing tables.
+// The new doctype_versions + doctype_field_bbox tables are created via
+// schema.sql above (CREATE TABLE IF NOT EXISTS). Only the ALTER TABLE
+// statements need the try/catch guard for idempotency on existing DBs.
+// ---------------------------------------------------------------------------
+const doctype0032Alters = [
+  "ALTER TABLE document_type_schemas ADD COLUMN notify_days TEXT NOT NULL DEFAULT '30,60,90'",
+  "ALTER TABLE document_type_schemas ADD COLUMN translate_extracted_to_dz INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE workflows ADD COLUMN doctype_version_id INTEGER REFERENCES doctype_versions(id)",
+];
+for (const ddl of doctype0032Alters) {
+  try { db.exec(ddl); } catch (_) { /* column already exists — skip */ }
+}
+console.log('Migration 0032 (DocTypes v2) columns applied.');
+
+// ---------------------------------------------------------------------------
 // Workflows v2 — tenant_config namespace 'workflows' defaults (idempotent).
 // Each key uses INSERT OR IGNORE so a re-seed never stomps admin edits.
 // ---------------------------------------------------------------------------
@@ -469,5 +522,116 @@ for (const [key, value] of wfConfigDefaults) {
   insertWfConfig.run(key, value);
 }
 console.log(`Workflows tenant_config seeded (${wfConfigDefaults.length} keys).`);
+
+// ---------------------------------------------------------------------------
+// Migration 0032 — tenant_config namespace 'doctypes' defaults (idempotent).
+// ---------------------------------------------------------------------------
+const doctypesConfigDefaults = [
+  ['ocr_engine',                 '"tesseract"'],
+  ['classification_model',       '"docbrain-v1"'],
+  ['confidence_floor_low',       '0.4'],
+  ['confidence_floor_high',      '0.7'],
+  ['notify_days',                '"30,60,90"'],
+  ['retention_days',             '3650'],
+  ['worm_eligible',              'false'],
+  ['translate_extracted_to_dz',  'false'],
+  ['schema_versioning',          'true'],
+  ['ab_test_sample_size',        '10'],
+];
+
+const insertDoctypesConfig = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'doctypes', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of doctypesConfigDefaults) {
+  insertDoctypesConfig.run(key, value);
+}
+console.log(`DocTypes tenant_config seeded (${doctypesConfigDefaults.length} keys).`);
+
+// ---------------------------------------------------------------------------
+// Migration 0031 — Users v2
+// 1. Make users.password nullable (rename-recreate-copy-drop — SQLite pattern).
+// 2. Add users.mfa_phone if absent.
+// 3. user_invites + saml_idps are created above via schema.sql (IF NOT EXISTS).
+// 4. Seed auth + rbac + _user_meta namespace defaults.
+// ---------------------------------------------------------------------------
+
+// 0031-a: make users.password nullable (detect by sqlite_master definition).
+const usersTableDef = db.prepare(
+  "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'"
+).get();
+const passwordNullable = usersTableDef && !usersTableDef.sql.includes('password TEXT NOT NULL');
+if (!passwordNullable && usersTableDef) {
+  // Rename → recreate nullable → copy → drop old.
+  db.exec(`
+    ALTER TABLE users RENAME TO _users_old_0031;
+
+    CREATE TABLE users (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      username   TEXT UNIQUE NOT NULL,
+      password   TEXT,
+      full_name  TEXT,
+      email      TEXT,
+      role       TEXT DEFAULT 'Viewer',
+      branch     TEXT,
+      mfa_enabled INTEGER DEFAULT 0,
+      mfa_secret TEXT,
+      mfa_phone  TEXT,
+      status     TEXT DEFAULT 'Active',
+      api_key    TEXT,
+      tenant_id  TEXT DEFAULT 'nbe',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    INSERT INTO users
+      (id, username, password, full_name, email, role, branch,
+       mfa_enabled, mfa_secret, status, api_key, tenant_id, created_at)
+    SELECT
+      id, username, password, full_name, email, role, branch,
+      mfa_enabled, mfa_secret, status, api_key, tenant_id, created_at
+    FROM _users_old_0031;
+
+    DROP TABLE _users_old_0031;
+  `);
+  console.log('Migration 0031: users.password made nullable, mfa_phone added.');
+}
+
+// 0031-b: add mfa_phone if this is a fresh post-0031 table that already exists
+// without the column (e.g. DB created before mfa_phone was in schema.sql).
+try {
+  db.exec("ALTER TABLE users ADD COLUMN mfa_phone TEXT");
+  console.log('Migration 0031: users.mfa_phone column added.');
+} catch (_) { /* already exists */ }
+
+// 0031-c: seed auth namespace defaults (idempotent via INSERT OR IGNORE).
+const authConfigDefaults = [
+  ['magic_link_ttl_hours',  '168'],
+  ['password_min_length',   '10'],
+  ['password_history_count','5'],
+  ['force_mfa_for_role',    '{"Maker":false,"Checker":false,"Doc Admin":false,"Viewer":false}'],
+  ['force_sso_for_tenant',  '"false"'],
+];
+const insertAuthConfig = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'auth', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of authConfigDefaults) {
+  insertAuthConfig.run(key, value);
+}
+console.log(`Auth tenant_config seeded (${authConfigDefaults.length} keys).`);
+
+// 0031-d: seed rbac namespace defaults (idempotent via INSERT OR IGNORE).
+const rbacConfigDefaults = [
+  ['session_ttl_minutes', '120'],
+  ['sod_forbidden_pairs', '[[\"Maker\",\"Checker\"]]'],
+];
+const insertRbacConfig = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'rbac', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of rbacConfigDefaults) {
+  insertRbacConfig.run(key, value);
+}
+console.log(`RBAC tenant_config seeded (${rbacConfigDefaults.length} keys).`);
 
 db.close();

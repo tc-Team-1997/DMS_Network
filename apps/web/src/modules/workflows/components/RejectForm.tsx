@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui';
 import { HttpError } from '@/lib/http';
 import { useTenantConfig } from '@/store/tenant-config';
-import { rejectWorkflow, stepUpStart, stepUpFinish, type RejectPayload } from '../api';
+import { stepUpStart, stepUpFinish } from '@/lib/step-up';
+import { rejectWorkflow, type RejectPayload } from '../api';
 import type { WorkflowRow } from '../api';
 
 interface RejectFormProps {

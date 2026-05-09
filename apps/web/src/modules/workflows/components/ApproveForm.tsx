@@ -10,7 +10,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui';
 import { HttpError } from '@/lib/http';
 import { useTenantConfig } from '@/store/tenant-config';
-import { approveWorkflow, stepUpStart, stepUpFinish, type ApprovePayload } from '../api';
+import { stepUpStart, stepUpFinish } from '@/lib/step-up';
+import { approveWorkflow, type ApprovePayload } from '../api';
 import type { WorkflowRow } from '../api';
 
 interface ApproveFormProps {

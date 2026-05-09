@@ -115,6 +115,20 @@ class VerifyBatchResponse(BaseModel):
     ran_at: str
 
 
+class ExtendRequest(BaseModel):
+    extend_by_days: int = Field(ge=1, le=36500, description="Days to extend the lock (must be positive — WORM locks can only be extended, never shortened)")
+    reason: str = Field(min_length=10, max_length=512)
+
+
+class ExtendResponse(BaseModel):
+    document_id: int
+    previous_unlock_after: str | None
+    new_unlock_after: str
+    extended_by_days: int
+    extended_at: str
+    status: str
+
+
 # ---------------------------------------------------------------------------
 # Helper: resolve document with tenant guard
 # ---------------------------------------------------------------------------
@@ -432,3 +446,80 @@ def verify_batch(
     )
 
     return VerifyBatchResponse(**summary)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/documents/{document_id}/worm/extend
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/documents/{document_id}/worm/extend",
+    response_model=ExtendResponse,
+    summary="Extend WORM lock period (admin only; can only extend, never shorten)",
+)
+def extend_lock(
+    document_id: int,
+    body: ExtendRequest,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require("admin")),
+) -> ExtendResponse:
+    """Extend the WORM unlock-after date forward by extend_by_days days.
+
+    Rules:
+    - Document must currently be WORM-locked.
+    - extend_by_days must be a positive integer (cannot shorten).
+    - The new unlock_after is computed as max(current unlock_after, now) + extend_by_days.
+      This guarantees the date only ever moves forward.
+    - Audit row written: WORM_EXTENDED.
+
+    Requires role: doc_admin.  Feature flag not required (extending an existing
+    lock is always safe regardless of FF_WORM — it cannot create new locks).
+    """
+    doc = _get_doc(document_id, p.tenant, db)
+
+    if doc.worm_locked_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document is not currently WORM-locked; lock it first before extending",
+        )
+
+    now = datetime.utcnow()
+    previous_unlock = doc.worm_unlock_after
+
+    # Extend from whichever is later: existing unlock_after or now.
+    # This guarantees the new date only moves forward.
+    base = previous_unlock if (previous_unlock and previous_unlock > now) else now
+    new_unlock_after = base + timedelta(days=body.extend_by_days)
+
+    prev_str = previous_unlock.isoformat() + "Z" if previous_unlock else None
+    doc.worm_unlock_after = new_unlock_after
+
+    _audit(
+        db, p.tenant, p.sub,
+        "WORM_EXTENDED",
+        document_id,
+        (
+            f"extend_by_days={body.extend_by_days} "
+            f"previous_unlock_after={prev_str} "
+            f"new_unlock_after={new_unlock_after.isoformat()}Z "
+            f"reason={body.reason[:80]}"
+        ),
+    )
+
+    db.commit()
+    db.refresh(doc)
+
+    log.info(
+        "worm.extend ok document_id=%d tenant=%s extend_by_days=%d new_unlock_after=%s",
+        document_id, p.tenant, body.extend_by_days,
+        new_unlock_after.isoformat(),
+    )
+
+    return ExtendResponse(
+        document_id=doc.id,
+        previous_unlock_after=prev_str,
+        new_unlock_after=new_unlock_after.isoformat() + "Z",
+        extended_by_days=body.extend_by_days,
+        extended_at=now.isoformat() + "Z",
+        status="extended",
+    )

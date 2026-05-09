@@ -432,6 +432,122 @@ router.post('/aml/hits/:id/decide', requirePermJson('aml:review'), async (req, r
 });
 
 // ---------------------------------------------------------------------------
+// GET /spa/api/aml/hits/:id/history
+// Decision history + suppressions for the subject×entry pair of this hit.
+// RBAC: aml:read
+// ---------------------------------------------------------------------------
+
+router.get('/aml/hits/:id/history', requirePermJson('aml:read'), async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: 'validation_failed', details: { id: 'must be a positive integer' } });
+  }
+
+  try {
+    const data = await pyCall(`/api/v1/aml/hits/${id}/history`, { timeout: 10_000 });
+    res.json(data);
+  } catch (err) {
+    const status = err.status || 502;
+    res.status(status).json(err.data ?? { error: 'proxy_error', detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /spa/api/aml/hits/:id/suppress
+// Create a false-positive suppression (Cleared+Suppress action).
+// Body: { reason: string (≥20 chars), suppress_days?: number }
+// RBAC: aml:review
+// ---------------------------------------------------------------------------
+
+const MIN_REASON_LEN = 20;
+
+function validateSuppress(body) {
+  const details = {};
+  if (!body || typeof body.reason !== 'string' || body.reason.trim().length < MIN_REASON_LEN) {
+    details.reason = `required string, at least ${MIN_REASON_LEN} characters`;
+  }
+  if (body && body.suppress_days !== undefined) {
+    const days = parseInt(String(body.suppress_days), 10);
+    if (!Number.isFinite(days) || days < 1 || days > 3650) {
+      details.suppress_days = 'must be an integer in [1, 3650]';
+    }
+  }
+  if (Object.keys(details).length > 0) return { ok: false, details };
+  return { ok: true };
+}
+
+router.post('/aml/hits/:id/suppress', requirePermJson('aml:review'), async (req, res) => {
+  const id     = parseInt(req.params.id, 10);
+  const tenant = tenantScope(req);
+  const userId = req.session.user.id;
+
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: 'validation_failed', details: { id: 'must be a positive integer' } });
+  }
+
+  const body  = req.body ?? {};
+  const check = validateSuppress(body);
+  if (!check.ok) {
+    return res.status(400).json({ error: 'validation_failed', details: check.details });
+  }
+
+  const pyBody = {
+    reason:       body.reason.trim(),
+    suppress_days: body.suppress_days ?? null,
+  };
+
+  try {
+    const data = await pyCall(`/api/v1/aml/hits/${id}/suppress`, {
+      method:  'POST',
+      body:    pyBody,
+      timeout: 10_000,
+    });
+
+    auditLog(userId, 'AML_HIT_SUPPRESSED', 'aml_hits', id,
+      { hit_id: id, suppression_reason: body.reason.slice(0, 200), suppress_days: body.suppress_days ?? null },
+      tenant);
+
+    res.json(data);
+  } catch (err) {
+    const status = err.status || 502;
+    res.status(status).json(err.data ?? { error: 'proxy_error', detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /spa/api/aml/hits/:id/sar-submit
+// Stub SAR submission (True-match → Generate SAR → Submit).
+// RBAC: aml:review
+// ---------------------------------------------------------------------------
+
+router.post('/aml/hits/:id/sar-submit', requirePermJson('aml:review'), async (req, res) => {
+  const id     = parseInt(req.params.id, 10);
+  const tenant = tenantScope(req);
+  const userId = req.session.user.id;
+
+  if (!Number.isFinite(id) || id <= 0) {
+    return res.status(400).json({ error: 'validation_failed', details: { id: 'must be a positive integer' } });
+  }
+
+  try {
+    const data = await pyCall(`/api/v1/aml/hits/${id}/sar-submit`, {
+      method:  'POST',
+      body:    req.body ?? {},
+      timeout: 10_000,
+    });
+
+    auditLog(userId, 'AML_SAR_SUBMITTED', 'aml_hits', id,
+      { hit_id: id, stub: true },
+      tenant);
+
+    res.json(data);
+  } catch (err) {
+    const status = err.status || 502;
+    res.status(status).json(err.data ?? { error: 'proxy_error', detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /spa/api/aml/summary
 // Compliance card data: last_24h counts + last_run_at. The SPA's AmlSummaryCard
 // reads { last_24h: { screenings_count, hit_count, open_hit_count }, last_run_at }.

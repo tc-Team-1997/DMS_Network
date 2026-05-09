@@ -15,6 +15,7 @@ import { WorkflowsPage } from '@/modules/workflows/WorkflowsPage';
 import { IndexingPage } from '@/modules/indexing/IndexingPage';
 import { ReportsPage } from '@/modules/reports/ReportsPage';
 import { TemplatesPage } from '@/modules/workflow-templates/TemplatesPage';
+import { DesignerPage } from '@/modules/workflow-templates/DesignerPage';
 import { AIEnginePage } from '@/modules/ai/AIEnginePage';
 import { ChatPage } from '@/modules/ai/ChatPage';
 import { CompliancePage } from '@/modules/compliance/CompliancePage';
@@ -27,6 +28,8 @@ import { DocumentTypesPage } from '@/modules/document-types/DocumentTypesPage';
 import { GlossaryPage } from '@/modules/ai/GlossaryPage';
 import { AmlScreeningPage } from '@/modules/aml-screening/AmlScreeningPage';
 import { FaceMatchPage } from '@/modules/face-match/FaceMatchPage';
+// Wave B — Retention + WORM admin
+import { RetentionPage } from '@/modules/retention/Page';
 // CC3 — Admin Settings shell + panels
 import { SettingsLayout } from '@/modules/admin/settings/SettingsLayout';
 import { BrandingPanel } from '@/modules/admin/settings/panels/BrandingPanel';
@@ -45,6 +48,10 @@ import { NotificationsPanel } from '@/modules/admin/settings/panels/Notification
 import { MobilePanel } from '@/modules/admin/settings/panels/MobilePanel';
 import { IntegrationsPanel } from '@/modules/admin/settings/panels/IntegrationsPanel';
 import { SearchPanel } from '@/modules/admin/settings/panels/SearchPanel';
+import { WorkflowTemplatesPanel } from '@/modules/admin/settings/panels/WorkflowTemplatesPanel';
+import { UsersPanel } from '@/modules/admin/settings/panels/UsersPanel';
+// Wave B — Users v2
+import { SetPasswordPage } from '@/pages/SetPasswordPage';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useTenant } from '@/store/tenant';
 
@@ -100,7 +107,9 @@ export function App() {
         <BrowserRouter>
           <TenantBrandingEffect />
           <Routes>
+            {/* Anonymous routes — no session required */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/set-password" element={<SetPasswordPage />} />
             <Route
               element={
                 <RequireAuth>
@@ -117,6 +126,7 @@ export function App() {
               <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/workflows" element={<WorkflowsPage />} />
               <Route path="/workflows/templates" element={<TemplatesPage />} />
+              <Route path="/workflows/templates/:id/design" element={<DesignerPage />} />
               <Route path="/indexing" element={<IndexingPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/ai" element={<ChatPage />} />
@@ -128,6 +138,7 @@ export function App() {
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/document-types" element={<DocumentTypesPage />} />
               <Route path="/admin/dedup-settings" element={<DedupSettingsPage />} />
+              <Route path="/admin/retention" element={<RetentionPage />} />
               <Route path="/admin/ai-glossary" element={<GlossaryPage />} />
               <Route path="/admin/aml" element={<AmlScreeningPage />} />
               <Route path="/admin/kyc/face-match" element={<FaceMatchPage />} />
@@ -141,7 +152,9 @@ export function App() {
                 <Route path="capture"       element={<CapturePanel />} />
                 <Route path="ocr"           element={<OcrPanel />} />
                 <Route path="doctypes"      element={<DoctypesPanel />} />
-                <Route path="workflows"     element={<WorkflowsPanel />} />
+                <Route path="workflows"            element={<WorkflowsPanel />} />
+                <Route path="workflow-templates"  element={<WorkflowTemplatesPanel />} />
+                <Route path="users-auth"     element={<UsersPanel />} />
                 <Route path="rbac"          element={<RbacPanel />} />
                 <Route path="abac"          element={<AbacPanel />} />
                 <Route path="aml"           element={<AmlPanel />} />

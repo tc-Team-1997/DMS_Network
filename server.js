@@ -186,6 +186,7 @@ require('./services/saml').configure(app);
 require('./services/expiry-job').start();
 require('./services/retention').start();
 require('./services/offline-sync').start(parseInt(process.env.OFFLINE_SYNC_INTERVAL_SEC || '15', 10));
+require('./services/indexing-sweeper').start();
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);

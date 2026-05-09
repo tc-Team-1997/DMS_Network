@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/notifications",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "smtp_host": {
+      "type": "string",
+      "maxLength": 253,
+      "description": "SMTP server hostname"
+    },
+    "smtp_port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "SMTP port (587 STARTTLS default, 465 for implicit TLS)"
+    },
+    "smtp_user": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "SMTP login username"
+    },
+    "smtp_pass": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "SMTP login password (stored encrypted at rest)"
+    },
+    "smtp_from": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Envelope From address e.g. noreply@bank.bt"
+    },
+    "smtp_tls": {
+      "type": "string",
+      "enum": ["starttls", "ssl", "none"],
+      "description": "TLS mode: starttls (default), ssl (implicit), or none"
+    }
+  }
+}

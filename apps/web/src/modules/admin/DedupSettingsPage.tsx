@@ -1,28 +1,43 @@
 /**
  * DedupSettingsPage — admin UI for deduplication threshold tuning.
  *
- * Req 44–45: surface the fuzzy-text similarity threshold and pHash Hamming
- * distance that the Python/Node dedup service uses.  A read-only table of
- * recent dedup decisions is shown below when the endpoint exists.
+ * Thresholds are stored in tenant_config namespace "capture":
+ *   dedup.fuzzy_min_ratio   — fraction 0–1 (stored), displayed as 0–100 %
+ *   dedup.phash_max_distance — integer 0–64 (stored and displayed as-is)
+ *
+ * The dedup_settings table was dropped in migration 0036; all values now live
+ * in CC1 tenant_config. This page reads/writes via useTenantConfig('capture')
+ * and useUpdateConfig('capture').
  */
 
 import { useState, useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Save, RotateCcw, ShieldAlert } from 'lucide-react';
 import { Badge, Button, Panel } from '@/components/ui';
 import { HttpError } from '@/lib/http';
-import {
-  fetchDedupSettings,
-  fetchDedupDecisions,
-  updateDedupSettings,
-  type DedupDecision,
-  type DedupSettings,
-} from './api';
+import { useTenantConfig, useUpdateConfig } from '@/store/tenant-config';
+import { fetchDedupDecisions, type DedupDecision } from './api';
 
-const DEFAULT_FUZZY = 80;
+// Defaults match services/duplicates.js DEFAULTS
+const DEFAULT_FUZZY_PCT = 80;   // 0.8 fraction → 80 %
 const DEFAULT_PHASH = 10;
 
-// ── shared slider component ────────────────────────────────────────────────
+// ── helpers ────────────────────────────────────────────────────────────────────
+
+function toFraction(pct: number): number {
+  return Math.round((pct / 100) * 1000) / 1000; // 3-decimal precision
+}
+
+function toPct(fraction: number): number {
+  return Math.round(fraction * 100);
+}
+
+function numOrDefault(raw: unknown, fallback: number): number {
+  const n = Number(raw);
+  return isFinite(n) ? n : fallback;
+}
+
+// ── shared slider component ────────────────────────────────────────────────────
 
 function ThresholdSlider({
   id,
@@ -89,7 +104,7 @@ function ThresholdSlider({
   );
 }
 
-// ── recent decisions table ─────────────────────────────────────────────────
+// ── recent decisions table ─────────────────────────────────────────────────────
 
 function DedupDecisionsTable({ rows }: { rows: DedupDecision[] }) {
   if (rows.length === 0) {
@@ -145,21 +160,14 @@ function DedupDecisionsTable({ rows }: { rows: DedupDecision[] }) {
   );
 }
 
-// ── page ───────────────────────────────────────────────────────────────────
+// ── page ───────────────────────────────────────────────────────────────────────
 
 export function DedupSettingsPage() {
-  const qc = useQueryClient();
+  // CC1 — read capture namespace
+  const configQuery = useTenantConfig('capture');
+  const updateConfig = useUpdateConfig('capture');
 
-  const settings = useQuery({
-    queryKey: ['dedup-settings'],
-    queryFn: fetchDedupSettings,
-    retry: (count, err: unknown) => {
-      const status = (err as { status?: number } | null)?.status ?? 0;
-      if (status === 404) return false;
-      return count < 2;
-    },
-  });
-
+  // Decisions table — separate endpoint (not affected by dedup_settings removal)
   const decisions = useQuery({
     queryKey: ['dedup-decisions'],
     queryFn: fetchDedupDecisions,
@@ -170,58 +178,78 @@ export function DedupSettingsPage() {
     },
   });
 
-  // Local slider state — seeded from server once loaded
-  const [fuzzy, setFuzzy] = useState(DEFAULT_FUZZY);
-  const [phash, setPhash] = useState(DEFAULT_PHASH);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
-  const [savedOk, setSavedOk] = useState(false);
+  // Local slider state — seeded from tenant_config on first load
+  const [fuzzyPct, setFuzzyPct] = useState(DEFAULT_FUZZY_PCT);
+  const [phash, setPhash]       = useState(DEFAULT_PHASH);
+  // Reason field — required by CC1 setConfig (≥20 chars)
+  const [reason, setReason] = useState('');
+  const [reasonErr, setReasonErr] = useState<string | null>(null);
+  const [saveErr, setSaveErr]     = useState<string | null>(null);
+  const [savedOk, setSavedOk]     = useState(false);
 
-  // Seed from server data when it arrives
+  // Seed sliders once the namespace config resolves
   useEffect(() => {
-    if (settings.data) {
-      setFuzzy(settings.data.fuzzy_threshold);
-      setPhash(settings.data.phash_distance);
-    }
-  }, [settings.data]);
+    if (!configQuery.data) return;
+    const raw = configQuery.data;
+    const fuzzyFraction = numOrDefault(raw['dedup.fuzzy_min_ratio'], DEFAULT_FUZZY_PCT / 100);
+    const phashRaw      = numOrDefault(raw['dedup.phash_max_distance'], DEFAULT_PHASH);
+    setFuzzyPct(toPct(fuzzyFraction));
+    setPhash(phashRaw);
+  }, [configQuery.data]);
 
-  const saveMutation = useMutation({
-    mutationFn: updateDedupSettings,
-    onSuccess: (updated: DedupSettings) => {
-      void qc.invalidateQueries({ queryKey: ['dedup-settings'] });
-      setFuzzy(updated.fuzzy_threshold);
-      setPhash(updated.phash_distance);
-      setSaveErr(null);
-      setSavedOk(true);
-      setTimeout(() => setSavedOk(false), 3000);
-    },
-    onError: (e: unknown) => {
-      setSaveErr(e instanceof HttpError ? e.message : (e as Error).message);
-    },
-  });
-
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaveErr(null);
     setSavedOk(false);
-    saveMutation.mutate({ fuzzy_threshold: fuzzy, phash_distance: phash });
+    setReasonErr(null);
+
+    if (reason.trim().length < 20) {
+      setReasonErr('Reason must be at least 20 characters.');
+      return;
+    }
+
+    const auditReason = reason.trim();
+    try {
+      await updateConfig.mutateAsync({
+        key: 'dedup.fuzzy_min_ratio',
+        value: toFraction(fuzzyPct),
+        reason: auditReason,
+      });
+      await updateConfig.mutateAsync({
+        key: 'dedup.phash_max_distance',
+        value: phash,
+        reason: auditReason,
+      });
+      setSavedOk(true);
+      setReason('');
+      setTimeout(() => setSavedOk(false), 3000);
+    } catch (err: unknown) {
+      setSaveErr(err instanceof HttpError ? err.message : (err as Error).message);
+    }
   };
 
   const handleReset = () => {
-    setFuzzy(DEFAULT_FUZZY);
+    setFuzzyPct(DEFAULT_FUZZY_PCT);
     setPhash(DEFAULT_PHASH);
+    setReasonErr(null);
+    setSaveErr(null);
+    setSavedOk(false);
   };
 
-  const isLoading = settings.isLoading;
-  const serverError = settings.error instanceof HttpError && settings.error.status !== 404
-    ? settings.error.message
-    : null;
+  const isLoading = configQuery.isLoading;
+  const configError = configQuery.error;
+  const serverError =
+    configError instanceof HttpError && configError.status !== 404
+      ? configError.message
+      : null;
+  const show404Banner =
+    configError instanceof HttpError && configError.status === 404;
 
-  // Gate decisions table on a 200 response (hide on 404)
-  const decisionsData: typeof decisions.data | null =
+  const decisionsData: DedupDecision[] | null =
     decisions.isSuccess ? decisions.data
     : decisions.error instanceof HttpError && decisions.error.status === 404 ? null
     : null;
 
-  const show404Banner = settings.error instanceof HttpError && settings.error.status === 404;
+  const isSaving = updateConfig.isPending;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -245,7 +273,7 @@ export function DedupSettingsPage() {
           </div>
         )}
 
-        {serverError && (
+        {serverError !== null && (
           <div className="rounded-input border border-danger/30 bg-danger-bg px-3 py-2 text-xs text-danger mb-4">
             {serverError}
           </div>
@@ -256,12 +284,12 @@ export function DedupSettingsPage() {
             <ThresholdSlider
               id="dedup-fuzzy-threshold"
               label="Fuzzy text similarity"
-              value={fuzzy}
+              value={fuzzyPct}
               min={0}
               max={100}
               unit="%"
               helpText="Levenshtein match threshold for near-duplicate text detection. Documents whose text similarity exceeds this value are flagged as duplicates."
-              onChange={setFuzzy}
+              onChange={setFuzzyPct}
             />
 
             <ThresholdSlider
@@ -275,7 +303,26 @@ export function DedupSettingsPage() {
               onChange={setPhash}
             />
 
-            {saveErr && (
+            {/* Audit reason — required by CC1 */}
+            <div className="space-y-1">
+              <label htmlFor="dedup-reason" className="text-xs font-medium text-ink">
+                Reason for change <span className="text-muted">(min 20 characters)</span>
+              </label>
+              <textarea
+                id="dedup-reason"
+                rows={2}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Tuning thresholds after Q1 duplicate review audit"
+                className="w-full rounded-input border border-border px-3 py-2 text-xs text-ink placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                data-testid="dedup-reason"
+              />
+              {reasonErr !== null && (
+                <p className="text-[10px] text-danger">{reasonErr}</p>
+              )}
+            </div>
+
+            {saveErr !== null && (
               <p
                 className="rounded-input bg-danger-bg border border-danger/30 px-3 py-2 text-xs text-danger"
                 data-testid="dedup-save-error"
@@ -293,12 +340,6 @@ export function DedupSettingsPage() {
               </p>
             )}
 
-            {settings.data && (
-              <p className="text-[11px] text-muted">
-                Last updated {new Date(settings.data.updated_at).toLocaleString()} by {settings.data.updated_by}
-              </p>
-            )}
-
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-divider">
               <Button
                 type="button"
@@ -312,8 +353,8 @@ export function DedupSettingsPage() {
               <Button
                 type="button"
                 size="sm"
-                onClick={handleSave}
-                loading={saveMutation.isPending}
+                onClick={() => { void handleSave(); }}
+                loading={isSaving}
                 data-testid="dedup-save"
               >
                 <Save size={13} /> Save

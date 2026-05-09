@@ -172,9 +172,50 @@ function recordAction({ workflowId, userId, action, reasonCode, comment, asserti
 
 /**
  * Advance the workflow stage and mirror the doc status.
+ *
+ * Version-pinned path (Migration 0033):
+ *   If the workflow has a non-null template_version_id AND the action maps to
+ *   a named stage (approve/reject/escalate), we look up the BPMN graph's stage
+ *   sequence and return the actual next stage name instead of the legacy
+ *   hard-coded STAGE_MAP entry.  This respects "old instances finish on old
+ *   rule semantics" — STAGE_MAP is still the fallback for NULL-pinned rows.
+ *
+ * @param {number} workflowId
+ * @param {string} action        — 'approve' | 'reject' | 'escalate'
+ * @param {number|null} docId
+ * @param {object|null} wfRow    — full workflow row (for template_version_id lookup)
  */
-function advanceWorkflow(workflowId, action, docId) {
-  const stage = STAGE_MAP[action];
+function advanceWorkflow(workflowId, action, docId, wfRow) {
+  let stage = STAGE_MAP[action];
+
+  // Version-pinned advancement: for the 'approve' action try to resolve the
+  // next BPMN stage from the pinned version's canvas graph.
+  if (action === 'approve' && wfRow?.template_version_id != null) {
+    try {
+      const vrow = db.prepare(
+        "SELECT bpmn_json FROM wf_template_versions WHERE id = ? AND status = 'published'",
+      ).get(wfRow.template_version_id);
+      if (vrow) {
+        const bpmn = JSON.parse(vrow.bpmn_json ?? '{"nodes":[],"edges":[]}');
+        const nodes = bpmn.nodes ?? [];
+        const edges = bpmn.edges ?? [];
+        // Find the current stage node by matching label to wfRow.stage.
+        const currentNode = nodes.find(
+          (n) => (n.type === 'stage' || n.type === 'edd-case') &&
+                 String(n.label ?? '') === String(wfRow.stage ?? ''),
+        );
+        if (currentNode) {
+          // Follow the first outgoing edge to the next node.
+          const outEdge = edges.find((e) => String(e.from) === String(currentNode.id));
+          if (outEdge) {
+            const nextNode = nodes.find((n) => String(n.id) === String(outEdge.to));
+            if (nextNode?.label) stage = String(nextNode.label);
+          }
+        }
+      }
+    } catch { /* fall back to STAGE_MAP */ }
+  }
+
   db.prepare(
     'UPDATE workflows SET stage = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
   ).run(stage, workflowId);
@@ -200,6 +241,109 @@ function fetchWorkflowRow(id) {
      WHERE w.id = ?`,
   ).get(id);
 }
+
+// ---------------------------------------------------------------------------
+// POST /spa/api/workflows
+// Create a new workflow, pinning it to the currently published version of
+// the chosen template (template_version_id).
+//
+// Body:
+//   template_id   (integer, required) — must be an active workflow_template
+//   doc_id        (integer, optional) — link to a document
+//   title         (string, optional)  — defaults to "Workflow #<ref>"
+//   priority      (string, optional)  — defaults to 'Medium'
+//   ref_code      (string, optional)  — defaults to a generated code
+//
+// Runtime version pinning (Migration 0033):
+//   Looks up the current_version_id on workflow_templates. If a published
+//   wf_template_versions row is found, sets workflows.template_version_id = that id.
+//   NULL template_version_id = legacy path (reads steps_json).
+// ---------------------------------------------------------------------------
+router.post('/workflows', requirePermJson('workflow'), (req, res) => {
+  const body = req.body ?? {};
+  const tenantId = tenantScope(req);
+
+  const rawTemplateId = body.template_id;
+  if (rawTemplateId == null) {
+    return res.status(400).json({ error: 'template_id_required' });
+  }
+  const templateId = parseInt(String(rawTemplateId), 10);
+  if (!Number.isFinite(templateId)) {
+    return res.status(400).json({ error: 'invalid_template_id' });
+  }
+
+  const template = db.prepare(
+    'SELECT * FROM workflow_templates WHERE id = ? AND active = 1',
+  ).get(templateId);
+  if (!template) {
+    return res.status(404).json({ error: 'template_not_found_or_inactive' });
+  }
+
+  // Resolve the published version, if any.
+  const publishedVersion = template.current_version_id
+    ? db.prepare(
+        "SELECT id FROM wf_template_versions WHERE id = ? AND status = 'published'",
+      ).get(template.current_version_id)
+    : null;
+  const templateVersionId = publishedVersion ? publishedVersion.id : null;
+
+  // Resolve initial stage from template.
+  // New path: first stage node from bpmn_json.
+  // Legacy path: first entry in steps_json.
+  let initialStage = 'Maker Review';
+  if (templateVersionId) {
+    const vrow = db.prepare('SELECT bpmn_json FROM wf_template_versions WHERE id = ?')
+      .get(templateVersionId);
+    try {
+      const bpmn = JSON.parse(vrow?.bpmn_json ?? '{"nodes":[]}');
+      const firstStage = (bpmn.nodes ?? []).find(
+        (n) => n.type === 'stage' || n.type === 'edd-case',
+      );
+      if (firstStage?.label) initialStage = String(firstStage.label);
+    } catch { /* fall through to default */ }
+  } else {
+    try {
+      const steps = JSON.parse(template.steps_json ?? '[]');
+      if (steps.length > 0 && steps[0]?.name) initialStage = steps[0].name;
+    } catch { /* fall through to default */ }
+  }
+
+  const docId    = body.doc_id   != null ? parseInt(String(body.doc_id),   10) : null;
+  const priority = typeof body.priority === 'string' && body.priority.trim()
+    ? body.priority.trim()
+    : 'Medium';
+
+  const refCode = typeof body.ref_code === 'string' && body.ref_code.trim()
+    ? body.ref_code.trim()
+    : `WF${Date.now()}`;
+
+  const title = typeof body.title === 'string' && body.title.trim()
+    ? body.title.trim()
+    : `Workflow #${refCode}`;
+
+  const info = db.prepare(
+    `INSERT INTO workflows
+       (ref_code, title, doc_id, stage, priority, tenant_id, template_version_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(refCode, title, docId ?? null, initialStage, priority, tenantId, templateVersionId);
+
+  writeAudit({
+    userId:   req.session.user.id,
+    action:   'workflow_created',
+    entity:   'workflow',
+    entityId: info.lastInsertRowid,
+    details:  {
+      template_id:         templateId,
+      template_version_id: templateVersionId,
+      initial_stage:       initialStage,
+      ref_code:            refCode,
+    },
+    tenantId,
+  });
+
+  const created = fetchWorkflowRow(info.lastInsertRowid);
+  return res.status(201).json({ ok: true, workflow: created });
+});
 
 // ---------------------------------------------------------------------------
 // GET /spa/api/workflows
@@ -338,7 +482,7 @@ function makeSingleActionHandlers(action) {
     }
 
     const stage = db.transaction(() => {
-      const s = advanceWorkflow(id, action, wf.doc_id);
+      const s = advanceWorkflow(id, action, wf.doc_id, wf);
       recordAction({
         workflowId:  id,
         userId:      req.session.user.id,
@@ -460,7 +604,7 @@ router.post('/workflows/bulk', requirePermJson('workflow'), (req, res) => {
       // TODO(SOX): same as single-row handler — assertion_id stored but not
       // cryptographically validated. Wave C must close this before go-live.
 
-      const stage = advanceWorkflow(id, action, wf.doc_id);
+      const stage = advanceWorkflow(id, action, wf.doc_id, wf);
       recordAction({
         workflowId:  id,
         userId:      req.session.user.id,

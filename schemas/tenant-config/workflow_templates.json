@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/workflow_templates",
+  "type": "object",
+  "properties": {
+    "default_sla_hours_maker": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8760,
+      "description": "Default SLA hours for Maker stages"
+    },
+    "default_sla_hours_checker": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8760,
+      "description": "Default SLA hours for Checker stages"
+    },
+    "default_sla_hours_compliance": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8760,
+      "description": "Default SLA hours for Compliance stages"
+    },
+    "default_sla_hours_edd": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8760,
+      "description": "Default SLA hours for EDD Case stages"
+    },
+    "default_calendar_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "ID of the default business calendar for SLA calculations"
+    },
+    "stage_catalog": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 100 },
+      "description": "Allowed stage names for the BPMN canvas palette"
+    },
+    "stepup_gate_conditions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "DMN input variable names that trigger WebAuthn step-up"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,11 +1,9 @@
-import { ConfigPanel } from '../ConfigPanel';
+/**
+ * AbacPanel — renders the full ABAC Editor at /admin/settings/abac.
+ * Replaced the CC3 ConfigPanel placeholder with the AbacPage visual editor (Wave B).
+ */
+import { AbacPage } from '@/modules/abac/AbacPage';
 
 export function AbacPanel() {
-  return (
-    <ConfigPanel
-      namespace="abac"
-      title="ABAC"
-      description="Attribute-based access control configuration. OPA policy wave modules will publish this schema."
-    />
-  );
+  return <AbacPage />;
 }

@@ -257,4 +257,112 @@ router.post(
   },
 );
 
+// ---------------------------------------------------------------------------
+// GET /spa/api/admin/worm/locked
+// ---------------------------------------------------------------------------
+
+/**
+ * List all WORM-locked documents for the tenant.
+ * Returns id, original_name, doc_type, worm_locked_at, worm_unlock_after,
+ * days_remaining, sha256_at_lock (prefix only, not full hash for PII safety).
+ * Query params: limit (default 200, max 500).
+ */
+router.get(
+  '/admin/worm/locked',
+  requirePermJson(WORM_ADMIN_PERM),
+  (req, res) => {
+    const tenant = tenantScope(req);
+    const limit = Math.min(parseInt(String(req.query.limit ?? 200), 10) || 200, 500);
+
+    const rows = db.prepare(`
+      SELECT id, original_name, doc_type, worm_locked_at, worm_unlock_after, sha256_at_lock
+      FROM documents
+      WHERE worm_locked_at IS NOT NULL
+        AND (tenant_id = ? OR tenant_id IS NULL)
+      ORDER BY worm_locked_at DESC
+      LIMIT ?
+    `).all(tenant, limit);
+
+    const now = Date.now();
+    const result = rows.map((r) => {
+      const unlockMs = r.worm_unlock_after ? new Date(r.worm_unlock_after).getTime() : null;
+      const days_remaining = unlockMs !== null
+        ? Math.max(0, Math.ceil((unlockMs - now) / 86400000))
+        : null;
+      return {
+        id:               r.id,
+        original_name:    r.original_name,
+        doc_type:         r.doc_type,
+        worm_locked_at:   r.worm_locked_at,
+        worm_unlock_after: r.worm_unlock_after,
+        days_remaining,
+        // Only expose first 8 chars of hash — enough to correlate in audit,
+        // not enough to reconstruct or reveal full forensic baseline.
+        sha256_prefix:    r.sha256_at_lock ? r.sha256_at_lock.slice(0, 8) + '…' : null,
+      };
+    });
+
+    res.json({ locked_documents: result, total: result.length });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// POST /spa/api/admin/worm/extend
+// ---------------------------------------------------------------------------
+
+/**
+ * Extend the WORM lock period for a document. Admin can EXTEND, never SHORTEN.
+ * Body: { document_id: number, extend_by_days: number (≥1), reason: string (≥20 chars) }
+ * Proxies to POST /api/v1/documents/{id}/worm/extend on the Python service.
+ * Writes a local audit row regardless of Python-side audit.
+ */
+router.post(
+  '/admin/worm/extend',
+  requirePermJson(WORM_ADMIN_PERM),
+  async (req, res) => {
+    const tenant = tenantScope(req);
+    const userId = req.session.user.id;
+    const { document_id, extend_by_days, reason } = req.body || {};
+
+    const docId = parseDocId(document_id);
+    if (docId === null) {
+      return res.status(400).json({ error: 'validation_error', detail: 'document_id must be a positive integer' });
+    }
+
+    const extDays = Number(extend_by_days);
+    if (!Number.isFinite(extDays) || extDays < 1 || !Number.isInteger(extDays)) {
+      return res.status(400).json({ error: 'validation_error', detail: 'extend_by_days must be a positive integer' });
+    }
+
+    if (!reason || typeof reason !== 'string' || reason.trim().length < 20) {
+      return res.status(400).json({ error: 'validation_error', detail: 'reason must be at least 20 characters' });
+    }
+
+    try {
+      const data = await pyCall(
+        `/api/v1/documents/${docId}/worm/extend`,
+        { method: 'POST', body: { extend_by_days: extDays, reason: reason.trim() } },
+      );
+
+      writeAudit({
+        userId,
+        action:   'WORM_EXTENDED',
+        entity:   'document',
+        entityId: docId,
+        details:  {
+          extend_by_days: extDays,
+          reason: reason.trim().slice(0, 120),
+          new_unlock_after: data.new_unlock_after,
+        },
+        tenantId: tenant,
+      });
+
+      return res.json(data);
+    } catch (err) {
+      const status = err.status || 500;
+      return res.status(status).json(err.data || { error: 'upstream_error' });
+    }
+  },
+);
+
 module.exports = router;

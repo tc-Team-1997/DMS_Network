@@ -422,7 +422,8 @@ class DocumentTypeSchema(Base):
     """Admin-configurable field schema for one document type.
 
     Mirrors the SQLite ``document_type_schemas`` table in the Node schema plus
-    the four DocBrain inference columns added in migration 0018.
+    the four DocBrain inference columns added in migration 0018 and the
+    DocTypes-v2 columns added in migration 0031.
     """
     __tablename__ = "document_type_schemas"
     id = Column(Integer, primary_key=True)
@@ -438,11 +439,20 @@ class DocumentTypeSchema(Base):
     inference_status = Column(String(32), nullable=False, default="pending")
     source_samples_count = Column(Integer, nullable=False, default=0)
     vector_index_version = Column(Integer, nullable=False, default=0)
+    # DocTypes v2 (migration 0031)
+    notify_days = Column(String(64), nullable=False, default="30,60,90")
+    translate_extracted_to_dz = Column(Integer, nullable=False, default=0)
 
     samples = relationship(
         "DocumentTypeSample",
         back_populates="schema",
         cascade="all, delete-orphan",
+    )
+    versions = relationship(
+        "DoctypeVersion",
+        back_populates="doctype",
+        cascade="all, delete-orphan",
+        order_by="DoctypeVersion.version",
     )
 
 
@@ -478,6 +488,66 @@ class DocumentTypeSample(Base):
         back_populates="sample",
         cascade="all, delete-orphan",
     )
+
+
+class DoctypeVersion(Base):
+    """Schema version snapshot for a DocumentTypeSchema (migration 0031).
+
+    Each edit to a doctype creates a new draft version row. Publishing
+    promotes it to ``live`` and archives the previous live row.  Workflow
+    instances pin to the live version at creation time via
+    ``workflow_steps.doctype_version_id``.
+    """
+    __tablename__ = "doctype_versions"
+    id          = Column(Integer, primary_key=True)
+    doctype_id  = Column(
+        Integer,
+        ForeignKey("document_type_schemas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    version     = Column(Integer, nullable=False, default=1)
+    schema_json = Column(Text, nullable=False, default="[]")
+    created_by  = Column(String(128), nullable=True)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+    status      = Column(String(16), nullable=False, default="draft")
+
+    __table_args__ = (
+        UniqueConstraint("doctype_id", "version", name="uq_dv_doctype_version"),
+    )
+
+    doctype = relationship("DocumentTypeSchema", back_populates="versions")
+    bboxes  = relationship(
+        "DoctypeFieldBbox",
+        back_populates="version",
+        cascade="all, delete-orphan",
+    )
+
+
+class DoctypeFieldBbox(Base):
+    """Per-field bounding box annotation on a sample page (migration 0031).
+
+    ``x``, ``y``, ``w``, ``h`` are normalised to [0, 1] relative to the
+    rendered page dimensions.  ``source`` distinguishes human-confirmed boxes
+    (solid green in the labeler) from AI-proposed ones (dashed amber).
+    """
+    __tablename__ = "doctype_field_bbox"
+    id                 = Column(Integer, primary_key=True)
+    doctype_version_id = Column(
+        Integer,
+        ForeignKey("doctype_versions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    field_name = Column(String(64), nullable=False)
+    page       = Column(Integer, nullable=False, default=1)
+    x          = Column(Float, nullable=False)
+    y          = Column(Float, nullable=False)
+    w          = Column(Float, nullable=False)
+    h          = Column(Float, nullable=False)
+    source     = Column(String(16), nullable=False, default="confirmed")
+
+    version = relationship("DoctypeVersion", back_populates="bboxes")
 
 
 class DoctypeSampleChunk(Base):
@@ -645,6 +715,45 @@ class AmlHit(Base):
 
     screening       = relationship("AmlScreening", back_populates="hits")
     watchlist_entry = relationship("AmlWatchlistEntry", back_populates="hits")
+
+
+class AmlHitSuppression(Base):
+    """False-positive memory for AML hit-decide v2 (migration 0035).
+
+    When a reviewer suppresses a subject_cid×watchlist_entry_id pair, future
+    screenings of the same pair within the suppressed_until window are
+    auto-cleared with the stored suppression_reason, skipping manual review.
+    """
+
+    __tablename__ = "aml_hit_suppressions"
+
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id          = Column(String(64), nullable=False, index=True)
+    subject_cid        = Column(String(64), nullable=False, index=True)
+    watchlist_entry_id = Column(Integer, nullable=False, index=True)
+    suppression_reason = Column(Text, nullable=False)
+    suppressed_until   = Column(DateTime, nullable=True)   # None = permanent
+    suppressed_by      = Column(String(256), nullable=False)
+    created_at         = Column(DateTime, default=datetime.utcnow)
+
+
+class CustomerPiiReveal(Base):
+    """Audit trail for every PII field reveal in the Customer-360 drawer (migration 0035).
+
+    Each row records one reveal event: which user revealed which fields on which
+    customer CID, with a mandatory reason of ≥ 20 chars. Retained indefinitely
+    for regulatory audit; never deleted even on DSAR erasure of customer records.
+    """
+
+    __tablename__ = "customer_pii_reveals"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id    = Column(String(64), nullable=False, index=True)
+    user_id      = Column(Integer, nullable=False, index=True)
+    customer_cid = Column(String(64), nullable=False, index=True)
+    fields_json  = Column(Text, nullable=False)   # JSON array e.g. '["phone","email"]'
+    reason       = Column(Text, nullable=False)
+    created_at   = Column(DateTime, default=datetime.utcnow)
 
 
 # ---------------------------------------------------------------------------

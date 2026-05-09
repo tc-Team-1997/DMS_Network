@@ -13,7 +13,7 @@ import { t } from '@/lib/i18n';
 import { cn } from '@/lib/cn';
 import { fetchOpenHits } from '../api';
 import type { Hit } from '../schemas';
-import { HitDecideModal } from './HitDecideModal';
+import { HitDecideV2Modal } from './HitDecideV2Modal';
 
 // Score display — color + icon + text label (never color-only)
 function ScoreCell({ score }: { score: number }) {
@@ -272,7 +272,7 @@ export function HitsQueueTab({ canDecide }: HitsQueueTabProps) {
       </Panel>
 
       {selectedHit && (
-        <HitDecideModal
+        <HitDecideV2Modal
           hit={selectedHit}
           onClose={() => setSelectedHit(null)}
           onDecided={handleDecided}

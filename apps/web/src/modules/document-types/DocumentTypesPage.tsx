@@ -19,14 +19,24 @@ import { fetchFolders } from '@/modules/capture/api';
 import { LearnWizard } from './LearnWizard';
 import { SamplesTab } from './SamplesTab';
 import { ThresholdsTab } from './ThresholdsTab';
+import { VersionsPanel } from './components/VersionsPanel';
+import { AbTestPanel } from './components/AbTestPanel';
 
 const BLANK_FIELD: FieldDef = { key: '', label: '', type: 'text', required: false };
 
 function blankInput(): DocumentTypeInput {
-  return { name: '', description: '', fields: [{ ...BLANK_FIELD }], active: true, default_folder_id: null };
+  return {
+    name: '',
+    description: '',
+    fields: [{ ...BLANK_FIELD }],
+    active: true,
+    default_folder_id: null,
+    notify_days: '30,60,90',
+    translate_extracted_to_dz: false,
+  };
 }
 
-type EditTab = 'fields' | 'samples' | 'thresholds';
+type EditTab = 'fields' | 'samples' | 'thresholds' | 'versions' | 'abtest';
 
 export function DocumentTypesPage() {
   const qc = useQueryClient();
@@ -85,6 +95,8 @@ export function DocumentTypesPage() {
       fields: t.fields.map((f) => ({ ...f })),
       active: !!t.active,
       default_folder_id: t.default_folder_id ?? null,
+      notify_days: t.notify_days ?? '30,60,90',
+      translate_extracted_to_dz: t.translate_extracted_to_dz ?? false,
     });
     setErr(null);
     setEditTab('fields');
@@ -131,6 +143,10 @@ export function DocumentTypesPage() {
         .filter((f) => f.key && f.label),
       ...(draft.active !== undefined ? { active: draft.active } : {}),
       default_folder_id: draft.default_folder_id ?? null,
+      ...(draft.notify_days !== undefined ? { notify_days: draft.notify_days } : {}),
+      ...(draft.translate_extracted_to_dz !== undefined
+        ? { translate_extracted_to_dz: draft.translate_extracted_to_dz }
+        : {}),
     };
     if (selected === 'new') create.mutate(payload);
     else if (typeof selected === 'number') patch.mutate({ id: selected, body: payload });
@@ -289,6 +305,36 @@ export function DocumentTypesPage() {
                   >
                     Thresholds
                   </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={editTab === 'versions'}
+                    onClick={() => setEditTab('versions')}
+                    className={cn(
+                      'px-3 py-1.5 text-xs border-l border-border',
+                      editTab === 'versions'
+                        ? 'bg-brand-blue text-white'
+                        : 'bg-white text-ink hover:bg-divider',
+                    )}
+                    data-testid="doctype-tab-versions"
+                  >
+                    Versions
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={editTab === 'abtest'}
+                    onClick={() => setEditTab('abtest')}
+                    className={cn(
+                      'px-3 py-1.5 text-xs border-l border-border',
+                      editTab === 'abtest'
+                        ? 'bg-brand-blue text-white'
+                        : 'bg-white text-ink hover:bg-divider',
+                    )}
+                    data-testid="doctype-tab-abtest"
+                  >
+                    A/B Test
+                  </button>
                 </div>
               )}
 
@@ -297,6 +343,10 @@ export function DocumentTypesPage() {
                 <ThresholdsTab docType={editingType} />
               ) : editTab === 'samples' && typeof selected === 'number' && editingType ? (
                 <SamplesTab docType={editingType} />
+              ) : editTab === 'versions' && typeof selected === 'number' && editingType ? (
+                <VersionsPanel doctype={editingType} />
+              ) : editTab === 'abtest' && typeof selected === 'number' && editingType ? (
+                <AbTestPanel doctype={editingType} />
               ) : (
                 <>
                   <label className="flex flex-col text-xs text-muted">
@@ -354,6 +404,31 @@ export function DocumentTypesPage() {
                       The user can still override at capture time, and reviewers can re-route during
                       workflow approval.
                     </span>
+                  </label>
+
+                  <label className="flex flex-col text-xs text-muted">
+                    Expiry notification days
+                    <input
+                      value={draft.notify_days ?? '30,60,90'}
+                      onChange={(e) => setDraft((d) => ({ ...d, notify_days: e.target.value }))}
+                      placeholder="30,60,90"
+                      data-testid="doctype-notify-days"
+                      className="mt-0.5 h-9 rounded-input border border-border px-3 text-md font-mono text-ink"
+                    />
+                    <span className="mt-1 text-[11px] text-muted leading-snug">
+                      Comma-separated days before expiry to alert (e.g. 30,60,90). The expiry cron uses
+                      these values per doctype to emit labelled alerts.
+                    </span>
+                  </label>
+
+                  <label className="inline-flex items-center gap-2 text-xs text-muted">
+                    <input
+                      type="checkbox"
+                      checked={!!draft.translate_extracted_to_dz}
+                      onChange={(e) => setDraft((d) => ({ ...d, translate_extracted_to_dz: e.target.checked }))}
+                      data-testid="doctype-translate-dz"
+                    />
+                    Translate extracted text to Dzongkha
                   </label>
 
                   <div>

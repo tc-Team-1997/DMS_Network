@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "retention",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "worm_lock_default_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 36500,
+      "description": "Default WORM lock period in days applied when no per-doctype rule specifies one"
+    },
+    "delete_policy": {
+      "type": "string",
+      "enum": ["archive", "cryptoshred", "soft_delete"],
+      "description": "Default action when retention period expires and no per-doctype override is set"
+    },
+    "sweep_schedule_cron": {
+      "type": "string",
+      "description": "Cron expression for the retention sweep job (e.g. '30 2 * * *')"
+    },
+    "alert_on_breach": {
+      "type": "boolean",
+      "description": "Send an alert when a document that should have been purged is still present"
+    },
+    "retention_audit_retention_days": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 3650,
+      "description": "How long to keep retention audit log rows before they are archived"
+    }
+  }
+}

@@ -318,15 +318,29 @@ CREATE TRIGGER IF NOT EXISTS documents_fts_au AFTER UPDATE ON documents BEGIN
 END;
 
 -- ---------------------------------------------------------------------------
--- Req 44-45 — Deduplication settings and decision log
+-- Req 44-45 — Deduplication decision log
+-- NOTE: dedup_settings table removed in migration 0036. Thresholds now live
+-- in tenant_config namespace 'capture', keys 'dedup.fuzzy_min_ratio' and
+-- 'dedup.phash_max_distance'. See services/duplicates.js for threshold logic.
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS dedup_settings (
-  tenant_id        TEXT PRIMARY KEY,
-  fuzzy_threshold  REAL    DEFAULT 0.8,
-  phash_distance   INTEGER DEFAULT 10,
-  updated_at       TEXT    DEFAULT CURRENT_TIMESTAMP,
-  updated_by       INTEGER
+
+-- ---------------------------------------------------------------------------
+-- Migration 0036 — Legal holds (Retention + WORM admin, F#30-31)
+-- A legal hold pins a document so it is excluded from the retention sweep.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS legal_holds (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  doc_id      INTEGER NOT NULL,
+  applied_by  TEXT    NOT NULL,
+  applied_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  released_by TEXT,
+  released_at TEXT,
+  reason      TEXT    NOT NULL,
+  tenant_id   TEXT    NOT NULL DEFAULT 'nbe',
+  FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_legal_holds_doc    ON legal_holds(doc_id);
+CREATE INDEX IF NOT EXISTS idx_legal_holds_tenant ON legal_holds(tenant_id);
 
 CREATE TABLE IF NOT EXISTS dedup_decisions (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -451,3 +465,243 @@ CREATE TABLE IF NOT EXISTS redaction_pages (
 
 CREATE INDEX IF NOT EXISTS idx_redaction_pages_rid ON redaction_pages(redaction_id);
 CREATE INDEX IF NOT EXISTS idx_wf_actions_tenant   ON wf_actions(tenant_id);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0031 — Users v2
+-- user_invites: email magic-link invite tokens (SHA-256 of raw token stored)
+-- saml_idps:    per-tenant IdP metadata + claim mapping for SAML SSO admin UI
+-- NOTE: users.password column is nullable as of this migration (invite flow).
+--       users.mfa_phone is added for SMS factor management.
+-- The password nullability requires rename-recreate-copy-drop on existing DBs
+-- (see db/seed.js migration 0031 block). Fresh DBs use this schema directly.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS user_invites (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  email       TEXT NOT NULL,
+  token_hash  TEXT NOT NULL UNIQUE,
+  role        TEXT NOT NULL,
+  branch      TEXT,
+  expires_at  TEXT NOT NULL,
+  used_at     TEXT,
+  created_by  INTEGER NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  tenant_id   TEXT NOT NULL DEFAULT 'nbe',
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_invites_token  ON user_invites(token_hash);
+CREATE INDEX IF NOT EXISTS idx_user_invites_email  ON user_invites(email, tenant_id);
+
+CREATE TABLE IF NOT EXISTS saml_idps (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id      TEXT NOT NULL,
+  name           TEXT NOT NULL,
+  metadata_xml   TEXT NOT NULL,
+  claim_map_json TEXT NOT NULL DEFAULT '{}',
+  enforce_only   INTEGER NOT NULL DEFAULT 0,
+  is_active      INTEGER NOT NULL DEFAULT 1,
+  created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (tenant_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_saml_idps_tenant ON saml_idps(tenant_id);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0031 — Saved searches (Wave B)
+-- (Placeholder row; the table is already present above for SQLite compat.)
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- Migration 0032 — DocTypes v2 (DocTypes + Learn Wizard v2)
+--
+-- New tables:
+--   doctype_versions    — version history for a document_type_schemas row
+--   doctype_field_bbox  — per-field bounding box annotations on sample pages
+--
+-- New columns on document_type_schemas:
+--   notify_days               — comma-separated notification bands, default "30,60,90"
+--   translate_extracted_to_dz — Dzongkha translation toggle (0/1)
+--
+-- New column on workflows:
+--   doctype_version_id — pins an instance to the live schema version at creation
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS doctype_versions (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  doctype_id  INTEGER NOT NULL,
+  version     INTEGER NOT NULL DEFAULT 1,
+  schema_json TEXT    NOT NULL DEFAULT '[]',
+  created_by  TEXT,
+  created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status      TEXT    NOT NULL DEFAULT 'draft'
+                CHECK(status IN ('draft', 'live', 'archived')),
+  FOREIGN KEY (doctype_id) REFERENCES document_type_schemas(id) ON DELETE CASCADE,
+  UNIQUE (doctype_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_doctype_versions_doctype ON doctype_versions(doctype_id);
+CREATE INDEX IF NOT EXISTS idx_doctype_versions_status  ON doctype_versions(doctype_id, status);
+
+CREATE TABLE IF NOT EXISTS doctype_field_bbox (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  doctype_version_id INTEGER NOT NULL,
+  field_name         TEXT    NOT NULL,
+  page               INTEGER NOT NULL DEFAULT 1,
+  x                  REAL    NOT NULL,
+  y                  REAL    NOT NULL,
+  w                  REAL    NOT NULL,
+  h                  REAL    NOT NULL,
+  source             TEXT    NOT NULL DEFAULT 'confirmed'
+                       CHECK(source IN ('confirmed', 'ai_proposed')),
+  FOREIGN KEY (doctype_version_id) REFERENCES doctype_versions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dfbbox_version ON doctype_field_bbox(doctype_version_id);
+
+-- Additive columns on document_type_schemas (safe to re-run — ALTER TABLE
+-- is idempotent for new columns in SQLite when wrapped in the seed script).
+-- The seed.js script guards these with a column-existence check.
+-- (These are applied at boot time by the seed/migration logic.)
+
+-- ALTER TABLE document_type_schemas ADD COLUMN notify_days TEXT DEFAULT '30,60,90';
+-- ALTER TABLE document_type_schemas ADD COLUMN translate_extracted_to_dz INTEGER NOT NULL DEFAULT 0;
+
+-- New column on workflows table
+-- ALTER TABLE workflows ADD COLUMN doctype_version_id INTEGER REFERENCES doctype_versions(id);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0033 — Template versioning + business calendars (Wave B)
+--
+-- New tables:
+--   business_calendars     — tenant-scoped working-hour / holiday calendars
+--   wf_template_versions   — immutable version snapshots of a workflow template
+--                            carrying BPMN canvas JSON, DMN decision table JSON,
+--                            per-stage SLA JSON, and a calendar reference.
+--
+-- New column on workflow_templates:
+--   current_version_id — FK to the last published wf_template_versions row;
+--                        allows quick "what is live?" lookup without a sub-query.
+--
+-- New column on workflows:
+--   template_version_id — pins a running instance to the exact template version
+--                         that was current when the workflow was created.
+--                         NULL = legacy row; read stage list from
+--                         workflow_templates.steps_json (legacy path).
+--                         Non-NULL = read stage list from
+--                         wf_template_versions.bpmn_json (new path).
+--
+-- Existing workflows retain NULL template_version_id and continue reading from
+-- workflow_templates.steps_json without any data change.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS business_calendars (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id            TEXT    NOT NULL DEFAULT 'nbe',
+  name                 TEXT    NOT NULL,
+  holidays_json        TEXT    NOT NULL DEFAULT '[]',
+  business_hours_json  TEXT    NOT NULL DEFAULT '{"days":[1,2,3,4,5],"start":"09:00","end":"17:00","tz":"Asia/Thimphu"}',
+  created_by           INTEGER,
+  created_at           TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_biz_cal_tenant ON business_calendars(tenant_id);
+
+CREATE TABLE IF NOT EXISTS wf_template_versions (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  template_id INTEGER NOT NULL,
+  version     INTEGER NOT NULL,
+  bpmn_json   TEXT    NOT NULL DEFAULT '{"nodes":[],"edges":[]}',
+  dmn_json    TEXT    NOT NULL DEFAULT '{}',
+  sla_json    TEXT    NOT NULL DEFAULT '{}',
+  calendar_id INTEGER,
+  created_by  INTEGER,
+  status      TEXT    NOT NULL DEFAULT 'draft'
+                CHECK(status IN ('draft','published','archived')),
+  created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE,
+  FOREIGN KEY (calendar_id) REFERENCES business_calendars(id),
+  FOREIGN KEY (created_by)  REFERENCES users(id),
+  UNIQUE (template_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_wftv_template ON wf_template_versions(template_id);
+CREATE INDEX IF NOT EXISTS idx_wftv_status   ON wf_template_versions(status);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0033 — Wave B placeholder (reserved)
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
+-- Migration 0034 — Indexing Station: claim/lock table
+--
+-- indexing_locks: one row per document currently claimed for indexing.
+--   doc_id    PRIMARY KEY  — at most one active claim per document.
+--   user_id               — who holds the claim.
+--   user_name             — denormalized for display without a JOIN.
+--   claimed_at            — when the lock was acquired.
+--   expires_at            — sweeper deletes rows past this timestamp.
+--
+-- Race-condition handling: the PK constraint makes concurrent INSERT-OR-FAIL
+-- atomic in better-sqlite3 (synchronous, serialized writes). The claim
+-- handler wraps sweep + insert + select in a single transaction.
+--
+-- TTL: runtime value read from tenant_config.indexing.claim_lock_ttl_minutes
+--      (default 15). The schema.sql default is intentionally absent — TTL
+--      is computed and interpolated by the route handler.
+--
+-- Sweeper: services/indexing-sweeper.js runs every 60 s and deletes rows
+--          where expires_at < datetime('now').
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS indexing_locks (
+  doc_id     INTEGER PRIMARY KEY,
+  user_id    INTEGER NOT NULL,
+  user_name  TEXT    NOT NULL,
+  claimed_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TEXT    NOT NULL,
+  FOREIGN KEY (doc_id)  REFERENCES documents(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_indexing_locks_expires ON indexing_locks(expires_at);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0035 — AML hit suppressions + Customer PII reveal audit
+-- ---------------------------------------------------------------------------
+
+-- aml_hit_suppressions: false-positive memory for AML hit-decide v2.
+-- When a compliance officer suppresses a subject×watchlist-entry pair,
+-- future screenings auto-clear the same pair until suppressed_until expires.
+CREATE TABLE IF NOT EXISTS aml_hit_suppressions (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id          TEXT    NOT NULL,
+  subject_cid        TEXT    NOT NULL,
+  watchlist_entry_id INTEGER NOT NULL,
+  suppression_reason TEXT    NOT NULL,
+  suppressed_until   TEXT,                           -- ISO-8601 UTC; NULL = permanent
+  suppressed_by      TEXT    NOT NULL,               -- username / principal sub
+  created_at         TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_aml_supp_tenant_cid
+  ON aml_hit_suppressions(tenant_id, subject_cid);
+CREATE INDEX IF NOT EXISTS idx_aml_supp_entry
+  ON aml_hit_suppressions(watchlist_entry_id);
+CREATE INDEX IF NOT EXISTS idx_aml_supp_cid_entry
+  ON aml_hit_suppressions(tenant_id, subject_cid, watchlist_entry_id);
+
+-- customer_pii_reveals: audit trail for every PII reveal in Customer-360.
+-- Each row records one reveal event (user, CID, which fields, reason, timestamp).
+CREATE TABLE IF NOT EXISTS customer_pii_reveals (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id    TEXT    NOT NULL,
+  user_id      INTEGER NOT NULL,
+  customer_cid TEXT    NOT NULL,
+  fields_json  TEXT    NOT NULL,   -- JSON array e.g. '["phone","email"]'
+  reason       TEXT    NOT NULL,
+  created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pii_reveals_tenant_cid
+  ON customer_pii_reveals(tenant_id, customer_cid);
+CREATE INDEX IF NOT EXISTS idx_pii_reveals_user
+  ON customer_pii_reveals(tenant_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_pii_reveals_created
+  ON customer_pii_reveals(created_at);

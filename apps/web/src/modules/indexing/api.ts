@@ -1,62 +1,78 @@
 import { z } from 'zod';
-import { get, http } from '@/lib/http';
+import { get, http, del } from '@/lib/http';
 import { OkSchema } from '@/lib/schemas';
+import {
+  IndexingRowSchema,
+  IndexingStatsSchema,
+  IndexingPatchSchema,
+  AnalysisResponseSchema,
+  ClaimResponseSchema,
+  type IndexingPatch,
+  type IndexingRow,
+  type IndexingStats,
+  type AnalysisResponse,
+  type ClaimResponse,
+} from './schemas';
 
-// Indexing candidates carry only the subset of columns a triage UI needs.
-export const IndexingRowSchema = z.object({
-  id: z.number().int(),
-  filename: z.string(),
-  original_name: z.string().nullable(),
-  doc_type: z.string().nullable(),
-  customer_cid: z.string().nullable(),
-  customer_name: z.string().nullable(),
-  doc_number: z.string().nullable(),
-  dob: z.string().nullable(),
-  issue_date: z.string().nullable(),
-  expiry_date: z.string().nullable(),
-  issuing_authority: z.string().nullable(),
-  branch: z.string().nullable(),
-  status: z.string(),
-  ocr_confidence: z.number().nullable(),
-  uploaded_at: z.string(),
-  notes: z.string().nullable(),
-});
-export type IndexingRow = z.infer<typeof IndexingRowSchema>;
+// Re-export types callers need.
+export type { IndexingPatch, IndexingRow, IndexingStats, AnalysisResponse, ClaimResponse };
 
-export const IndexingStatsSchema = z.object({
-  low_confidence: z.number().int(),
-  missing_type: z.number().int(),
-  missing_owner: z.number().int(),
-  missing_number: z.number().int(),
-});
-export type IndexingStats = z.infer<typeof IndexingStatsSchema>;
-
-export const IndexingPatchSchema = z.object({
-  doc_type: z.string().nullable().optional(),
-  customer_cid: z.string().nullable().optional(),
-  customer_name: z.string().nullable().optional(),
-  doc_number: z.string().nullable().optional(),
-  dob: z.string().nullable().optional(),
-  issue_date: z.string().nullable().optional(),
-  expiry_date: z.string().nullable().optional(),
-  issuing_authority: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-});
-export type IndexingPatch = z.infer<typeof IndexingPatchSchema>;
+// ---------------------------------------------------------------------------
+// Filters
+// ---------------------------------------------------------------------------
 
 export interface IndexingFilters {
   low_conf?: 0 | 1;
   limit?: number;
 }
 
-export const fetchIndexingQueue = (f: IndexingFilters = {}) =>
+// ---------------------------------------------------------------------------
+// Queue + stats
+// ---------------------------------------------------------------------------
+
+export const fetchIndexingQueue = (f: IndexingFilters = {}): Promise<IndexingRow[]> =>
   get('/spa/api/indexing', z.array(IndexingRowSchema), f as Record<string, unknown>);
 
-export const fetchIndexingStats = () =>
+export const fetchIndexingStats = (): Promise<IndexingStats> =>
   get('/spa/api/indexing/stats', IndexingStatsSchema);
 
-export const patchIndexingRow = async (id: number, patch: IndexingPatch) => {
+// ---------------------------------------------------------------------------
+// Analysis (per-field AI confidence from metadata_json._ai_fields)
+// ---------------------------------------------------------------------------
+
+export const fetchIndexingAnalysis = (id: number): Promise<AnalysisResponse> =>
+  get(`/spa/api/indexing/${id}/analysis`, AnalysisResponseSchema);
+
+// ---------------------------------------------------------------------------
+// Save edits
+// ---------------------------------------------------------------------------
+
+export const patchIndexingRow = async (id: number, patch: IndexingPatch): Promise<{ ok: true }> => {
   const parsed = IndexingPatchSchema.parse(patch);
   const { data } = await http.patch(`/spa/api/indexing/${id}`, parsed);
   return OkSchema.parse(data);
 };
+
+// ---------------------------------------------------------------------------
+// Claim / release
+// ---------------------------------------------------------------------------
+
+export const claimIndexingDoc = async (id: number): Promise<ClaimResponse> => {
+  const { data } = await http.post<unknown>(`/spa/api/indexing/${id}/claim`, {});
+  return ClaimResponseSchema.parse(data);
+};
+
+export const releaseIndexingDoc = async (id: number): Promise<{ ok: true }> =>
+  del(`/spa/api/indexing/${id}/claim`, OkSchema);
+
+/**
+ * Beacon release — called in beforeunload via navigator.sendBeacon.
+ * sendBeacon only supports POST; we POST to the /release alias endpoint.
+ * Returns void (fire-and-forget — beacon callbacks are not awaited by the browser).
+ */
+export function beaconRelease(id: number): void {
+  const url = `/spa/api/indexing/${id}/claim/release`;
+  if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    navigator.sendBeacon(url);
+  }
+}
