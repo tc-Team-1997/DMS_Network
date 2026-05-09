@@ -37,6 +37,18 @@ PERMISSIONS = {
     "audit_read": {"auditor", "doc_admin", "compliance"},
     "sign":       {"checker", "doc_admin"},
     "view":       {"viewer", "maker", "checker", "doc_admin", "auditor", "compliance"},
+    # Wave A backend slugs (worm / redaction / face-match / translate / sync).
+    # `kyc:write|read` use the colon convention (matches Node rbac.js); the
+    # earlier `kyc_write|read` underscore variants from the face-match agent
+    # are dropped. See team-lead reconciliation note in commit message.
+    "worm:read":         {"viewer", "maker", "checker", "doc_admin", "auditor", "compliance"},
+    "worm:admin":        {"doc_admin"},
+    "documents:redact":  {"maker", "checker", "doc_admin"},
+    "view_unredacted":   {"doc_admin", "auditor"},
+    "kyc:write":         {"maker", "doc_admin"},
+    "kyc:read":          {"auditor", "doc_admin"},
+    "translate:read":    {"viewer", "maker", "checker", "doc_admin", "auditor", "compliance"},
+    "translate:delete":  {"doc_admin"},
 }
 
 
@@ -94,3 +106,26 @@ def require(permission: str):
                                 f"Role lacks '{permission}' permission")
         return p
     return _dep
+
+
+# ---------------------------------------------------------------------------
+# Redaction-specific permission helpers (BHU-46)
+# ---------------------------------------------------------------------------
+
+_VIEW_UNREDACTED_ROLES: frozenset[str] = frozenset({"doc_admin", "auditor"})
+"""Roles that may access the original (unredacted) version of a document.
+
+Permission slug: ``view_unredacted``.
+Only doc_admin and auditor hold this permission. All other roles are served
+the redacted copy by default. The team lead must add
+``"view_unredacted": {"doc_admin", "auditor"}`` to rbac.js on the Node side.
+"""
+
+
+def principal_can_view_unredacted(p: Principal) -> bool:
+    """Return True if the principal holds the ``view_unredacted`` permission.
+
+    Grants access to original (pre-redaction) document content.
+    Granted to: doc_admin, auditor.
+    """
+    return any(r in _VIEW_UNREDACTED_ROLES for r in p.roles)

@@ -206,6 +206,82 @@ try {
     'default_folder_id',
     'default_folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL',
   );
+  // ── Wave A backend slices (worm / redaction / offline-sync / dzongkha) ──
+  // Face-match has no Node-side tables — biometric encodings live Python-only.
+
+  // WORM retention lock — chflags / chattr immutable enforcement (BHU-32).
+  addColumnIfMissing('documents', 'worm_locked_at',     'worm_locked_at TEXT');
+  addColumnIfMissing('documents', 'worm_unlock_after',  'worm_unlock_after TEXT');
+  addColumnIfMissing('documents', 'worm_release_reason','worm_release_reason TEXT');
+  addColumnIfMissing('documents', 'sha256_at_lock',     'sha256_at_lock TEXT');
+  // Indexes are best-effort: try once, ignore if column came in a later migration.
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_documents_worm_locked_at    ON documents(worm_locked_at)"); } catch (e) {}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_documents_worm_unlock_after ON documents(worm_unlock_after)"); } catch (e) {}
+
+  // Document redaction — version chain + audit log (BHU-46).
+  addColumnIfMissing('documents', 'parent_id', 'parent_id INTEGER REFERENCES documents(id)');
+  addColumnIfMissing('documents', 'redacted',  'redacted INTEGER DEFAULT 0');
+  addColumnIfMissing('documents', 'version',   'version INTEGER DEFAULT 1');
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_documents_parent_id ON documents(parent_id)"); } catch (e) {}
+  try { db.exec("CREATE INDEX IF NOT EXISTS idx_documents_redacted  ON documents(redacted)"); } catch (e) {}
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS redaction_log (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      document_id         INTEGER NOT NULL REFERENCES documents(id),
+      redacted_version_id INTEGER NOT NULL REFERENCES documents(id),
+      redacted_by         TEXT NOT NULL,
+      regions             TEXT NOT NULL,                  -- JSON array
+      reason              TEXT NOT NULL,
+      created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+      tenant_id           TEXT NOT NULL DEFAULT 'nbe'
+    );
+    CREATE INDEX IF NOT EXISTS idx_rl_document_id ON redaction_log(document_id);
+    CREATE INDEX IF NOT EXISTS idx_rl_version_id  ON redaction_log(redacted_version_id);
+    CREATE INDEX IF NOT EXISTS idx_rl_created_at  ON redaction_log(created_at);
+    CREATE INDEX IF NOT EXISTS idx_rl_tenant_id   ON redaction_log(tenant_id);
+  `);
+
+  // Offline sync — idempotency keys for replayed uploads (BHU-57).
+  // Owns its own DDL via services/idempotency.js but kept here for schema-ownership clarity.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS idempotency_keys (
+      key             TEXT PRIMARY KEY,
+      tenant_id       TEXT NOT NULL DEFAULT 'default',
+      user_id         INTEGER NOT NULL REFERENCES users(id),
+      endpoint        TEXT NOT NULL,
+      request_hash    TEXT NOT NULL,
+      response_status INTEGER,
+      response_body   TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at      TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_idem_user_created     ON idempotency_keys(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_idem_expires          ON idempotency_keys(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_idem_tenant_user_key  ON idempotency_keys(tenant_id, user_id, key);
+  `);
+
+  // Translations — Dzongkha / Arabic / English NLLB cache (BHU-14).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS translations (
+      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id            TEXT NOT NULL,
+      doc_id               INTEGER REFERENCES documents(id) ON DELETE SET NULL,
+      source_lang          TEXT NOT NULL,
+      target_lang          TEXT NOT NULL,
+      sha256_source        TEXT NOT NULL,
+      original_text_length INTEGER NOT NULL DEFAULT 0,
+      translated_text      TEXT NOT NULL,
+      confidence_estimate  REAL NOT NULL DEFAULT 0.0,
+      model_version        TEXT NOT NULL DEFAULT 'facebook/nllb-200-distilled-600M',
+      created_at           TEXT DEFAULT (datetime('now')),
+      created_by           TEXT,
+      deleted_at           TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_translations_tenant_sha256 ON translations(tenant_id, sha256_source, source_lang, target_lang);
+    CREATE INDEX IF NOT EXISTS idx_translations_doc_id        ON translations(doc_id);
+    CREATE INDEX IF NOT EXISTS idx_translations_created_at    ON translations(created_at);
+  `);
+
   // OCR confidence tuning: per-doctype thresholds + last sample tested.
   addColumnIfMissing('document_type_schemas', 'autofill_floor',  'autofill_floor REAL DEFAULT 0.4');
   addColumnIfMissing('document_type_schemas', 'high_confidence', 'high_confidence REAL DEFAULT 0.7');

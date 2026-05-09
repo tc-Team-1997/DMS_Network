@@ -6,6 +6,14 @@ const db = require('../../db');
 const { runOcr } = require('../../services/ocr');
 const rbac = require('../../services/rbac');
 const { branchScope, requirePermJson, tenantScope } = require('./_shared');
+const {
+  getIdempotency,
+  storeIdempotency,
+  sha256,
+} = require('../../services/idempotency');
+
+// UUID v4 regex for validating Idempotency-Key header values.
+const IDEM_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Write a row to audit_log.
@@ -117,6 +125,47 @@ router.post(
     if (!req.file) return res.status(400).json({ error: 'file_required' });
     const tenant = tenantScope(req);
     const body = req.body ?? {};
+
+    // ------------------------------------------------------------------
+    // Idempotency-Key deduplication (BHU-57 / offline-sync-queue).
+    // ------------------------------------------------------------------
+    const idemKey = req.headers['idempotency-key'];
+    if (idemKey !== undefined) {
+      // Validate UUID v4 format.
+      if (!IDEM_KEY_RE.test(idemKey)) {
+        return res.status(400).json({ error: 'invalid_idempotency_key', message: 'Idempotency-Key must be a UUID v4' });
+      }
+
+      // Build a canonical hash of the request body (file excluded — file hash
+      // would require reading the stream twice; body fields are sufficient for
+      // dedup correctness in the offline replay path).
+      const requestHash = sha256({
+        doc_type:      body.doc_type      ?? null,
+        customer_cid:  body.customer_cid  ?? null,
+        customer_name: body.customer_name ?? null,
+        doc_number:    body.doc_number    ?? null,
+        notes:         body.notes         ?? null,
+        metadata_json: body.metadata_json ?? null,
+      });
+
+      const userId = req.session.user.id;
+      const existing = getIdempotency(idemKey, requestHash, tenant, userId);
+
+      if (existing !== null) {
+        if (!existing.match) {
+          // Same key, different body — hard conflict.
+          return res.status(409).json({
+            error: 'idempotency_conflict',
+            message: 'Idempotency-Key already used with different request body',
+          });
+        }
+        // Cache hit — return the original response without re-processing.
+        let cached = null;
+        try { cached = JSON.parse(existing.row.response_body); } catch { cached = {}; }
+        return res.status(existing.row.response_status).json(cached);
+      }
+    }
+    // ------------------------------------------------------------------
     const { doc_type, branch, folder_id, notes } = body;
 
     // Parse the caller-supplied metadata blob. Legacy flat fields (from
@@ -229,7 +278,38 @@ router.post(
     // fills ocr_confidence via /spa/api/docbrain/analyze later.
     runOcr(id).catch(() => {});
 
-    res.json({ ok: true, id, auto_routed: autoRouted });
+    const responsePayload = { ok: true, id, auto_routed: autoRouted };
+
+    // ------------------------------------------------------------------
+    // Store idempotency record now that we have a successful result.
+    // Only stored when the header was present and passed validation above.
+    // ------------------------------------------------------------------
+    if (idemKey !== undefined && IDEM_KEY_RE.test(idemKey)) {
+      try {
+        const storedHash = sha256({
+          doc_type:      body.doc_type      ?? null,
+          customer_cid:  body.customer_cid  ?? null,
+          customer_name: body.customer_name ?? null,
+          doc_number:    body.doc_number    ?? null,
+          notes:         body.notes         ?? null,
+          metadata_json: body.metadata_json ?? null,
+        });
+        storeIdempotency({
+          key:            idemKey,
+          tenantId:       tenant,
+          userId:         req.session.user.id,
+          endpoint:       'POST /spa/api/documents',
+          requestHash:    storedHash,
+          responseStatus: 200,
+          responseBody:   responsePayload,
+        });
+      } catch {
+        // Idempotency store failure must not fail the upload response.
+      }
+    }
+    // ------------------------------------------------------------------
+
+    res.json(responsePayload);
   },
 );
 

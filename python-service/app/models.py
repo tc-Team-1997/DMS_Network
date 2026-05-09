@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Float, Boolean, LargeBinary, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
@@ -24,6 +24,17 @@ class Document(Base):
     expiry_date = Column(String(32))
     uploaded_by = Column(String(128))
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # WORM retention-lock columns (migration 0023)
+    worm_locked_at = Column(DateTime, nullable=True)
+    worm_unlock_after = Column(DateTime, nullable=True)
+    worm_release_reason = Column(String(128), nullable=True)
+    sha256_at_lock = Column(String(64), nullable=True)
+
+    # Redaction columns (migration 0024_redaction)
+    parent_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
+    redacted = Column(Integer, default=0)  # 0=original, 1=redacted copy
+    version = Column(Integer, default=1)
 
     ocr = relationship("OcrResult", back_populates="document", uselist=False, cascade="all, delete-orphan")
     workflow_steps = relationship("WorkflowStep", back_populates="document", cascade="all, delete-orphan")
@@ -685,3 +696,105 @@ class CbsCircuitEvent(Base):
     reason            = Column(String(64), nullable=True)    # consecutive_errors | half_open_success | half_open_failure | manual_reset
     consecutive_errors = Column(Integer, nullable=False, default=0)
     event_at          = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+# ---------------------------------------------------------------------------
+# Face Match KYC models (BHU-9, migration 0025_face_match)
+# DPIA: high risk — biometric PII. Raw images are NEVER stored.
+# Only 128-dim float64 encodings (non-reversible) are persisted.
+# ---------------------------------------------------------------------------
+
+
+class BiometricEncoding(Base):
+    """Cache of face encodings for ID photos (never live photos — privacy-first).
+
+    face_encoding is a raw bytes serialisation of a 128-dim float64 numpy array
+    (~1024 bytes). Stored as BLOB/BYTEA. Deserialise with numpy.frombuffer.
+    Encrypted at rest by the storage layer (AES-256).
+
+    Expires after tenant_settings.face_encoding_retention_days (default 90).
+    A daily cron deletes rows where expires_at < now().
+    """
+    __tablename__ = "biometric_encodings"
+
+    id              = Column(Integer, primary_key=True)
+    tenant_id       = Column(String(64), nullable=False, index=True)
+    photo_sha256    = Column(String(64), nullable=False, unique=True, index=True)
+    photo_type      = Column(String(16), nullable=False)          # 'id_photo'
+    face_encoding   = Column(LargeBinary, nullable=False)         # 128-dim float64 bytes
+    face_geometry   = Column(JSON, nullable=True)                 # {eye_distance_px, head_pose_deg, face_count}
+    encoding_model  = Column(String(128), nullable=False, default="face_recognition/dlib")
+    created_at      = Column(DateTime, nullable=False, default=datetime.utcnow)
+    expires_at      = Column(DateTime, nullable=False,
+                             default=lambda: datetime.utcnow() + timedelta(days=90))
+
+
+class BiometricConsent(Base):
+    """GDPR consent audit trail — records WHEN a customer consented to biometric processing.
+
+    Retention: 7 years regulatory minimum (consent records are legal evidence).
+    On DSAR erasure: set revoked_at, do NOT hard-delete (legal hold).
+    """
+    __tablename__ = "biometric_consent"
+
+    id                    = Column(Integer, primary_key=True)
+    tenant_id             = Column(String(64), nullable=False, index=True)
+    customer_cid          = Column(String(64), nullable=False, index=True)
+    consent_version       = Column(String(16), nullable=False)
+    language              = Column(String(2), nullable=False, default="en")
+    given_at              = Column(DateTime, nullable=False, default=datetime.utcnow)
+    signature_or_approval = Column(String(256), nullable=True)    # hash/token, not plaintext
+    expires_at            = Column(DateTime, nullable=True)
+    revoked_at            = Column(DateTime, nullable=True)
+
+
+class BiometricMatch(Base):
+    """Append-only audit record for every face match decision.
+
+    No raw images. No encodings. Only SHA-256 hashes (non-reversible) +
+    distance/match metadata. Required for DPIA compliance and regulatory audit.
+
+    Retention: 10 years regulatory minimum (do not purge on DSAR — mark as
+    requires_audit_review instead per contract §8).
+    """
+    __tablename__ = "biometric_match"
+
+    id               = Column(Integer, primary_key=True)
+    tenant_id        = Column(String(64), nullable=False, index=True)
+    customer_cid     = Column(String(64), nullable=False, index=True)
+    doc_id           = Column(Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
+    id_photo_sha256  = Column(String(64), nullable=False)
+    live_photo_sha256 = Column(String(64), nullable=False)
+    distance         = Column(Float, nullable=False)
+    confidence       = Column(Float, nullable=False)
+    match_result     = Column(Boolean, nullable=False)
+    face_geometry_ok = Column(Boolean, nullable=False, default=True)
+    threshold_used   = Column(Float, nullable=False)
+    decided_at       = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    decided_by       = Column(String(128), nullable=True)
+    decided_from     = Column(String(16), nullable=True)          # 'mobile' | 'web' | 'api'
+    consent_token_id = Column(Integer, ForeignKey("biometric_consent.id", ondelete="SET NULL"), nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Redaction models (BHU-46, migration 0024_redaction)
+# ---------------------------------------------------------------------------
+
+
+class RedactionLog(Base):
+    """Append-only audit record for every document redaction operation.
+
+    One row per redaction call. Regions is a JSON array of
+    {page, x, y, w, h, reason} dicts. Never updated after insert.
+    Tenant boundary enforced: every query must filter by tenant_id.
+    """
+    __tablename__ = "redaction_log"
+
+    id                 = Column(Integer, primary_key=True, autoincrement=True)
+    document_id        = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
+    redacted_version_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
+    redacted_by        = Column(String(256), nullable=False)
+    regions            = Column(JSON, nullable=False)
+    reason             = Column(String(128), nullable=False)
+    created_at         = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    tenant_id          = Column(String(64), nullable=False, default="default", index=True)

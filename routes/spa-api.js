@@ -40,7 +40,12 @@ router.use(require('./spa-api/ai'));
 router.use(require('./spa-api/ai-glossary'));
 router.use(require('./spa-api/docbrain'));
 router.use(require('./spa-api/offline'));
+router.use(require('./spa-api/sync'));
 router.use(require('./spa-api/cbs'));
 router.use(require('./spa-api/aml-screening'));
+router.use(require('./spa-api/worm'));
+router.use(require('./spa-api/redaction'));
+router.use(require('./spa-api/face-match'));
+router.use(require('./spa-api/translate'));
 
 module.exports = router;
