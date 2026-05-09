@@ -31,3 +31,9 @@ airgap-bundle/
 nbe-dms-airgap-*.tar.zst
 playwright-report/
 test-results/
+
+# Microsoft Office lock files (created when an .xlsx / .docx is open).
+~$*.xlsx
+~$*.docx
+~$*.pptx
+.~lock.*
