@@ -45,6 +45,8 @@ function hydrate(row) {
     tenant_id: row.tenant_id,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    default_folder_id: row.default_folder_id ?? null,
+    default_folder_name: row.default_folder_name ?? null,
   };
 }
 
@@ -82,17 +84,23 @@ router.get('/document-types', (req, res) => {
   const tenant = tenantScope(req);
   const onlyActive = String(req.query.active ?? '') === '1';
   let sql =
-    'SELECT * FROM document_type_schemas WHERE tenant_id = ?';
+    `SELECT s.*, f.name AS default_folder_name
+       FROM document_type_schemas s
+       LEFT JOIN folders f ON f.id = s.default_folder_id
+      WHERE s.tenant_id = ?`;
   const params = [tenant];
-  if (onlyActive) sql += ' AND active = 1';
-  sql += ' ORDER BY name ASC';
+  if (onlyActive) sql += ' AND s.active = 1';
+  sql += ' ORDER BY s.name ASC';
   res.json(db.prepare(sql).all(...params).map(hydrate));
 });
 
 router.get('/document-types/:id', (req, res) => {
   const tenant = tenantScope(req);
   const row = db.prepare(
-    'SELECT * FROM document_type_schemas WHERE id = ? AND tenant_id = ?',
+    `SELECT s.*, f.name AS default_folder_name
+       FROM document_type_schemas s
+       LEFT JOIN folders f ON f.id = s.default_folder_id
+      WHERE s.id = ? AND s.tenant_id = ?`,
   ).get(parseInt(req.params.id, 10), tenant);
   if (!row) return res.status(404).json({ error: 'not_found' });
   res.json(hydrate(row));
@@ -101,28 +109,45 @@ router.get('/document-types/:id', (req, res) => {
 // ---------- writes (admin only) -------------------------------------------
 
 router.post('/document-types', requirePermJson('admin'), (req, res) => {
-  const { name, description, fields, active } = req.body ?? {};
+  const { name, description, fields, active, default_folder_id } = req.body ?? {};
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
   const check = validateFields(fields ?? []);
   if (!check.ok) return res.status(400).json({ error: check.error });
 
+  // Validate default_folder_id when supplied.
+  let resolvedDefaultFolderId = null;
+  if (default_folder_id != null) {
+    const fid = parseInt(default_folder_id, 10);
+    if (!Number.isFinite(fid) || fid <= 0) {
+      return res.status(400).json({ error: 'invalid_default_folder_id' });
+    }
+    const folderRow = db.prepare('SELECT id FROM folders WHERE id = ?').get(fid);
+    if (!folderRow) return res.status(400).json({ error: 'default_folder_not_found' });
+    resolvedDefaultFolderId = fid;
+  }
+
   const tenant = tenantScope(req);
   try {
     const info = db.prepare(
       `INSERT INTO document_type_schemas
-         (name, description, fields_json, active, tenant_id)
-       VALUES (?, ?, ?, ?, ?)`,
+         (name, description, fields_json, active, tenant_id, default_folder_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(
       name.trim().slice(0, 80),
       (typeof description === 'string' ? description.slice(0, 500) : null),
       JSON.stringify(check.fields),
       active === false ? 0 : 1,
       tenant,
+      resolvedDefaultFolderId,
     );
-    const row = db.prepare('SELECT * FROM document_type_schemas WHERE id = ?')
-      .get(info.lastInsertRowid);
+    const row = db.prepare(
+      `SELECT s.*, f.name AS default_folder_name
+         FROM document_type_schemas s
+         LEFT JOIN folders f ON f.id = s.default_folder_id
+        WHERE s.id = ?`,
+    ).get(info.lastInsertRowid);
     res.status(201).json(hydrate(row));
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'name_taken' });
@@ -161,6 +186,21 @@ router.patch('/document-types/:id', requirePermJson('admin'), (req, res) => {
     sets.push('active = ?');
     values.push(body.active ? 1 : 0);
   }
+  if ('default_folder_id' in body) {
+    if (body.default_folder_id == null) {
+      sets.push('default_folder_id = ?');
+      values.push(null);
+    } else {
+      const fid = parseInt(body.default_folder_id, 10);
+      if (!Number.isFinite(fid) || fid <= 0) {
+        return res.status(400).json({ error: 'invalid_default_folder_id' });
+      }
+      const folderRow = db.prepare('SELECT id FROM folders WHERE id = ?').get(fid);
+      if (!folderRow) return res.status(400).json({ error: 'default_folder_not_found' });
+      sets.push('default_folder_id = ?');
+      values.push(fid);
+    }
+  }
   if (sets.length === 0) return res.status(400).json({ error: 'no_fields' });
   sets.push('updated_at = CURRENT_TIMESTAMP');
   values.push(id);
@@ -173,7 +213,12 @@ router.patch('/document-types/:id', requirePermJson('admin'), (req, res) => {
     if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'name_taken' });
     throw err;
   }
-  const updated = db.prepare('SELECT * FROM document_type_schemas WHERE id = ?').get(id);
+  const updated = db.prepare(
+    `SELECT s.*, f.name AS default_folder_name
+       FROM document_type_schemas s
+       LEFT JOIN folders f ON f.id = s.default_folder_id
+      WHERE s.id = ?`,
+  ).get(id);
   res.json(hydrate(updated));
 });
 

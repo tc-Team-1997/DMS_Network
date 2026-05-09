@@ -6,7 +6,7 @@
  *   metadata, then sequential "Upload all" with per-card progress.
  */
 
-import { useEffect, useMemo, useRef, useState, useCallback, type FormEvent } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Upload,
@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Sparkles,
   ExternalLink,
+  FolderOpen,
   Wand2,
   Eye,
   X,
@@ -28,6 +29,7 @@ import {
   fetchFolders,
   previewDocument,
   uploadDocument,
+  type AutoRouted,
   type Extraction,
   type PreviewResponse,
 } from './api';
@@ -73,7 +75,7 @@ type CardStatus =
   | { tag: 'ready'; preview: PreviewResponse }
   | { tag: 'scan_error'; message: string }
   | { tag: 'uploading' }
-  | { tag: 'done'; uploadId: number }
+  | { tag: 'done'; uploadId: number; autoRouted: AutoRouted | null }
   | { tag: 'upload_error'; message: string };
 
 interface FileCard {
@@ -180,28 +182,66 @@ function AiPipelineProgress({
 
   return (
     <div
-      className="rounded-lg bg-brand-skyLight/40 border border-brand-blue/20 px-4 py-4 space-y-4"
+      className="rounded-lg border border-brand-blue/30 px-4 py-4 space-y-4 relative overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, #0D2B6A 0%, #1a2e6b 30%, #1565C0 70%, #0e4a9a 100%)',
+        boxShadow: '0 0 32px 4px rgba(21, 101, 192, 0.22), 0 0 64px 8px rgba(33, 150, 243, 0.09)',
+      }}
       data-testid="capture-ai-pipeline"
     >
-      <p className="text-xs font-semibold text-brand-blue flex items-center gap-1.5">
-        <Sparkles size={12} /> AI Processing Pipeline
+      {/* Subtle noise texture overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")',
+        }}
+        aria-hidden="true"
+      />
+
+      <p className="relative text-xs font-semibold text-brand-skyLight flex items-center gap-1.5">
+        <Sparkles size={12} className="text-brand-sky" /> AI Processing Pipeline
       </p>
 
       {/* Step progress bar */}
-      <div className="flex items-center gap-0">
+      <div className="relative flex items-center gap-0">
         {PIPELINE_STEPS.map((s, i) => {
+          const isIndexedStep = s.id === 'indexed';
           const done = i < activeIdx || (i === activeIdx && step === 'indexed');
           const active = i === activeIdx && step !== 'indexed';
           const future = i > activeIdx;
           return (
             <div key={s.id} className="flex items-center flex-1 min-w-0">
-              <div className="flex flex-col items-center flex-shrink-0">
+              <div className="flex flex-col items-center flex-shrink-0 relative">
+                {/* Animated halo rings — only while this step is active */}
+                {active && (
+                  <>
+                    <span
+                      className="absolute rounded-full border border-brand-sky/60 motion-safe:animate-ai-halo-outer"
+                      style={{ width: '42px', height: '42px', top: '-7px', left: '-7px' }}
+                      aria-hidden="true"
+                    />
+                    <span
+                      className="absolute rounded-full border border-brand-sky/40 motion-safe:animate-ai-halo-inner"
+                      style={{ width: '34px', height: '34px', top: '-3px', left: '-3px' }}
+                      aria-hidden="true"
+                    />
+                  </>
+                )}
+                {/* Sparkle pulse on the indexed (final) node */}
+                {done && isIndexedStep && (
+                  <span
+                    className="absolute -top-1 -right-1 motion-safe:animate-ai-sparkle"
+                    aria-hidden="true"
+                  >
+                    <Sparkles size={10} className="text-success" />
+                  </span>
+                )}
                 <div
                   className={cn(
-                    'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
+                    'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all relative z-10',
                     done   && 'bg-success border-success text-white',
-                    active && 'bg-brand-blue border-brand-blue text-white animate-pulse',
-                    future && 'bg-white border-border text-muted',
+                    active && 'bg-brand-sky border-brand-sky text-white',
+                    future && 'bg-white/10 border-white/20 text-white/40',
                   )}
                 >
                   {done ? <CheckCircle2 size={14} /> : i + 1}
@@ -210,8 +250,8 @@ function AiPipelineProgress({
                   className={cn(
                     'mt-1 text-[10px] whitespace-nowrap',
                     done   && 'text-success font-medium',
-                    active && 'text-brand-blue font-medium',
-                    future && 'text-muted',
+                    active && 'text-brand-skyLight font-medium',
+                    future && 'text-white/40',
                   )}
                 >
                   {s.label}
@@ -220,10 +260,21 @@ function AiPipelineProgress({
               {i < PIPELINE_STEPS.length - 1 && (
                 <div
                   className={cn(
-                    'h-0.5 flex-1 mx-1 mb-4 rounded transition-all',
-                    i < activeIdx ? 'bg-success' : 'bg-border',
+                    'h-0.5 flex-1 mx-1 mb-4 rounded transition-all relative overflow-hidden',
+                    i < activeIdx ? 'bg-success/60' : 'bg-white/15',
                   )}
-                />
+                >
+                  {/* Flowing light gradient on traversed connectors */}
+                  {i < activeIdx && (
+                    <span
+                      className="absolute inset-y-0 w-1/2 motion-safe:animate-ai-connector-flow"
+                      style={{
+                        background: 'linear-gradient(90deg, transparent, rgba(33,150,243,0.8), transparent)',
+                      }}
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
               )}
             </div>
           );
@@ -232,16 +283,16 @@ function AiPipelineProgress({
 
       {/* Results when indexed */}
       {step === 'indexed' && (
-        <div className="space-y-2">
+        <div className="relative space-y-2">
           {docType && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted font-medium">Document type:</span>
+              <span className="text-xs text-brand-skyLight/70 font-medium">Document type:</span>
               <span
                 className={cn(
                   'inline-flex items-center gap-1 rounded-badge px-2 py-0.5 text-xs font-medium',
                   ocr !== null && ocr >= 70
-                    ? 'bg-success-bg text-success'
-                    : 'bg-warning-bg text-warning',
+                    ? 'bg-success/20 text-success border border-success/30'
+                    : 'bg-warning/20 text-warning border border-warning/30',
                 )}
               >
                 <Sparkles size={10} />
@@ -252,8 +303,8 @@ function AiPipelineProgress({
           )}
           {ocrText && (
             <div>
-              <p className="text-xs text-muted font-medium mb-1">OCR text preview:</p>
-              <p className="text-xs text-ink bg-white border border-divider rounded-input px-3 py-2 font-mono leading-relaxed line-clamp-3">
+              <p className="text-xs text-brand-skyLight/70 font-medium mb-1">OCR text preview:</p>
+              <p className="text-xs text-white/80 bg-white/5 border border-white/10 rounded-input px-3 py-2 font-mono leading-relaxed line-clamp-3">
                 {ocrText.slice(0, 200)}{ocrText.length > 200 ? '…' : ''}
               </p>
             </div>
@@ -288,6 +339,7 @@ export function CapturePage() {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [lastUploadId, setLastUploadId] = useState<number | null>(null);
+  const [lastAutoRouted, setLastAutoRouted] = useState<AutoRouted | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [aiSuggest, setAiSuggest] = useState<ClassifyOneResponse | null>(null);
   const [aiSuggestDismissed, setAiSuggestDismissed] = useState(false);
@@ -343,6 +395,7 @@ export function CapturePage() {
     setPreview(null);
     setClientError(null);
     setLastUploadId(null);
+    setLastAutoRouted(null);
     setConfirming(false);
     setFolderId('');
     setBranch('');
@@ -417,6 +470,7 @@ export function CapturePage() {
     mutationFn: uploadDocument,
     onSuccess: (r) => {
       setLastUploadId(r.id);
+      setLastAutoRouted(r.auto_routed ?? null);
       // Capture classification info from preview for the pipeline display
       if (preview) {
         setUploadedDocType(preview.classification.doc_class);
@@ -685,7 +739,7 @@ export function CapturePage() {
         const result = await uploadDocument(fd);
         analyzeDocument(result.id).catch(() => { /* background */ });
         setCards((prev) => prev.map((c) =>
-          c.id === card.id ? { ...c, status: { tag: 'done', uploadId: result.id } } : c,
+          c.id === card.id ? { ...c, status: { tag: 'done', uploadId: result.id, autoRouted: result.auto_routed ?? null } } : c,
         ));
       } catch (err) {
         const msg = err instanceof HttpError ? err.message : 'Upload failed';
@@ -872,7 +926,7 @@ export function CapturePage() {
             />
           </label>
 
-          {file && fileUrl && <FilePreview file={file} url={fileUrl} />}
+          {file && fileUrl && <FilePreview file={file} url={fileUrl} scanning={previewMutation.isPending} />}
 
           {file && (
             <PreviewStatus
@@ -986,6 +1040,12 @@ export function CapturePage() {
               <div className="rounded-lg bg-success-bg border border-success/30 px-3 py-2 text-xs text-success flex items-center gap-2 font-medium">
                 <CheckCircle2 size={14} /> Uploaded as document #{lastUploadId}
               </div>
+              {lastAutoRouted != null && (
+                <AutoRoutedBadge
+                  folderName={lastAutoRouted.folder_name}
+                  documentId={lastUploadId}
+                />
+              )}
               <AiPipelineProgress
                 documentId={lastUploadId}
                 initialOcr={uploadedOcr}
@@ -1004,15 +1064,11 @@ export function CapturePage() {
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={reset}>Reset</Button>
-            <Button
-              type="submit"
+            <AiSubmitButton
               loading={uploadMutation.isPending}
               disabled={!file || previewMutation.isPending || !selectedType}
-              data-testid="capture-submit"
-              {...(previewMutation.isPending ? { title: 'Waiting for AI preview…' } : {})}
-            >
-              {previewMutation.isPending ? 'Analysing…' : 'Upload'}
-            </Button>
+              analysing={previewMutation.isPending}
+            />
           </div>
         </form>
       </Panel>
@@ -1069,8 +1125,8 @@ function BatchFileCard({
     switch (status.tag) {
       case 'scanning':
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-brand-blue">
-            <Wand2 size={11} className="animate-pulse" /> Scanning…
+          <span className="inline-flex items-center gap-1 text-xs text-brand-sky font-medium">
+            <Wand2 size={11} className="motion-safe:animate-pulse" /> Scanning…
           </span>
         );
       case 'ready':
@@ -1089,9 +1145,18 @@ function BatchFileCard({
         return <span className="text-xs text-brand-blue">Uploading…</span>;
       case 'done':
         return (
-          <Link to={`/viewer/${status.uploadId}`} className="inline-flex items-center gap-1 text-xs text-success hover:underline">
-            <CheckCircle2 size={11} /> Doc #{status.uploadId}
-          </Link>
+          <span className="inline-flex flex-col gap-1">
+            <Link to={`/viewer/${status.uploadId}`} className="inline-flex items-center gap-1 text-xs text-success hover:underline">
+              <CheckCircle2 size={11} /> Doc #{status.uploadId}
+            </Link>
+            {status.autoRouted != null && (
+              <AutoRoutedBadge
+                folderName={status.autoRouted.folder_name}
+                documentId={status.uploadId}
+                compact
+              />
+            )}
+          </span>
         );
       case 'upload_error':
         return <span className="inline-flex items-center gap-1 text-xs text-danger"><AlertCircle size={11} /> {status.message}</span>;
@@ -1110,13 +1175,30 @@ function BatchFileCard({
       )}
       data-testid={`batch-card-${card.id}`}
     >
-      <div className="flex items-start gap-3 px-3 py-2 border-b border-divider bg-raised">
+      <div
+        className={cn(
+          'flex items-start gap-3 px-3 py-2 border-b border-divider relative transition-colors duration-300',
+          status.tag === 'scanning' ? 'bg-brand-navy/5' : 'bg-raised',
+        )}
+      >
         {/* Thumbnail */}
-        <div className="w-12 h-12 rounded-input border border-divider bg-page flex-shrink-0 overflow-hidden flex items-center justify-center">
+        <div className="w-12 h-12 rounded-input border border-divider bg-page flex-shrink-0 overflow-hidden flex items-center justify-center relative">
           {isImage ? (
             <img src={objectUrl} alt="" className="w-full h-full object-cover" />
           ) : (
             <FileText size={20} className={cn('text-brand-blue', isPdf && 'text-danger')} />
+          )}
+          {/* Mini scan overlay on thumbnail */}
+          {status.tag === 'scanning' && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+              <div
+                className="absolute left-0 right-0 h-px motion-safe:animate-ai-scan-line"
+                style={{
+                  background: 'linear-gradient(90deg, transparent, rgba(33,150,243,0.9), transparent)',
+                  boxShadow: '0 0 4px rgba(33,150,243,0.6)',
+                }}
+              />
+            </div>
           )}
         </div>
 
@@ -1209,37 +1291,78 @@ function DynamicField({
   compact?: boolean;
 }) {
   const testId = `capture-field-${field.key}`;
+  const hasAi = confidence != null;
+  const isHighConf = hasAi && confidence >= confidenceHigh;
+  const isMedConf  = hasAi && !isHighConf && confidence >= AUTOFILL_FLOOR;
+
+  /** Left-border glow style applied when AI has filled the field */
+  const aiGlowStyle: React.CSSProperties | undefined = hasAi
+    ? {
+        borderLeftWidth: '3px',
+        borderLeftColor: isHighConf
+          ? '#1D9E75'   // success / emerald
+          : isMedConf
+            ? '#EF9F27' // warning / amber
+            : '#888780', // muted — low confidence, no glow
+        boxShadow: isHighConf
+          ? '0 0 8px 0 rgba(29,158,117,0.28)'
+          : isMedConf
+            ? '0 0 8px 0 rgba(239,159,39,0.22)'
+            : 'none',
+      }
+    : undefined;
+
   const common = {
     value,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       onChange(e.target.value),
     'data-testid': testId,
   };
+
   return (
     <label className="block">
-      <span className={cn('mb-1 flex items-center gap-2 font-medium text-muted', compact ? 'text-xs' : 'text-xs')}>
+      <span className="mb-1 flex items-center gap-2 font-medium text-muted text-xs">
         {field.label}
         {field.required && <span className="text-danger" aria-label="required">*</span>}
-        {confidence != null && (
-          <Badge
-            tone={confidence >= confidenceHigh ? 'purple' : 'warning'}
-            className="inline-flex items-center gap-1 normal-case"
+        {hasAi && (
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-badge px-1.5 py-0.5 text-[10px] font-semibold normal-case',
+              isHighConf && 'text-success border border-success/40',
+              isMedConf  && 'text-warning border border-warning/40',
+              !isHighConf && !isMedConf && 'text-muted border border-border',
+            )}
+            style={
+              isHighConf
+                ? { background: 'linear-gradient(135deg, rgba(29,158,117,0.12), rgba(21,101,192,0.08))' }
+                : isMedConf
+                  ? { background: 'linear-gradient(135deg, rgba(239,159,39,0.12), rgba(21,101,192,0.08))' }
+                  : { background: 'transparent' }
+            }
           >
             <Sparkles size={9} />
             AI · {Math.round(confidence * 100)}%
-            {confidence < confidenceHigh && ' · verify'}
-          </Badge>
+            {!isHighConf && confidence >= AUTOFILL_FLOOR && ' · verify'}
+          </span>
         )}
       </span>
-      {field.type === 'textarea' ? (
-        <textarea
-          rows={compact ? 2 : 3}
-          className="w-full rounded-lg border border-border bg-white px-3 py-2 text-md"
-          {...common}
-        />
-      ) : (
-        <Input type={htmlInputType(field.type)} {...common} />
-      )}
+      <div className="relative transition-all duration-200">
+        {field.type === 'textarea' ? (
+          <textarea
+            rows={compact ? 2 : 3}
+            className="w-full rounded-lg border border-border bg-white px-3 py-2 text-md transition-all duration-200"
+            style={aiGlowStyle}
+            {...common}
+          />
+        ) : (
+          <Input
+            type={htmlInputType(field.type)}
+            className={cn(hasAi && 'transition-all duration-200')}
+            style={aiGlowStyle}
+            {...common}
+          />
+        )}
+      </div>
     </label>
   );
 }
@@ -1252,6 +1375,93 @@ function htmlInputType(t: FieldDef['type']): string {
     case 'tel':    return 'tel';
     default:       return 'text';
   }
+}
+
+// ── AI Submit Button — gradient + shimmer + glow ──────────────────────────
+
+/**
+ * The primary upload button with AI-grade visual treatment:
+ * - Gradient background: brand-navy → brand-blue → brand-sky → violet tone
+ * - Sweeping shimmer diagonal every ~3s (motion-safe)
+ * - Hover: stronger glow shadow
+ * - While analysing: continuous pulse glow instead of shimmer (no stuck feel)
+ *
+ * Behavior is byte-identical to the plain Button — only presentation differs.
+ */
+function AiSubmitButton({
+  loading,
+  disabled,
+  analysing,
+}: {
+  loading: boolean;
+  disabled: boolean;
+  analysing: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-input group transition-all duration-200',
+        !disabled && 'hover:shadow-ai-btn-hover',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+      )}
+      style={
+        disabled
+          ? undefined
+          : {
+              background: 'linear-gradient(135deg, #0D2B6A 0%, #1565C0 45%, #2196F3 75%, #7F77DD 100%)',
+              boxShadow: '0 0 16px 2px rgba(21, 101, 192, 0.35)',
+            }
+      }
+    >
+      {/* Shimmer sweep — only when idle (not analysing), motion-safe */}
+      {!analysing && !disabled && (
+        <span
+          className="absolute inset-y-0 w-1/3 motion-safe:animate-ai-shimmer pointer-events-none"
+          style={{
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+          }}
+          aria-hidden="true"
+        />
+      )}
+      {/* Pulse glow ring — shown while AI is analysing */}
+      {analysing && (
+        <span
+          className="absolute inset-0 rounded-input motion-safe:animate-ai-badge-pulse pointer-events-none"
+          style={{
+            boxShadow: '0 0 0 3px rgba(33,150,243,0.4)',
+          }}
+          aria-hidden="true"
+        />
+      )}
+      <button
+        type="submit"
+        disabled={disabled || loading}
+        data-testid="capture-submit"
+        title={analysing ? 'Waiting for AI preview…' : undefined}
+        className={cn(
+          'relative z-10 inline-flex items-center justify-center gap-2 rounded-input font-medium transition-colors',
+          'h-10 px-4 text-sm',
+          disabled
+            ? 'bg-brand-blue text-white'
+            : 'bg-transparent text-white',
+        )}
+      >
+        {analysing ? (
+          <>
+            <Wand2 size={14} className="motion-safe:animate-pulse" />
+            Analysing…
+          </>
+        ) : loading ? (
+          <span className="motion-safe:animate-pulse">…</span>
+        ) : (
+          <>
+            <Upload size={14} />
+            Upload
+          </>
+        )}
+      </button>
+    </div>
+  );
 }
 
 // ── AI preview banner (existing) ──────────────────────────────────────────
@@ -1271,11 +1481,23 @@ function PreviewStatus({
   if (status === 'running') {
     return (
       <div
-        className="rounded-card border border-brand-blue/30 bg-brand-skyLight/40 px-3 py-2 text-xs text-ink flex items-center gap-2"
+        className="relative overflow-hidden rounded-card border border-brand-blue/30 px-3 py-2.5 text-xs flex items-center gap-2"
+        style={{
+          background: 'linear-gradient(135deg, rgba(13,43,106,0.06) 0%, rgba(21,101,192,0.08) 60%, rgba(33,150,243,0.06) 100%)',
+          color: '#1565C0',
+        }}
         data-testid="capture-preview-running"
+        role="status"
+        aria-live="polite"
       >
-        <Wand2 size={14} className="text-brand-blue animate-pulse" />
-        <span>DocBrain is reading the file — OCR + classify + extract…</span>
+        {/* Subtle animated scan stripe */}
+        <span
+          className="absolute inset-y-0 w-1/4 motion-safe:animate-ai-connector-flow pointer-events-none"
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(33,150,243,0.08), transparent)' }}
+          aria-hidden="true"
+        />
+        <Wand2 size={14} className="text-brand-blue motion-safe:animate-pulse shrink-0 relative z-10" />
+        <span className="relative z-10 font-medium">DocBrain is reading the file — OCR + classify + extract…</span>
       </div>
     );
   }
@@ -1364,7 +1586,7 @@ function DocumentSummaryPanel({
             DocBrain is reading <span className="font-medium text-ink">{file.name}</span>. This runs
             OCR across every page, classifies the document, and pulls every field we can identify.
           </p>
-          <SkeletonRows count={7} />
+          <QuantumLoader />
         </div>
       </Panel>
     );
@@ -1545,22 +1767,317 @@ function AiSuggestChip({
   );
 }
 
-function SkeletonRows({ count }: { count: number }) {
+// ── QuantumLoader ──────────────────────────────────────────────────────────
+
+const PHASES = ['Reading every page', 'Classifying', 'Extracting fields'] as const;
+
+function QuantumLoader() {
+  const [phaseIndex, setPhaseIndex] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    const id = setInterval(() => {
+      setPhaseIndex(prev => (prev + 1) % PHASES.length);
+    }, 1800);
+    return () => clearInterval(id);
+  }, [reducedMotion]);
+
+  // Tick mark geometry: 12 marks at every 30°, from r=118 to r=122
+  const ticks = Array.from({ length: 12 }, (_, i) => {
+    const angleRad = (i * 30 * Math.PI) / 180;
+    const x1 = 130 + 118 * Math.sin(angleRad);
+    const y1 = 130 - 118 * Math.cos(angleRad);
+    const x2 = 130 + 122 * Math.sin(angleRad);
+    const y2 = 130 - 122 * Math.cos(angleRad);
+    return { x1, y1, x2, y2 };
+  });
+
+  // Outer gear: 12 teeth, 24 segments alternating outer-radius=22 / inner-radius=16
+  const GEAR_OUTER = 22;
+  const GEAR_INNER = 16;
+  const outerGearPath = Array.from({ length: 24 }, (_, i) => {
+    const angleDeg = i * 15 - 90; // 360/24 = 15° per segment
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const r = i % 2 === 0 ? GEAR_OUTER : GEAR_INNER;
+    const x = 130 + r * Math.cos(angleRad);
+    const y = 130 + r * Math.sin(angleRad);
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(3)} ${y.toFixed(3)}`;
+  }).join(' ') + ' Z';
+
+  // Inner (micro) gear: 8 teeth, 16 segments alternating outer=7 / inner=5
+  const MICRO_OUTER = 7;
+  const MICRO_INNER = 5;
+  const innerGearPath = Array.from({ length: 16 }, (_, i) => {
+    const angleDeg = i * 22.5 - 90; // 360/16 = 22.5° per segment
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const r = i % 2 === 0 ? MICRO_OUTER : MICRO_INNER;
+    const x = 130 + r * Math.cos(angleRad);
+    const y = 130 + r * Math.sin(angleRad);
+    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(3)} ${y.toFixed(3)}`;
+  }).join(' ') + ' Z';
+
+  // LED chip dots: every other outer-gear tooth tip (6 dots at even i * 30° steps)
+  const chipDots = Array.from({ length: 12 }, (_, i) => {
+    if (i % 2 !== 0) return null; // only even-indexed teeth
+    const angleDeg = i * 2 * 15 - 90; // tooth tips at i*30° - 90°
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const x = 130 + GEAR_OUTER * Math.cos(angleRad);
+    const y = 130 + GEAR_OUTER * Math.sin(angleRad);
+    return { x, y, key: i };
+  }).filter((d): d is { x: number; y: number; key: number } => d !== null);
+
   return (
-    <div className="space-y-2">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex gap-2 animate-pulse">
-          <div className="h-3 w-24 rounded bg-divider" />
-          <div className="h-3 flex-1 rounded bg-divider" />
-        </div>
-      ))}
+    <div className="flex flex-col items-center gap-4">
+      {/* Gradient backdrop */}
+      <div className="min-h-[280px] flex items-center justify-center rounded-card bg-gradient-to-b from-brand-skyLight/30 via-white to-white w-full">
+        {/* Breathing outer glow — sits behind SVG via DOM order */}
+        <div className="relative">
+          <div
+            className={
+              reducedMotion
+                ? 'absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(33,150,243,0.20)_0%,_transparent_60%)] blur-2xl'
+                : 'absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(33,150,243,0.35)_0%,_transparent_60%)] blur-2xl animate-ai-breathe'
+            }
+            aria-hidden="true"
+          />
+        <svg
+          viewBox="0 0 260 260"
+          width="220"
+          height="220"
+          aria-hidden="true"
+          role="img"
+          style={{ position: 'relative' }}
+        >
+          <defs>
+            {/* Glow filter for particles — tuned for white background */}
+            <filter id="qglow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            {/* Gear glow filter — soft powered look on outer gear only */}
+            <filter id="gearglow" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* ── Outer dashed guide ring + tick marks (slow rotation) ── */}
+          <g>
+            {!reducedMotion && (
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 130 130"
+                to="360 130 130"
+                dur="60s"
+                repeatCount="indefinite"
+              />
+            )}
+            {/* Dashed ring */}
+            <circle
+              cx="130"
+              cy="130"
+              r="122"
+              fill="none"
+              stroke="rgba(21,101,192,0.22)"
+              strokeWidth="0.5"
+              strokeDasharray="1 5"
+            />
+            {/* 12 tick marks */}
+            {ticks.map((t, i) => (
+              <line
+                key={i}
+                x1={t.x1}
+                y1={t.y1}
+                x2={t.x2}
+                y2={t.y2}
+                stroke="rgba(21,101,192,0.20)"
+                strokeWidth="1"
+              />
+            ))}
+          </g>
+
+          {/* ── Scan arc (static position, brand-blue) ── */}
+          {!reducedMotion && (
+            <circle
+              cx="130"
+              cy="130"
+              r="122"
+              fill="none"
+              stroke="#1565C0"
+              strokeWidth="1.5"
+              strokeDasharray="38 1000"
+              strokeLinecap="round"
+            >
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 130 130"
+                to="360 130 130"
+                dur="4s"
+                repeatCount="indefinite"
+              />
+            </circle>
+          )}
+          {reducedMotion && (
+            <circle
+              cx="130"
+              cy="130"
+              r="122"
+              fill="none"
+              stroke="#1565C0"
+              strokeWidth="1.5"
+              strokeDasharray="38 1000"
+              strokeLinecap="round"
+            />
+          )}
+
+          {/* ── Inner guide ring (r=80, subtle) ── */}
+          <circle
+            cx="130"
+            cy="130"
+            r="80"
+            fill="none"
+            stroke="rgba(21,101,192,0.10)"
+            strokeWidth="0.5"
+            strokeDasharray="2 6"
+          />
+
+          {/* ── Particle 1: primary orbit, tilted 60°, brand-blue mid ── */}
+          <g transform="rotate(60 130 130)">
+            {reducedMotion ? (
+              // Static fallback at motion start position
+              <g transform="translate(30 130)">
+                <circle r="7" fill="#2196F3" filter="url(#qglow)" opacity="0.7" />
+                <circle r="2.4" fill="#ffffff" />
+              </g>
+            ) : (
+              <g>
+                <circle r="7" fill="#2196F3" filter="url(#qglow)" opacity="0.7" />
+                <circle r="2.4" fill="#ffffff" />
+                <animateMotion
+                  dur="5.5s"
+                  repeatCount="indefinite"
+                  begin="-1.2s"
+                  path="M 30 130 A 100 32 0 1 0 230 130 A 100 32 0 1 0 30 130"
+                />
+              </g>
+            )}
+          </g>
+
+          {/* ── Particle 2: complementary orbit, tilted -30°, sky-blue ── */}
+          <g transform="rotate(-30 130 130)">
+            {reducedMotion ? (
+              <g transform="translate(230 130)">
+                <circle r="5.5" fill="#0EA5E9" filter="url(#qglow)" opacity="0.65" />
+                <circle r="1.8" fill="#ffffff" />
+              </g>
+            ) : (
+              <g>
+                <circle r="5.5" fill="#0EA5E9" filter="url(#qglow)" opacity="0.65" />
+                <circle r="1.8" fill="#ffffff" />
+                <animateMotion
+                  dur="7.5s"
+                  repeatCount="indefinite"
+                  begin="-3.1s"
+                  path="M 30 130 A 100 32 0 1 0 230 130 A 100 32 0 1 0 30 130"
+                />
+              </g>
+            )}
+          </g>
+
+          {/* ── Center nucleus: rotating gear assembly ── */}
+          {/* Outer gear — 12 teeth, clockwise, with gearglow filter */}
+          <g>
+            <path
+              d={outerGearPath}
+              stroke="#1565C0"
+              strokeWidth="1.5"
+              fill="rgba(21,101,192,0.12)"
+              filter="url(#gearglow)"
+            />
+            {/* LED chip dots at every other tooth tip */}
+            {chipDots.map(({ x, y, key }) => (
+              <circle key={key} cx={x} cy={y} r="1" fill="#0EA5E9" />
+            ))}
+            {/* Inner hole ring so it reads as a true gear */}
+            <circle cx="130" cy="130" r="8" fill="white" stroke="#1565C0" strokeWidth="1.2" />
+            {!reducedMotion && (
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 130 130"
+                to="360 130 130"
+                dur="14s"
+                repeatCount="indefinite"
+              />
+            )}
+          </g>
+
+          {/* Inner micro-gear — 8 teeth, counter-rotating */}
+          <g>
+            <path
+              d={innerGearPath}
+              stroke="#2196F3"
+              strokeWidth="0.8"
+              fill="rgba(33,150,243,0.18)"
+            />
+            {!reducedMotion && (
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="360 130 130"
+                to="0 130 130"
+                dur="9s"
+                repeatCount="indefinite"
+              />
+            )}
+          </g>
+        </svg>
+        </div>{/* end relative wrapper */}
+      </div>
+
+      {/* Phase text — cycles with opacity transition */}
+      <p className="text-xs text-center select-none">
+        {PHASES.map((phase, i) => (
+          <span
+            key={phase}
+            className={cn(
+              'transition-opacity duration-200',
+              i === phaseIndex
+                ? 'text-brand-blue font-medium opacity-100'
+                : 'text-muted opacity-60',
+            )}
+          >
+            {phase}
+            {i < PHASES.length - 1 && (
+              <span className="mx-1.5 text-muted opacity-40"> · </span>
+            )}
+          </span>
+        ))}
+      </p>
     </div>
   );
 }
 
 // ── inline file preview (blob URL) ────────────────────────────────────────
 
-function FilePreview({ file, url }: { file: File; url: string }) {
+function FilePreview({ file, url, scanning = false }: { file: File; url: string; scanning?: boolean }) {
   const isPdf = file.type === 'application/pdf';
   const isImage = file.type.startsWith('image/');
   const canPreview = isPdf || isImage;
@@ -1574,7 +2091,7 @@ function FilePreview({ file, url }: { file: File; url: string }) {
           {file.name}
         </span>
       </div>
-      <div className="h-[360px] flex items-center justify-center bg-page">
+      <div className="h-[360px] flex items-center justify-center bg-page relative">
         {isPdf && (
           <iframe
             title={`Preview of ${file.name}`}
@@ -1593,6 +2110,58 @@ function FilePreview({ file, url }: { file: File; url: string }) {
             <p className="text-xs mt-1">Upload will still work — the AI summary above reflects what DocBrain sees.</p>
           </div>
         )}
+
+        {/* Scanner overlay — shown while AI is reading the document */}
+        <ScanOverlay visible={scanning} />
+      </div>
+    </div>
+  );
+}
+
+/** Animated scan overlay shown while AI processes a document preview. */
+function ScanOverlay({ visible }: { visible: boolean }) {
+  return (
+    <div
+      className={cn(
+        'absolute inset-0 pointer-events-none transition-opacity duration-200',
+        visible ? 'opacity-100' : 'opacity-0',
+      )}
+      aria-hidden="true"
+    >
+      {/* Cyan grid suggesting "AI reading" */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(33,150,243,0.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(33,150,243,0.06) 1px, transparent 1px)
+          `,
+          backgroundSize: '28px 28px',
+        }}
+      />
+      {/* Horizontal scan line */}
+      <div
+        className="absolute left-0 right-0 h-px motion-safe:animate-ai-scan-line"
+        style={{
+          background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 20%, rgba(33,150,243,0.9) 50%, rgba(255,255,255,0.6) 80%, transparent 100%)',
+          boxShadow: '0 0 8px 2px rgba(33,150,243,0.5)',
+        }}
+      />
+      {/* "AI ANALYZING…" floating badge — top-right */}
+      <div className="absolute top-2 right-2 flex items-center gap-1.5 rounded-badge px-2 py-1 text-[10px] font-semibold tracking-wide"
+        style={{
+          background: 'linear-gradient(135deg, rgba(13,43,106,0.88) 0%, rgba(21,101,192,0.88) 100%)',
+          color: '#E3EFFF',
+          border: '1px solid rgba(33,150,243,0.4)',
+          backdropFilter: 'blur(4px)',
+        }}
+        role="status"
+        aria-live="polite"
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full bg-brand-sky motion-safe:animate-ai-badge-pulse"
+        />
+        AI ANALYZING…
       </div>
     </div>
   );
@@ -1774,6 +2343,69 @@ function ConfirmUploadDialog({
             <Upload size={14} /> Confirm upload
           </Button>
         </footer>
+      </div>
+    </div>
+  );
+}
+
+// ── AutoRoutedBadge ───────────────────────────────────────────────────────────
+
+/**
+ * Shown after upload when the backend auto-resolved the folder from the
+ * document type's default_folder_id (source: 'doctype-default').
+ *
+ * Props:
+ *   folderName  — human-readable folder name from the server response
+ *   documentId  — used to link to the viewer for the "Move…" action
+ *   compact     — when true (batch cards) renders a smaller inline variant
+ *
+ * New test IDs: capture-auto-routed-badge
+ */
+function AutoRoutedBadge({
+  folderName,
+  documentId,
+  compact = false,
+}: {
+  folderName: string;
+  documentId: number;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-input border-l-2 border-brand-blue bg-gradient-to-r from-brand-skyLight/60 to-brand-blue/10 px-2 py-0.5 text-[10px] text-brand-blue"
+        data-testid="capture-auto-routed-badge"
+        title={`AI auto-routed to folder: ${folderName}`}
+      >
+        <Sparkles size={9} />
+        <FolderOpen size={9} />
+        {folderName}
+      </span>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-lg border-l-4 border-brand-blue bg-gradient-to-r from-brand-skyLight/60 to-brand-blue/10 px-3 py-2 space-y-1"
+      data-testid="capture-auto-routed-badge"
+    >
+      <div className="flex items-center gap-1.5 text-xs font-medium text-brand-blue">
+        <Sparkles size={12} />
+        AI auto-routed to
+        <FolderOpen size={12} />
+        <span>{folderName}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] text-ink-sub">
+          Reviewer can confirm or move during approval.
+        </p>
+        <Link
+          to={`/viewer/${documentId}`}
+          className="inline-flex items-center gap-1 text-[11px] text-brand-blue hover:underline"
+          aria-label={`Open document ${documentId} in viewer to change folder`}
+        >
+          <FolderOpen size={11} /> Move…
+        </Link>
       </div>
     </div>
   );

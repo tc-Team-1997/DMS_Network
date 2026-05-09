@@ -35,6 +35,8 @@ export const DocumentTypeSchema = z.object({
   inference_status: z.enum(['manual', 'draft', 'live']).optional(),
   autofill_floor: z.number().min(0).max(1).optional(),
   high_confidence: z.number().min(0).max(1).optional(),
+  default_folder_id: z.number().int().positive().nullable().optional(),
+  default_folder_name: z.string().nullable().optional(),
 });
 export type DocumentType = z.infer<typeof DocumentTypeSchema>;
 
@@ -45,6 +47,7 @@ export const DocumentTypeInputSchema = z.object({
   active: z.boolean().optional(),
   autofill_floor: z.number().min(0).max(1).optional(),
   high_confidence: z.number().min(0).max(1).optional(),
+  default_folder_id: z.number().int().positive().nullable().optional(),
 });
 export type DocumentTypeInput = z.infer<typeof DocumentTypeInputSchema>;
 

@@ -33,3 +33,23 @@ export type ComplianceSummary = z.infer<typeof ComplianceSummarySchema>;
 
 export const fetchComplianceSummary = () =>
   get('/spa/api/compliance/summary', ComplianceSummarySchema);
+
+// ---------------------------------------------------------------------------
+// Regulatory controls — GET /spa/api/compliance/controls
+// Status is derived from real data server-side; shape mirrors the Control
+// interface in CompliancePage.tsx so no UI reshape is needed.
+// ---------------------------------------------------------------------------
+export const ControlSchema = z.object({
+  id:        z.string(),
+  name:      z.string(),
+  framework: z.string(),
+  status:    z.enum(['pass', 'warn', 'fail']),
+  evidence:  z.string(),
+  lastAudit: z.string(),
+});
+export type Control = z.infer<typeof ControlSchema>;
+
+export const ControlsResponseSchema = z.array(ControlSchema);
+
+export const fetchComplianceControls = () =>
+  get('/spa/api/compliance/controls', ControlsResponseSchema);

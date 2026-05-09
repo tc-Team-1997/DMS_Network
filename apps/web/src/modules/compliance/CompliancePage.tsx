@@ -1,56 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Download, ShieldCheck, ShieldAlert, ShieldX, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { DataTable, MetricCard, Panel, type Column } from '@/components/ui';
-import { fetchComplianceSummary, type ComplianceSummary } from './api';
+import { fetchComplianceSummary, fetchComplianceControls, type ComplianceSummary, type Control } from './api';
 import { cn } from '@/lib/cn';
-
-type RetentionRow = ComplianceSummary['retention'][number] & { id: string };
-
-// ── Regulatory controls (realistic demo data shaped like the real API) ──────
-
-interface Control {
-  id: string;
-  name: string;
-  framework: string;
-  status: 'pass' | 'warn' | 'fail';
-  evidence: string;
-  lastAudit: string;
-}
-
-const DEMO_CONTROLS: Control[] = [
-  {
-    id: 'cbe-22-2022',
-    name: 'CBE Reg 22/2022',
-    framework: 'Central Bank of Egypt',
-    status: 'pass',
-    evidence: 'All 14 mandatory document categories captured; retention ≥10 years enforced.',
-    lastAudit: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'pci-dss-4',
-    name: 'PCI-DSS 4.0',
-    framework: 'Payment Card Industry',
-    status: 'warn',
-    evidence: '3 of 4 cardholder data segments encrypted at rest; key rotation due in 7 days.',
-    lastAudit: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'iso-27001',
-    name: 'ISO 27001:2022',
-    framework: 'Information Security',
-    status: 'pass',
-    evidence: 'Access controls and audit log coverage verified across all 12 branches.',
-    lastAudit: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'gdpr',
-    name: 'GDPR / Data Privacy',
-    framework: 'EU General Data Protection',
-    status: 'warn',
-    evidence: 'Right-to-erasure requests pending for 2 legacy records; scheduled for next batch.',
-    lastAudit: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
 
 /** Compute overall score: pass=100pts, warn=60pts, fail=0pts per control */
 function overallScore(controls: Control[]): number {
@@ -91,11 +43,16 @@ function ControlStatusBadge({ status }: { status: Control['status'] }) {
   );
 }
 
+type RetentionRow = ComplianceSummary['retention'][number] & { id: string };
+
 export function CompliancePage() {
   const q = useQuery({ queryKey: ['compliance', 'summary'], queryFn: fetchComplianceSummary });
   const s = q.data;
 
-  const score = overallScore(DEMO_CONTROLS);
+  const cq = useQuery({ queryKey: ['compliance', 'controls'], queryFn: fetchComplianceControls });
+  const controls: Control[] = cq.data ?? [];
+
+  const score = overallScore(controls);
   const tone = scoreTone(score);
 
   // Retention rows have no primary key of their own; synthesize one from
@@ -118,7 +75,7 @@ export function CompliancePage() {
     { key: 'entity', header: 'Entity', width: 180, render: (r) => `${r.entity ?? ''}${r.entity_id ? ` #${r.entity_id}` : ''}` },
   ];
 
-  const lastAuditDate = DEMO_CONTROLS.reduce<string | null>((latest, c) => {
+  const lastAuditDate = controls.reduce<string | null>((latest, c) => {
     if (!latest) return c.lastAudit;
     return c.lastAudit > latest ? c.lastAudit : latest;
   }, null);
@@ -183,7 +140,13 @@ export function CompliancePage() {
       {/* Per-control cards */}
       <Panel title="Regulatory controls">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {DEMO_CONTROLS.map((ctrl) => (
+          {cq.isLoading && (
+            <p className="col-span-2 text-xs text-muted py-4">Loading controls…</p>
+          )}
+          {cq.isError && (
+            <p className="col-span-2 text-xs text-danger py-4">Failed to load compliance controls.</p>
+          )}
+          {controls.map((ctrl) => (
             <div
               key={ctrl.id}
               className={cn(

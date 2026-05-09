@@ -166,6 +166,28 @@ router.post(
       flat[col] = typeof v === 'string' && v.trim() ? v.trim() : null;
     }
 
+    // AI-driven folder auto-routing: if the caller did not supply a folder_id
+    // but did supply a doc_type, look up the doctype's default_folder_id.
+    let autoRouted = null;
+    let resolvedFolderId = folder_id ? parseInt(folder_id, 10) : null;
+    if (!resolvedFolderId && doc_type) {
+      const dt = db.prepare(
+        `SELECT s.id, s.name, s.default_folder_id, f.name AS folder_name
+           FROM document_type_schemas s
+           LEFT JOIN folders f ON f.id = s.default_folder_id
+          WHERE s.name = ? AND s.active = 1
+          LIMIT 1`,
+      ).get(doc_type);
+      if (dt?.default_folder_id) {
+        resolvedFolderId = dt.default_folder_id;
+        autoRouted = {
+          folder_id: dt.default_folder_id,
+          folder_name: dt.folder_name,
+          source: 'doctype-default',
+        };
+      }
+    }
+
     const info = db.prepare(
       `INSERT INTO documents
          (filename, original_name, doc_type, customer_cid, customer_name,
@@ -179,18 +201,35 @@ router.post(
       flat.customer_cid, flat.customer_name, flat.doc_number,
       flat.dob, flat.issue_date, flat.expiry_date, flat.issuing_authority,
       branch || req.session.user.branch || null,
-      folder_id ? parseInt(folder_id, 10) : null,
+      resolvedFolderId,
       req.file.size, req.file.mimetype, notes || null,
       req.session.user.id, tenant,
       JSON.stringify(metadata),
     );
     const id = info.lastInsertRowid;
 
+    // Audit auto-routing so reviewers can see exactly what triggered it.
+    if (autoRouted) {
+      writeAudit({
+        userId: req.session.user.id,
+        action: 'DOCUMENT_AUTO_ROUTED',
+        entity: 'document',
+        entityId: id,
+        details: {
+          doc_type,
+          folder_id: autoRouted.folder_id,
+          folder_name: autoRouted.folder_name,
+          source: autoRouted.source,
+        },
+        tenantId: tenant,
+      });
+    }
+
     // Kick off Tesseract (image-only fast path). The richer Python pipeline
     // fills ocr_confidence via /spa/api/docbrain/analyze later.
     runOcr(id).catch(() => {});
 
-    res.json({ ok: true, id });
+    res.json({ ok: true, id, auto_routed: autoRouted });
   },
 );
 

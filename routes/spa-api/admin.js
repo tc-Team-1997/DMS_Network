@@ -141,76 +141,112 @@ router.post('/admin/retention/trigger', requirePermJson('admin'), (req, res) => 
 
 // ---------------------------------------------------------------------------
 // Req 44-45 — Dedup settings admin
+//
+// Wire-format note: the SPA DedupSettingsSchema uses fuzzy_threshold as an
+// integer percentage 0–100 (e.g. 80 means "80 %") while dupSvc stores it in
+// the DB as a REAL fraction 0–1 (e.g. 0.8).  All conversion happens here:
+//   - GET: DB value × 100  → response
+//   - PUT: request value ÷ 100 → DB / dupSvc
+//
+// updated_by is stored as an integer user-id; the SPA expects a username
+// string.  We JOIN to users on read and fall back to 'system' for null/seed rows.
 // ---------------------------------------------------------------------------
+
+/** Translate a DB dedup_settings row into the SPA wire shape. */
+function _formatDedupRow(row, fallbackTenant) {
+  const pct    = typeof row.fuzzy_threshold === 'number'
+    ? Math.round(row.fuzzy_threshold * 100)
+    : Math.round(dupSvc.DEFAULTS.fuzzy_threshold * 100);
+  const phash  = typeof row.phash_distance === 'number'
+    ? row.phash_distance
+    : dupSvc.DEFAULTS.phash_distance;
+  return {
+    fuzzy_threshold: pct,
+    phash_distance:  phash,
+    updated_at:      row.updated_at  || new Date().toISOString(),
+    updated_by:      row.updated_by  || 'system',
+  };
+}
 
 /**
  * GET /spa/api/admin/dedup-settings
  * Returns the current thresholds for the caller's tenant.
+ * fuzzy_threshold is returned as an integer percentage (0–100).
+ * updated_by is resolved to a username string.
  */
 router.get('/admin/dedup-settings', requirePermJson('admin'), (req, res) => {
   const tenant = tenantScope(req);
-  const row = db.prepare(
-    'SELECT tenant_id, fuzzy_threshold, phash_distance, updated_at, updated_by FROM dedup_settings WHERE tenant_id = ?'
-  ).get(tenant);
+  const row = db.prepare(`
+    SELECT d.tenant_id, d.fuzzy_threshold, d.phash_distance, d.updated_at,
+           COALESCE(u.username, 'system') AS updated_by
+    FROM dedup_settings d
+    LEFT JOIN users u ON u.id = d.updated_by
+    WHERE d.tenant_id = ?
+  `).get(tenant);
+
   if (!row) {
-    // Return defaults if row is missing (shouldn't happen post-seed, but be defensive).
+    // Row missing (e.g. fresh DB before seed) — return sane defaults.
     return res.json({
-      tenant_id: tenant,
-      fuzzy_threshold: dupSvc.DEFAULTS.fuzzy_threshold,
+      fuzzy_threshold: Math.round(dupSvc.DEFAULTS.fuzzy_threshold * 100),
       phash_distance:  dupSvc.DEFAULTS.phash_distance,
-      updated_at: null,
-      updated_by: null,
+      updated_at:      new Date().toISOString(),
+      updated_by:      'system',
     });
   }
-  res.json(row);
+
+  res.json(_formatDedupRow(row, tenant));
 });
 
 /**
  * PUT /spa/api/admin/dedup-settings
- * Body: { fuzzy_threshold?: number, phash_distance?: number }
- * Upserts thresholds and writes an audit log entry.
+ * Body: { fuzzy_threshold: number (0–100), phash_distance: number (0–64) }
+ * Validates, converts to internal scale, upserts, audits, and returns the
+ * updated row in the same SPA wire shape.
  */
 router.put('/admin/dedup-settings', requirePermJson('admin'), (req, res) => {
-  const tenant  = tenantScope(req);
-  const userId  = req.session.user.id;
+  const tenant = tenantScope(req);
+  const userId = req.session.user.id;
   const { fuzzy_threshold, phash_distance } = req.body || {};
 
-  // Validate
-  if (fuzzy_threshold !== undefined) {
-    const ft = Number(fuzzy_threshold);
-    if (isNaN(ft) || ft < 0 || ft > 1) {
-      return res.status(400).json({ error: 'fuzzy_threshold must be a number between 0 and 1' });
-    }
+  // Validate — SPA sends percentage integers (0–100) and bit-counts (0–64).
+  if (fuzzy_threshold === undefined || phash_distance === undefined) {
+    return res.status(400).json({ error: 'fuzzy_threshold and phash_distance are required' });
   }
-  if (phash_distance !== undefined) {
-    const pd = Number(phash_distance);
-    if (isNaN(pd) || pd < 0 || !Number.isInteger(pd)) {
-      return res.status(400).json({ error: 'phash_distance must be a non-negative integer' });
-    }
+  const ftPct = Number(fuzzy_threshold);
+  if (isNaN(ftPct) || ftPct < 0 || ftPct > 100 || !Number.isFinite(ftPct)) {
+    return res.status(400).json({ error: 'fuzzy_threshold must be an integer between 0 and 100' });
+  }
+  const pd = Number(phash_distance);
+  if (isNaN(pd) || pd < 0 || pd > 64 || !Number.isInteger(pd)) {
+    return res.status(400).json({ error: 'phash_distance must be an integer between 0 and 64' });
   }
 
-  // Merge with existing values so a partial update doesn't zero the other field.
-  const current = dupSvc.getThresholds(tenant);
-  const newFuzzy = fuzzy_threshold !== undefined ? Number(fuzzy_threshold) : current.fuzzy_threshold;
-  const newPhash = phash_distance  !== undefined ? Number(phash_distance)  : current.phash_distance;
+  // Convert percentage → fraction for dupSvc / DB storage.
+  const ftFraction = ftPct / 100;
 
-  dupSvc.setThresholds(tenant, { fuzzy_threshold: newFuzzy, phash_distance: newPhash }, userId);
+  dupSvc.setThresholds(tenant, { fuzzy_threshold: ftFraction, phash_distance: pd }, userId);
 
-  // Audit
+  // Audit — record the user-facing values so the log is human-readable.
   db.prepare(
-    'INSERT INTO audit_log (user_id, action, entity, details, tenant_id) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO audit_log (user_id, action, entity, details, tenant_id) VALUES (?, ?, ?, ?, ?)',
   ).run(
     userId,
-    'dedup_settings_update',
+    'DEDUP_SETTINGS_UPDATE',
     'dedup_settings',
-    JSON.stringify({ fuzzy_threshold: newFuzzy, phash_distance: newPhash }),
+    JSON.stringify({ fuzzy_threshold_pct: ftPct, phash_distance: pd }),
     tenant,
   );
 
-  const updated = db.prepare(
-    'SELECT tenant_id, fuzzy_threshold, phash_distance, updated_at, updated_by FROM dedup_settings WHERE tenant_id = ?'
-  ).get(tenant);
-  res.json(updated);
+  // Return the persisted row in SPA wire shape.
+  const updated = db.prepare(`
+    SELECT d.tenant_id, d.fuzzy_threshold, d.phash_distance, d.updated_at,
+           COALESCE(u.username, 'system') AS updated_by
+    FROM dedup_settings d
+    LEFT JOIN users u ON u.id = d.updated_by
+    WHERE d.tenant_id = ?
+  `).get(tenant);
+
+  res.json(_formatDedupRow(updated, tenant));
 });
 
 /**
@@ -224,7 +260,7 @@ router.get('/admin/dedup-decisions', requirePermJson('admin'), (req, res) => {
      FROM dedup_decisions
      WHERE tenant_id = ?
      ORDER BY id DESC
-     LIMIT 50`
+     LIMIT 50`,
   ).all(tenant);
   res.json(rows);
 });

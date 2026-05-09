@@ -4,8 +4,19 @@ import { z } from 'zod';
 
 export const fetchFolders = () => get('/spa/api/folders', z.array(FolderSchema));
 
-const UploadResponseSchema = z.object({ ok: z.literal(true), id: z.number().int() });
+const AutoRoutedSchema = z.object({
+  folder_id: z.number().int(),
+  folder_name: z.string(),
+  source: z.literal('doctype-default'),
+}).nullable();
+
+const UploadResponseSchema = z.object({
+  ok: z.literal(true),
+  id: z.number().int(),
+  auto_routed: AutoRoutedSchema.optional(),
+});
 export type UploadResponse = z.infer<typeof UploadResponseSchema>;
+export type AutoRouted = z.infer<typeof AutoRoutedSchema>;
 
 export const uploadDocument = (form: FormData): Promise<UploadResponse> =>
   postForm('/spa/api/documents', form, UploadResponseSchema);

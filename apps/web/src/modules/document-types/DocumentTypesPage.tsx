@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Plus, Save, Settings2, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Folder, Plus, Save, Settings2, Sparkles, Trash2, X } from 'lucide-react';
 import { Badge, Button, Panel } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { HttpError } from '@/lib/http';
@@ -15,13 +15,14 @@ import {
   type DocumentTypeInput,
   type FieldDef,
 } from './api';
+import { fetchFolders } from '@/modules/capture/api';
 import { LearnWizard } from './LearnWizard';
 import { SamplesTab } from './SamplesTab';
 
 const BLANK_FIELD: FieldDef = { key: '', label: '', type: 'text', required: false };
 
 function blankInput(): DocumentTypeInput {
-  return { name: '', description: '', fields: [{ ...BLANK_FIELD }], active: true };
+  return { name: '', description: '', fields: [{ ...BLANK_FIELD }], active: true, default_folder_id: null };
 }
 
 type EditTab = 'fields' | 'samples';
@@ -31,6 +32,10 @@ export function DocumentTypesPage() {
   const types = useQuery({
     queryKey: ['document-types', { active: false }],
     queryFn: () => fetchDocumentTypes(false),
+  });
+  const folders = useQuery({
+    queryKey: ['folders'],
+    queryFn: fetchFolders,
   });
 
   const [selected, setSelected] = useState<number | 'new' | null>(null);
@@ -78,6 +83,7 @@ export function DocumentTypesPage() {
       description: t.description ?? '',
       fields: t.fields.map((f) => ({ ...f })),
       active: !!t.active,
+      default_folder_id: t.default_folder_id ?? null,
     });
     setErr(null);
     setEditTab('fields');
@@ -123,6 +129,7 @@ export function DocumentTypesPage() {
         }))
         .filter((f) => f.key && f.label),
       ...(draft.active !== undefined ? { active: draft.active } : {}),
+      default_folder_id: draft.default_folder_id ?? null,
     };
     if (selected === 'new') create.mutate(payload);
     else if (typeof selected === 'number') patch.mutate({ id: selected, body: payload });
@@ -168,6 +175,15 @@ export function DocumentTypesPage() {
                     <Badge tone={t.inference_status === 'live' ? 'blue' : 'warning'}>
                       {t.inference_status}
                     </Badge>
+                  )}
+                  {t.default_folder_name != null && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-input border border-brand-blue/30 bg-brand-skyLight px-1.5 py-0.5 text-[10px] text-brand-blue font-medium"
+                      data-testid={`doctype-folder-pill-${t.id}`}
+                    >
+                      <Folder size={9} />
+                      {t.default_folder_name}
+                    </span>
                   )}
                   <button
                     type="button"
@@ -293,6 +309,33 @@ export function DocumentTypesPage() {
                       data-testid="doctype-active"
                     />
                     Active (only active types show in the Capture picker)
+                  </label>
+
+                  <label className="flex flex-col text-xs text-muted">
+                    Default folder
+                    <select
+                      value={draft.default_folder_id ?? ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDraft((d) => ({
+                          ...d,
+                          default_folder_id: v === '' ? null : parseInt(v, 10),
+                        }));
+                      }}
+                      data-testid="doctype-default-folder-select"
+                      className="mt-0.5 h-9 rounded-input border border-border px-3 text-md text-ink"
+                      disabled={folders.isLoading}
+                    >
+                      <option value="">— no default folder —</option>
+                      {folders.data?.map((f) => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <span className="mt-1 text-[11px] text-muted leading-snug">
+                      Documents classified as this type will auto-route to this folder during upload.
+                      The user can still override at capture time, and reviewers can re-route during
+                      workflow approval.
+                    </span>
                   </label>
 
                   <div>

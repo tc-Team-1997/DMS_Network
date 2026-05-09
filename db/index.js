@@ -200,6 +200,12 @@ try {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  // AI-driven folder auto-routing: each doctype can nominate a default folder.
+  addColumnIfMissing(
+    'document_type_schemas',
+    'default_folder_id',
+    'default_folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL',
+  );
   seedDefaultTypeSchemas();
 } catch (err) {
   // Never block boot on migration chatter; log for operators.
