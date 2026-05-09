@@ -32,10 +32,32 @@ const db     = require('../db');
 
 // ---------------------------------------------------------------------------
 // Table bootstrap — idempotent, safe to call on every import.
+//
+// Schema note (2026-05-09 v1.1 hardening): primary key is the composite
+// (tenant_id, user_id, key). The original v1 shape had `key TEXT PRIMARY
+// KEY` which made the client UUID globally unique across all tenants —
+// two users from different tenants with the same UUID would collide on
+// the PK and silently fail INSERT OR IGNORE, masking real dedup bugs.
+// The composite PK enforces idempotency per-(tenant, user) without
+// cross-tenant collision risk. Existing v1 rows have ≤ 24h TTL and are
+// short-lived state; this migration drops the v1 table on first boot
+// after upgrade and recreates with the new shape.
 // ---------------------------------------------------------------------------
+try {
+  // Detect v1 shape: single-column PK on `key`.
+  const cols = db.prepare("PRAGMA table_info(idempotency_keys)").all();
+  const keyCol = cols.find((c) => c.name === 'key');
+  const pkCount = cols.filter((c) => c.pk > 0).length;
+  if (keyCol && keyCol.pk === 1 && pkCount === 1) {
+    db.exec('DROP TABLE idempotency_keys');
+  }
+} catch (e) {
+  // First-boot path — table doesn't exist yet; CREATE below makes it.
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS idempotency_keys (
-    key             TEXT PRIMARY KEY,
+    key             TEXT NOT NULL,
     tenant_id       TEXT NOT NULL DEFAULT 'default',
     user_id         INTEGER NOT NULL REFERENCES users(id),
     endpoint        TEXT NOT NULL,
@@ -43,14 +65,13 @@ db.exec(`
     response_status INTEGER,
     response_body   TEXT,
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at      TEXT NOT NULL
+    expires_at      TEXT NOT NULL,
+    PRIMARY KEY (tenant_id, user_id, key)
   );
   CREATE INDEX IF NOT EXISTS idx_idem_user_created
     ON idempotency_keys(user_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_idem_expires
     ON idempotency_keys(expires_at);
-  CREATE INDEX IF NOT EXISTS idx_idem_tenant_user_key
-    ON idempotency_keys(tenant_id, user_id, key);
 `);
 
 // ---------------------------------------------------------------------------

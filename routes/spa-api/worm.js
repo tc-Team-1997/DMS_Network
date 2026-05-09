@@ -100,7 +100,7 @@ function parseDocId(raw) {
 // ---------------------------------------------------------------------------
 
 router.post(
-  '/:documentId/lock',
+  '/worm/:documentId/lock',
   requirePermJson(WORM_ADMIN_PERM),
   async (req, res) => {
     const documentId = parseDocId(req.params.documentId);
@@ -155,7 +155,7 @@ router.post(
 // ---------------------------------------------------------------------------
 
 router.post(
-  '/:documentId/unlock',
+  '/worm/:documentId/unlock',
   requirePermJson(WORM_ADMIN_PERM),
   async (req, res) => {
     const documentId = parseDocId(req.params.documentId);
@@ -205,7 +205,7 @@ router.post(
 // ---------------------------------------------------------------------------
 
 router.get(
-  '/:documentId/status',
+  '/worm/:documentId/status',
   requirePermJson(WORM_READ_PERM),
   async (req, res) => {
     const documentId = parseDocId(req.params.documentId);
@@ -231,7 +231,7 @@ router.get(
 // ---------------------------------------------------------------------------
 
 router.post(
-  '/verify-batch',
+  '/worm/verify-batch',
   requirePermJson(WORM_ADMIN_PERM),
   async (req, res) => {
     try {

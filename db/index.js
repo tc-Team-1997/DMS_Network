@@ -242,23 +242,13 @@ try {
   `);
 
   // Offline sync — idempotency keys for replayed uploads (BHU-57).
-  // Owns its own DDL via services/idempotency.js but kept here for schema-ownership clarity.
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS idempotency_keys (
-      key             TEXT PRIMARY KEY,
-      tenant_id       TEXT NOT NULL DEFAULT 'default',
-      user_id         INTEGER NOT NULL REFERENCES users(id),
-      endpoint        TEXT NOT NULL,
-      request_hash    TEXT NOT NULL,
-      response_status INTEGER,
-      response_body   TEXT,
-      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      expires_at      TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_idem_user_created     ON idempotency_keys(user_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_idem_expires          ON idempotency_keys(expires_at);
-    CREATE INDEX IF NOT EXISTS idx_idem_tenant_user_key  ON idempotency_keys(tenant_id, user_id, key);
-  `);
+  // Composite PK (tenant_id, user_id, key) — see services/idempotency.js
+  // for the v1.1 hardening note. The actual table bootstrap + v1-shape
+  // migration live in services/idempotency.js so we don't duplicate
+  // logic here. This block is left intentionally thin so that the
+  // schema-ownership comment in db/index.js tells future readers
+  // where to look.
+  // (services/idempotency.js handles the create + composite-PK migration.)
 
   // Translations — Dzongkha / Arabic / English NLLB cache (BHU-14).
   db.exec(`
