@@ -4,6 +4,8 @@
 >
 > Implementation: [ROADMAP.md Q3 2026 → Q4 2026](./ROADMAP.md).
 > Architecture context: [TARGET_ARCHITECTURE.md §7](./TARGET_ARCHITECTURE.md#7-ai-layer-docbrain).
+>
+> Last updated: **2026-05-10** (post-Wave-B). **Shipping today:** the AI providers are abstracted behind the CC6 integration registry — `OllamaOcr`, `LocalEmbedding`, `OllamaLlm`, `OllamaTranslate`, `LocalFaceMatch` are seeded ON; AWS Bedrock / Textract / Kendra / Comprehend / Translate / Rekognition / Macie are registered as adapter slots but seeded OFF (see `python-service/app/services/integrations/providers/aws/`, [ADR-0009](./adr/0009-local-first-adapter-registry.md), [docs/aws/phase-2/README.md](./aws/phase-2/README.md)). The `AiConfidenceBadge` UI primitive (Foundation CC4) makes every model output clickable with model+promptId+sourceSpan provenance. DocBrain chat v2 (Wave C) adds clickable `[^N]` citations + edit-and-resend + amber "no grounded evidence" halt.
 
 ---
 

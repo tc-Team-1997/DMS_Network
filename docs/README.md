@@ -10,8 +10,10 @@
 
 We are **purely a Document Management System** for banking — not a core banking system, not a loan origination system, not an AML transaction-monitoring product. We are the specialist; we integrate with everyone else.
 
-> **What's live on a laptop today (2026-05-09):** NBE pilot SPA (18 screens, 227 KB gzipped), Node session gateway, Python FastAPI service, MinIO content-addressed storage, and **DocBrain running 100% locally on Ollama** (`llama3.2:3b` + `nomic-embed-text`). 81/81 Playwright tests green (26 spec files, 25 skipped) in ~20s. AML document-level screening and scheduled retention services shipped. One command brings it up: `./start.sh`.
-> The `docs/` set distinguishes **today's pilot architecture** (see [ARCHITECTURE.md](./ARCHITECTURE.md), [TECHNICAL.md](./TECHNICAL.md)) from the **target multi-tenant SaaS** ([TARGET_ARCHITECTURE.md](./TARGET_ARCHITECTURE.md)). Don't confuse them.
+> **What's live on a laptop today (2026-05-10, post-Wave-B):** the platform is bank-agnostic, local-first, admin-controlled. First deployment: Bank of Bhutan (regulator: Royal Monetary Authority). 19 modules shipped across 4 commits — Foundation + Wave A + Wave B + docs sync. Every business value resolves through one of 16 admin-governed `tenant_config` namespaces. Local-first stack: Ollama (OCR/LLM/Translate) + Tesseract + dlib face-match + per-tenant KEK envelope encryption + content-addressed FS storage; AWS adapter classes are registered but seeded off. One command brings it up: `./start.sh`.
+>
+> **Start here for current state:** [CHANGELOG.md](../CHANGELOG.md) (3 release sections), [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md) (16-namespace catalog), [VISION.md "Shipping today"](./VISION.md), [ARCHITECTURE.md §10h–§10l](./ARCHITECTURE.md), and the new [ADRs 0008–0013](./adr/). The strategic docs below remain the planning frame; they are aware of Wave B and point readers at the canonical sources for what's actually live.
+> The `docs/` set distinguishes **today's pilot architecture** ([ARCHITECTURE.md](./ARCHITECTURE.md), [TECHNICAL.md](./TECHNICAL.md)) from the **target multi-tenant SaaS** ([TARGET_ARCHITECTURE.md](./TARGET_ARCHITECTURE.md)). Don't confuse them.
 
 ## 2. The documentation set
 

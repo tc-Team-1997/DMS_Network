@@ -3,7 +3,9 @@
 > Engineering reference for the DocManager SPA and its supporting services.
 > Read this alongside [ARCHITECTURE.md](./ARCHITECTURE.md) and [PROJECT.md](./PROJECT.md).
 
-Last updated: 2026-04-17
+Last updated: **2026-05-10** (post-Wave-B).
+
+> **Shipping today:** Foundation + Wave A + Wave B added 16 admin namespaces (catalogued in [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md)), 12 design-system primitives + DataTable v1 (in `apps/web/src/components/ui/`), the typed event bus (`apps/web/src/lib/events.ts`), the Cmd-K command palette (`apps/web/src/components/CommandPalette.tsx`), 19 module-level routes under `/admin/settings/*`, and ~50 new Node + Python endpoints across the spa-api surface. Migration chain stamped at `0037_users_v2`. The reference content below reflects the pre-Wave-B baseline; for the post-Wave-B shipping surface see [CHANGELOG.md](../CHANGELOG.md), [ARCHITECTURE.md §10h–§10l](./ARCHITECTURE.md), and the new ADRs at `docs/adr/0008-0013`.
 
 ---
 

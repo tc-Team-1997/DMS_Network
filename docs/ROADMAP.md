@@ -3,7 +3,9 @@
 > **Quarterly execution plan from NBE pilot through GA to platform maturity.**
 > Paired with [VISION.md](./VISION.md) (the *why*) and [TARGET_ARCHITECTURE.md](./TARGET_ARCHITECTURE.md) (the *how*).
 
-Last updated: 2026-04-17 · Horizon: **7 quarters (Q2 2026 → Q4 2027)**
+Last updated: **2026-05-10** · Horizon: **7 quarters (Q2 2026 → Q4 2027)**
+
+> **Shipping today (post-Wave-B):** Foundation (`ebae97e`) + Wave A operational core (`06d3967`) + Wave B admin & access (`9bbae4a`) have shipped 19 modules across 4 commits. The quarterly trajectory below remains the planning frame; for the actual delivered surface see [CHANGELOG.md](../CHANGELOG.md), [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md), [VISION.md "Shipping today"](./VISION.md) and the new ADRs at `docs/adr/0008-0013`. Wave C (compliance & reporting) and Wave D (mobile + Dzongkha + branding finalize) are pending.
 
 ---
 

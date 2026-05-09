@@ -4,6 +4,8 @@
 >
 > Implementation quarters: see [ROADMAP.md Q4 2026 → Q2 2027](./ROADMAP.md).
 > Architecture context: [TARGET_ARCHITECTURE.md §8](./TARGET_ARCHITECTURE.md#8-integration-hub).
+>
+> Last updated: **2026-05-10** (post-Wave-B). **Shipping today:** the integration registry is live (CC6 foundation, commit `ebae97e`) — 13 abstract `Provider` base classes (`OcrProvider`, `LlmProvider`, `KmsProvider`, `WatchlistProvider`, etc.) under `python-service/app/services/integrations/providers/`, with local providers seeded ON and AWS adapter classes registered OFF. Switching providers is a `tenant_config.integrations.<kind>.provider` edit; cache invalidates on the next call. Temenos T24 ships in production (commit `833df98` predates this work). See [PLATFORM_CONFIG.md §integrations](./PLATFORM_CONFIG.md), [ADR-0009](./adr/0009-local-first-adapter-registry.md), and [docs/aws/phase-2/README.md](./aws/phase-2/README.md). The strategic sections below remain the commercial frame.
 
 ---
 

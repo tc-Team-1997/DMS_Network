@@ -2,7 +2,9 @@
 
 > **Where we are going — the SaaS-ready, multi-tenant, AI-native, integration-first architecture.**
 >
-> This document is the blueprint. [ARCHITECTURE.md](./ARCHITECTURE.md) describes the current pilot. [ROADMAP.md](./ROADMAP.md) shows the quarterly migration path from one to the other.
+> This document is the blueprint. [ARCHITECTURE.md](./ARCHITECTURE.md) describes the current pilot (post-Wave-B). [ROADMAP.md](./ROADMAP.md) shows the quarterly migration path from one to the other.
+>
+> Last updated: **2026-05-10** (post-Wave-B). **Shipping today closes major target items**: configuration-first architecture (CC1 tenant_config spine), tenant abstraction (CC2 branding + tenants registry), admin self-service (CC3 Settings shell with 16 namespaces), local-first AI/integration registry (CC6 — see [ADR-0009](./adr/0009-local-first-adapter-registry.md)), hash-chained config audit ([ADR-0010](./adr/0010-hash-chained-config-history.md)), visual ABAC editor ([ADR-0011](./adr/0011-abac-closed-enum-field-paths.md)), WORM extend-only immutability ([ADR-0012](./adr/0012-worm-extend-only-immutability.md)), explicit step-up enforcement ([ADR-0013](./adr/0013-stepup-enforcement-contract.md)). For the catalog of what's shipped vs aspirational in this blueprint see [CHANGELOG.md](../CHANGELOG.md) + [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md). The blueprint sections below remain authoritative for unshipped components (DocBrain v2 chat, regulator-report engine, DSAR console, Dzongkha pack, mobile-first refactor).
 
 ---
 
