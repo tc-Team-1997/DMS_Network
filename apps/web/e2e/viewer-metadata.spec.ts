@@ -35,7 +35,7 @@ function passportType() {
     {
       id: 100,
       name: 'Passport',
-      description: '',
+      description: null,
       fields: [
         { key: 'customer_name',     label: 'Customer name',     type: 'text', required: false },
         { key: 'customer_cid',      label: 'Customer CID',      type: 'text', required: false },
@@ -53,7 +53,38 @@ function passportType() {
 
 test.describe('Viewer — Captured Metadata panel', () => {
   test.beforeEach(async ({ page }) => {
-    await login(page, 'admin', 'admin123');
+    // Mock auth endpoints so page.goto() resolves without a live session.
+    await page.route('**/spa/api/me', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1, username: 'admin', full_name: 'Admin User',
+          role: 'Doc Admin', branch: null, tenant_id: 'nbe',
+          user: { id: 1, username: 'admin', full_name: 'Admin User',
+                  role: 'Doc Admin', branch: null, tenant_id: 'nbe' },
+        }),
+      }),
+    );
+    await page.route('**/spa/api/auth/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          authenticated: true,
+          user: { id: 1, username: 'admin', role: 'Doc Admin', tenant_id: 'nbe' },
+          session: {
+            id: 'test1234',
+            created_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 7200_000).toISOString(),
+            seconds_remaining: 7200,
+            last_active_at: new Date().toISOString(),
+            can_extend: true,
+            warning_threshold: 1800,
+          },
+        }),
+      }),
+    );
     // No AI analysis row — keeps the test focused on the metadata panel.
     await page.route('**/spa/api/docbrain/document/**', (route) =>
       route.fulfill({ status: 404, body: '{}' }),
@@ -64,6 +95,10 @@ test.describe('Viewer — Captured Metadata panel', () => {
         contentType: 'application/json',
         body: JSON.stringify(passportType()),
       }),
+    );
+    // Suppress PDF blob fetches — file doesn't exist in test environment.
+    await page.route('**/uploads/**', (route) =>
+      route.fulfill({ status: 404, body: '{}' }),
     );
   });
 

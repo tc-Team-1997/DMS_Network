@@ -4,6 +4,9 @@ vision-language fallback (Qwen2.5-VL / Llava) for low-confidence scans.
 Output is structured (page index, text, confidence, word-level bboxes optional)
 so downstream consumers (classifier, NER, layout reasoning) can trace any
 inference back to a specific region of the source document.
+
+Office-format text extraction (DOCX / XLSX) is handled here so that all
+extract-text-from-upload logic lives in one place.
 """
 from __future__ import annotations
 
@@ -87,15 +90,101 @@ def _ocr_pdf(data: bytes) -> List[OcrPage]:
     return out
 
 
+_DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def extract_docx_text(file_bytes: bytes) -> str:
+    """Extract plain text from a .docx file using python-docx."""
+    try:
+        from docx import Document as DocxDocument  # type: ignore[import]
+    except ImportError:
+        log.warning("python-docx not installed; returning empty string for DOCX")
+        return ""
+    try:
+        doc = DocxDocument(io.BytesIO(file_bytes))
+        paragraphs = [para.text for para in doc.paragraphs if para.text]
+        # Also extract text from tables.
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text and cell.text not in paragraphs:
+                        paragraphs.append(cell.text)
+        return "\n".join(paragraphs).strip()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("extract_docx_text failed: %s", exc)
+        return ""
+
+
+def extract_xlsx_text(file_bytes: bytes) -> str:
+    """Extract plain text from a .xlsx file using openpyxl."""
+    try:
+        import openpyxl  # type: ignore[import]
+    except ImportError:
+        log.warning("openpyxl not installed; returning empty string for XLSX")
+        return ""
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+        parts: list[str] = []
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                row_text = "\t".join(str(cell) for cell in row if cell is not None)
+                if row_text.strip():
+                    parts.append(row_text)
+        wb.close()
+        return "\n".join(parts).strip()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("extract_xlsx_text failed: %s", exc)
+        return ""
+
+
 def _tesseract_ocr(data: bytes, mime_type: str) -> OcrResult:
     """The pure-Tesseract path, isolated so the orchestrator can fall back."""
     if mime_type == "application/pdf":
         pages = _ocr_pdf(data)
     elif mime_type.startswith("image/"):
         pages = [_ocr_image(data)]
+    elif mime_type == _DOCX_MIME or mime_type in (
+        "application/msword",
+        "application/vnd.ms-word",
+    ):
+        text = extract_docx_text(data)
+        return OcrResult(
+            pages=[OcrPage(page=1, text=text, mean_confidence=100.0, width=0, height=0)],
+            full_text=text,
+            languages=_detect_languages(text),
+            mean_confidence=100.0,
+            backend="docx",
+        )
+    elif mime_type == _XLSX_MIME or mime_type in (
+        "application/vnd.ms-excel",
+        "application/octet-stream",
+    ):
+        # application/octet-stream is a common fallback for xlsx uploads; we
+        # try openpyxl and fall back gracefully if the bytes aren't a workbook.
+        if mime_type == "application/octet-stream":
+            text = ""
+            try:
+                text = extract_xlsx_text(data)
+            except Exception:  # noqa: BLE001
+                pass
+            if not text:
+                # Not an xlsx — fall through to utf-8 passthrough below.
+                try:
+                    text = data.decode("utf-8", errors="replace")
+                except Exception:  # noqa: BLE001
+                    text = ""
+        else:
+            text = extract_xlsx_text(data)
+        return OcrResult(
+            pages=[OcrPage(page=1, text=text, mean_confidence=100.0, width=0, height=0)],
+            full_text=text,
+            languages=_detect_languages(text),
+            mean_confidence=100.0,
+            backend="xlsx",
+        )
     else:
-        # Plain text / docx fall back to utf-8 treatment. DOCX would use
-        # python-docx; skipped here for footprint.
+        # Plain text — utf-8 passthrough.
         try:
             text = data.decode("utf-8", errors="replace")
         except Exception:  # noqa: BLE001

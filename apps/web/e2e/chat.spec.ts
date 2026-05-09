@@ -52,8 +52,8 @@ test.describe('AI chat (streaming)', () => {
       return route.continue();
     });
 
-    // /ai/chat/stream — write back an SSE body with a citation, two tokens, done.
-    await page.route('**/spa/api/ai/chat/stream', async (route) => {
+    // /ai/agent/stream — write back an SSE body with a citation, two tokens, done.
+    await page.route('**/spa/api/ai/agent/stream', async (route) => {
       const sse = [
         'data: {"type":"citations","items":[{"document_id":1,"chunk_index":0,"snippet":"Test passage"}]}',
         '',
@@ -100,7 +100,7 @@ test.describe('AI chat (streaming)', () => {
       return route.continue();
     });
     let streamCalled = false;
-    await page.route('**/spa/api/ai/chat/stream', async (route) => {
+    await page.route('**/spa/api/ai/agent/stream', async (route) => {
       streamCalled = true;
       await route.fulfill({
         status: 200,

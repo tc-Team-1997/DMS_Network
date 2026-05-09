@@ -16,6 +16,6 @@ test.describe('Search — FTS5 backed', () => {
   test('no results state for nonsense query', async ({ page }) => {
     await page.getByPlaceholder(/Search by name/).fill('zzxyz-nonexistent-term');
     await page.getByRole('button', { name: 'Search' }).click();
-    await expect(page.getByText(/No matches/i)).toBeVisible();
+    await expect(page.getByText(/No documents match/i)).toBeVisible();
   });
 });

@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import RetentionPolicy, LegalHold
+from ..security import require_api_key
 from ..services.auth import require, Principal
 from ..services.retention import (
     upsert_policy, apply_due, purge_due,
     place_hold, release_hold,
 )
+from ..services.retention_scheduler import get_last_run
 
 router = APIRouter(prefix="/api/v1/retention", tags=["retention"])
 
@@ -85,3 +87,9 @@ def list_holds(active_only: bool = True, db: Session = Depends(get_db),
              "placed_at": h.placed_at.isoformat() if h.placed_at else None,
              "released_at": h.released_at.isoformat() if h.released_at else None}
             for h in q.all()]
+
+
+@router.get("/last-run", dependencies=[Depends(require_api_key)])
+def last_run():
+    """Return the summary from the most recent automated retention cycle."""
+    return get_last_run()

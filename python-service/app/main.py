@@ -1,3 +1,5 @@
+import asyncio
+import time
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,8 +9,10 @@ from fastapi.responses import HTMLResponse
 
 from .config import settings
 from .db import Base, engine
+
+_startup_time: float = time.monotonic()
 from .services import tasks as _tasks_model  # noqa: F401 (registers TaskRun on Base)
-from .routers import documents, ocr, workflow, duplicates, integrations, search, dashboard, alerts, signatures, tasks as tasks_router, ws, auth, bi, saml as saml_router, anchor as anchor_router, face as face_router, eforms as eforms_router, siem as siem_router, fraud as fraud_router, vector as vector_router, copilot as copilot_router, portal as portal_router, redaction as redaction_router, retention as retention_router, dsar as dsar_router, cbe as cbe_router, stepup as stepup_router, summarize as summarize_router, customer_risk as customer_risk_router, fx as fx_router, ifrs9 as ifrs9_router, replication as replication_router, provenance as prov_router, campaigns as campaigns_router, aisp as aisp_router, ocr_arabic as ocr_ar_router, dp as dp_router, oidc as oidc_router, adversarial as adversarial_router, encryption as encryption_router, graph as graph_router, voice as voice_router, zkkyc as zk_router, ledger as ledger_router, sustainability as sustainability_router, coach as coach_router, journey as journey_router, live as live_router, usage as usage_router, moderation as moderation_router, remediation as remediation_router, passkeys as passkeys_router, federated as federated_router, watchlist as watchlist_router, covenants as covenants_router, lineage as lineage_router, tenant_keys as tenant_keys_router, abac as abac_router, stamp_search as stamp_router, compliance as compliance_router, workflow_designer as wfd_router, retention_nl as retention_nl_router, test_data as test_data_router, transparency as transparency_router, redteam as redteam_router, doc_diff as doc_diff_router, exec_report as exec_report_router, blast_radius as blast_router, stride as stride_router, lang_router as lang_router_r, notify as notify_router, cbs as cbs_router
+from .routers import documents, ocr, workflow, duplicates, integrations, search, dashboard, alerts, signatures, tasks as tasks_router, ws, auth, bi, saml as saml_router, anchor as anchor_router, face as face_router, eforms as eforms_router, siem as siem_router, fraud as fraud_router, vector as vector_router, copilot as copilot_router, portal as portal_router, redaction as redaction_router, retention as retention_router, dsar as dsar_router, cbe as cbe_router, stepup as stepup_router, summarize as summarize_router, customer_risk as customer_risk_router, fx as fx_router, ifrs9 as ifrs9_router, replication as replication_router, provenance as prov_router, campaigns as campaigns_router, aisp as aisp_router, ocr_arabic as ocr_ar_router, dp as dp_router, oidc as oidc_router, adversarial as adversarial_router, encryption as encryption_router, graph as graph_router, voice as voice_router, zkkyc as zk_router, ledger as ledger_router, sustainability as sustainability_router, coach as coach_router, journey as journey_router, live as live_router, usage as usage_router, moderation as moderation_router, remediation as remediation_router, passkeys as passkeys_router, federated as federated_router, watchlist as watchlist_router, covenants as covenants_router, lineage as lineage_router, tenant_keys as tenant_keys_router, abac as abac_router, stamp_search as stamp_router, compliance as compliance_router, workflow_designer as wfd_router, retention_nl as retention_nl_router, test_data as test_data_router, transparency as transparency_router, redteam as redteam_router, doc_diff as doc_diff_router, exec_report as exec_report_router, blast_radius as blast_router, stride as stride_router, lang_router as lang_router_r, notify as notify_router, cbs as cbs_router, aml as aml_router
 from .services import task_handlers  # noqa: F401 (register handlers)
 from .services.tasks import start_workers
 from .services.metrics import PrometheusMiddleware, metrics_response
@@ -40,8 +44,79 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "service": settings.APP_NAME, "env": settings.APP_ENV}
+async def health():
+    """Rich health check — DB, MinIO/S3, Ollama, and retention scheduler status.
+
+    Uses asyncio.gather with per-dependency timeouts so one slow/dead service
+    does not block the whole response.
+    """
+    import os
+    import httpx
+    from .services.retention_scheduler import get_last_run as _retention_last_run
+
+    ollama_base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+    s3_endpoint = os.environ.get("S3_ENDPOINT", "http://localhost:9100")
+    s3_bucket   = os.environ.get("S3_BUCKET", "docmanager")
+
+    async def _check_db() -> str:
+        try:
+            def _sync_probe():
+                from .db import engine as _eng
+                with _eng.connect() as conn:
+                    conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+            await asyncio.wait_for(asyncio.to_thread(_sync_probe), timeout=3.0)
+            return "ok"
+        except Exception:
+            return "degraded"
+
+    async def _check_storage() -> str:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                url = f"{s3_endpoint}/{s3_bucket}"
+                resp = await client.head(url)
+                # MinIO returns 200, 403 (bucket exists but no perms), or 404.
+                return "ok" if resp.status_code in (200, 403) else "degraded"
+        except Exception:
+            return "degraded"
+
+    async def _check_ollama() -> str:
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"{ollama_base}/api/version")
+                return "ok" if resp.status_code == 200 else "unreachable"
+        except Exception:
+            return "unreachable"
+
+    db_status, storage_status, ollama_status = await asyncio.gather(
+        _check_db(),
+        _check_storage(),
+        _check_ollama(),
+    )
+
+    last_run = _retention_last_run()
+    scheduler_status = (
+        "running" if last_run.get("ran_at") and last_run.get("status") == "ok"
+        else "idle" if last_run.get("status") == "never_run"
+        else "error"
+    )
+
+    overall = "ok" if all(
+        s in ("ok", "idle", "running")
+        for s in (db_status, storage_status, ollama_status, scheduler_status)
+    ) else "degraded"
+
+    return {
+        "status": overall,
+        "services": {
+            "database": db_status,
+            "storage": storage_status,
+            "ollama": ollama_status,
+            "retention_scheduler": scheduler_status,
+            "last_retention_run": last_run.get("ran_at"),
+        },
+        "version": "1.0.0",
+        "uptime_seconds": round(time.monotonic() - _startup_time, 1),
+    }
 
 
 @app.get("/metrics")
@@ -126,6 +201,7 @@ app.include_router(stride_router.router)
 app.include_router(lang_router_r.router)
 app.include_router(notify_router.router)
 app.include_router(cbs_router.router)
+app.include_router(aml_router.router)
 
 # DocBrain (AI) — OCR + classify + extract + embed + RAG chat.
 from .routers import docbrain as docbrain_router  # noqa: E402
@@ -156,3 +232,6 @@ async def _startup():
     except Exception as exc:  # noqa: BLE001
         import logging as _logging
         _logging.getLogger(__name__).warning("knowledge ingest skipped: %s", exc)
+    # Scheduled retention — runs immediately then every RETENTION_INTERVAL_SECONDS.
+    from .services.retention_scheduler import start_scheduler as _start_retention
+    _start_retention()

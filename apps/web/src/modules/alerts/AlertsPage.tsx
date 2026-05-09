@@ -58,7 +58,11 @@ export function AlertsPage() {
           </li>
         ))}
         {alerts.data?.length === 0 && (
-          <li className="py-10 text-center text-muted text-md">No alerts.</li>
+          <li className="py-10 flex flex-col items-center text-center text-muted">
+            <CheckCircle2 size={32} className="mb-3 text-success" />
+            <p className="text-md font-medium text-ink">All clear — no alerts</p>
+            <p className="text-xs mt-1">No alerts have been raised. All documents are within policy.</p>
+          </li>
         )}
       </ul>
     </Panel>

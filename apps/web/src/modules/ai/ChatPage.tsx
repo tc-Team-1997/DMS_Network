@@ -51,10 +51,10 @@ interface LocalMessage {
 }
 
 const SUGGESTED_PROMPTS = [
-  'Which documents are expiring in the next 30 days?',
-  'Summarise the latest KYC submissions for branch Cairo.',
-  'What customer records are missing a CID?',
-  'Compare retention policies across document types.',
+  'What documents are expiring this month?',
+  'Show KYC compliance status',
+  'Summarize the latest loan agreement',
+  'Which customer records are missing a CID?',
 ] as const;
 
 export function ChatPage() {

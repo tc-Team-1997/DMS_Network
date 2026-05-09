@@ -36,3 +36,5 @@ redis==5.0.4
 rq==1.16.2
 aiosmtplib>=3.0
 twilio>=9.0
+python-docx==1.1.2
+openpyxl==3.1.2

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Search as SearchIcon } from 'lucide-react';
+import { Search as SearchIcon, FileSearch } from 'lucide-react';
 import { type DocumentRow } from '@/lib/schemas';
 import { Badge, Button, DataTable, Input, Panel, statusTone, type Column } from '@/components/ui';
 import { fetchSearch } from './api';
@@ -56,13 +56,33 @@ export function SearchPage() {
         </p>
       </Panel>
 
+      {!query && (
+        <Panel>
+          <div className="py-12 flex flex-col items-center text-center text-muted">
+            <FileSearch size={36} className="mb-3 text-brand-blue/50" />
+            <p className="text-md font-medium text-ink">Start a search</p>
+            <p className="text-xs mt-1 max-w-xs">
+              Full-text search spans document names, customer CID, OCR text, and notes across all branches you have access to.
+            </p>
+          </div>
+        </Panel>
+      )}
+
       {query && (
         <Panel title={result.data ? `${result.data.length} result${result.data.length === 1 ? '' : 's'} for "${query}"` : 'Searching…'}>
-          <DataTable<DocumentRow>
-            columns={columns}
-            data={result.data ?? []}
-            empty={result.isLoading ? 'Loading…' : 'No matches'}
-          />
+          {result.data?.length === 0 && !result.isLoading ? (
+            <div className="py-12 flex flex-col items-center text-center text-muted">
+              <FileSearch size={32} className="mb-3 text-brand-blue/40" />
+              <p className="text-md font-medium text-ink">No documents match "{query}"</p>
+              <p className="text-xs mt-1">Try different keywords or check the spelling.</p>
+            </div>
+          ) : (
+            <DataTable<DocumentRow>
+              columns={columns}
+              data={result.data ?? []}
+              empty={result.isLoading ? 'Loading…' : 'No matches'}
+            />
+          )}
         </Panel>
       )}
     </div>

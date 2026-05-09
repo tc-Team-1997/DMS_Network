@@ -65,8 +65,13 @@ router.get('/search', (req, res) => {
 
     const lowerTokens = tokens.map((t) => t.toLowerCase());
 
+    // Only surface fuzzy results that are genuinely similar — a minimum
+    // score threshold prevents random docs appearing for nonsense queries.
+    const maxScore = Math.max(3, Math.ceil(Math.min(...lowerTokens.map((t) => t.length)) * 0.4));
+
     const scored = recent
       .map((doc) => ({ doc, score: scoreDoc(doc, lowerTokens) }))
+      .filter(({ score }) => score <= maxScore)
       .sort((a, b) => a.score - b.score)
       .slice(0, 10)
       .map(({ doc }) => ({ ...doc, match_type: 'fuzzy' }));

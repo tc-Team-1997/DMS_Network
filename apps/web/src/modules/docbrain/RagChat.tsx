@@ -1,6 +1,7 @@
 import { useState, type FormEvent, useRef, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Send, Bot, User as UserIcon, ShieldAlert, AlertTriangle, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Send, Bot, User as UserIcon, ShieldAlert, AlertTriangle, Sparkles, ExternalLink } from 'lucide-react';
 import { Button, Input, Panel } from '@/components/ui';
 import { fetchAnalysis, streamDocBrain } from './api';
 import type { Citation } from './api';
@@ -15,6 +16,12 @@ interface Message {
   needsVerification?: boolean;
   streaming?: boolean;
 }
+
+const DEMO_QUESTIONS = [
+  'What documents are expiring this month?',
+  'Show KYC compliance status',
+  'Summarize the latest loan agreement',
+] as const;
 
 export function RagChat({ documentId }: { documentId: number }) {
   const analysis = useQuery({
@@ -34,11 +41,14 @@ export function RagChat({ documentId }: { documentId: number }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
+  /** True when streaming has started but no tokens have arrived yet */
+  const [waitingForFirst, setWaitingForFirst] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<(() => void) | null>(null);
 
   const ask = useCallback((question: string) => {
     setStreaming(true);
+    setWaitingForFirst(true);
     // Append the assistant bubble immediately so tokens stream into it.
     setMessages((m) => [...m, { role: 'assistant', text: '', streaming: true }]);
 
@@ -51,11 +61,13 @@ export function RagChat({ documentId }: { documentId: number }) {
           ));
         },
         onToken: (text) => {
+          setWaitingForFirst(false);
           setMessages((m) => m.map((msg, i) =>
             i === m.length - 1 ? { ...msg, text: msg.text + text } : msg,
           ));
         },
         onNoEvidence: (message) => {
+          setWaitingForFirst(false);
           setMessages((m) => m.map((msg, i) =>
             i === m.length - 1
               ? { ...msg, text: message, hasEvidence: false, streaming: false }
@@ -64,6 +76,7 @@ export function RagChat({ documentId }: { documentId: number }) {
           setStreaming(false);
         },
         onDone: ({ hasEvidence, needsVerification }) => {
+          setWaitingForFirst(false);
           setMessages((m) => m.map((msg, i) =>
             i === m.length - 1
               ? { ...msg, hasEvidence, needsVerification, streaming: false }
@@ -72,6 +85,7 @@ export function RagChat({ documentId }: { documentId: number }) {
           setStreaming(false);
         },
         onError: (message) => {
+          setWaitingForFirst(false);
           setMessages((m) => m.map((msg, i) =>
             i === m.length - 1
               ? { ...msg, text: `Error: ${message}`, hasEvidence: false, streaming: false }
@@ -95,6 +109,12 @@ export function RagChat({ documentId }: { documentId: number }) {
     if (!q || streaming) return;
     setMessages((m) => [...m, { role: 'user', text: q }]);
     setInput('');
+    ask(q);
+  };
+
+  const sendDemoQuestion = (q: string) => {
+    if (streaming) return;
+    setMessages((m) => [...m, { role: 'user', text: q }]);
     ask(q);
   };
 
@@ -135,7 +155,6 @@ export function RagChat({ documentId }: { documentId: number }) {
           <div className="text-center py-6 text-muted">
             <Bot size={22} className="mx-auto mb-2" />
             <p className="text-sm">Ask anything about this document.</p>
-            <p className="text-xs mt-1">Try: "When does it expire?" · "Who issued it?"</p>
           </div>
         )}
 
@@ -150,7 +169,11 @@ export function RagChat({ documentId }: { documentId: number }) {
               'rounded-input px-3 py-2 text-sm max-w-[85%]',
               m.role === 'user' ? 'bg-brand-blue text-white' : 'bg-divider text-ink',
             )}>
-              <MessageBody text={m.text} citations={m.citations ?? []} />
+              {m.role === 'assistant' && m.streaming && m.text === '' ? (
+                <TypingIndicator />
+              ) : (
+                <MessageBody text={m.text} citations={m.citations ?? []} />
+              )}
               {m.role === 'assistant' && m.hasEvidence === false && (
                 <p className="mt-2 pt-2 border-t border-border/40 text-[11px] text-warning flex items-center gap-1">
                   <ShieldAlert size={11} /> No grounded evidence
@@ -166,13 +189,18 @@ export function RagChat({ documentId }: { documentId: number }) {
                   </p>
                   <ul className="space-y-1">
                     {m.citations.map((c, j) => (
-                      <li
-                        key={j}
-                        className="rounded-input bg-page/70 border border-divider px-2 py-1 text-[11px] text-ink-sub"
-                      >
-                        <span className="font-mono text-muted">doc #{c.document_id} · chunk {c.chunk_index}</span>
-                        <div className="mt-0.5 line-clamp-3">{c.snippet}</div>
-                      </li>
+                      <CitationCard key={j} idx={j + 1} citation={c} />
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {/* Show citation cards after non-verification responses too */}
+              {m.role === 'assistant' && !m.needsVerification && m.citations && m.citations.length > 0 && !m.streaming && (
+                <div className="mt-2 pt-2 border-t border-border/40 space-y-1.5" data-testid="docbrain-citations">
+                  <p className="text-[11px] text-muted font-medium">{m.citations.length} source{m.citations.length === 1 ? '' : 's'}:</p>
+                  <ul className="space-y-1">
+                    {m.citations.map((c, j) => (
+                      <CitationCard key={j} idx={j + 1} citation={c} />
                     ))}
                   </ul>
                 </div>
@@ -186,17 +214,35 @@ export function RagChat({ documentId }: { documentId: number }) {
           </div>
         ))}
 
-        {streaming && messages[messages.length - 1]?.text === '' && (
+        {/* Typing indicator when streaming has started but no tokens yet */}
+        {waitingForFirst && (
           <div className="flex gap-2">
             <div className="w-6 h-6 rounded-full bg-brand-skyLight flex items-center justify-center flex-shrink-0 mt-0.5">
               <Bot size={13} className="text-brand-blue" />
             </div>
-            <div className="rounded-input px-3 py-2 text-sm bg-divider text-muted animate-pulse">
-              Searching passages…
+            <div className="rounded-input px-3 py-2 text-sm bg-divider text-muted">
+              <TypingIndicator />
             </div>
           </div>
         )}
       </div>
+
+      {/* Demo question chips */}
+      {messages.length === 0 && !notReady && (
+        <div className="mt-3 flex flex-wrap gap-2" data-testid="docbrain-demo-chips">
+          {DEMO_QUESTIONS.map((q) => (
+            <button
+              key={q}
+              type="button"
+              disabled={streaming}
+              onClick={() => sendDemoQuestion(q)}
+              className="rounded-input border border-brand-blue/30 bg-brand-skyLight/50 px-3 py-1.5 text-xs text-brand-blue hover:bg-brand-skyLight transition disabled:opacity-50"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="mt-3 flex gap-2 pt-3 border-t border-divider">
         <Input
@@ -219,6 +265,37 @@ export function RagChat({ documentId }: { documentId: number }) {
         </Button>
       </form>
     </Panel>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <span className="inline-flex gap-1 items-center" aria-label="Typing">
+      <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce" style={{ animationDelay: '0ms' }} />
+      <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce" style={{ animationDelay: '150ms' }} />
+      <span className="w-1.5 h-1.5 rounded-full bg-muted animate-bounce" style={{ animationDelay: '300ms' }} />
+    </span>
+  );
+}
+
+function CitationCard({ idx, citation }: { idx: number; citation: Citation }) {
+  return (
+    <li className="flex items-start gap-2 rounded-input bg-page/70 border border-divider px-2 py-1.5">
+      <span className="w-4 h-4 rounded-full bg-brand-skyLight text-brand-blue text-[10px] font-mono flex items-center justify-center shrink-0 mt-0.5">
+        {idx}
+      </span>
+      <div className="flex-1 min-w-0">
+        <Link
+          to={`/viewer/${citation.document_id}`}
+          className="text-[11px] text-brand-blue hover:underline inline-flex items-center gap-1"
+          data-testid={`docbrain-citation-link-${citation.document_id}`}
+        >
+          Document #{citation.document_id} · chunk {citation.chunk_index}
+          <ExternalLink size={9} />
+        </Link>
+        <p className="text-[11px] text-muted mt-0.5 line-clamp-2">{citation.snippet}</p>
+      </div>
+    </li>
   );
 }
 

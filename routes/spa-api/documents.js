@@ -83,9 +83,30 @@ router.get('/documents', (req, res) => {
 
 router.get('/documents/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid_id' });
+
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(id);
   if (!doc) return res.status(404).json({ error: 'not_found' });
-  res.json(doc);
+
+  // Branch permission: Maker and Viewer can only see docs from their branch.
+  const user = req.session.user;
+  if ((user.role === 'Maker' || user.role === 'Viewer') && user.branch && doc.branch && doc.branch !== user.branch) {
+    return res.status(403).json({ error: 'forbidden', detail: 'out_of_branch' });
+  }
+
+  // Truncate ocr_text to 500 chars for the polling endpoint; full text is
+  // available via the file download / docbrain analyze path.
+  const ocr_text_preview = typeof doc.ocr_text === 'string' && doc.ocr_text.length > 500
+    ? doc.ocr_text.slice(0, 500) + '…'
+    : (doc.ocr_text || null);
+
+  res.json({
+    ...doc,
+    ocr_text:   ocr_text_preview,
+    // Normalise field names the SPA polls on.
+    confidence: doc.ocr_confidence ?? null,
+    created_at: doc.uploaded_at,
+  });
 });
 
 router.post(

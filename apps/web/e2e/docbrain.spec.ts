@@ -3,10 +3,88 @@ import { login } from './helpers';
 
 test.describe('DocBrain — AI surfaces in Viewer', () => {
   test.beforeEach(async ({ page }) => {
-    await login(page, 'admin', 'admin123');
+    // Mock auth endpoints so page.goto() resolves without a live session.
+    await page.route('**/spa/api/me', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1, username: 'admin', full_name: 'Admin User',
+          role: 'Doc Admin', branch: null, tenant_id: 'nbe',
+          user: { id: 1, username: 'admin', full_name: 'Admin User',
+                  role: 'Doc Admin', branch: null, tenant_id: 'nbe' },
+        }),
+      }),
+    );
+    await page.route('**/spa/api/auth/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          authenticated: true,
+          user: { id: 1, username: 'admin', role: 'Doc Admin', tenant_id: 'nbe' },
+          session: {
+            id: 'test1234',
+            created_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 7200_000).toISOString(),
+            seconds_remaining: 7200,
+            last_active_at: new Date().toISOString(),
+            can_extend: true,
+            warning_threshold: 1800,
+          },
+        }),
+      }),
+    );
+    // Mock the document-types endpoint so the metadata panel can resolve labels.
+    await page.route('**/spa/api/document-types**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([{
+          id: 1,
+          name: 'Passport',
+          description: null,
+          fields: [],
+          active: 1,
+          tenant_id: 'nbe',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }]),
+      }),
+    );
+    // Suppress PDF blob fetches — file doesn't exist in test environment.
+    await page.route('**/uploads/**', (route) =>
+      route.fulfill({ status: 404, body: '{}' }),
+    );
   });
 
   test('viewer renders AI panel with Analyse button when no analysis yet', async ({ page }) => {
+    // Mock the document endpoint.
+    await page.route('**/spa/api/documents/1', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1,
+          filename: 'sample.pdf',
+          original_name: 'Sample.pdf',
+          doc_type: 'Passport',
+          customer_cid: null,
+          customer_name: null,
+          doc_number: null,
+          expiry_date: null,
+          branch: null,
+          folder_id: null,
+          status: 'Valid',
+          version: 'v1.0',
+          size: 1000,
+          mime_type: 'application/pdf',
+          ocr_confidence: null,
+          metadata_json: null,
+          uploaded_at: new Date().toISOString(),
+        }),
+      }),
+    );
     // The analysis endpoint returns 404 until an analysis exists; stub it so
     // this test stays fast and deterministic regardless of Ollama state.
     await page.route('**/spa/api/docbrain/document/**', (route) =>
@@ -19,6 +97,32 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
   });
 
   test('viewer renders AI panel populated from stored analysis', async ({ page }) => {
+    // Mock the document endpoint.
+    await page.route('**/spa/api/documents/1', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1,
+          filename: 'sample.pdf',
+          original_name: 'Sample.pdf',
+          doc_type: 'Passport',
+          customer_cid: null,
+          customer_name: null,
+          doc_number: null,
+          expiry_date: null,
+          branch: null,
+          folder_id: null,
+          status: 'Valid',
+          version: 'v1.0',
+          size: 1000,
+          mime_type: 'application/pdf',
+          ocr_confidence: null,
+          metadata_json: null,
+          uploaded_at: new Date().toISOString(),
+        }),
+      }),
+    );
     await page.route('**/spa/api/docbrain/document/**', (route) =>
       route.fulfill({
         status: 200,
@@ -59,6 +163,32 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
   });
 
   test('RAG chat sends question and renders grounded answer with citation', async ({ page }) => {
+    // Mock the document endpoint.
+    await page.route('**/spa/api/documents/1', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1,
+          filename: 'sample.pdf',
+          original_name: 'Sample.pdf',
+          doc_type: 'Passport',
+          customer_cid: null,
+          customer_name: null,
+          doc_number: null,
+          expiry_date: null,
+          branch: null,
+          folder_id: null,
+          status: 'Valid',
+          version: 'v1.0',
+          size: 1000,
+          mime_type: 'application/pdf',
+          ocr_confidence: null,
+          metadata_json: null,
+          uploaded_at: new Date().toISOString(),
+        }),
+      }),
+    );
     // Supply a populated analysis so the chat input is un-gated.
     await page.route('**/spa/api/docbrain/document/**', (route) =>
       route.fulfill({
@@ -84,20 +214,22 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
         }),
       }),
     );
-    await page.route('**/spa/api/docbrain/chat', (route) =>
-      route.fulfill({
+    await page.route('**/spa/api/docbrain/chat/stream', (route) => {
+      const sse = [
+        'data: {"type":"citations","items":[{"document_id":1,"chunk_index":0,"snippet":"Date of expiry: 2032-01-09"}]}',
+        '',
+        'data: {"type":"token","text":"The passport expires on 2032-01-09[^1]."}',
+        '',
+        'data: {"type":"done","has_evidence":true}',
+        '',
+        '',
+      ].join('\n');
+      return route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          answer: 'The passport expires on 2032-01-09[^1].',
-          citations: [{
-            document_id: 1, chunk_index: 0,
-            snippet: 'Date of expiry: 2032-01-09',
-          }],
-          has_evidence: true,
-        }),
-      }),
-    );
+        headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache' },
+        body: sse,
+      });
+    });
     await page.goto('/viewer/1');
     await page.getByTestId('docbrain-chat-input').fill('When does this passport expire?');
     await page.getByTestId('docbrain-chat-send').click();
@@ -107,6 +239,32 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
   });
 
   test('RAG refuses an answer without evidence and surfaces the warning', async ({ page }) => {
+    // Mock the document endpoint.
+    await page.route('**/spa/api/documents/1', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1,
+          filename: 'sample.pdf',
+          original_name: 'Sample.pdf',
+          doc_type: 'Passport',
+          customer_cid: null,
+          customer_name: null,
+          doc_number: null,
+          expiry_date: null,
+          branch: null,
+          folder_id: null,
+          status: 'Valid',
+          version: 'v1.0',
+          size: 1000,
+          mime_type: 'application/pdf',
+          ocr_confidence: null,
+          metadata_json: null,
+          uploaded_at: new Date().toISOString(),
+        }),
+      }),
+    );
     // Supply a populated analysis so the chat input is un-gated.
     await page.route('**/spa/api/docbrain/document/**', (route) =>
       route.fulfill({
@@ -132,17 +290,18 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
         }),
       }),
     );
-    await page.route('**/spa/api/docbrain/chat', (route) =>
-      route.fulfill({
+    await page.route('**/spa/api/docbrain/chat/stream', (route) => {
+      const sse = [
+        'data: {"type":"no_evidence","message":"I could not find supporting passages."}',
+        '',
+        '',
+      ].join('\n');
+      return route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          answer: 'I could not find supporting passages.',
-          citations: [],
-          has_evidence: false,
-        }),
-      }),
-    );
+        headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache' },
+        body: sse,
+      });
+    });
     await page.goto('/viewer/1');
     await page.getByTestId('docbrain-chat-input').fill('What colour is the customer\'s tie?');
     await page.getByTestId('docbrain-chat-send').click();
@@ -150,6 +309,32 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
   });
 
   test('needs_verification: answer rendered with amber verify banner + retrieved passages', async ({ page }) => {
+    // Mock the document endpoint.
+    await page.route('**/spa/api/documents/1', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1,
+          filename: 'sample.pdf',
+          original_name: 'Sample.pdf',
+          doc_type: 'Passport',
+          customer_cid: null,
+          customer_name: null,
+          doc_number: null,
+          expiry_date: null,
+          branch: null,
+          folder_id: null,
+          status: 'Valid',
+          version: 'v1.0',
+          size: 1000,
+          mime_type: 'application/pdf',
+          ocr_confidence: null,
+          metadata_json: null,
+          uploaded_at: new Date().toISOString(),
+        }),
+      }),
+    );
     await page.route('**/spa/api/docbrain/document/**', (route) =>
       route.fulfill({
         status: 200,
@@ -174,21 +359,22 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
         }),
       }),
     );
-    await page.route('**/spa/api/docbrain/chat', (route) =>
-      route.fulfill({
+    await page.route('**/spa/api/docbrain/chat/stream', (route) => {
+      const sse = [
+        'data: {"type":"citations","items":[{"document_id":1,"chunk_index":0,"snippet":"Date of expiry: 2032-01-09"},{"document_id":1,"chunk_index":1,"snippet":"Issuing authority: Egyptian Passport Authority"}]}',
+        '',
+        'data: {"type":"token","text":"The passport expires in 2032."}',
+        '',
+        'data: {"type":"done","has_evidence":true,"needs_verification":true}',
+        '',
+        '',
+      ].join('\n');
+      return route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          answer: 'The passport expires in 2032.',
-          citations: [
-            { document_id: 1, chunk_index: 0, snippet: 'Date of expiry: 2032-01-09' },
-            { document_id: 1, chunk_index: 1, snippet: 'Issuing authority: Egyptian Passport Authority' },
-          ],
-          has_evidence: true,
-          needs_verification: true,
-        }),
-      }),
-    );
+        headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache' },
+        body: sse,
+      });
+    });
     await page.goto('/viewer/1');
     await page.getByTestId('docbrain-chat-input').fill('When does it expire?');
     await page.getByTestId('docbrain-chat-send').click();
@@ -199,6 +385,32 @@ test.describe('DocBrain — AI surfaces in Viewer', () => {
   });
 
   test('chat is gated with a warning when chunks_indexed === 0', async ({ page }) => {
+    // Mock the document endpoint.
+    await page.route('**/spa/api/documents/1', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 1,
+          filename: 'sample.pdf',
+          original_name: 'Sample.pdf',
+          doc_type: 'Passport',
+          customer_cid: null,
+          customer_name: null,
+          doc_number: null,
+          expiry_date: null,
+          branch: null,
+          folder_id: null,
+          status: 'Valid',
+          version: 'v1.0',
+          size: 1000,
+          mime_type: 'application/pdf',
+          ocr_confidence: null,
+          metadata_json: null,
+          uploaded_at: new Date().toISOString(),
+        }),
+      }),
+    );
     await page.route('**/spa/api/docbrain/document/**', (route) =>
       route.fulfill({
         status: 200,

@@ -6,7 +6,7 @@
  *   metadata, then sequential "Upload all" with per-card progress.
  */
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Upload,
@@ -32,6 +32,7 @@ import {
   type PreviewResponse,
 } from './api';
 import { analyzeDocument } from '@/modules/docbrain/api';
+import { fetchDocument } from '@/modules/viewer/api';
 import {
   classifyOne,
   fetchDocumentTypes,
@@ -96,6 +97,173 @@ function fmtSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
+// ── AI pipeline step-progress ─────────────────────────────────────────────
+
+type PipelineStep = 'uploaded' | 'ocr' | 'classify' | 'indexed';
+interface PipelineStepDef {
+  id: PipelineStep;
+  label: string;
+}
+const PIPELINE_STEPS: PipelineStepDef[] = [
+  { id: 'uploaded', label: 'Uploaded' },
+  { id: 'ocr',      label: 'OCR Processing' },
+  { id: 'classify', label: 'AI Classification' },
+  { id: 'indexed',  label: 'Indexed' },
+];
+
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_MS = 30_000;
+
+function AiPipelineProgress({
+  documentId,
+  initialOcr,
+  initialDocType,
+  initialOcrText,
+}: {
+  documentId: number;
+  initialOcr: number | null;
+  initialDocType: string | null;
+  initialOcrText: string | null;
+}) {
+  const [step, setStep] = useState<PipelineStep>(
+    initialOcr !== null ? 'indexed' : 'uploaded',
+  );
+  const [docType, setDocType] = useState<string | null>(initialDocType);
+  const [ocr, setOcr] = useState<number | null>(initialOcr);
+  const [ocrText] = useState<string | null>(initialOcrText);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef(0);
+
+  const poll = useCallback(async () => {
+    try {
+      const doc = await fetchDocument(documentId);
+      if (doc.status !== 'captured') {
+        setStep('indexed');
+        setDocType(doc.doc_type);
+        setOcr(doc.ocr_confidence);
+        if (pollRef.current !== null) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        return;
+      }
+      // Advance through steps while still processing
+      elapsedRef.current += POLL_INTERVAL_MS;
+      if (elapsedRef.current >= 2 * POLL_INTERVAL_MS) setStep('ocr');
+      if (elapsedRef.current >= 4 * POLL_INTERVAL_MS) setStep('classify');
+      if (elapsedRef.current >= POLL_MAX_MS) {
+        setStep('indexed');
+        if (pollRef.current !== null) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      }
+    } catch {
+      // ignore poll errors
+    }
+  }, [documentId]);
+
+  useEffect(() => {
+    if (initialOcr !== null) {
+      // Already fully processed — no polling needed
+      return;
+    }
+    // Start at OCR step immediately
+    setStep('ocr');
+    pollRef.current = setInterval(() => { void poll(); }, POLL_INTERVAL_MS);
+    return () => {
+      if (pollRef.current !== null) clearInterval(pollRef.current);
+    };
+  }, [documentId, initialOcr, poll]);
+
+  const activeIdx = PIPELINE_STEPS.findIndex((s) => s.id === step);
+
+  return (
+    <div
+      className="rounded-lg bg-brand-skyLight/40 border border-brand-blue/20 px-4 py-4 space-y-4"
+      data-testid="capture-ai-pipeline"
+    >
+      <p className="text-xs font-semibold text-brand-blue flex items-center gap-1.5">
+        <Sparkles size={12} /> AI Processing Pipeline
+      </p>
+
+      {/* Step progress bar */}
+      <div className="flex items-center gap-0">
+        {PIPELINE_STEPS.map((s, i) => {
+          const done = i < activeIdx || (i === activeIdx && step === 'indexed');
+          const active = i === activeIdx && step !== 'indexed';
+          const future = i > activeIdx;
+          return (
+            <div key={s.id} className="flex items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center flex-shrink-0">
+                <div
+                  className={cn(
+                    'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all',
+                    done   && 'bg-success border-success text-white',
+                    active && 'bg-brand-blue border-brand-blue text-white animate-pulse',
+                    future && 'bg-white border-border text-muted',
+                  )}
+                >
+                  {done ? <CheckCircle2 size={14} /> : i + 1}
+                </div>
+                <span
+                  className={cn(
+                    'mt-1 text-[10px] whitespace-nowrap',
+                    done   && 'text-success font-medium',
+                    active && 'text-brand-blue font-medium',
+                    future && 'text-muted',
+                  )}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {i < PIPELINE_STEPS.length - 1 && (
+                <div
+                  className={cn(
+                    'h-0.5 flex-1 mx-1 mb-4 rounded transition-all',
+                    i < activeIdx ? 'bg-success' : 'bg-border',
+                  )}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Results when indexed */}
+      {step === 'indexed' && (
+        <div className="space-y-2">
+          {docType && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted font-medium">Document type:</span>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-badge px-2 py-0.5 text-xs font-medium',
+                  ocr !== null && ocr >= 70
+                    ? 'bg-success-bg text-success'
+                    : 'bg-warning-bg text-warning',
+                )}
+              >
+                <Sparkles size={10} />
+                {docType}
+                {ocr !== null && ` — ${ocr.toFixed(0)}% confidence`}
+              </span>
+            </div>
+          )}
+          {ocrText && (
+            <div>
+              <p className="text-xs text-muted font-medium mb-1">OCR text preview:</p>
+              <p className="text-xs text-ink bg-white border border-divider rounded-input px-3 py-2 font-mono leading-relaxed line-clamp-3">
+                {ocrText.slice(0, 200)}{ocrText.length > 200 ? '…' : ''}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── component ─────────────────────────────────────────────────────────────
 
 export function CapturePage() {
@@ -123,6 +291,9 @@ export function CapturePage() {
   const [confirming, setConfirming] = useState(false);
   const [aiSuggest, setAiSuggest] = useState<ClassifyOneResponse | null>(null);
   const [aiSuggestDismissed, setAiSuggestDismissed] = useState(false);
+  const [uploadedDocType, setUploadedDocType] = useState<string | null>(null);
+  const [uploadedOcr, setUploadedOcr] = useState<number | null>(null);
+  const [uploadedOcrText, setUploadedOcrText] = useState<string | null>(null);
 
   // Multi-file mode state
   const [cards, setCards] = useState<FileCard[]>([]);
@@ -177,6 +348,9 @@ export function CapturePage() {
     setBranch('');
     setAiSuggest(null);
     setAiSuggestDismissed(false);
+    setUploadedDocType(null);
+    setUploadedOcr(null);
+    setUploadedOcrText(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -243,6 +417,13 @@ export function CapturePage() {
     mutationFn: uploadDocument,
     onSuccess: (r) => {
       setLastUploadId(r.id);
+      // Capture classification info from preview for the pipeline display
+      if (preview) {
+        setUploadedDocType(preview.classification.doc_class);
+        setUploadedOcr(preview.classification.confidence * 100);
+        // First non-empty line of the OCR text (approximated from summary)
+        setUploadedOcrText(preview.summary || null);
+      }
       analyzeDocument(r.id).catch(() => { /* user can retry from viewer */ });
       setFile(null);
       setForm({});
@@ -801,14 +982,16 @@ export function CapturePage() {
             </div>
           )}
           {lastUploadId !== null && (
-            <div className="rounded-lg bg-success-bg border border-success/30 px-3 py-3 text-xs text-success space-y-2" data-testid="capture-success">
-              <div className="flex items-center gap-2 font-medium">
+            <div className="space-y-3" data-testid="capture-success">
+              <div className="rounded-lg bg-success-bg border border-success/30 px-3 py-2 text-xs text-success flex items-center gap-2 font-medium">
                 <CheckCircle2 size={14} /> Uploaded as document #{lastUploadId}
               </div>
-              <div className="flex items-center gap-2 text-ink">
-                <Sparkles size={12} className="text-brand-blue" />
-                Full analysis is running (OCR + classify + extract + embed). Open it in the viewer for results.
-              </div>
+              <AiPipelineProgress
+                documentId={lastUploadId}
+                initialOcr={uploadedOcr}
+                initialDocType={uploadedDocType}
+                initialOcrText={uploadedOcrText}
+              />
               <div>
                 <Link to={`/viewer/${lastUploadId}`}>
                   <Button size="sm">

@@ -253,12 +253,23 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-4 pt-4 border-t border-divider">
-            <p className="text-center text-[11px] text-muted">
-              Demo accounts · <span className="font-mono">admin/admin123</span>{' '}
-              · <span className="font-mono">sara/sara123</span>{' '}
-              · <span className="font-mono">mohamed/mohamed123</span>
-            </p>
+          <div className="mt-4 pt-4 border-t border-divider space-y-2">
+            <p className="text-center text-[11px] text-muted font-medium uppercase tracking-wide">Demo credentials</p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {[
+                { user: 'admin',    pass: 'admin123',   role: 'Doc Admin' },
+                { user: 'sara',     pass: 'sara123',    role: 'Maker' },
+                { user: 'mohamed',  pass: 'mohamed123', role: 'Checker' },
+              ].map(({ user, pass, role }) => (
+                <div
+                  key={user}
+                  className="flex items-center justify-between rounded-input border border-divider bg-raised px-3 py-1.5 text-[11px]"
+                >
+                  <span className="font-mono text-ink font-medium">{user} / {pass}</span>
+                  <span className="text-muted">{role}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

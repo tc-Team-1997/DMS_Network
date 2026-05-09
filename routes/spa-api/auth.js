@@ -92,10 +92,16 @@ async function buildSessionStatus(req) {
 
   return {
     authenticated: true,
+    // Flat aliases used by the SPA's auth polling.
+    valid:     true,
+    expiresAt: expiresAt.toISOString(),
     user: {
       id:        user.id,
       username:  user.username,
       role:      user.role,
+      fullName:  user.full_name || null,
+      full_name: user.full_name || null,
+      branch:    user.branch || null,
       tenant_id: user.tenant_id || 'nbe',
     },
     session: {
@@ -159,13 +165,30 @@ router.post('/logout', (req, res) => {
 // GET /me
 // ---------------------------------------------------------------------------
 router.get('/me', (req, res) => {
-  res.json({ user: req.session.user ?? null });
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ error: 'unauthenticated' });
+  }
+  const u = req.session.user;
+  // Return both the flat shape the SPA expects AND the legacy wrapper so
+  // older callers keep working.
+  res.json({
+    id:       u.id,
+    username: u.username,
+    role:     u.role,
+    fullName: u.full_name || u.fullName || null,
+    full_name: u.full_name || u.fullName || null,
+    branch:   u.branch || null,
+    tenant_id: u.tenant_id || 'nbe',
+    // Legacy wrapper field — kept for backward compat.
+    user: u,
+  });
 });
 
 // ---------------------------------------------------------------------------
 // GET /session-status  — PUBLIC (no requireAuth): SPA polls even after expiry
+// Also aliased as GET /status for SPA convenience.
 // ---------------------------------------------------------------------------
-router.get('/session-status', async (req, res) => {
+router.get(['/session-status', '/status'], async (req, res) => {
   // Prevent this polling endpoint from bumping the rolling cookie TTL.
   // We do this by temporarily neutralising the rolling flag for this request.
   // express-session checks req.session._rollingDisabled (non-standard) before

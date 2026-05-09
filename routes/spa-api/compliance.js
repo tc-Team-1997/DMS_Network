@@ -4,7 +4,7 @@
  */
 const express = require('express');
 const db = require('../../db');
-const { branchScope, tenantScope } = require('./_shared');
+const { branchScope, tenantScope, pyCall } = require('./_shared');
 
 const router = express.Router();
 
@@ -56,6 +56,62 @@ router.get('/compliance/summary', (req, res) => {
   `).all(tenant);
 
   res.json({ expiry, retention, workflow_sla: workflowSla, audit });
+});
+
+// ---------------------------------------------------------------------------
+// GET /spa/api/compliance/scorecard
+//
+// Tries Python /api/v1/compliance/scorecard first; on failure computes a
+// local heuristic so the dashboard always has a number.
+// ---------------------------------------------------------------------------
+router.get('/compliance/scorecard', async (req, res) => {
+  const tenant = tenantScope(req);
+
+  // Try Python service first.
+  try {
+    const pyData = await pyCall('/api/v1/compliance/scorecard', { timeout: 8000 });
+    // Normalise whichever key Python returns.
+    const raw = pyData?.overall_score ?? pyData?.score ?? pyData?.compliance_score ?? null;
+    if (typeof raw === 'number') {
+      return res.json({
+        overall_score:  Math.round(raw),
+        source:         'python',
+        detail:         pyData,
+      });
+    }
+  } catch { /* fall through to local heuristic */ }
+
+  // Local heuristic: 100 - deductions.
+  const totalDocs = db.prepare(
+    'SELECT COUNT(*) c FROM documents WHERE tenant_id = ?',
+  ).get(tenant).c || 1;
+
+  const expiredDocs = db.prepare(
+    "SELECT COUNT(*) c FROM documents WHERE tenant_id = ? AND status = 'Expired'",
+  ).get(tenant).c;
+
+  const lateWorkflows = db.prepare(`
+    SELECT COUNT(*) c FROM workflows
+    WHERE tenant_id = ?
+      AND stage NOT LIKE 'Approved%' AND stage NOT LIKE 'Rejected%'
+      AND julianday('now') - julianday(updated_at) > 3
+  `).get(tenant).c;
+
+  const expiredDeduct  = Math.round((expiredDocs / totalDocs) * 20);
+  const wfDeduct       = Math.min(10, lateWorkflows * 2);
+  const overallScore   = Math.max(0, Math.min(100, 100 - expiredDeduct - wfDeduct));
+
+  res.json({
+    overall_score: overallScore,
+    source:        'local',
+    detail: {
+      total_docs:       totalDocs,
+      expired_docs:     expiredDocs,
+      late_workflows:   lateWorkflows,
+      expired_deduct:   expiredDeduct,
+      wf_deduct:        wfDeduct,
+    },
+  });
 });
 
 module.exports = router;

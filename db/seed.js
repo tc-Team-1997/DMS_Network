@@ -270,6 +270,16 @@ insertDoctype.run('KYC',
     { key: 'expiry_date',    label: 'Expiry Date',     type: 'date', required: false, ai_extract_from: 'expiry_date' },
   ]));
 
+insertDoctype.run('Loan Application',
+  'Retail or corporate loan application form.',
+  JSON.stringify([
+    { key: 'customer_name',  label: 'Applicant Name',  type: 'text', required: true,  ai_extract_from: 'customer_name' },
+    { key: 'customer_cid',   label: 'Applicant CID',   type: 'text', required: true,  ai_extract_from: 'customer_cid' },
+    { key: 'doc_number',     label: 'Application #',   type: 'text', required: false, ai_extract_from: 'doc_number' },
+    { key: 'issue_date',     label: 'Application Date', type: 'date', required: true,  ai_extract_from: 'issue_date' },
+    { key: 'address',        label: 'Address',         type: 'textarea', required: false, ai_extract_from: 'address' },
+  ]));
+
 // Ensure placeholder sample files exist so the UI can render thumbnails.
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'tmp');
 fs.mkdirSync(uploadsDir, { recursive: true });

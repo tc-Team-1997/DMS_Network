@@ -24,6 +24,30 @@ export function ViewerPage() {
     queryFn: () => fetchDocumentTypes(false),
   });
 
+  // Hoist blob-fetch state above early returns to satisfy Rules of Hooks —
+  // hooks must be called unconditionally every render.
+  const isPdf = (doc.data?.mime_type ?? '').includes('pdf');
+  const blobSrc = doc.data?.filename ? `/uploads/${doc.data.filename}` : null;
+
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isPdf || !blobSrc) { setBlobUrl(null); return; }
+    let cancelled = false;
+    let createdUrl: string | null = null;
+    fetch(blobSrc, { credentials: 'include' })
+      .then((r) => r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((blob) => {
+        if (cancelled) return;
+        createdUrl = URL.createObjectURL(blob);
+        setBlobUrl(createdUrl);
+      })
+      .catch(() => { if (!cancelled) setBlobUrl(null); });
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [blobSrc, isPdf]);
+
   if (!Number.isFinite(docId)) {
     return (
       <Panel title="No document selected">
@@ -41,31 +65,7 @@ export function ViewerPage() {
 
   const d = doc.data;
   const src = `/uploads/${d.filename}`;
-  const isPdf = (d.mime_type ?? '').includes('pdf');
   const isImage = (d.mime_type ?? '').startsWith('image/');
-
-  // Fetch PDFs as blobs so the iframe renders via blob: URL, which is
-  // immune to X-Frame-Options and any origin mismatch introduced by dev
-  // proxies. Images stay on the direct URL — <img> isn't subject to
-  // X-Frame-Options.
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!isPdf) { setBlobUrl(null); return; }
-    let cancelled = false;
-    let createdUrl: string | null = null;
-    fetch(src, { credentials: 'include' })
-      .then((r) => r.ok ? r.blob() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((blob) => {
-        if (cancelled) return;
-        createdUrl = URL.createObjectURL(blob);
-        setBlobUrl(createdUrl);
-      })
-      .catch(() => { if (!cancelled) setBlobUrl(null); });
-    return () => {
-      cancelled = true;
-      if (createdUrl) URL.revokeObjectURL(createdUrl);
-    };
-  }, [src, isPdf]);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">

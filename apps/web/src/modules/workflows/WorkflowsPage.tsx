@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Check, X, ArrowUp, ExternalLink } from 'lucide-react';
+import { Check, X, ArrowUp, ExternalLink, Clock, AlertTriangle } from 'lucide-react';
 import { Badge, Button, DataTable, Panel, statusTone, type Column } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import type { Workflow } from '@/lib/schemas';
@@ -17,12 +17,65 @@ const queueLabels: Record<QueueKey, string> = {
   rejected: 'Rejected / rework',
 };
 
+/** SLA window for demo: 48 hours from created_at */
+const SLA_HOURS = 48;
+
 function matchesQueue(stage: string, queue: QueueKey): boolean {
   if (queue === 'all') return true;
   if (queue === 'approved') return stage === 'Approved';
   if (queue === 'rejected') return stage.startsWith('Rejected');
   // pending = anything that is neither approved nor rejected
   return stage !== 'Approved' && !stage.startsWith('Rejected');
+}
+
+/** Returns ms remaining until SLA breach (negative = overdue). */
+function slaRemainingMs(createdAt: string): number {
+  const created = new Date(createdAt).getTime();
+  const deadline = created + SLA_HOURS * 60 * 60 * 1000;
+  return deadline - Date.now();
+}
+
+/** Format a duration in ms to "Xh Ym" or "OVERDUE by Xh Ym". */
+function formatSla(remainingMs: number): { label: string; tone: 'success' | 'warning' | 'danger' } {
+  const abs = Math.abs(remainingMs);
+  const h = Math.floor(abs / (1000 * 60 * 60));
+  const m = Math.floor((abs % (1000 * 60 * 60)) / (1000 * 60));
+  const parts = h > 0 ? `${h}h ${m}m` : `${m}m`;
+
+  if (remainingMs < 0) {
+    return { label: `OVERDUE by ${parts}`, tone: 'danger' };
+  }
+  if (remainingMs < 4 * 60 * 60 * 1000) {
+    return { label: `${parts} remaining`, tone: 'danger' };
+  }
+  if (remainingMs < 24 * 60 * 60 * 1000) {
+    return { label: `${parts} remaining`, tone: 'warning' };
+  }
+  return { label: `${parts} remaining`, tone: 'success' };
+}
+
+function SlaBadge({ createdAt, stage }: { createdAt: string; stage: string }) {
+  // Don't show SLA for terminal stages
+  if (stage === 'Approved' || stage.startsWith('Rejected')) return null;
+
+  const remaining = slaRemainingMs(createdAt);
+  const { label, tone } = formatSla(remaining);
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-badge px-1.5 py-0.5 text-xs font-medium',
+        tone === 'success' && 'bg-success-bg text-success',
+        tone === 'warning' && 'bg-warning-bg text-warning',
+        tone === 'danger'  && 'bg-danger-bg text-danger',
+      )}
+    >
+      {remaining < 0
+        ? <AlertTriangle size={10} />
+        : <Clock size={10} />}
+      {label}
+    </span>
+  );
 }
 
 export function WorkflowsPage() {
@@ -94,6 +147,16 @@ export function WorkflowsPage() {
         render: (w) => (
           <span data-testid={`workflow-${w.id}-stage`}>
             <Badge tone={statusTone(w.stage)}>{w.stage}</Badge>
+          </span>
+        ),
+      },
+      {
+        key: 'sla',
+        header: 'SLA',
+        width: 180,
+        render: (w) => (
+          <span data-testid={`workflow-${w.id}-sla`}>
+            <SlaBadge createdAt={w.created_at} stage={w.stage} />
           </span>
         ),
       },
@@ -199,45 +262,57 @@ export function WorkflowsPage() {
         </div>
       </Panel>
 
-      <Panel
-        title={`${filtered.length} items — ${queueLabels[queue]}`}
-        action={
-          <div className="flex gap-2">
-            <Link to="/workflows/templates">
-              <Button size="sm" variant="ghost" data-testid="templates-link">
-                Templates
-              </Button>
-            </Link>
-            <Link to="/repository">
-              <Button size="sm" variant="ghost">
-                Repository
-              </Button>
-            </Link>
+      {filtered.length === 0 && !workflows.isLoading && (
+        <Panel>
+          <div className="py-10 flex flex-col items-center text-center text-muted">
+            <Check size={32} className="mb-3 text-success" />
+            <p className="text-md font-medium text-ink">No workflows in this queue</p>
+            <p className="text-xs mt-1">All documents are up to date — no pending actions required.</p>
           </div>
-        }
-      >
-        <DataTable<Workflow>
-          columns={columns}
-          data={filtered}
-          empty={workflows.isLoading ? 'Loading…' : 'No workflows in this queue'}
-        />
-        {act.isError && (
-          <div
-            className="mt-3 rounded-input bg-danger-bg border border-danger/30 px-3 py-2 text-xs text-danger"
-            data-testid="workflow-error"
-          >
-            Action failed. Check permissions and try again.
-          </div>
-        )}
-        {act.isSuccess && (
-          <div
-            className="mt-3 rounded-input bg-success-bg border border-success/30 px-3 py-2 text-xs text-success"
-            data-testid="workflow-success"
-          >
-            Workflow moved to {act.data.stage}.
-          </div>
-        )}
-      </Panel>
+        </Panel>
+      )}
+
+      {(filtered.length > 0 || workflows.isLoading) && (
+        <Panel
+          title={`${filtered.length} item${filtered.length === 1 ? '' : 's'} — ${queueLabels[queue]}`}
+          action={
+            <div className="flex gap-2">
+              <Link to="/workflows/templates">
+                <Button size="sm" variant="ghost" data-testid="templates-link">
+                  Templates
+                </Button>
+              </Link>
+              <Link to="/repository">
+                <Button size="sm" variant="ghost">
+                  Repository
+                </Button>
+              </Link>
+            </div>
+          }
+        >
+          <DataTable<Workflow>
+            columns={columns}
+            data={filtered}
+            empty={workflows.isLoading ? 'Loading…' : 'No workflows in this queue'}
+          />
+          {act.isError && (
+            <div
+              className="mt-3 rounded-input bg-danger-bg border border-danger/30 px-3 py-2 text-xs text-danger"
+              data-testid="workflow-error"
+            >
+              Action failed. Check permissions and try again.
+            </div>
+          )}
+          {act.isSuccess && (
+            <div
+              className="mt-3 rounded-input bg-success-bg border border-success/30 px-3 py-2 text-xs text-success"
+              data-testid="workflow-success"
+            >
+              Workflow moved to {act.data.stage}.
+            </div>
+          )}
+        </Panel>
+      )}
     </div>
   );
 }
