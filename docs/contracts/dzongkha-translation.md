@@ -9,7 +9,7 @@
 | Feature | `dzongkha-translation` |
 | Spec ID | `BHU-14` |
 | Owner | _assigned by team lead_ |
-| Status | `draft` |
+| Status | `shipped` |
 | Risk class | `medium` (new ML model dependency, but fully offline; no internet required) |
 | Contract published | `2026-05-09` |
 | Last updated | `2026-05-09` |

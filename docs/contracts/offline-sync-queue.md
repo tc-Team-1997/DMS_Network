@@ -11,7 +11,7 @@
 | Feature | `offline-sync-queue` |
 | Spec ID | `BHU-57` (branch officer offline capture) |
 | Owner | `node-engineer` + `spa-engineer` + `python-engineer` |
-| Status | `draft` |
+| Status | `shipped` |
 | Risk class | `medium` (new IndexedDB schema, new ServiceWorker logic, replay safety) |
 | Contract published | `2026-05-09` |
 | Last updated | `2026-05-09` |

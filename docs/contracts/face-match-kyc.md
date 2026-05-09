@@ -9,7 +9,7 @@
 | Feature | `face-match-kyc` |
 | Spec ID | `BHU-9` |
 | Owner | _assigned by team lead_ |
-| Status | `draft` |
+| Status | `shipped` |
 | Risk class | `high` (PII — biometric data, requires DPIA, consent, retention policy, ADR) |
 | Contract published | `2026-05-09` |
 | Last updated | `2026-05-09` |

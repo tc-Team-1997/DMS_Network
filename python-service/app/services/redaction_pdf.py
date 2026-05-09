@@ -386,7 +386,24 @@ def redact_pdf(
         pdf.save(output_path)
 
     # --- Post-redaction verification ---
-    if _pdftotext_available() and original_snippets:
+    # Banking-grade redaction (bidding §46) demands proof that the underlying
+    # text is physically removed, not just visually overlaid. We REQUIRE
+    # pdftotext to verify; falling back silently to "skipped verification"
+    # would let a misconfigured deploy ship redacted PDFs with intact text.
+    # Tightened in the 2026-05-09 Wave A+B security review.
+    if not _pdftotext_available():
+        try:
+            os.unlink(output_path)
+        except Exception:
+            pass
+        raise RedactionFailedError(
+            "pdftotext is unavailable on this host — required to verify "
+            "post-redaction text destruction. Install poppler-utils "
+            "(macOS: `brew install poppler`; debian: `apt-get install "
+            "poppler-utils`) before enabling FF_REDACTION."
+        )
+
+    if original_snippets:
         output_text = _extract_text_pdftotext(output_path)
         failed_regions: list[int] = []
         for i, snippet in enumerate(original_snippets):

@@ -11,7 +11,7 @@
 | Feature | `document-redaction` |
 | Spec ID | `BHU-46` (document annotation and redaction) |
 | Owner | `spa-engineer` + `python-engineer` |
-| Status | `draft` |
+| Status | `shipped` |
 | Risk class | `high` (PII handling, irreversibility, tamper detection) |
 | Contract published | `2026-05-09` |
 | Last updated | `2026-05-09` |

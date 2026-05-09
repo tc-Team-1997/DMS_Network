@@ -3,7 +3,7 @@
 > How the system is organised, how requests flow, and where the boundaries are.
 > Companion docs: [TECHNICAL.md](./TECHNICAL.md) · [PROJECT.md](./PROJECT.md).
 
-Last updated: 2026-05-09
+Last updated: 2026-05-09 · Sections §10c–§10g added (5 shipped Q2 features)
 
 ---
 
@@ -362,6 +362,26 @@ The target AI architecture is in [AI_STRATEGY.md](./AI_STRATEGY.md) — vLLM, Qd
 ## 10a. Compliance layer — AML screening
 
 **AML watchlist screening** ([contract](./contracts/aml-screening.md), [ADR 0001](./adr/0001-aml-screening-architecture.md)) runs synchronously on every customer create/update. The Python service's `aml` router (`python-service/app/routers/aml.py`) loads OFAC SDN, EU Consolidated, and UN watchlists at startup (refreshable via `POST /api/v1/aml/watchlists/refresh`). When a customer is created, an async task enqueues to match the customer name against all watchlist entries using Levenshtein distance (threshold 0.85, configurable). Hits create `aml_hits` rows and assign a workflow task to compliance officers for human review and decision (cleared/escalated/blocked). Every decision is audited with action names `AML_SCREENING_TRIGGERED`, `AML_SCREENING_COMPLETED`, `AML_HIT_DECIDED`, `AML_HIT_ESCALATED`. The Compliance card on the dashboard queries `/spa/api/aml/stats` to show pending review counts. This is local-first (no PII egress to third-party SaaS) with full explainability (Levenshtein score + original record visible to auditors).
+
+## 10c. Immutability layer — WORM retention lock
+
+**Filesystem-level Write-Once-Read-Many locks** ([contract](./contracts/worm-retention-lock.md)) protect documents under legal hold or retention policy from modification or deletion. When a document is committed to retention, the Python storage service (`python-service/app/services/storage.py`) sets OS immutable flags (`chflags uchg` on macOS/BSD, `chattr +i` on Linux). A nightly cron job verifies that locked files remain immutable and haven't been tampered (via SHA-256 hash comparison). Locked documents show a WormBadge in the Repository and Viewer (locked until date). Unlock requires a Doc Admin role + audit trail entry with reason. This is a local-only feature (on-prem filesystems only; S3 Object Lock handles the cloud case).
+
+## 10d. Privacy layer — Document redaction
+
+**PDF text destruction** ([contract](./contracts/document-redaction.md)) allows users to permanently erase PII regions from documents. The SPA Viewer page provides a rectangle-draw tool where users select sensitive regions; the backend uses pikepdf to physically remove text content from the PDF's content streams (not a visual overlay). Every redaction is recorded in a `redaction_log` table (audit trail), and the redacted PDF is saved as a new document version (original preserved). Post-redaction verification runs `pdftotext` to confirm text no longer exists in the marked regions. This closes the "annotation without destruction" gap and enables safe sharing of documents.
+
+## 10e. KYC layer — Face match biometric verification
+
+**Offline face biometric verification** ([contract](./contracts/face-match-kyc.md)) using dlib's face_recognition library enables branch officers to match ID photos against live selfies during onboarding. The mobile app (Expo) and web SPA support consent-gated capture; the Python service (`python-service/app/routers/face_match.py`) computes 128-dimensional face encodings (not raw images), caches them for 90 days, and returns Euclidean distance + confidence. Matches are idempotent (same ID photo → same encoding, ≤ 50ms latency). All operations are audited with action `BIOMETRIC_MATCH_PERFORMED`. DPIA compliance: encodings are sensitive PII but not reversible to faces; raw image retention is optional per consent.
+
+## 10f. Offline layer — Sync queue for branch officers
+
+**IndexedDB outbox + Service Worker background sync** ([contract](./contracts/offline-sync-queue.md)) lets branch officers capture documents while offline and automatically replay uploads when connectivity returns. When a document POST fails (offline), the SPA queues it to IndexedDB with an `Idempotency-Key` header. When connectivity restores, the Service Worker replays the exact request. The Node server deduplicates by idempotency key (24h TTL) — if the same key is replayed with different content, it rejects with 409 Conflict. This prevents accidental double-uploads and ensures no documents are lost.
+
+## 10g. Localization layer — Dzongkha translation
+
+**Offline Meta NLLB-200-distilled-600M translation** ([contract](./contracts/dzongkha-translation.md)) enables branch officers to translate documents between Dzongkha and English (or Arabic). The Python service loads the model once, caches it for the process lifetime, and caches translations by source SHA-256 for 7 days. Cold-load is ≤ 30s; cache hits ≤ 50ms. The SPA Viewer shows a "Translate" button that opens a side-by-side modal with original (left) and translation (right). Confidence scoring (0–1) is included; low confidence (<0.7) triggers a warning. This replaces Amazon Translate and enables air-gapped deployment.
 
 ## 10b. Integration layer — CBS adapters
 

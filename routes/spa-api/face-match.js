@@ -264,8 +264,18 @@ router.post('/face-match', requirePermJson('kyc:write'), (req, res) => {
   // Extract customer_cid from query param for audit log (it arrives in the
   // multipart body at the Python layer — we accept it as a query param here
   // so the audit log can record it without parsing the stream).
-  // The Python service validates it as a required Form field.
-  const customerCid = req.query.customer_cid || req.body?.customer_cid || 'unknown';
+  //
+  // Security note (2026-05-09 review): the Node layer trusts the client-
+  // supplied CID for AUDIT-LOGGING only. Tenant-binding is enforced
+  // server-side at the Python layer — the consent token is JWT-signed
+  // with both sub=cid and tenant=jwt.tenant, and Python's
+  // `_decode_consent_jwt()` rejects any request whose CID doesn't match
+  // the consent token's subject AND tenant. So a malicious client cannot
+  // match against a CID in another tenant: the consent gate fails closed.
+  // We still record the JWT tenant in the audit detail (already done via
+  // tenantScope below) so an auditor can reconstruct WHO attempted what.
+  const rawCid = req.query.customer_cid || req.body?.customer_cid || '';
+  const customerCid = /^[A-Za-z0-9_-]{1,64}$/.test(String(rawCid)) ? String(rawCid) : 'invalid';
 
   // Intercept the response so we can write the audit log after Python responds.
   // We wrap res.json to capture the response body.

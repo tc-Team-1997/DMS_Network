@@ -141,9 +141,15 @@ def model_is_loaded() -> bool:
 # Cache key
 # ---------------------------------------------------------------------------
 
-def _cache_key(text: str, source: str, target: str) -> str:
-    """SHA-256 over the concatenation of text + source + target."""
-    raw = f"{text}\x00{source}\x00{target}".encode("utf-8")
+def _cache_key(text: str, source: str, target: str, tenant_id: str = "default") -> str:
+    """SHA-256 over (tenant_id, text, source, target).
+
+    The tenant_id salt prevents cross-tenant cache bleed-through: tenant A
+    translating "PII X" to dz produces a different cache_key than tenant B
+    translating the same text to dz, so they never share the cached row.
+    Caught + fixed in the 2026-05-09 Wave A+B security review (regression
+    introduced when the slice was first written without tenant scope)."""
+    raw = f"{tenant_id}\x00{text}\x00{source}\x00{target}".encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -235,7 +241,7 @@ def translate(
     # PII-safe log: show only a preview, never the full text.
     text_preview = text[:30] + "..." + f" ({len(text)} chars)"
 
-    key = _cache_key(text, source, target)
+    key = _cache_key(text, source, target, tenant_id)
 
     # --- Cache lookup ---
     from ...db import SessionLocal  # lazy import to avoid circular deps

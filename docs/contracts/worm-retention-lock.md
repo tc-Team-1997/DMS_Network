@@ -11,7 +11,7 @@
 | Feature | `worm-retention-lock` |
 | Spec ID | `BHU-32` (document immutability under retention) |
 | Owner | `python-engineer` + `db-migrator` |
-| Status | `draft` |
+| Status | `shipped` |
 | Risk class | `high` (data integrity, regulatory compliance, irreversibility) |
 | Contract published | `2026-05-09` |
 | Last updated | `2026-05-09` |

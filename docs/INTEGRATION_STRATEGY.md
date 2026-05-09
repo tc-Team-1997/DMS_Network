@@ -51,7 +51,18 @@ Added in tranches. Q3 2027 onwards:
 - **Snowflake / Databricks / BigQuery** — analytics export via CDC
 - **ServiceNow / Jira Service Management** — ops ticketing
 
-### 2.3 Partner-built adapters
+### 2.3 AI & Cloud service replacements
+
+The following capabilities historically require third-party SaaS. DocManager replaces them with local, open-source models:
+
+| # | Capability | Cloud alternative | Local DocManager | Status |
+|--:|---|---|---|---|
+| A1 | **Face biometric verification** | Amazon Rekognition | dlib `face_recognition` (128-dim encodings, 90-day cache) | ✓ Production (shipped 2026-05-09) |
+| A2 | **Document translation** (Dzongkha, Arabic) | Amazon Translate / Google Translate | Meta NLLB-200-distilled-600M (7-day SHA-256 cache) | ✓ Production (shipped 2026-05-09) |
+
+These are **fully offline** — no outbound API calls, no external credentials, no regulator concerns about data egress.
+
+### 2.4 Partner-built adapters
 
 From Q3 2027, SIs and ISVs can ship adapters via our SDK. We run a certification program — tested against our sandbox — so a bank can trust a partner adapter the same way they trust ours.
 

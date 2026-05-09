@@ -55,6 +55,11 @@ Every control we implement maps to one or more standards. A single control usual
 | Data residency | Custom | A.18 | n/a | 2-7 | ✓ | Per-tenant region pinning, DSAR automation |
 | AML screening | CC1.4, CC7.2 | A.12.4, A.18.1 | n/a | 2-6, 2-8 | ✓ | OFAC/EU/UN watchlist matching, human-reviewed hits, audit trail (AML_SCREENING_TRIGGERED, AML_HIT_DECIDED, AML_HIT_ESCALATED) |
 | CBS integration | CC1.4, CC9.1, CC7.2 | A.15, A.12.4 | 10 | 2-3, 2-8 | ✓ | OAuth2 token mgmt, circuit breaker fallback, PII-masked logging, audit trail (CBS_PULL_CUSTOMER, CBS_LINK_POSTED, CBS_CACHE_INVALIDATED) |
+| WORM immutability | CC6.5, CC7.2 | A.8, A.12.4 | 3.4 | 2-7, 2-8 | ✓ | OS-level immutable flags (chflags/chattr) on documents under retention, nightly verification with hash baseline, audit trail (WORM_LOCKED, WORM_UNLOCKED, WORM_VERIFIED, WORM_TAMPERED) |
+| Document redaction | CC6.1, CC7.2 | A.10, A.12.4 | 3.1 | 2-4, 2-8 | ✓ | Pike PDF-based text destruction (not visual overlay), post-redaction pdftotext verification, parent-child version chain, audit trail (DOCUMENT_REDACTED, REDACTION_VERIFICATION) |
+| Biometric KYC | CC1.2, CC6.1, CC7.2 | A.9, A.10, A.12.4 | 8.3 | 2-1, 2-4, 2-8 | ✓ | Offline dlib face_recognition, 128-dim encodings only (no raw images), 90-day encoding cache, consent audit trail, DPIA-style review, audit trail (BIOMETRIC_MATCH_PERFORMED, BIOMETRIC_CONSENT_GRANTED) |
+| Offline sync queue | CC1.4, CC7.2 | A.12.4 | n/a | 2-8 | ✓ | IndexedDB outbox encryption, Service Worker background sync, 24h idempotency-key deduplication, audit trail (OFFLINE_SYNC_REPLAY, IDEMPOTENCY_CONFLICT) |
+| Offline translation | CC6.1, CC7.2 | A.10, A.12.4 | n/a | 2-4, 2-8 | ✓ | Meta NLLB-200-distilled-600M model (fully offline, no API calls), 7-day translation cache, SHA-256 source dedup, audit trail (DOCUMENT_TRANSLATED, TRANSLATION_DELETED) |
 
 ---
 

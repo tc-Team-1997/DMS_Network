@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..security import require_api_key
+from ..services.auth import Principal, require
 from ..services.docbrain.translate import (
     SUPPORTED_PAIRS,
     MAX_INPUT_CHARS,
@@ -173,7 +174,10 @@ def _infer_source_lang(text: str) -> str:
 
 
 def _tenant_id_from_request() -> str:
-    """Stub — returns 'default'. Production reads JWT claims via Depends."""
+    """DEPRECATED — kept only as a fallback. Every endpoint now extracts
+    tenant from the Principal injected by `require("translate:read")` etc.
+    Calling this function in a request path is a security bug; use
+    ``principal.tenant`` instead."""
     return os.environ.get("DEFAULT_TENANT_ID", "default")
 
 
@@ -201,11 +205,12 @@ def get_supported_languages() -> SupportedLanguagesResponse:
 def translate_text(
     req: TranslateTextRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require("translate:read")),
 ) -> TranslateTextResponse:
     """Translate arbitrary text (no document context)."""
     _check_flag()
 
-    tenant_id = _tenant_id_from_request()
+    tenant_id = principal.tenant
     t0 = time.monotonic()
 
     try:
@@ -270,7 +275,7 @@ def translate_text(
                     "SELECT created_at FROM translations "
                     "WHERE cache_key = :k AND tenant_id = :tid AND deleted_at IS NULL"
                 ),
-                {"k": _cache_key(req.text, req.source_lang, req.target_lang), "tid": tenant_id},
+                {"k": _cache_key(req.text, req.source_lang, req.target_lang, tenant_id), "tid": tenant_id},
             ).first()
             if row:
                 cached_at = str(row[0])
@@ -298,14 +303,18 @@ def translate_document(
     doc_id: int = Path(..., ge=1),
     req: TranslateDocumentRequest = ...,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require("translate:read")),
 ) -> TranslateDocumentResponse:
     """Translate the OCR text of a stored document plus high-confidence extraction fields."""
     _check_flag()
 
-    tenant_id = _tenant_id_from_request()
+    tenant_id = principal.tenant
     t0 = time.monotonic()
 
     # --- Fetch the document's OCR text from docbrain_analyses or documents ---
+    # Both queries are tenant-scoped — Commandment #1. Cross-tenant document
+    # exfiltration via this endpoint was caught + fixed in the 2026-05-09
+    # Wave A+B security review.
     ocr_text: Optional[str] = None
     source_lang: str = "dz"  # default assumption for this feature (Bhutan mandate)
 
@@ -313,9 +322,9 @@ def translate_document(
         row = db.execute(
             sqltext(
                 "SELECT extraction_json, ocr_language FROM docbrain_analyses "
-                "WHERE document_id = :id"
+                "WHERE document_id = :id AND tenant_id = :tenant"
             ),
-            {"id": doc_id},
+            {"id": doc_id, "tenant": tenant_id},
         ).first()
     except Exception:  # noqa: BLE001
         row = None
@@ -336,8 +345,8 @@ def translate_document(
     # Try to get the raw OCR text from the documents table.
     try:
         doc_row = db.execute(
-            sqltext("SELECT ocr_text FROM documents WHERE id = :id"),
-            {"id": doc_id},
+            sqltext("SELECT ocr_text FROM documents WHERE id = :id AND tenant_id = :tenant"),
+            {"id": doc_id, "tenant": tenant_id},
         ).first()
         if doc_row and doc_row[0]:
             ocr_text = doc_row[0]
@@ -459,14 +468,16 @@ def translate_document(
 def delete_translation(
     cache_key_param: str = Path(..., min_length=64, max_length=64),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require("translate:delete")),
 ) -> Dict[str, Any]:
     """Soft-delete a cached translation (DSAR / privacy erasure request).
 
-    Requires doc_admin role (enforced by the Node proxy layer; Python layer
-    trusts the API key for now — enforcement is at the Node SPA mirror).
+    Requires the `translate:delete` permission. Tenant scope is enforced
+    server-side via Principal; the Node proxy layer is defense-in-depth,
+    not the only gate.
     """
     _check_flag()
-    tenant_id = _tenant_id_from_request()
+    tenant_id = principal.tenant
 
     deleted = soft_delete_translation(cache_key_param, tenant_id)
 
