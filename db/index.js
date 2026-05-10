@@ -653,4 +653,21 @@ try {
   console.error('[db] migration 0039 (regulator_reports) skipped:', err.message);
 }
 
+// ---------------------------------------------------------------------------
+// Migration 0040 — Wave-E foundation columns
+// audit_log.policy_decision: OPA decision JSON per audit row (Wave-E DoD).
+// users.reset_token + users.reset_token_expires_at: forgot-password flow.
+// All three columns are nullable — no backfill required.
+// ---------------------------------------------------------------------------
+try {
+  addColumnIfMissing('audit_log', 'policy_decision',       'policy_decision TEXT');
+  addColumnIfMissing('users',     'reset_token',           'reset_token TEXT');
+  addColumnIfMissing('users',     'reset_token_expires_at','reset_token_expires_at TEXT');
+  // eslint-disable-next-line no-console
+  console.log('[db] migration 0040: policy_decision + reset_token columns ready.');
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.error('[db] migration 0040 skipped:', err.message);
+}
+
 module.exports = db;
