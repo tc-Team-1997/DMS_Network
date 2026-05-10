@@ -658,5 +658,17 @@
   "a11y": {
     "skip_to_content": "[DZ-PENDING] Skip to main content",
     "breadcrumb": "[DZ-PENDING] Breadcrumb"
+  },
+  "tabs": {
+    "approved": "མོས་མཐུན་འབྱུང་བ།",
+    "pending":  "[DZ-PENDING] Pending",
+    "rejected": "[DZ-PENDING] Rejected",
+    "all":      "ཐམས་ཅད།",
+    "assigned": "[DZ-PENDING] Assigned to me",
+    "team":     "[DZ-PENDING] Team queue",
+    "users":    "[DZ-PENDING] Users",
+    "mfa":      "[DZ-PENDING] MFA",
+    "saml":     "[DZ-PENDING] SAML",
+    "sessions": "[DZ-PENDING] Sessions"
   }
 }

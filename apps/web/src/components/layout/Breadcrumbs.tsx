@@ -35,11 +35,13 @@ export function Breadcrumbs() {
     });
   }
 
-  // For tab-based routes, append the active tab label.
+  // For tab-based routes, append the active tab label via i18n.
+  // Falling back to the capitalised slug means ASCII-only locales still work
+  // while Dzongkha (Tibetan script, no case) gets the translated string.
   const tab = params.get('tab');
   if (tab) {
-    const tabLabel = tab.charAt(0).toUpperCase() + tab.slice(1);
-    crumbs.push({ label: tabLabel });
+    const fallback = tab.charAt(0).toUpperCase() + tab.slice(1);
+    crumbs.push({ label: t(`tabs.${tab}`, fallback) });
   }
 
   return (

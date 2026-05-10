@@ -550,5 +550,17 @@
   "a11y": {
     "skip_to_content": "Skip to main content",
     "breadcrumb": "Breadcrumb"
+  },
+  "tabs": {
+    "approved": "Approved",
+    "pending":  "Pending",
+    "rejected": "Rejected",
+    "all":      "All",
+    "assigned": "Assigned to me",
+    "team":     "Team queue",
+    "users":    "Users",
+    "mfa":      "MFA",
+    "saml":     "SAML",
+    "sessions": "Sessions"
   }
 }
