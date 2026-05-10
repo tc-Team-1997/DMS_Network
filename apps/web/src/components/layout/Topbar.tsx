@@ -149,6 +149,7 @@ function TenantChip() {
 
 function BellButton() {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
   const unread = useUnreadCount();
 
   return (
@@ -156,15 +157,21 @@ function BellButton() {
       trigger={
         <button
           type="button"
+          data-testid="notif-bell"
           className="w-9 h-9 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors relative"
-          aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
+          aria-label={unread > 0
+            ? t('notif.unread_count', { count: unread, defaultValue: '{{count}} unread' })
+            : t('notif.title', 'Notifications')}
         >
           <Bell size={15} className="text-ink-sub" />
           {unread > 0 && (
             <span
-              className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full"
+              data-testid="notif-badge-count"
+              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] rounded-full bg-danger text-white text-[10px] font-medium flex items-center justify-center px-1"
               aria-hidden="true"
-            />
+            >
+              {unread > 99 ? '99+' : unread}
+            </span>
           )}
         </button>
       }

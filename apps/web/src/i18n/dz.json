@@ -670,5 +670,20 @@
     "mfa":      "[DZ-PENDING] MFA",
     "saml":     "[DZ-PENDING] SAML",
     "sessions": "[DZ-PENDING] Sessions"
+  },
+  "notif": {
+    "title":          "གསལ་བརྡ།",
+    "tabs_aria":      "གསལ་བརྡ་བཀོལ་ལྟ།",
+    "tab": {
+      "alerts":    "སྲུང་སྐྱོབ།",
+      "approvals": "ཆོག་མཆན།",
+      "system":    "མ་ལག"
+    },
+    "unread_count":  "[DZ-PENDING] {count, plural, one {{{count}} unread} other {{{count}} unread}}",
+    "mark_all_read": "[DZ-PENDING] Mark all read",
+    "mark_read":     "[DZ-PENDING] Mark as read",
+    "loading":       "[DZ-PENDING] Loading…",
+    "empty":         "[DZ-PENDING] No notifications",
+    "view_all":      "[DZ-PENDING] View all notifications"
   }
 }

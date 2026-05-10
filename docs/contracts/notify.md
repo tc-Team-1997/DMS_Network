@@ -126,3 +126,19 @@ All vars optional — missing vars cause the provider to enter **no-op mode** (l
 `POST /api/v1/alerts` accepts `{ user_id, level, title, message }` and:
 1. Inserts an `alert_records` row.
 2. Calls `notify.send(user_id, ...)` in a fire-and-forget task (swallows exceptions).
+
+---
+
+## §6.4 SPA test IDs (Wave-E Task 7)
+
+The following `data-testid` values are shipped by `NotificationFeed.tsx` and `Topbar.tsx`.
+QA-engineer should reference this list — do NOT diff against stale copies.
+
+| testid | element | notes |
+|--------|---------|-------|
+| `notif-bell` | `<button>` in Topbar `BellButton` | triggers popover open |
+| `notif-badge-count` | `<span>` inside bell button | numeric unread badge; absent when unread === 0 |
+| `notif-tab-alerts` | `<button role="tab">` | Alerts tab |
+| `notif-tab-approvals` | `<button role="tab">` | Approvals tab |
+| `notif-tab-system` | `<button role="tab">` | System tab |
+| `notif-list` | `<ul role="tabpanel">` | filtered notification list |
