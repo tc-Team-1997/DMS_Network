@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { FileText, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/store/auth';
 import { HttpError } from '@/lib/http';
 import { Button, Input } from '@/components/ui';
 import { fetchTenantPublic, type Tenant } from '@/store/tenant';
+import { useTranslation } from 'react-i18next';
 
 const schema = z.object({
   username: z.string().min(1, 'Username required'),
@@ -136,6 +137,7 @@ export function LoginPage() {
   const status = useAuth((s) => s.status);
   const [serverError, setServerError] = useState<string | null>(null);
   const [publicTenant, setPublicTenant] = useState<Tenant | null>(null);
+  const { t } = useTranslation();
 
   // Fetch public tenant branding — anonymous, before user is authenticated.
   // This powers the hero panel's display_name, login_banner, branding colours, etc.
@@ -273,13 +275,23 @@ export function LoginPage() {
               required
             />
 
+            <div className="flex justify-end">
+              <Link
+                to="/forgot-password"
+                data-testid="forgot-password-link"
+                className="text-2xs text-brand-blue hover:underline"
+              >
+                {t('auth.forgot_password')}
+              </Link>
+            </div>
+
             {serverError !== null && (
               <p className="text-[11px] text-danger bg-danger-bg border border-danger/20 rounded px-3 py-1.5">
                 {serverError}
               </p>
             )}
 
-            <Button type="submit" className="w-full" loading={isSubmitting}>
+            <Button type="submit" data-testid="login-submit" className="w-full" loading={isSubmitting}>
               Sign in
             </Button>
           </form>

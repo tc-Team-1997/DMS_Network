@@ -563,6 +563,21 @@
     "saml":     "SAML",
     "sessions": "Sessions"
   },
+  "auth": {
+    "forgot_title":         "Reset your password",
+    "username_or_email":    "Username or email",
+    "send_reset_link":      "Send reset link",
+    "forgot_done":          "If that account exists, a reset link has been sent.",
+    "reset_title":          "Set a new password",
+    "new_password":         "New password",
+    "confirm_password":     "Confirm password",
+    "reset_submit":         "Reset password",
+    "forgot_password":      "Forgot password?",
+    "reset_invalid_token":  "Reset link is invalid or expired",
+    "reset_missing_token":  "Missing token",
+    "reset_failed":         "Reset failed",
+    "reset_mismatch":       "Passwords do not match"
+  },
   "notif": {
     "title":          "Notifications",
     "tabs_aria":      "Notification tabs",
