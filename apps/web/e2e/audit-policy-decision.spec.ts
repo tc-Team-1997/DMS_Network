@@ -33,7 +33,8 @@ import { login } from './helpers';
 // Tier 1 — annotation create → audit_log read-back
 // ---------------------------------------------------------------------------
 
-test('annotation CREATE writes policy_decision JSON to audit_log', async ({ page, request }) => {
+test('annotation CREATE writes policy_decision JSON to audit_log', async ({ page }) => {
+  const request = page.request;
   await login(page, 'admin', 'admin123');
 
   // Fetch a known seeded document id.
@@ -54,14 +55,16 @@ test('annotation CREATE writes policy_decision JSON to audit_log', async ({ page
     data: {
       type: 'comment',
       page: 0,
-      x: 10, y: 10, w: 50, h: 20,
+      bbox: { x: 10, y: 10, w: 50, h: 20 },
       payload: 'policy_decision integration test marker',
     },
   });
-  expect(annotationResp.status()).toBeLessThan(500);
+  expect(annotationResp.ok()).toBeTruthy();
 
   // Read back the most recent audit events (DESC order).
-  const auditResp = await request.get('/spa/api/audit/events?per_page=20&entity_type=annotation');
+  // Filter by action because annotations.js writeAudit sets `entity='annotation'`
+  // (not entity_type) — entity_type would be NULL and not match the param filter.
+  const auditResp = await request.get('/spa/api/audit/events?per_page=20&action=ANNOTATION_CREATED');
   expect(auditResp.ok()).toBeTruthy();
   const auditBody = await auditResp.json();
 
@@ -90,7 +93,8 @@ test('annotation CREATE writes policy_decision JSON to audit_log', async ({ page
 // This test will SKIP if no workflow rows exist in the DB (fresh seed).
 // ---------------------------------------------------------------------------
 
-test('approving a workflow writes policy_decision JSON to audit_log', async ({ page, request }) => {
+test('approving a workflow writes policy_decision JSON to audit_log', async ({ page }) => {
+  const request = page.request;
   await login(page, 'admin', 'admin123');
 
   // Check if any workflows exist.

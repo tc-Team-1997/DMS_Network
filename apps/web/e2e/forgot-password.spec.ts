@@ -9,12 +9,12 @@ test('forgot-password → reset-password full flow', async ({ page }) => {
     await expect(page).toHaveURL(/\/forgot-password/);
 
     // 2. Submit username — admin is the seeded account.
-    await page.getByLabel(/username|email/i).fill('admin');
+    await page.getByLabel(/username|email/i).fill('sara');
     await page.getByTestId('forgot-submit').click();
     await expect(page.getByTestId('forgot-success')).toBeVisible();
 
     // 3. Pull the token from the test inbox endpoint.
-    const inbox = await page.request.get('/spa/api/auth/_test_last_reset_token?username=admin');
+    const inbox = await page.request.get('/spa/api/auth/_test_last_reset_token?username=sara');
     expect(inbox.ok()).toBe(true);
     const { token } = await inbox.json() as { token: string };
     expect(token).toBeTruthy();
@@ -27,33 +27,33 @@ test('forgot-password → reset-password full flow', async ({ page }) => {
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
 
     // 5. Confirm new password works.
-    await page.getByLabel(/username/i).fill('admin');
+    await page.getByLabel(/username/i).fill('sara');
     await page.getByLabel(/password/i).fill('newpass1234');
     await page.getByTestId('login-submit').click();
     await expect(page).toHaveURL(/^(?!.*login)/, { timeout: 10000 });
   } finally {
-    // Always restore admin/admin123 so subsequent specs aren't broken.
+    // Always restore admin/sara123 so subsequent specs aren't broken.
     // Runs even if any expect() above throws — prevents cascade failures
     // across the entire E2E suite.
     try {
-      await page.request.post('/spa/api/auth/forgot-password', { data: { username: 'admin' } });
-      const r = await page.request.get('/spa/api/auth/_test_last_reset_token?username=admin');
+      await page.request.post('/spa/api/auth/forgot-password', { data: { username: 'sara' } });
+      const r = await page.request.get('/spa/api/auth/_test_last_reset_token?username=sara');
       const { token } = await r.json() as { token: string };
       if (token) {
         await page.request.post('/spa/api/auth/reset-password', {
-          data: { token, password: 'admin123' },
+          data: { token, password: 'sara123' },
         });
         originalPasswordRestored = true;
       }
     } catch (e) {
       console.error(
-        '[forgot-password.spec] FAILED to restore admin/admin123 — manual DB reset required:',
+        '[forgot-password.spec] FAILED to restore admin/sara123 — manual DB reset required:',
         e,
       );
     }
   }
 
   if (!originalPasswordRestored) {
-    console.warn('[forgot-password.spec] admin password may need manual reset to admin123');
+    console.warn('[forgot-password.spec] admin password may need manual reset to sara123');
   }
 });
