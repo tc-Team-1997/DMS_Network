@@ -1,12 +1,11 @@
 import { useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { Bell, ChevronDown, Menu, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/store/auth';
 import { useTenant, useAvailableTenants } from '@/store/tenant';
 import { post } from '@/lib/http';
 import { z } from 'zod';
-import { navItems } from './nav';
+import { Breadcrumbs } from './Breadcrumbs';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { Popover } from '@/components/ui/Popover';
 import { NotificationFeed, useUnreadCount } from '@/modules/notifications/NotificationFeed';
@@ -149,7 +148,7 @@ function TenantChip() {
 // ---------------------------------------------------------------------------
 
 function BellButton() {
-  const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
   const unread = useUnreadCount();
 
   return (
@@ -157,20 +156,24 @@ function BellButton() {
       trigger={
         <button
           type="button"
+          data-testid="notif-bell"
           className="w-9 h-9 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors relative"
-          aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
+          aria-label={unread > 0
+            ? t('notif.unread_count', { count: unread, defaultValue: '{{count}} unread' })
+            : t('notif.title', 'Notifications')}
         >
           <Bell size={15} className="text-ink-sub" />
           {unread > 0 && (
             <span
-              className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full"
+              data-testid="notif-badge-count"
+              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] rounded-full bg-danger text-white text-[10px] font-medium flex items-center justify-center px-1"
               aria-hidden="true"
-            />
+            >
+              {unread > 99 ? '99+' : unread}
+            </span>
           )}
         </button>
       }
-      open={open}
-      onClose={() => { setOpen(false); }}
       placement="bottom"
     >
       <NotificationFeed />
@@ -269,18 +272,9 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick, menuOpen = false }: TopbarProps) {
   const user = useAuth((s) => s.user);
-  const { pathname } = useLocation();
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [searchOpen, setSearchOpen] = useState(false);
-
-  // Find the longest prefix match so /viewer/123 matches the "/viewer" nav item.
-  const active =
-    navItems
-      .filter((n) => (n.path === '/' ? pathname === '/' : pathname.startsWith(n.path)))
-      .sort((a, b) => b.path.length - a.path.length)[0] ?? navItems[0];
-
-  const title = active?.label ?? 'Dashboard';
-  const module = active?.section ?? 'Overview';
 
   const firstName = (user?.full_name ?? user?.username ?? 'User').split(' ')[0] ?? 'User';
 
@@ -311,8 +305,7 @@ export function Topbar({ onMenuClick, menuOpen = false }: TopbarProps) {
           )}
 
           <div className="min-w-0">
-            <p className="module-label hidden md:block">{module}</p>
-            <h1 className="text-base font-semibold text-ink leading-tight mt-0.5 truncate">{title}</h1>
+            <Breadcrumbs />
           </div>
         </div>
 
@@ -336,6 +329,19 @@ export function Topbar({ onMenuClick, menuOpen = false }: TopbarProps) {
 
           {/* Locale switcher — EN / DZ toggle */}
           <LocaleSwitcher />
+
+          {/* Branch + role chip — desktop only */}
+          {user && (
+            <span
+              data-testid="topbar-branch-role-chip"
+              className="hidden md:inline-flex items-center gap-1 rounded-full bg-brand-skyLight/40 text-brand-navy text-2xs px-2 py-0.5"
+              title={`${user.branch ?? t('topbar.no_branch', 'HQ')} · ${user.role}`}
+            >
+              <span className="font-medium">{user.branch ?? t('topbar.no_branch', 'HQ')}</span>
+              <span className="text-divider" aria-hidden="true">·</span>
+              <span>{user.role}</span>
+            </span>
+          )}
 
           <BellButton />
 

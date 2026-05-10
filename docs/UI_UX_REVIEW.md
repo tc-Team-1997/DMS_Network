@@ -697,6 +697,70 @@ Wave 3 →  Audit log · Regulator reports · DSAR console ·
 
 ---
 
+## 14. Wave-E (Plan 0) verification — verified live in code
+
+### 14.1 Policy decision audit trail (Task 1–2)
+
+| Feature | Evidence (file:line) | Status |
+|---------|-----|--------|
+| `audit_log.policy_decision` column | `db/index.js` migration 0038; `routes/spa-api/audit.js#78-141` writeAuditRow | ✅ Persisted |
+| buildPolicyDecision factory | `services/audit-policy.js#13-24` captures role/tenant/branch/opa_allow/captured_at | ✅ Captures context |
+| 13 route writeAudit callers | `routes/spa-api/{workflows,annotations,documents,users,auth,docbrain}.js` + 7 more | ✅ All pass policyDecision |
+
+### 14.2 WCAG Level-A fixes (Task 5)
+
+| Violation | Fix | Evidence |
+|-----------|-----|----------|
+| Toast role-prohibited | Removed role="status" override; let aria-live govern | `apps/web/src/components/ui/Toast.tsx` |
+| Badge/MetricCard missing aria-label | Added aria-label on icon-only badges | `apps/web/src/components/ui/Badge.tsx`, `MetricCard.tsx` |
+| Nav link missing aria-current | Added aria-current="page" on active sidebar link | `apps/web/src/components/layout/Sidebar.tsx` |
+| Input aria-describedby merge | Merge caller + schema-generated aria-describedby values | `apps/web/src/components/ui/Input.tsx#88-92` |
+| SessionExpired focus trap | Added focus trap + restoreFocus on modal | `apps/web/src/components/SessionExpiredModal.tsx` |
+| Color contrast on light bg | Updated muted text color (#6B6962) for AA compliance | `apps/web/src/index.css` (design tokens) |
+| Axe-core result | 5 routes tested; 0 critical/serious violations | `apps/web/e2e/wcag-foundation.spec.ts` ✓ |
+
+### 14.3 Navigation chrome (Task 6–8)
+
+| Component | Evidence | Status |
+|-----------|----------|--------|
+| Topbar breadcrumb trail | `apps/web/src/components/layout/Topbar.tsx` + `Breadcrumbs.tsx` (visible on all routes) | ✅ Rendered |
+| Branch+role chip | `apps/web/src/components/layout/Topbar.tsx#chip` from session user role/branch/tenant | ✅ Rendered |
+| Notifications 3-tab popover | `apps/web/src/components/layout/NotificationsPopover.tsx` (Alerts/Approvals/System tabs) | ✅ Rendered |
+| Numeric notification badge | Severity-colored badge (critical=red, warning=amber, info=blue) | `apps/web/src/components/layout/Topbar.tsx#badge` ✅ |
+| Cmd-K operator hints | `apps/web/src/components/CommandPalette.tsx` hints for type:, branch:, customer: operators | ✅ Rendered |
+
+### 14.4 Authentication flow (Task 9)
+
+| Stage | Evidence | Status |
+|-------|----------|--------|
+| Forgot password form | `apps/web/src/modules/auth/ForgotPasswordPage.tsx` + POST /spa/api/auth/forgot-password | ✅ Wired |
+| Token generation + email | `routes/spa-api/auth-reset.js#41-88` generates reset_token, persists reset_token_expires_at (1h TTL) | ✅ Backend |
+| Reset password form | `apps/web/src/modules/auth/ResetPasswordPage.tsx` + POST /spa/api/auth/reset-password | ✅ Wired |
+| Token validation | GET /spa/api/auth/reset-password/:token/validate (task 9 endpoint) | ✅ Validated |
+| DB schema | `db/schema.sql` users.reset_token, users.reset_token_expires_at columns | ✅ Migrated |
+| E2E spec | `apps/web/e2e/forgot-password.spec.ts` with try/finally restore of admin/admin123 | ✅ Green |
+
+### 14.5 Audit emission (Task 3, 10)
+
+| Event type | Evidence | Status |
+|------------|----------|--------|
+| SPA-emit endpoint | `routes/spa-api/audit-events.js` POST /spa/api/audit/events with allow-list (pii_reveal, aml_decision, document_expiry_alert) | ✅ Wired |
+| PII reveal trigger | `apps/web/src/components/PiiRevealField.tsx` calls emitAuditEvent('pii_reveal') after successful reveal | ✅ Emits |
+| Policy decision persisted | All SPA-emitted rows carry policy_decision JSON (Task 2 writeAuditRow) | ✅ Persisted |
+| E2E specs | `audit-events.spec.ts` (4 tests: happy path, allow-list rejection, validation, auth gate) | ✅ Green |
+|  | `pii-reveal-audit.spec.ts` (2 tests: read-back, UI emission mocked) | ✅ Green |
+|  | `audit-policy-decision.spec.ts` (2 tests: annotation create, workflow approve) | ✅ Green |
+
+### 14.6 Internationalization (Task 11)
+
+| Feature | Evidence | Status |
+|---------|----------|--------|
+| i18n parity check | `apps/web/scripts/i18n-parity.cjs` compares en.json vs dz.json key counts | ✅ 509 keys |
+| Dzongkha translation | `apps/web/src/i18n/dz.json#1-509` — verified non-byte-identical content (sample: line 1 `"aml": {"title": "AML གཞི་བཀོད།"}`) | ✅ Live |
+| npm run i18n:check | `apps/web/package.json` script wired; returns 0 on parity match | ✅ CI gate |
+
+---
+
 ## 14. Document changelog
 
 | Date | Change | By |

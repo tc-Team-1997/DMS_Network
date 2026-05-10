@@ -23,6 +23,7 @@ const db      = require('../../db');
 const { requirePermJson, requireNamespacePermJson, tenantScope, pyCall } = require('./_shared');
 const { getConfig, setConfig } = require('../../db/tenant-config');
 const { sendInvite } = require('../../services/invite-mailer');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -51,11 +52,12 @@ function publicRow(u) {
   };
 }
 
-function writeAudit({ userId, action, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, 'user', ?, ?, ?)`
-  ).run(userId, action, entityId ?? null, details ? JSON.stringify(details) : null, tenantId ?? 'nbe');
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, 'user', ?, ?, ?, ?)`
+  ).run(userId, action, entityId ?? null, details ? JSON.stringify(details) : null, tenantId ?? 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null);
 }
 
 /**
@@ -152,11 +154,12 @@ router.patch('/users/:id', requirePermJson('admin'), (req, res) => {
   db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
   writeAudit({
-    userId:   req.session.user.id,
-    action:   'USER_UPDATE',
-    entityId: id,
-    details:  Object.keys(body),
-    tenantId: tenant,
+    userId:         req.session.user.id,
+    action:         'USER_UPDATE',
+    entityId:       id,
+    details:        Object.keys(body),
+    tenantId:       tenant,
+    policyDecision: buildPolicyDecision(req),
   });
 
   if ('role' in body) {
@@ -223,11 +226,12 @@ router.post('/admin/users/invite', requireNamespacePermJson('users'), async (req
   ).run(email, tokenHash, role, branch ?? null, expiresAt, actorId, tenant);
 
   writeAudit({
-    userId:   actorId,
-    action:   'USER_INVITE',
-    entityId: newUserId,
-    details:  { email, role, branch, expires_at: expiresAt },
-    tenantId: tenant,
+    userId:         actorId,
+    action:         'USER_INVITE',
+    entityId:       newUserId,
+    details:        { email, role, branch, expires_at: expiresAt },
+    tenantId:       tenant,
+    policyDecision: buildPolicyDecision(req),
   });
 
   try {
@@ -333,13 +337,13 @@ router.delete('/admin/users/:id/factors/:fid', requirePermJson('admin'), async (
 
   if (kind === 'totp') {
     db.prepare('UPDATE users SET mfa_enabled = 0, mfa_secret = NULL WHERE id = ?').run(id);
-    writeAudit({ userId: req.session.user.id, action: 'MFA_DISABLE_TOTP', entityId: id, tenantId: tenant });
+    writeAudit({ userId: req.session.user.id, action: 'MFA_DISABLE_TOTP', entityId: id, tenantId: tenant, policyDecision: buildPolicyDecision(req) });
     return res.json({ ok: true, factor_id: fid });
   }
 
   if (kind === 'sms') {
     db.prepare('UPDATE users SET mfa_phone = NULL WHERE id = ?').run(id);
-    writeAudit({ userId: req.session.user.id, action: 'MFA_DISABLE_SMS', entityId: id, tenantId: tenant });
+    writeAudit({ userId: req.session.user.id, action: 'MFA_DISABLE_SMS', entityId: id, tenantId: tenant, policyDecision: buildPolicyDecision(req) });
     return res.json({ ok: true, factor_id: fid });
   }
 
@@ -350,7 +354,7 @@ router.delete('/admin/users/:id/factors/:fid', requirePermJson('admin'), async (
         { method: 'DELETE', timeout: 10000 }
       );
       writeAudit({ userId: req.session.user.id, action: 'MFA_REVOKE_WEBAUTHN',
-                   entityId: id, details: { credential_id: credId }, tenantId: tenant });
+                   entityId: id, details: { credential_id: credId }, tenantId: tenant, policyDecision: buildPolicyDecision(req) });
       return res.json({ ok: true, factor_id: fid });
     } catch (err) {
       return res.status(502).json({ error: 'python_error', detail: err.message });

@@ -30,6 +30,7 @@
 const express = require('express');
 const db = require('../../db');
 const { pyCall, requirePermJson, tenantScope } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -62,11 +63,11 @@ const VALID_UNLOCK_REASONS = new Set([
  * @param {object|string} opts.details
  * @param {string}        [opts.tenantId]
  */
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   try {
     db.prepare(
-      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(
       userId,
       action,
@@ -74,6 +75,7 @@ function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
       String(entityId),
       typeof details === 'string' ? details : JSON.stringify(details),
       tenantId || 'nbe',
+      policyDecision !== null ? JSON.stringify(policyDecision) : null,
     );
   } catch (auditErr) {
     // Log to stderr but swallow so the primary response is unaffected.
@@ -134,12 +136,13 @@ router.post(
       );
 
       writeAudit({
-        userId:   req.session.user.id,
-        action:   'WORM_LOCKED',
-        entity:   'document',
-        entityId: documentId,
-        details:  { unlock_after_days, reason: reason.trim() },
-        tenantId: tenantScope(req),
+        userId:         req.session.user.id,
+        action:         'WORM_LOCKED',
+        entity:         'document',
+        entityId:       documentId,
+        details:        { unlock_after_days, reason: reason.trim() },
+        tenantId:       tenantScope(req),
+        policyDecision: buildPolicyDecision(req),
       });
 
       return res.json(data);
@@ -184,12 +187,13 @@ router.post(
       );
 
       writeAudit({
-        userId:   req.session.user.id,
-        action:   'WORM_UNLOCKED',
-        entity:   'document',
-        entityId: documentId,
-        details:  { reason, approver_notes_len: (approver_notes || '').length },
-        tenantId: tenantScope(req),
+        userId:         req.session.user.id,
+        action:         'WORM_UNLOCKED',
+        entity:         'document',
+        entityId:       documentId,
+        details:        { reason, approver_notes_len: (approver_notes || '').length },
+        tenantId:       tenantScope(req),
+        policyDecision: buildPolicyDecision(req),
       });
 
       return res.json(data);
@@ -241,12 +245,13 @@ router.post(
       );
 
       writeAudit({
-        userId:   req.session.user.id,
-        action:   'WORM_VERIFY_BATCH',
-        entity:   'worm',
-        entityId: 0,
-        details:  { examined: data.examined, tampered: data.tampered },
-        tenantId: tenantScope(req),
+        userId:         req.session.user.id,
+        action:         'WORM_VERIFY_BATCH',
+        entity:         'worm',
+        entityId:       0,
+        details:        { examined: data.examined, tampered: data.tampered },
+        tenantId:       tenantScope(req),
+        policyDecision: buildPolicyDecision(req),
       });
 
       return res.json(data);
@@ -346,15 +351,16 @@ router.post(
 
       writeAudit({
         userId,
-        action:   'WORM_EXTENDED',
-        entity:   'document',
-        entityId: docId,
-        details:  {
+        action:         'WORM_EXTENDED',
+        entity:         'document',
+        entityId:       docId,
+        details:        {
           extend_by_days: extDays,
           reason: reason.trim().slice(0, 120),
           new_unlock_after: data.new_unlock_after,
         },
-        tenantId: tenant,
+        tenantId:       tenant,
+        policyDecision: buildPolicyDecision(req),
       });
 
       return res.json(data);

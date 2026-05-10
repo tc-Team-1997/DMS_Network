@@ -26,6 +26,7 @@ import {
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Search, Clock, Bookmark, Navigation, FileText, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { isCmdK, useGlobalShortcut } from '@/lib/keyboard';
@@ -70,6 +71,7 @@ interface PaletteOverlayProps {
 
 function PaletteOverlay({ onClose }: PaletteOverlayProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -191,6 +193,14 @@ function PaletteOverlay({ onClose }: PaletteOverlayProps) {
           >
             <X size={14} />
           </button>
+        </div>
+
+        {/* Operator-token hints — only operators SearchInput TOKEN_RE actually parses */}
+        <div data-testid="cmdk-hints" className="px-3 py-1.5 border-b border-divider text-2xs text-muted">
+          {t('cmdk.hints', 'Try:')}{' '}
+          <code className="text-brand-blue">type:passport</code>{' · '}
+          <code className="text-brand-blue">branch:thimphu</code>{' · '}
+          <code className="text-brand-blue">customer:001234</code>
         </div>
 
         {/* Results list */}

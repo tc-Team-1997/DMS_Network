@@ -34,6 +34,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requirePermJson, tenantScope, pyCall } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 const { getNamespace } = require('../../db/tenant-config');
 const { verifyStepUpAssertion } = require('../../services/stepup-verify');
 
@@ -68,10 +69,10 @@ const RISK_BAND_ORDER = ['low', 'medium', 'high', 'critical'];
 // Helpers
 // ---------------------------------------------------------------------------
 
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     userId,
     action,
@@ -79,6 +80,7 @@ function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
     entityId != null ? entityId : null,
     typeof details === 'string' ? details : JSON.stringify(details != null ? details : null),
     tenantId || 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null,
   );
 }
 
@@ -148,7 +150,7 @@ function validateActionBody(action, body, cfg) {
  * Write a wf_actions row and the shared audit_log entry.
  * python_step_id is set from the Python /advance response (SOX-2 two-phase commit).
  */
-function recordAction({ workflowId, userId, action, reasonCode, comment, assertionId, attachmentId, tenantId, pythonStepId }) {
+function recordAction({ workflowId, userId, action, reasonCode, comment, assertionId, attachmentId, tenantId, pythonStepId, policyDecision = null }) {
   db.prepare(
     `INSERT INTO wf_actions
        (workflow_id, user_id, action, reason_code, comment, webauthn_assertion_id, attachment_id, tenant_id, python_step_id)
@@ -167,10 +169,10 @@ function recordAction({ workflowId, userId, action, reasonCode, comment, asserti
 
   writeAudit({
     userId,
-    action:   `workflow_${action}`,
-    entity:   'workflow',
-    entityId: workflowId,
-    details:  {
+    action:         `workflow_${action}`,
+    entity:         'workflow',
+    entityId:       workflowId,
+    details:        {
       action,
       reason_code: reasonCode,
       comment,
@@ -178,6 +180,7 @@ function recordAction({ workflowId, userId, action, reasonCode, comment, asserti
       python_step_id: pythonStepId != null ? pythonStepId : null,
     },
     tenantId,
+    policyDecision,
   });
 }
 
@@ -339,17 +342,18 @@ router.post('/workflows', requirePermJson('workflow'), (req, res) => {
   ).run(refCode, title, docId ?? null, initialStage, priority, tenantId, templateVersionId);
 
   writeAudit({
-    userId:   req.session.user.id,
-    action:   'workflow_created',
-    entity:   'workflow',
-    entityId: info.lastInsertRowid,
-    details:  {
+    userId:         req.session.user.id,
+    action:         'workflow_created',
+    entity:         'workflow',
+    entityId:       info.lastInsertRowid,
+    details:        {
       template_id:         templateId,
       template_version_id: templateVersionId,
       initial_stage:       initialStage,
       ref_code:            refCode,
     },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   const created = fetchWorkflowRow(info.lastInsertRowid);
@@ -532,15 +536,16 @@ function makeSingleActionHandlers(action) {
     const stage = db.transaction(() => {
       const s = advanceWorkflow(id, action, wf.doc_id, wf);
       recordAction({
-        workflowId:  id,
-        userId:      req.session.user.id,
+        workflowId:     id,
+        userId:         req.session.user.id,
         action,
-        reasonCode:  reason_code  != null ? reason_code  : null,
-        comment:     comment      != null ? comment      : null,
+        reasonCode:     reason_code  != null ? reason_code  : null,
+        comment:        comment      != null ? comment      : null,
         assertionId,
-        attachmentId: attachment_id != null ? attachment_id : null,
+        attachmentId:   attachment_id != null ? attachment_id : null,
         tenantId,
         pythonStepId,
+        policyDecision: buildPolicyDecision(req),
       });
       return s;
     })();
@@ -705,15 +710,16 @@ router.post('/workflows/bulk', requirePermJson('workflow'), async (req, res) => 
       const { id, wf, pythonStepId } = entry;
       const stage = advanceWorkflow(id, action, wf.doc_id, wf);
       recordAction({
-        workflowId:  id,
-        userId:      req.session.user.id,
+        workflowId:     id,
+        userId:         req.session.user.id,
         action,
-        reasonCode:  reason_code  != null ? reason_code  : null,
-        comment:     comment      != null ? comment      : null,
+        reasonCode:     reason_code  != null ? reason_code  : null,
+        comment:        comment      != null ? comment      : null,
         assertionId,
         attachmentId,
         tenantId,
         pythonStepId,
+        policyDecision: buildPolicyDecision(req),
       });
       results.push({ id, ok: true, stage, python_step_id: pythonStepId });
     }

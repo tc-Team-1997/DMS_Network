@@ -23,6 +23,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireNamespacePermJson, tenantScope } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -34,15 +35,16 @@ const router = express.Router();
  * Write an audit_log row. Swallows errors so audit failure cannot block
  * the primary response.
  */
-function writeAudit({ userId, action, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entityId, details, tenantId, policyDecision = null }) {
   try {
     db.prepare(
-      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(
       userId, action, 'legal_hold', String(entityId ?? ''),
       typeof details === 'string' ? details : JSON.stringify(details),
       tenantId || 'nbe',
+      policyDecision !== null ? JSON.stringify(policyDecision) : null,
     );
   } catch (auditErr) {
     console.error('[legal-holds] audit_log write failed:', auditErr.message);
@@ -149,10 +151,11 @@ router.post(
 
     writeAudit({
       userId,
-      action: 'LEGAL_HOLD_APPLIED',
-      entityId: result.lastInsertRowid,
-      details: { doc_id: docIdNum, reason: reason.trim().slice(0, 120) },
-      tenantId: tenant,
+      action:         'LEGAL_HOLD_APPLIED',
+      entityId:       result.lastInsertRowid,
+      details:        { doc_id: docIdNum, reason: reason.trim().slice(0, 120) },
+      tenantId:       tenant,
+      policyDecision: buildPolicyDecision(req),
     });
 
     res.status(201).json({
@@ -215,10 +218,11 @@ router.delete(
 
     writeAudit({
       userId,
-      action: 'LEGAL_HOLD_RELEASED',
-      entityId: holdId,
-      details: { doc_id: hold.doc_id, reason: reason.trim().slice(0, 120) },
-      tenantId: tenant,
+      action:         'LEGAL_HOLD_RELEASED',
+      entityId:       holdId,
+      details:        { doc_id: hold.doc_id, reason: reason.trim().slice(0, 120) },
+      tenantId:       tenant,
+      policyDecision: buildPolicyDecision(req),
     });
 
     const updated = db.prepare('SELECT * FROM legal_holds WHERE id = ?').get(holdId);

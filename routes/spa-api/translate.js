@@ -14,6 +14,7 @@
 const express = require('express');
 const db = require('../../db');
 const { pyCall, requirePermJson, tenantScope } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -31,18 +32,19 @@ const router = express.Router();
  * @param {object} opts.details  — must NOT contain source/target text
  * @param {string} opts.tenantId
  */
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   try {
     db.prepare(
-      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(
       userId ?? null,
       action,
       entity,
       entityId != null ? String(entityId) : null,
       typeof details === 'string' ? details : JSON.stringify(details),
-      tenantId || 'nbe'
+      tenantId || 'nbe',
+      policyDecision !== null ? JSON.stringify(policyDecision) : null
     );
   } catch (err) {
     // Non-fatal — never let audit failure break the response path.
@@ -98,10 +100,10 @@ router.post('/translate', requirePermJson('translate:read'), async (req, res) =>
     // Audit: log char_count, NOT the text itself.
     writeAudit({
       userId,
-      action: 'DOCUMENT_TRANSLATED',
-      entity: 'translation',
-      entityId: null,
-      details: {
+      action:         'DOCUMENT_TRANSLATED',
+      entity:         'translation',
+      entityId:       null,
+      details:        {
         document_id: null,
         target_lang,
         char_count: text.length,
@@ -109,6 +111,7 @@ router.post('/translate', requirePermJson('translate:read'), async (req, res) =>
         cache_hit: data?.cache_hit ?? null,
       },
       tenantId,
+      policyDecision: buildPolicyDecision(req),
     });
 
     res.json(data);
@@ -168,10 +171,10 @@ router.post(
 
       writeAudit({
         userId,
-        action: 'DOCUMENT_TRANSLATED',
-        entity: 'document',
-        entityId: docId,
-        details: {
+        action:         'DOCUMENT_TRANSLATED',
+        entity:         'document',
+        entityId:       docId,
+        details:        {
           document_id: docId,
           target_lang,
           char_count: charCount,
@@ -180,6 +183,7 @@ router.post(
           model_version: data?.model_version ?? null,
         },
         tenantId,
+        policyDecision: buildPolicyDecision(req),
       });
 
       res.json(data);
@@ -224,11 +228,12 @@ router.delete(
 
       writeAudit({
         userId,
-        action: 'TRANSLATION_DELETED',
-        entity: 'translation',
-        entityId: cacheKey.slice(0, 16) + '...',
-        details: { cache_key_prefix: cacheKey.slice(0, 16) },
+        action:         'TRANSLATION_DELETED',
+        entity:         'translation',
+        entityId:       cacheKey.slice(0, 16) + '...',
+        details:        { cache_key_prefix: cacheKey.slice(0, 16) },
         tenantId,
+        policyDecision: buildPolicyDecision(req),
       });
 
       res.json(data);

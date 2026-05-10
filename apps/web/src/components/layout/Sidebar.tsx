@@ -55,7 +55,7 @@ export function Sidebar() {
             <div className="w-5 h-5 rounded bg-white/10 flex items-center justify-center flex-shrink-0">
               <span className="text-white text-[9px] font-bold leading-none">{monogram}</span>
             </div>
-            <span className="text-sidebar-text text-[10px] leading-tight opacity-70 truncate">
+            <span className="text-sidebar-text text-[10px] leading-tight opacity-90 truncate">
               {tenant.display_name}
             </span>
           </div>
@@ -71,27 +71,28 @@ export function Sidebar() {
           if (items.length === 0) return null;
           return (
             <div key={section} className={gi > 0 ? 'mt-3' : ''}>
-              <p className="px-3 pt-2 pb-1 text-[9px] font-semibold uppercase tracking-wider text-sidebar-text opacity-60">
+              <p className="px-3 pt-2 pb-1 text-[9px] font-semibold uppercase tracking-wider text-sidebar-text opacity-80">
                 {section}
               </p>
               {items.map(({ label, i18nKey, path, icon: Icon, comingSoon }) => {
                 const active = path === '/' ? pathname === '/' : pathname.startsWith(path);
                 return (
-                  <Link key={path} to={path}>
-                    <div
-                      className={cn(
-                        'h-7 mx-1 my-0.5 px-3 rounded-md flex items-center gap-2.5 transition-colors',
-                        active
-                          ? 'bg-brand-blue text-white font-semibold'
-                          : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white font-normal',
-                      )}
-                    >
-                      <Icon size={13} strokeWidth={active ? 2.25 : 1.75} className="flex-shrink-0" />
-                      <span className="text-[12px] leading-none flex-1">{i18nKey ? t(i18nKey, label) : label}</span>
-                      {comingSoon && (
-                        <span className="text-[8px] font-semibold opacity-60 tracking-wide">SOON</span>
-                      )}
-                    </div>
+                  <Link
+                    key={path}
+                    to={path}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'h-7 mx-1 my-0.5 px-3 rounded-md flex items-center gap-2.5 transition-colors',
+                      active
+                        ? 'bg-brand-blue text-white font-semibold'
+                        : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white font-normal',
+                    )}
+                  >
+                    <Icon size={13} strokeWidth={active ? 2.25 : 1.75} className="flex-shrink-0" />
+                    <span className="text-[12px] leading-none flex-1">{i18nKey ? t(i18nKey, label) : label}</span>
+                    {comingSoon && (
+                      <span className="text-[8px] font-semibold opacity-60 tracking-wide">SOON</span>
+                    )}
                   </Link>
                 );
               })}

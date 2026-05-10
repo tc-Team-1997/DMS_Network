@@ -9,6 +9,7 @@ const { redis: sessionRedis } = require('../../services/session-store');
 // we reuse the module-level cache without a second DB hit for the default row.
 const { loadTenant } = require('./tenant-public');
 const { getNamespace } = require('../../db/tenant-config');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -16,17 +17,18 @@ const router = express.Router();
 // Helpers
 // ---------------------------------------------------------------------------
 
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(
     userId,
     action,
     entity ?? 'user',
     entityId ?? null,
     typeof details === 'string' ? details : JSON.stringify(details ?? null),
-    tenantId ?? 'nbe'
+    tenantId ?? 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null
   );
 }
 
@@ -157,7 +159,7 @@ router.post('/logout', (req, res) => {
   const userId = req.session?.user?.id;
 
   if (sid && userId) {
-    writeAudit({ userId, action: 'logout', entity: 'user', entityId: userId });
+    writeAudit({ userId, action: 'logout', entity: 'user', entityId: userId, policyDecision: buildPolicyDecision(req) });
     sessionRedis.hdel(`dms:user-sessions:${userId}`, sid).catch(() => {});
     sessionRedis.del(`dms:session-meta:${sid}`).catch(() => {});
   }
@@ -288,10 +290,11 @@ router.post('/extend-session', (req, res, next) => {
 
     writeAudit({
       userId,
-      action:   'session_extend',
-      entity:   'user',
-      entityId: userId,
-      details:  JSON.stringify({ extended_by_seconds: extendSeconds }),
+      action:         'session_extend',
+      entity:         'user',
+      entityId:       userId,
+      details:        JSON.stringify({ extended_by_seconds: extendSeconds }),
+      policyDecision: buildPolicyDecision(req),
     });
 
     try {
@@ -373,12 +376,13 @@ router.delete('/auth/sessions/:userId/:sid', requirePermJson('admin'), async (re
     ]);
 
     writeAudit({
-      userId:   req.session.user.id,
-      action:   'SESSION_KILL',
-      entity:   'user',
-      entityId: targetUserId,
-      details:  JSON.stringify({ sid_last8: targetSid.slice(-8) }),
-      tenantId: req.session.user.tenant_id || 'nbe',
+      userId:         req.session.user.id,
+      action:         'SESSION_KILL',
+      entity:         'user',
+      entityId:       targetUserId,
+      details:        JSON.stringify({ sid_last8: targetSid.slice(-8) }),
+      tenantId:       req.session.user.tenant_id || 'nbe',
+      policyDecision: buildPolicyDecision(req),
     });
 
     const { setConfig } = require('../../db/tenant-config');
@@ -420,12 +424,13 @@ router.delete('/auth/sessions/:userId', requirePermJson('admin'), async (req, re
     await Promise.all(delOps);
 
     writeAudit({
-      userId:   req.session.user.id,
-      action:   'SESSION_KILL_ALL',
-      entity:   'user',
-      entityId: targetUserId,
-      details:  JSON.stringify({ sessions_killed: sids.length }),
-      tenantId: req.session.user.tenant_id || 'nbe',
+      userId:         req.session.user.id,
+      action:         'SESSION_KILL_ALL',
+      entity:         'user',
+      entityId:       targetUserId,
+      details:        JSON.stringify({ sessions_killed: sids.length }),
+      tenantId:       req.session.user.tenant_id || 'nbe',
+      policyDecision: buildPolicyDecision(req),
     });
 
     const { setConfig } = require('../../db/tenant-config');
@@ -491,12 +496,13 @@ router.post('/auth/set-password', async (req, res) => {
   })();
 
   writeAudit({
-    userId:   null,
-    action:   'SET_PASSWORD',
-    entity:   'user',
-    entityId: null,
-    details:  JSON.stringify({ email: invite.email, tenant_id: tenant }),
-    tenantId: tenant,
+    userId:         null,
+    action:         'SET_PASSWORD',
+    entity:         'user',
+    entityId:       null,
+    details:        JSON.stringify({ email: invite.email, tenant_id: tenant }),
+    tenantId:       tenant,
+    policyDecision: buildPolicyDecision(req),
   });
 
   res.json({ ok: true });

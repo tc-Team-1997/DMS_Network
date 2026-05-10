@@ -213,7 +213,7 @@
     "field_phone": "ཁ་པར་ཨང་།",
     "field_kyc": "KYC གནས་ཚད།",
     "field_risk_band": "ཉེན་ཁ་རིམ།",
-    "not_available": "—",
+    "not_available": "[DZ-PENDING] —",
 
     "cached_pill": "ཉར་ཚགས་ནས (སྐར་མ་ ༥ TTL)",
     "customer_loaded": "གྲཞི་མཐོང་འཇུག་ཟིན: {{name}}",
@@ -451,7 +451,7 @@
     "tab_workflows": "ལས་རིམ།",
     "tab_activity": "བྱ་བ།",
 
-    "attr_cid": "CID",
+    "attr_cid": "[DZ-PENDING] CID",
     "attr_national_id": "རྒྱལ་ཡོངས་ ID",
     "attr_dob": "སྐྱེས་ཚེས།",
     "attr_phone": "ཁ་པར་ཨང་།",
@@ -494,7 +494,7 @@
     "confirm_subtitle": "བྱ་གཞི་འདི་མི་བཅོས་ཤིང་ཕྱིར་མི་ལོག། ངོ་མའི་ཡིག་ཆ་ལྟ་ཞིབ་ཀྱི་དོན་ལ་ཉར་འཇོག་ཀྱི་ཡོད།",
     "region_summary_label": "{{count}} ས་ཁོངས་ཁ་བཀབ།",
     "reason_label": "ཁ་བཀབ་གཙོ་བོའི་རྒྱུ་མཚན།",
-    "reason_pii": "PII",
+    "reason_pii": "[DZ-PENDING] PII",
     "reason_financial_secret": "དངུལ་རྩིས་གསང་བ།",
     "reason_commercial_confidential": "ཚོང་འབྲེལ་གསང་བ།",
     "reason_legal_hold": "ཁྲིམས་འཛིན།",
@@ -508,8 +508,8 @@
     "manual_toggle": "ལག་ལེན་ལས་སྒོར།",
     "manual_hint_active": "ཚད་གཞི་ (0–100) ཨང་གིས་འབྲི།",
     "manual_hint_inactive": "ཡིག་ཆ་ལ་ཀྱི་ས་ཁོངས་འདེམས།",
-    "manual_x_label": "X (%)",
-    "manual_y_label": "Y (%)",
+    "manual_x_label": "[DZ-PENDING] X (%)",
+    "manual_y_label": "[DZ-PENDING] Y (%)",
     "manual_w_label": "རྒྱ (%)",
     "manual_h_label": "མཐོ (%)",
     "manual_reason_label": "རྒྱུ་མཚན།",
@@ -528,6 +528,7 @@
     "feature_disabled_hint": "VITE_FF_REDACTION=true བཞག་དགོ།"
   },
   "nav": {
+    "home": "གཙོ་ས།",
     "dashboard": "ལས་ཁུངས་གཙོ།",
     "capture": "ཡིག་ཆ་བྱིན།",
     "repository": "ཡིག་ཚང་།",
@@ -542,6 +543,9 @@
     "settings": "བཀོད་སྒྲིག།",
     "audit": "ལྟ་ཞིབ་ཐོ།",
     "admin": "དོ་དམ།"
+  },
+  "topbar": {
+    "no_branch": "[DZ-PENDING] HQ"
   },
   "common": {
     "save": "ཉར་ཚགས།",
@@ -622,7 +626,20 @@
     "error_invalid": "སྤྱོད་མི་མིང་ཡང་ན་གསང་ཨང་ནོར་འཁྲུལ།",
     "error_locked": "རྩིས་ཁང་བསྡམས། དོ་དམ་མི་ལ་ཞུ།",
     "error_network": "དྲ་རྒྱ་འབྲེལ་བ་མེད། བསྐྱར་ཞིབ།",
-    "logout": "ཕྱིར་ཐོན།"
+    "logout": "ཕྱིར་ཐོན།",
+    "forgot_title":        "གསང་ཨང་གསར་འཛུགས།",
+    "username_or_email":   "སྤྱོད་མི་མིང་ཡང་ན་གློག་འཕྲིན།",
+    "send_reset_link":     "གསར་འཛུགས་འབྲེལ་ལམ་གཏོང་།",
+    "forgot_done":         "རྩིས་ཁང་དེ་ཡོད་ན་གསར་འཛུགས་འབྲེལ་ལམ་གཏོང་ཟིན།",
+    "reset_title":         "གསང་ཨང་གསར་པ་བཀོད།",
+    "new_password":        "གསང་ཨང་གསར་པ།",
+    "confirm_password":    "གསང་ཨང་ར་སྤྲོད།",
+    "reset_submit":        "གསང་ཨང་གསར་འཛུགས།",
+    "forgot_password":     "གསང་ཨང་བརྗེད་དམ།",
+    "reset_invalid_token": "གསར་འཛུགས་འབྲེལ་ལམ་ནོར་འཁྲུལ་ཡང་ན་དུས་ཟིན།",
+    "reset_missing_token": "ལྡེ་མིག་མེད།",
+    "reset_failed":        "གསར་འཛུགས་ཕམ་ཁེལ།",
+    "reset_mismatch":      "གསང་ཨང་གཉིས་མི་མཐུན།"
   },
   "dashboard": {
     "title": "ལས་ཁུངས་གཙོ།",
@@ -650,5 +667,40 @@
     "locale_en": "དབྱིན་ཡིག (English)",
     "locale_dz": "རྫོང་ཁ (Dzongkha)",
     "save_success": "གནས་ས་བཀོད་སྒྲིག་ཉར་ཟིན།"
+  },
+  "a11y": {
+    "skip_to_content": "[DZ-PENDING] Skip to main content",
+    "breadcrumb": "[DZ-PENDING] Breadcrumb"
+  },
+  "tabs": {
+    "approved": "མོས་མཐུན་འབྱུང་བ།",
+    "pending":  "[DZ-PENDING] Pending",
+    "rejected": "[DZ-PENDING] Rejected",
+    "all":      "ཐམས་ཅད།",
+    "assigned": "[DZ-PENDING] Assigned to me",
+    "team":     "[DZ-PENDING] Team queue",
+    "users":    "[DZ-PENDING] Users",
+    "mfa":      "[DZ-PENDING] MFA",
+    "saml":     "[DZ-PENDING] SAML",
+    "sessions": "[DZ-PENDING] Sessions"
+  },
+  "notif": {
+    "title":          "གསལ་བརྡ།",
+    "tabs_aria":      "གསལ་བརྡ་བཀོལ་ལྟ།",
+    "tab": {
+      "alerts":    "སྲུང་སྐྱོབ།",
+      "approvals": "ཆོག་མཆན།",
+      "system":    "མ་ལག"
+    },
+    "unread_count_one":   "[DZ-PENDING] ༡ མ་ཀློག་པ།",
+    "unread_count_other": "[DZ-PENDING] {{count}} མ་ཀློག་པ།",
+    "mark_all_read": "[DZ-PENDING] Mark all read",
+    "mark_read":     "[DZ-PENDING] Mark as read",
+    "loading":       "[DZ-PENDING] Loading…",
+    "empty":         "[DZ-PENDING] No notifications",
+    "view_all":      "[DZ-PENDING] View all notifications"
+  },
+  "cmdk": {
+    "hints": "[DZ-PENDING] Try:"
   }
 }

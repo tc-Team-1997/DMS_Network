@@ -11,6 +11,7 @@ export const NotificationSchema = z.object({
   read_at:     z.string().nullable(),
   event_type:  z.string().nullable(),
   template_id: z.string().nullable(),
+  severity:    z.string().optional(),
 });
 export type Notification = z.infer<typeof NotificationSchema>;
 

@@ -1,5 +1,6 @@
 {
   "nav": {
+    "home": "Home",
     "dashboard": "Dashboard",
     "capture": "Capture",
     "repository": "Repository",
@@ -14,6 +15,9 @@
     "settings": "Settings",
     "audit": "Audit Log",
     "admin": "System Admin"
+  },
+  "topbar": {
+    "no_branch": "HQ"
   },
   "aml": {
     "title": "AML Screening",
@@ -542,5 +546,55 @@
     "error_generic": "Redaction failed. Please try again.",
     "feature_disabled": "Document redaction is not enabled in this environment.",
     "feature_disabled_hint": "Set VITE_FF_REDACTION=true to enable."
+  },
+  "a11y": {
+    "skip_to_content": "Skip to main content",
+    "breadcrumb": "Breadcrumb"
+  },
+  "tabs": {
+    "approved": "Approved",
+    "pending":  "Pending",
+    "rejected": "Rejected",
+    "all":      "All",
+    "assigned": "Assigned to me",
+    "team":     "Team queue",
+    "users":    "Users",
+    "mfa":      "MFA",
+    "saml":     "SAML",
+    "sessions": "Sessions"
+  },
+  "auth": {
+    "forgot_title":         "Reset your password",
+    "username_or_email":    "Username or email",
+    "send_reset_link":      "Send reset link",
+    "forgot_done":          "If that account exists, a reset link has been sent.",
+    "reset_title":          "Set a new password",
+    "new_password":         "New password",
+    "confirm_password":     "Confirm password",
+    "reset_submit":         "Reset password",
+    "forgot_password":      "Forgot password?",
+    "reset_invalid_token":  "Reset link is invalid or expired",
+    "reset_missing_token":  "Missing token",
+    "reset_failed":         "Reset failed",
+    "reset_mismatch":       "Passwords do not match"
+  },
+  "notif": {
+    "title":          "Notifications",
+    "tabs_aria":      "Notification tabs",
+    "tab": {
+      "alerts":    "Alerts",
+      "approvals": "Approvals",
+      "system":    "System"
+    },
+    "unread_count_one":   "1 unread",
+    "unread_count_other": "{{count}} unread",
+    "mark_all_read": "Mark all read",
+    "mark_read":     "Mark as read",
+    "loading":       "Loading…",
+    "empty":         "No notifications",
+    "view_all":      "View all notifications"
+  },
+  "cmdk": {
+    "hints": "Try:"
   }
 }

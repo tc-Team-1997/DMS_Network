@@ -36,6 +36,7 @@ const {
   sha256,
 } = require('../../services/idempotency');
 const { tenantScope } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 const { runOcr }      = require('../../services/ocr');
 
 const router = express.Router();
@@ -48,17 +49,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 // ---------------------------------------------------------------------------
 
 /** Write a row to audit_log (same pattern as documents.js). */
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(
     userId,
     action,
     entity,
     entityId ?? null,
     typeof details === 'string' ? details : JSON.stringify(details),
-    tenantId || 'nbe'
+    tenantId || 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null
   );
 }
 
@@ -231,15 +233,16 @@ router.post('/sync/replay', (req, res) => {
   // Audit — counts only, never raw payloads.
   writeAudit({
     userId,
-    action: 'OFFLINE_SYNC_REPLAY',
-    entity: 'offline_sync',
-    entityId: null,
-    details: {
+    action:         'OFFLINE_SYNC_REPLAY',
+    entity:         'offline_sync',
+    entityId:       null,
+    details:        {
       accepted_count: accepted.length,
       deduped_count:  deduped.length,
       failed_count:   failed.length,
     },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   return res.status(200).json({ accepted, deduped, failed });

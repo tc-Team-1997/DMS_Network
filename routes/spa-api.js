@@ -14,6 +14,9 @@ const router = express.Router();
 // Public — no session required.
 // New canonical paths: /spa/api/auth/*
 router.use('/auth', require('./spa-api/auth'));
+// Forgot-password / reset-password endpoints (Plan 0 / Task 9a-9c).
+// Must remain before requireAuthJson so unauthenticated users can reach them.
+router.use('/auth', require('./spa-api/auth-reset'));
 // Legacy aliases kept for backward-compat with existing SPA calls to
 // /spa/api/login, /spa/api/logout, /spa/api/me.
 router.use(require('./spa-api/auth'));
@@ -63,6 +66,8 @@ router.use(require('./spa-api/dashboard'));
 router.use(require('./spa-api/customer-360'));
 // Wave C — Audit log v2
 router.use(require('./spa-api/audit'));
+// Wave E1 — SPA-emitted audit events (pii_reveal, preview_open, export …)
+router.use(require('./spa-api/audit-events'));
 // Wave C — DSAR Console
 router.use(require('./spa-api/dsar'));
 // Wave C — Regulator Reports

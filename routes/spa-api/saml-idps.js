@@ -12,6 +12,7 @@ const express = require('express');
 const db      = require('../../db');
 const { requireNamespacePermJson, tenantScope } = require('./_shared');
 const { setConfig } = require('../../db/tenant-config');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -29,11 +30,12 @@ function publicIdp(row) {
   };
 }
 
-function writeAudit({ userId, action, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, 'saml_idp', ?, ?, ?)`
-  ).run(userId, action, entityId ?? null, details ? JSON.stringify(details) : null, tenantId ?? 'nbe');
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, 'saml_idp', ?, ?, ?, ?)`
+  ).run(userId, action, entityId ?? null, details ? JSON.stringify(details) : null, tenantId ?? 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +87,7 @@ router.post('/admin/users/saml-idps', requireNamespacePermJson('auth'), (req, re
       is_active !== false ? 1 : 0,
     );
 
-    writeAudit({ userId: actorId, action: 'SAML_IDP_CREATE', entityId: ins.lastInsertRowid, tenantId: tenant });
+    writeAudit({ userId: actorId, action: 'SAML_IDP_CREATE', entityId: ins.lastInsertRowid, tenantId: tenant, policyDecision: buildPolicyDecision(req) });
 
     try {
       setConfig(tenant, '_user_meta', 'last_saml_config_at', new Date().toISOString(), {
@@ -144,7 +146,7 @@ router.put('/admin/users/saml-idps/:id', requireNamespacePermJson('auth'), (req,
   db.prepare(`UPDATE saml_idps SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
 
   writeAudit({ userId: actorId, action: 'SAML_IDP_UPDATE', entityId: id,
-               details: Object.keys(body), tenantId: tenant });
+               details: Object.keys(body), tenantId: tenant, policyDecision: buildPolicyDecision(req) });
 
   try {
     setConfig(tenant, '_user_meta', 'last_saml_config_at', new Date().toISOString(), {
@@ -199,7 +201,7 @@ router.post('/admin/users/saml-idps/:id/test', requireNamespacePermJson('auth'),
     `</samlp:AuthnRequest>`,
   ].join('\n');
 
-  writeAudit({ userId: actorId, action: 'SAML_IDP_TEST', entityId: id, tenantId: tenant });
+  writeAudit({ userId: actorId, action: 'SAML_IDP_TEST', entityId: id, tenantId: tenant, policyDecision: buildPolicyDecision(req) });
 
   res.json({
     idp_entity_id:    idpEntityId,

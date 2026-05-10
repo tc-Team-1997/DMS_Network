@@ -30,22 +30,29 @@ export default {
         'action-hover':  '#104a94',
         'action-subtle': '#E3EFFF',
 
-        // ── Semantic (DEFAULT + bg) ─────────────────────────────
-        success: { DEFAULT: '#1D9E75', bg: '#E0F5EE' },
-        warning: { DEFAULT: '#EF9F27', bg: '#FAF0DC' },
-        danger:  { DEFAULT: '#E24B4A', bg: '#FCEBEB' },
-        purple:  { DEFAULT: '#7F77DD', bg: '#EEEDFE' },
+        // ── Component hover tokens ──────────────────────────────
+        'secondary-hover': '#d0e3fb',
+        'danger-hover':    '#c73b3a',
+
+        // ── Semantic (DEFAULT + bg + on-light) ─────────────────
+        // DEFAULT is the accessible text-on-bg shade (WCAG 1.4.3 ≥ 4.5:1 on respective -bg).
+        // bright: legacy vivid shade retained for icon/graphic use on dark surfaces.
+        // on-light: alias of DEFAULT for explicit intent.
+        success: { DEFAULT: '#136340', bright: '#1D9E75', bg: '#E0F5EE', 'on-light': '#136340' },
+        warning: { DEFAULT: '#8C5A00', bright: '#EF9F27', bg: '#FAF0DC', 'on-light': '#8C5A00' },
+        danger:  { DEFAULT: '#B91C1C', bright: '#E24B4A', bg: '#FCEBEB', 'on-light': '#B91C1C' },
+        purple:  { DEFAULT: '#4B44A8', bright: '#7F77DD', bg: '#EEEDFE', 'on-light': '#4B44A8' },
 
         // Legacy aliases kept for compatibility with apex-derived code
-        ok:   { DEFAULT: '#1D9E75', bg: '#E0F5EE' },
-        warn: { DEFAULT: '#EF9F27', bg: '#FAF0DC' },
-        risk: { DEFAULT: '#E24B4A', bg: '#FCEBEB' },
+        ok:   { DEFAULT: '#136340', bright: '#1D9E75', bg: '#E0F5EE', 'on-light': '#136340' },
+        warn: { DEFAULT: '#8C5A00', bright: '#EF9F27', bg: '#FAF0DC', 'on-light': '#8C5A00' },
+        risk: { DEFAULT: '#B91C1C', bright: '#E24B4A', bg: '#FCEBEB', 'on-light': '#B91C1C' },
 
         // ── Neutrals ────────────────────────────────────────────
         ink:            '#2C2C2A',
         'ink-sub':      '#5F5E5A',
         sub:            '#5F5E5A',
-        muted:          '#888780',
+        muted:          '#6B6962',
         border:         '#D3D1C7',
         borderMed:      '#B9B7AE',
         divider:        '#F1EFE8',

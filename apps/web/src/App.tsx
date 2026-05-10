@@ -67,6 +67,9 @@ import { TemplateDetail } from '@/modules/regulator-reports/TemplateDetail';
 import { RegulatorReportsPanel } from '@/modules/admin/settings/panels/RegulatorReportsPanel';
 // Wave C — Notifications feed
 import { NotificationsPage } from '@/modules/notifications/Page';
+// Wave E — forgot / reset password
+import ForgotPasswordPage from '@/modules/auth/ForgotPasswordPage';
+import ResetPasswordPage from '@/modules/auth/ResetPasswordPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,6 +135,8 @@ export function App() {
             {/* Anonymous routes — no session required */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/set-password" element={<SetPasswordPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route
               element={
                 <RequireAuth>

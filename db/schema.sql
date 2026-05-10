@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS users (
   status TEXT DEFAULT 'Active',
   api_key TEXT,
   tenant_id TEXT DEFAULT 'nbe',
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  reset_token TEXT,
+  reset_token_expires_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
@@ -190,7 +192,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
   entity_id INTEGER,
   details TEXT,
   tenant_id TEXT DEFAULT 'nbe',
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  policy_decision TEXT
 );
 
 CREATE TABLE IF NOT EXISTS ai_conversations (

@@ -156,7 +156,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {createPortal(
         <div
+          role="region"
           aria-label="Notifications"
+          aria-live="polite"
+          aria-atomic="false"
           className="fixed right-4 top-4 z-[60] flex flex-col gap-2"
         >
           {toasts.map((item) => (

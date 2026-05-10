@@ -31,6 +31,7 @@ const db = require('../../db');
 const { computeHash, canonicalJson } = require('../../db/hash-chain');
 const { requireNamespacePermJson, tenantScope } = require('./_shared');
 const { pyCall } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -72,6 +73,7 @@ function rowToDict(row) {
  * @param {object|null} [opts.detail]
  * @param {string} [opts.result]
  * @param {string} opts.tenantId
+ * @param {object|null} [opts.policyDecision] - OPA/RBAC decision blob from buildPolicyDecision()
  */
 function writeAuditRow(opts) {
   const {
@@ -83,10 +85,12 @@ function writeAuditRow(opts) {
     detail = null,
     result = 'allow',
     tenantId,
+    policyDecision = null,
   } = opts;
 
   const createdAt = new Date().toISOString();
   const detailJson = detail !== null ? JSON.stringify(detail) : null;
+  const policyDecisionJson = policyDecision !== null ? JSON.stringify(policyDecision) : null;
 
   // Get the last hash for this tenant (or globally — audit chain is per DB, not per tenant).
   const lastRow = db.prepare(
@@ -100,9 +104,9 @@ function writeAuditRow(opts) {
   const insertAndHash = db.transaction(() => {
     const info = db.prepare(`
       INSERT INTO audit_log
-        (user_id, action, entity, entity_type, entity_id, detail, details, result, tenant_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(userId, action, entity, entityType, entityId, detailJson, detailJson, result, tenantId, createdAt);
+        (user_id, action, entity, entity_type, entity_id, detail, details, result, tenant_id, created_at, policy_decision)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, action, entity, entityType, entityId, detailJson, detailJson, result, tenantId, createdAt, policyDecisionJson);
 
     const newId = info.lastInsertRowid;
 
@@ -114,6 +118,7 @@ function writeAuditRow(opts) {
       entity_id: entityId,
       entity_type: entityType,
       id: newId,
+      policy_decision: policyDecisionJson,
       result,
       tenant_id: tenantId,
       user_id: userId,
@@ -185,7 +190,7 @@ router.get(
       SELECT
         a.id, a.action, a.entity, a.entity_type, a.entity_id,
         a.detail, a.details, a.result, a.prev_hash, a.hash,
-        a.tenant_id, a.created_at,
+        a.policy_decision, a.tenant_id, a.created_at,
         u.username, u.full_name
       FROM audit_log a
       LEFT JOIN users u ON u.id = a.user_id
@@ -382,13 +387,14 @@ router.get(
     // Log the export as an audit event (fire-and-forget; don't block response).
     const actor_user = req.session?.user;
     writeAuditRow({
-      userId:     actor_user?.id ?? null,
-      action:     'audit_export',
-      entity:     'audit_log',
-      entityType: 'config',
-      detail:     { format, filters: { entity_type, action, actor, from, to, result }, row_count: rows.length },
-      result:     'allow',
-      tenantId:   tenant,
+      userId:         actor_user?.id ?? null,
+      action:         'audit_export',
+      entity:         'audit_log',
+      entityType:     'config',
+      detail:         { format, filters: { entity_type, action, actor, from, to, result }, row_count: rows.length },
+      result:         'allow',
+      tenantId:       tenant,
+      policyDecision: buildPolicyDecision(req),
     });
 
     if (format === 'json') {
@@ -542,13 +548,14 @@ router.post(
 
     // Log the anchor event.
     writeAuditRow({
-      userId:     req.session?.user?.id ?? null,
-      action:     'audit_anchor',
-      entity:     'audit_log',
-      entityType: 'config',
-      detail:     { head_hash: headHash, block_hash: pyResult?.block_hash ?? null },
-      result:     'allow',
-      tenantId:   tenant,
+      userId:         req.session?.user?.id ?? null,
+      action:         'audit_anchor',
+      entity:         'audit_log',
+      entityType:     'config',
+      detail:         { head_hash: headHash, block_hash: pyResult?.block_hash ?? null },
+      result:         'allow',
+      tenantId:       tenant,
+      policyDecision: buildPolicyDecision(req),
     });
 
     res.json({
@@ -561,4 +568,4 @@ router.post(
   },
 );
 
-module.exports = router;
+module.exports = Object.assign(router, { writeAuditRow });

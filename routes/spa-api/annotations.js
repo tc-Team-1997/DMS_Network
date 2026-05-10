@@ -20,6 +20,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireAuthJson, tenantScope } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -62,12 +63,13 @@ function resolveDocument(docId, _tenantId) {
   return db.prepare('SELECT id FROM documents WHERE id=?').get(docId) ?? null;
 }
 
-function writeAudit({ userId, action, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entityId, details, tenantId, policyDecision = null }) {
   try {
     db.prepare(
-      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-       VALUES (?, ?, 'annotation', ?, ?, ?)`,
-    ).run(userId, action, String(entityId), JSON.stringify(details), tenantId);
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+       VALUES (?, ?, 'annotation', ?, ?, ?, ?)`,
+    ).run(userId, action, String(entityId), JSON.stringify(details), tenantId,
+      policyDecision !== null ? JSON.stringify(policyDecision) : null);
   } catch {
     // audit failure must never block the response
   }
@@ -151,11 +153,12 @@ router.post('/documents/:id/annotations', requireAuthJson, (req, res) => {
   ).run(docId, user.id, pageNum, type, x, y, w, h, payloadText, colorStr);
 
   writeAudit({
-    userId: user.id,
-    action: 'ANNOTATION_CREATED',
-    entityId: info.lastInsertRowid,
-    details: { doc_id: docId, type, page: pageNum },
+    userId:         user.id,
+    action:         'ANNOTATION_CREATED',
+    entityId:       info.lastInsertRowid,
+    details:        { doc_id: docId, type, page: pageNum },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   const created = db.prepare('SELECT * FROM annotations WHERE id=?').get(info.lastInsertRowid);
@@ -199,11 +202,12 @@ router.patch('/documents/:id/annotations/:annId', requireAuthJson, (req, res) =>
   ).run(newPage, newX, newY, newW, newH, newPayload, newColor, annId);
 
   writeAudit({
-    userId: user.id,
-    action: 'ANNOTATION_UPDATED',
-    entityId: annId,
-    details: { doc_id: docId },
+    userId:         user.id,
+    action:         'ANNOTATION_UPDATED',
+    entityId:       annId,
+    details:        { doc_id: docId },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   const updated = db.prepare('SELECT * FROM annotations WHERE id=?').get(annId);
@@ -234,11 +238,12 @@ router.delete('/documents/:id/annotations/:annId', requireAuthJson, (req, res) =
   db.prepare('DELETE FROM annotations WHERE id=?').run(annId);
 
   writeAudit({
-    userId: user.id,
-    action: 'ANNOTATION_DELETED',
-    entityId: annId,
-    details: { doc_id: docId },
+    userId:         user.id,
+    action:         'ANNOTATION_DELETED',
+    entityId:       annId,
+    details:        { doc_id: docId },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   return res.json({ ok: true });
