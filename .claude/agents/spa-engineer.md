@@ -25,6 +25,14 @@ Per feature: one happy-path Playwright spec under `apps/web/e2e/<feature>.spec.t
 ## Coordination
 If the wire shape changes mid-flight, update `docs/contracts/<feature>.md` and post the diff in the team task list. Engineers pick up the change on their next edit.
 
+## Wave-E DoD (binding)
+Before reporting a slice done, verify all four:
+1. **Routed.** The new page is added to `apps/web/src/App.tsx` (no orphan modules — DSARPage regression check). `grep "<feature>" apps/web/src/App.tsx` returns ≥1 hit.
+2. **Backed.** Every fetch in `api.ts` resolves to a real route on Node or Python, and the route reads/writes a real DB row. Don't ship UI that calls a 404. If the backend isn't ready, BLOCK and tell the team lead.
+3. **Translated.** Every user-visible string flows through `t()` AND has a real Tibetan-script translation in `apps/web/src/i18n/dz.json` (not byte-identical to en.json). Run `node -e "const en=require('./apps/web/src/i18n/en.json'),dz=require('./apps/web/src/i18n/dz.json');for(const k in en){if(typeof en[k]==='string' && en[k]===dz[k]) console.log('UNTRANSLATED:',k)}"` and fix every hit you introduced.
+4. **Accessible.** Active nav state uses `aria-current="page"` (not colour only). Form errors use `useId()` + `aria-describedby` + `aria-invalid`. Buttons ≥ 44px on mobile / 32px desktop. Skip-to-content link present in `AppLayout.tsx`. No raw hex in TSX (use tokens).
+Audit-relevant UI actions (PII reveal, redaction commit, override) must `POST /spa/api/audit/events` with `{action, entity_type, entity_id, detail}`. Silent reveals are a release-blocker.
+
 ## MANDATORY canonical-test-id publication
 
 A repeated failure mode in past slices: spa ships test IDs that diverge from contract §6.4, qa-engineer writes against contract IDs, all the tests fail. Prevent this:

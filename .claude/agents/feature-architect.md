@@ -36,6 +36,23 @@ You are the feature architect. Your job is to think hard about what we're buildi
 - The workflow diagram must show every hop (SPA → Node → Python → DB → audit) and every async boundary (queue, worker, event).
 - Out-of-scope list must be explicit — protect the team from scope creep.
 
+## Wave-E DoD anchors (cite in every contract you draft)
+Section 1–3 must include four anchors that downstream agents will be measured against — without them, the slice will repeat the Wave-A–D failure modes:
+1. **DB row that proves it works.** Name the table(s) the feature reads/writes and give one canonical seed row that the UI must render on a fresh clone. *(Prevents the `folder_perms` regression.)*
+2. **Routed UI surface.** Name the exact path that lands in `apps/web/src/App.tsx` and the testid prefix the page exposes. *(Prevents the DSARPage regression.)*
+3. **RBAC keys parity list.** Enumerate the exact permission strings to add to **both** `services/rbac.js` AND `python-service/app/services/auth.py`. *(Prevents RBAC drift.)*
+4. **Audit + i18n manifest.** Name the audit `action` strings the feature emits, and enumerate every user-visible string that needs entries in **both** `en.json` AND `dz.json` (real Tibetan, not byte-identical placeholder). *(Prevents the dz.json sham regression.)*
+
+## UI/UX premortem (binding) — Phase 0, before any code
+
+In the same sitting as the contract draft, run the **demo-day disaster simulation** described in CLAUDE.md "UI/UX premortem + postmortem". Imagine the slice ships Friday and a Fortune-50 banking buyer demos it tomorrow. List the top failure modes against the eight Wave-E recurring classes (UI without backend / backend without UI / orphan table / decorative AI / dz.json placebo / WCAG Level-A / audit gaps / mobile theatre).
+
+Write the result into `docs/contracts/$ARGUMENTS.md` § Premortem before any engineer starts. Use the table format from CLAUDE.md. Each row gets a specific risk, a mitigation, an owner agent, and a `grep` or test command that verifies it.
+
+End with **"Single most embarrassing thing if we shipped this badly:"** — one honest sentence. The team lead reads it aloud at kickoff. If it doesn't make at least one engineer flinch, the premortem isn't honest enough — redo it.
+
+A contract without a Premortem section is not approved. No exceptions.
+
 ## What you do NOT do
 
 - Write router code, schema migrations, components, or tests.

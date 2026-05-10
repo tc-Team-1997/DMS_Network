@@ -157,6 +157,186 @@ Reviewers: do NOT edit production code — only read.
 - **Display mode:** iTerm2 + `it2` CLI → auto split-panes; anything else → in-process (Shift+Down to cycle).
 - **Don't resume agent-team sessions via `/resume`**; in-process teammates don't restore. Re-spawn them.
 
+## Definition of Done — Wave-E standard (binding for every shipment from 2026-05-10)
+
+The Wave-E re-review (`docs/UI_UX_REVIEW.md` + `DocManager-Fortune50-Mockup.html` × 7 Fortune-50 reviewers) found the dominant failure mode in Waves A–D was **partial-stack delivery** — UI present but no backend, backend present but no UI, schema seeded but no route ever queries it. From now on, no slice is "shipped" unless the four layers are wired end-to-end:
+
+1. **DB layer.** Every new column / table lands via a migration that runs on a fresh clone (`db/schema.sql` + Alembic for Python). `db-migrator` runs the verify-after-write protocol. **Tables that are seeded but never read are forbidden** — see `folder_perms` precedent under "RBAC reality" below.
+2. **Backend layer.** Every new domain has a router file (`routes/spa-api/<feature>.js` or `python-service/app/routers/<feature>.py`) wired to RBAC (`requirePermJson` / `require_role`) and to the DB rows added in step 1. Branch-scope check at `routes/spa-api/_shared.js:78-82` applies for non-admin reads.
+3. **UI layer.** Every promised mockup screen has a routed page in `apps/web/src/App.tsx` (no orphan modules), every fetch goes through `lib/http.ts` with a zod schema, every user-visible string flows through `t()`, and every interactive element is keyboard- and screen-reader-accessible (WCAG 2.1 AA).
+4. **Verification layer.** `cd apps/web && npm run typecheck && npx playwright test` green AND `cd python-service && pytest -q` green AND `node -c` parses every changed Node route. Per feature: one happy-path Playwright spec against the real stack + at least one mocked-error spec.
+
+**Hard checks before "done"** (lead does not accept the slice without these):
+
+- `grep -r '<feature_table_name>' routes/ python-service/app/routers/` returns ≥1 hit. *(folder_perms-class regression check.)*
+- `grep -rh 'data-testid=' apps/web/src/modules/<feature>/ | sort -u` matches `docs/contracts/<feature>.md` §6.4.
+- Every new endpoint is reachable from a routed UI surface in `apps/web/src/App.tsx`. No "backend ready but no DSARPage" repeats.
+- Every new permission key is in **both** `services/rbac.js` AND `python-service/app/services/auth.py`. RBAC drift is a P0 bug.
+- New user-visible strings exist in **both** `apps/web/src/i18n/en.json` AND `apps/web/src/i18n/dz.json` with real Tibetan-script translations (not English placeholders). The dz.json byte-identical-to-en regression is a release-blocker.
+- Audit-relevant actions write to `audit_log` with `policy_decision` populated (OPA decision + role + branch + risk_band JSON blob). PII reveals call `POST /spa/api/audit/events` with `action='pii_reveal'`.
+
+When a slice cannot finish all four layers in the same PR, split the work into a `feat/<feature>-backend` PR and a `feat/<feature>-ui` PR with a tracking issue — but **the feature is not announced shipped** until the UI PR lands and the four hard checks pass. No more "Wave B claimed shipped but DSARPage doesn't exist."
+
+## RBAC reality (verified 2026-05-10)
+
+Use this section as ground truth when reasoning about authorization. The earlier marketing-grade summaries diverge from the code in three places.
+
+### Where enforcement actually lives
+- **Node permission bundles** — `services/rbac.js:1-34` ships 6 fixed roles with bundled permission strings:
+
+| Role | Notable bundle |
+|---|---|
+| `Doc Admin` | capture, index, approve, reject, delete, admin, view_unredacted, worm:admin, kyc:read/write, regulator_reports:admin |
+| `Maker` | capture, index, upload, view, workflow, aml:read, cbs:read/write, kyc:write, translate:read |
+| `Checker` | approve, reject, view, workflow, aml:read, cbs:read/write, documents:redact |
+| `Viewer` | view, aml:read, cbs:read, worm:read, translate:read |
+| `auditor` | view, view_unredacted, aml:read, kyc:read, regulator_reports:read |
+| `compliance` | view, aml:read, aml:review, cbs:read, regulator_reports:read |
+
+- **Python permission bundles** — `python-service/app/services/auth.py:32-52` mirrors the Node bundle but with lowercase role names (`doc_admin / maker / checker / viewer / auditor / compliance`). RBAC keys must stay in sync across both files; drift is a P0 bug.
+- **OPA ABAC layer** — `opa/policies/dms.rego` enforces tenant isolation, branch scoping (non-admin/auditor users locked to their branch), risk-band gate (critical docs require step-up auth), and after-hours gate (admin/approve/sign blocked outside 07:00–22:00 UTC for non-admins). Compiled rules pushed via `routes/spa-api/abac.js` CRUD endpoints + `apps/web/src/modules/abac/AbacPage.tsx`.
+- **Route-level pattern** — every endpoint wraps `requirePermJson('<perm>')`; runtime branch scoping at `routes/spa-api/_shared.js:78-82` is the only attribute-level check in the Node layer. There is no per-action granularity within a handler and no per-document or per-folder access check at query time.
+
+### What the admin can actually control
+- **Role assignment only.** `routes/spa-api/users.js:105` (`PATCH /users/:id`) lets Doc Admin change a user's role to one of the 6 fixed values. **There is no per-permission override for individual users.** All "fine-grained" control flows through ABAC rules.
+- **SoD on role changes.** `routes/spa-api/users.js:75` `sodViolation()` reads forbidden role-pairs from `tenant_config` and blocks any change that would put Maker+Checker on the same person.
+- **ABAC rule editor.** Live in the SPA. Authoring path: `RuleList → RuleEditor → TestPolicyPanel → DecisionTraceViewer`. Rules compile to Rego and push to OPA.
+
+### Known dead code (folder_perms case study)
+- `db/schema.sql:295-305` defines `folder_perms (folder_id, role, can_view, can_edit, can_delete, tenant_id)`.
+- `db/seed.js:150-161` seeds rows: Doc Admin (1/1/1), Maker (1/1/0), Checker (1/0/0), Viewer (1/0/0).
+- **No route reads it.** `grep -r 'can_view\|can_edit\|can_delete' routes/spa-api/folders.js` returns nothing. The table is seeded at startup and never queried.
+- **DoD implication:** before approving any folder-permission UI work, the slice must include a route that reads this table. Until then, marketing copy must say "folder-level permission scaffolding" not "folder-level RBAC enforced."
+
+### What the Wave-E reviewers got right and wrong
+| Earlier claim | Verified status |
+|---|---|
+| 6 roles with bundled permissions | ✅ Correct |
+| Admin can assign roles via UI | ✅ Correct |
+| SoD enforcement on role change | ✅ Correct |
+| ABAC editor live | ✅ Correct |
+| `folder_perms` table exists | ✅ Correct |
+| `folder_perms` is enforced in routes | ❌ **Wrong** — table exists, never read |
+| Per-user permission override | ❌ **Absent** — only role swap |
+| Branch scoping for Viewer/Maker | ✅ Correct |
+
+## Live-code verification log — Wave D (2026-05-10)
+
+Run before relying on any Wave-D-claimed-shipped feature. The earlier UI/UX_REVIEW assertions were checked against on-disk source and confirmed:
+
+- `apps/web/src/components/layout/AppLayout.tsx` — `MobileSidebar` mounted only when `useIsBelowLg()` (< 1024px). Desktop `<Sidebar />` only when `!isBelowLg`. `LocaleEffect` syncs `<html lang>` with i18next.
+- `apps/web/src/components/layout/MobileSidebar.tsx` — 147 lines, full Drawer wrapper, nav with `t(i18nKey, label)`, 44px logout button, tenant monogram.
+- `apps/web/src/lib/useMatchMedia.ts` — 36 lines, SSR-safe, exports `useIsMobile()` (< 768px) and `useIsBelowLg()` (< 1024px).
+- `apps/web/src/lib/i18n.ts` — react-i18next + i18next-icu initialized; locale chain (localStorage → tenant config → en); ICU MessageFormat; missing-key console.warn in dev. Backwards-compat `t()` exported for non-React call sites.
+- `apps/web/src/modules/auth/LoginPage.tsx` — 320 lines, `StaticHeroPanel` (no auto-rotating carousel — confirmed absent); all branding fields interpolated from `fetchTenantPublic()`.
+- `apps/web/src/modules/capture/components/DocumentSummaryPanel.tsx` — 310 lines, line 181 comment `{/* Restrained loading indicator — no QuantumLoader */}` followed by `<Wand2 animate-pulse>`. **No QuantumLoader anywhere.**
+
+**Open Wave-E gaps still on disk** (carry into next sprint, do not re-claim shipped):
+- `apps/web/src/modules/dsar/DSARPage.tsx` — does not exist; backend `python-service/app/routers/dsar.py` is fully wired (lookup, 5-panel inventory, 4 fulfillment actions, 12-day SLA).
+- `db/seed.js:923` lists "RMA" token but seeds zero RMA templates — BoB tenant opens Regulator Reports → empty list.
+- `apps/web/tailwind.config.ts:48` — `muted: '#888780'` (3.4:1 contrast on white, fails WCAG 1.4.3 AA). Required value: `#6B6962`.
+- `apps/web/src/components/layout/Sidebar.tsx:80-95` — `<Link><div>` anti-pattern, no `aria-current="page"`. WCAG 1.4.1 + 4.1.2 fail.
+- `apps/web/src/components/ui/Input.tsx:23` — error span has no id; input lacks `aria-describedby` / `aria-invalid`. WCAG 3.3.1 fail.
+- `apps/web/src/components/ui/Button.tsx:18-20` — raw `bg-[#d0e3fb]` and `bg-[#c73b3a]` violate the file's own "DO NOT add raw hex" comment.
+- Multi-page redaction — migration `0029_redactions_multi_page.py:25-67` ships schema with composite PK `(redaction_id, page)`, but the AnnotationLayer submission still posts page-0 only. Data-leak class issue.
+- `audit_log` payload missing `policy_decision` — diff drawer cannot render OPA decision/role/branch/risk_band even though OPA is enforcing them.
+- `Customer360Drawer.tsx > PiiRevealField` — flips `masked: false` silently, no `POST /spa/api/audit/events` for `pii_reveal`. GDPR Art. 32 + PDPL §6 violation.
+
+## UI/UX premortem + postmortem (binding for every slice)
+
+The Wave-E re-review showed that the team consistently shipped features that *technically existed* but failed Fortune-50 buyer scrutiny — decorative AI, dz.json placebo, orphan tables, silent PII, demo-grade login. Every recurring failure was visible *before* shipment if anyone had asked the right question. From now on, every slice runs a structured **premortem** before code and a **postmortem** after merge. Both are short (30 minutes max, one screen of output). Skipping them is a release-blocker.
+
+### Premortem — Phase 0, before any code
+
+Owner: **`feature-architect`**, in the same sitting as the contract draft. Inputs: the contract sections 1–3, the relevant mockup screen in `DocManager-Fortune50-Mockup.html`, and the relevant axis in `docs/UI_UX_REVIEW.md`.
+
+The exercise is a **demo-day disaster simulation**: imagine the slice ships next Friday and a Fortune-50 banking buyer (calibrate against Bloomberg, Salesforce FS Cloud, Stripe, ServiceNow GRC, Hebbia, nCino) demos it tomorrow. List the top failure modes that could embarrass the team, then assign a mitigation owner.
+
+Anchor against the **eight Wave-E recurring failure modes** — every premortem must address all eight even if the answer is "n/a, this slice doesn't touch X":
+
+| # | Failure mode | Wave-E precedent | Default mitigation prompt |
+|---|---|---|---|
+| 1 | UI ships, backend not wired | DSARPage / regulator-RMA | "Which `App.tsx` route + which `routes/` or `app/routers/` file lands in the same PR? `grep` proof?" |
+| 2 | Backend ships, UI not routed | regulator routers without page | "Is the SPA page already in `apps/web/src/App.tsx`? If not, who blocks until it is?" |
+| 3 | Schema seeded but never read | `folder_perms` | "Which route reads the new table? `grep` proof?" |
+| 4 | AI decorative, not inspectable | confidence badges, fake progress | "Is every confidence indicator clickable → popover with model + prompt id + Confirm/Override + scroll-to-source?" |
+| 5 | Translation is a placebo | `dz.json` byte-identical to en.json | "Has a Dzongkha-speaking linguist signed off, or is the slice gated on it?" |
+| 6 | WCAG Level-A fails | sidebar `<Link><div>`, `--muted` contrast, missing `aria-describedby` | "Skip-link, `aria-current`, `useId()`/`aria-describedby`, contrast ≥ 4.5:1 — all four green?" |
+| 7 | Audit chain has gaps | silent PII reveal, missing `policy_decision` | "Every mutation writes to `audit_log` with `policy_decision` JSON? PII reveals emit `pii_reveal` events?" |
+| 8 | Mobile / responsive is theatre | iframe PDF letterbox, 28px targets | "Pixel-7 Playwright spec asserts the new page; touch targets ≥ 44px; capture uses `capture='environment'`?" |
+
+**Output format** — written into `docs/contracts/<feature>.md` § Premortem before any engineer starts coding. Reject the slice if any row reads "we'll figure it out":
+
+```markdown
+## Premortem (feature-architect, YYYY-MM-DD)
+
+| # | Failure mode | Specific risk for this slice | Mitigation | Owner | Verify with |
+|---|---|---|---|---|---|
+| 1 | UI without backend | … | … | spa-engineer / node-engineer | `grep -r "<route>" apps/web/src/App.tsx` |
+| 2 | Backend without UI | … | … | … | … |
+| … | … | … | … | … | … |
+
+**Single most embarrassing thing if we shipped this badly:** <one sentence — the lead reads this aloud at the kickoff>.
+```
+
+**Hard rule:** the team lead reads the "single most embarrassing thing" sentence aloud before approving the contract. If it doesn't make at least one engineer flinch, the premortem isn't honest enough — redo it.
+
+### Postmortem — within 24 hours of merge
+
+Owner: **`docs-architect`**, with `qa-engineer` providing test/score deltas and `security-reviewer` providing the audit-grade verdict. Output stored at `docs/postmortems/YYYY-MM-DD-<feature>.md` and linked from `docs/README.md` changelog.
+
+The exercise compares **what we said we'd ship** (premortem + contract AC) to **what actually shipped** (live code + Playwright/pytest output + screenshots), and grades the slice against the same Fortune-50 peers used in `docs/UI_UX_REVIEW.md` §2.2 rubric (0–2 absent, 3–4 internal-tool, 5–6 functional, 7–8 Tier-2 competitive, 9–10 Fortune-50 demo-survivable).
+
+**Output format** — strict, one screen, no marketing prose:
+
+```markdown
+# Postmortem — <feature> (YYYY-MM-DD)
+
+## 1. What shipped (file:line evidence)
+- <bullet> — `apps/web/src/modules/<feature>/Page.tsx:NN`
+- <bullet> — `routes/spa-api/<feature>.js:NN`
+- <bullet> — Alembic revision `NNNN_<slug>.py`
+
+## 2. What slipped (carry to next sprint)
+- <bullet> — root cause + owner + new ETA
+
+## 3. What surprised us
+- <bullet> — anything that wasn't in the premortem; update the premortem template if it's a new failure class
+
+## 4. Wave-E DoD verification
+| Hard check | Result | Evidence |
+|---|---|---|
+| App.tsx route grep | ✅/❌ | `grep` output |
+| Orphan-table grep (`folder_perms` class) | ✅/❌ | `grep` output |
+| RBAC keys parity (rbac.js ↔ auth.py) | ✅/❌ | `diff` of both files |
+| dz.json non-identical for new strings | ✅/❌ | byte-diff hits |
+| audit_log has `policy_decision` for new mutations | ✅/❌ | sample row |
+| Playwright + pytest green | ✅/❌ | reporter output |
+| axe-core critical/serious = 0 | ✅/❌ | scan summary |
+
+## 5. Score delta vs. Fortune-50 peers
+| Axis | Score before (UI_UX_REVIEW §9) | Score after | Calibration peer | One-line justification |
+|---|---|---|---|---|
+
+## 6. Before/after screenshots
+- `docs/postmortems/img/<feature>-before.png`
+- `docs/postmortems/img/<feature>-after.png`
+
+## 7. The "demo-day disaster" question revisited
+**Premortem said:** <copy the "single most embarrassing thing" sentence>
+**Postmortem answer:** <did we close it? if not, what's left?>
+
+## 8. Lessons for the catalogue
+- New failure mode discovered? → add row to CLAUDE.md "eight Wave-E recurring failure modes" table.
+- New mitigation that worked? → fold into the relevant agent's Wave-E DoD addendum.
+```
+
+**Hard rule:** a slice with any ❌ in §4 cannot be tagged as shipped in `docs/ROADMAP.md` or in the changelog. The fix lands as a follow-up commit, the postmortem is updated, and only then does the feature move from "in flight" to "shipped." This is the rule that prevents the next "Wave D claimed shipped but DSARPage doesn't exist" embarrassment.
+
+### Quarterly Wave review
+
+Once per quarter the lead runs a full repeat of the Wave-E exercise — 6–8 Fortune-50 reviewer agents in parallel against the live SPA + the latest mockup — and produces a new score sheet appended to `docs/UI_UX_REVIEW.md`. Postmortems written between reviews feed into it. The premortem template above is updated if any new failure class shows up that the eight-row table didn't catch.
+
 ## Compact instructions
 
 When compacting, **preserve**: the current todo list, file paths under edit, the last user directive, green/red state of typecheck + Playwright + pytest, and any open coordination messages between teammates.

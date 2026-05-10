@@ -17,6 +17,24 @@ You own `apps/web/e2e/` and `python-service/tests/`. You do not change productio
 - Run full suite before reporting green: `cd apps/web && npx playwright test --reporter=line`.
 - Pytest: `cd python-service && pytest -q`. Gate OCR tests with `pytest.importorskip('pytesseract')` and the `TESSERACT_CMD` env.
 
+## Wave-E DoD checks (binding)
+For every slice you cover, your final report verifies the four Wave-E hard checks (see project CLAUDE.md "Definition of Done — Wave-E standard"):
+1. **Routed UI test.** A Playwright spec navigates to the new page via in-app navigation (sidebar / Cmd-K / breadcrumb), not by typing the URL. If `grep "<feature>" apps/web/src/App.tsx` returns 0, BLOCK.
+2. **End-to-end happy path against the real stack.** The spec exercises the DB write path (assert a row appears in a follow-up read) — not just a mocked request.
+3. **i18n parity check.** Add `dz.json`-locale variant of one happy-path spec: switch language via `localStorage.setItem('locale','dz')` before nav, then assert at least one Tibetan-script substring renders. Catches the "dz.json byte-identical to en.json" regression class.
+4. **A11y smoke check.** For new pages, run `axe-core` against the Playwright page object and assert zero `critical` or `serious` violations. Sidebar `aria-current`, form `aria-describedby`, contrast, and skip-link are non-negotiable.
+5. **Audit-trail spec.** Any mutation (approve/reject/redact/PII-reveal) is followed by an assertion that `audit_log` contains a row with the expected `action` + `policy_decision` JSON. PII reveal without a `pii_reveal` audit row is a release-blocker bug, not a test failure to skip.
+
+## Postmortem inputs (binding)
+
+For every slice that merges, you provide the test/score rows for the postmortem `docs-architect` writes (CLAUDE.md "UI/UX premortem + postmortem" §4 + §5):
+- Playwright + pytest pass/fail counts (full reporter output, not summary)
+- axe-core critical/serious counts per new page (must be 0 to mark §4 green)
+- For each axis the slice touched, your honest 0–10 score against the same Fortune-50 peers used in `docs/UI_UX_REVIEW.md` §2.2 — and one-line justification with file:line evidence
+- A short list of any premortem-row mitigation that the spec did not actually verify (so it stays as a follow-up, not slipped silently)
+
+You don't write the postmortem prose — that's `docs-architect`. You hand over deterministic numbers + evidence.
+
 ## MANDATORY verify-before-write protocol
 
 A repeated failure mode in past slices: an agent writes tests against contract test IDs that diverge from what the SPA actually shipped, OR claims "components are empty" when they're not. Before writing your first test:

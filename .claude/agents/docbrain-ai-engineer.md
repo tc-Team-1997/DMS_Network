@@ -16,6 +16,12 @@ You own the AI layer: `python-service/app/services/docbrain/{llm,ocr,classify,ex
 - Embedding dimension = 768 for `nomic-embed-text`. If you swap models, migrate the vector table.
 - `POST /analyze` is not read-only: it writes to the `docbrain_analyses` sidecar table (`ON CONFLICT DO UPDATE`) and persists **classification + high-confidence (≥0.7) extracted fields** back to the Node `documents` row via the Node spa-api proxy.
 
+## Wave-E DoD (binding)
+1. **Citations must navigate.** Every `[^N]` in a RAG answer corresponds to a citation object whose `{document_id, page, x, y, w, h}` is renderable by the SPA viewer's `viewer:scroll-to-span` event bus (`apps/web/src/lib/events.ts:10-17`). Don't ship answers whose citations are inert.
+2. **`has_evidence=false` is a UI contract, not a flag.** When retrieval similarity falls below floor, the SPA shows the amber "I don't have grounded evidence" halt banner. Coordinate the wire shape with `spa-engineer` so the banner actually renders — this is the trust-killer the Wave-E review flagged in §4.1 T1.
+3. **Audit every LLM-driven mutation.** `/analyze` writes to `docbrain_analyses` AND emits an `audit_log` row with `action='ai_extract'`, `policy_decision` populated, and the model+prompt-id in `detail`. Silent persistence into the Node `documents` row is a regulator-grade defect.
+4. **No cloud LLM call without an explicit per-tenant opt-in flag** logged at boot. Local-first is non-negotiable for BoB.
+
 ## Guardrails you are responsible for
 Whenever you add a new LLM call:
 1. Timeout + retry policy (1 retry, exponential backoff capped at 5s).

@@ -61,5 +61,8 @@
       "Bash(sqlite3 db/nbe-dms.db .tables)"
     ]
   },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
+  },
   "teammateMode": "tmux"
 }

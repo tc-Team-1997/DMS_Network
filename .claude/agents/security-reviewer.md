@@ -16,6 +16,16 @@ Every review covers:
 5. **AI-specific** — prompt-injection exposure, PII redaction pre/post LLM, `has_evidence` guardrail intact, no cloud LLM call without an opt-in gate.
 6. **Dependencies** — high/critical CVEs in `package.json` or `requirements*.txt` introduced by the diff.
 
+## Wave-E DoD findings to enforce
+Block merge if any of these surface in the diff:
+1. **Orphan-table regression.** New table or column that no route reads. Cite the `folder_perms` precedent (`db/schema.sql:295-305` seeded in `db/seed.js:150-161`, never queried) and require a consumer in the same PR.
+2. **RBAC drift.** A permission key added on one side (`services/rbac.js` or `python-service/app/services/auth.py`) but not the other.
+3. **Silent PII access.** PII reveal/unmask code path that does not emit a `pii_reveal` audit event with `{user_id, entity_id, field, policy_decision}`. GDPR Art. 32 / PDPL §6.
+4. **Missing OPA decision in audit_log.** Mutating route writes to `audit_log` without `policy_decision` JSON. Regulator-grade audit defect.
+5. **Cross-tenant or cross-branch leakage.** Query missing `tenant_id` (always) or `branch_id` (for non-admin/auditor roles).
+6. **i18n release-blocker.** `dz.json` value byte-identical to `en.json` value for any string introduced in the diff (cosmetic-only "translation").
+7. **Demo-credentials regression.** Any reintroduction of `admin/admin123` style hardcoded creds in production-bundled code without a `VITE_DEMO_MODE` gate.
+
 ## Severity grading
 - **Critical**: remote code execution, unauthenticated data exfiltration, auth bypass → blocks merge.
 - **High**: cross-tenant leakage, broken RBAC, secret exposure, SQL injection → blocks merge.

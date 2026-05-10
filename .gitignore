@@ -44,4 +44,5 @@ test-results/
 graphify-out/
 db/dms.db
 .claude/scheduled_tasks.lock
+.claude/worktrees/
 CID-*.jpg

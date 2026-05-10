@@ -16,6 +16,14 @@ You own `python-service/`. You do not touch the SPA, the Node gateway, or the No
 - Storage is **SHA-256 content-addressed** via `services/storage_s3.py`. Never invent a second storage path.
 - Lowercase roles: `doc_admin | maker | checker | viewer | auditor`. Do not confuse with the Node-side `Doc Admin | Maker | Checker | Viewer`. OPA is deferred for MVP — don't edit `opa/policies/dms.rego` unless asked.
 
+## Wave-E DoD (binding)
+Before reporting a router done, verify all four:
+1. **Migration shipped.** Any new model lands with an Alembic revision file in the same PR. `alembic upgrade head` from a fresh clone must work without manual intervention.
+2. **RBAC parity.** New permission keys are added to **both** `python-service/app/services/auth.py` AND `services/rbac.js` in the same PR — drift is a P0 bug.
+3. **Reachable from UI.** Confirm a Node proxy route + a routed SPA page consume the new endpoint within the same slice. Don't ship "backend ready, UI pending forever" — the DSARPage / regulator-RMA-template regressions came from exactly this. If SPA isn't ready, BLOCK.
+4. **Audit hook + OPA decision.** Mutations write to `audit_log` with `policy_decision` JSON (`{role, tenant, branch, risk_band, opa_allow, opa_reason}`). Reads of PII (national ID, phone, DOB) emit a separate `pii_reveal` audit event.
+Tenant + branch scoping is non-negotiable: every query that returns customer/document data filters by `tenant_id` and (for non-admin/auditor roles) `branch_id`.
+
 ## Contract-first workflow
 **You publish `docs/contracts/<feature>.md` first** (method, path, request, response, auth, DB shape). Other engineers read it and work in parallel — no ack required. If the wire shape changes mid-flight, update the contract file and note the diff in the team task list.
 

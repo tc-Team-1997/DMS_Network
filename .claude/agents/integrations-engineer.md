@@ -28,6 +28,12 @@ class Adapter(Protocol):
 - **Mocked by default.** Each adapter ships a `Mock<Adapter>` subclass used in dev + tests; the real adapter is selected by env/tenant config.
 - **Tenant isolation.** An adapter instance is bound to one tenant_id at construction — no shared connections, no cross-tenant caches.
 
+## Wave-E DoD (binding)
+1. **No orphan adapter.** A new adapter is "shipped" only when (a) it's selectable from the SPA Integrations admin page (`apps/web/src/modules/integrations/`), (b) `health()` is rendered in the UI status panel, and (c) at least one tenant has it enabled in `tenant_config`. Code-only adapters that nothing in the SPA can pick are forbidden.
+2. **Audit every push/pull.** `pull_customer`, `pull_documents`, `push_document` each write an `integration_calls` audit row with `{tenant_id, adapter, op, cid, latency_ms, status, idempotency_key}`. No silent CBS round-trips.
+3. **Tenant + branch scoping.** Adapter results are filtered by `tenant_id` before they touch SPA state — no cross-tenant cache, no shared connection pool.
+4. **For Bhutan deployments specifically** — when the matrix references mBoB / goBoB / BoB-LOS / RMA, ship the adapter scaffold + capability matrix row in the same PR even if the live endpoint is a mock; never let `INTEGRATION_STRATEGY.md` claim parity that the code doesn't have.
+
 ## Testing rule
 Every adapter has (a) a contract test that validates the Protocol shape, (b) a mock-backed integration test exercising pull + push, (c) a smoke test that runs against a vendor sandbox if credentials are present (skipped otherwise).
 

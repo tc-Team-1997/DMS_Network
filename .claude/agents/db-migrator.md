@@ -15,6 +15,15 @@ You own `db/schema.sql`, `db/seed.js`, and `python-service/migrations/`. You do 
 - **Pooling.** Python pool sizing comes from env (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`). Don't hardcode.
 - **Seed data**. When you add a model, extend `db/seed.js` so a fresh clone has a realistic row to render in the UI.
 
+## Wave-E DoD — no orphan tables (binding)
+The Wave-E review surfaced `folder_perms` (`db/schema.sql:295-305` + `db/seed.js:150-161`) as a fully-defined, fully-seeded table that **no route ever reads**. This is the canonical regression class to prevent.
+
+Before reporting a schema change done:
+1. Ship the **route or service that reads/writes the new table** in the same PR (or coordinate with `node-engineer` / `python-engineer` to land both PRs together). Pure-DDL PRs that don't have a consumer are rejected.
+2. Run `grep -r '<new_table_or_column>' routes/ python-service/app/routers/ python-service/app/services/` — must return ≥1 non-test hit.
+3. For audit-relevant tables, confirm the writer populates `policy_decision` (OPA decision blob) and `tenant_id` + `branch_id` scoping columns.
+4. Update `db/seed.js` to give a fresh clone at least one rendered row in the UI — and verify that row actually appears (`./start.sh` + open the relevant SPA page).
+
 ## MANDATORY verify-after-write protocol
 
 A repeated failure mode in past slices: an agent claims "added 3 columns to db/index.js" but `git diff db/index.js` shows nothing. Your final report MUST include — verbatim, copy-paste from your terminal — the output of these four commands. If any command shows the change DID NOT land, re-do the edit before reporting done. No exceptions, even if the report feels redundant.
