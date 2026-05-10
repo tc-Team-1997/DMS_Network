@@ -679,7 +679,8 @@
       "approvals": "ཆོག་མཆན།",
       "system":    "མ་ལག"
     },
-    "unread_count":  "[DZ-PENDING] {count, plural, one {{{count}} unread} other {{{count}} unread}}",
+    "unread_count_one":   "[DZ-PENDING] ༡ མ་ཀློག་པ།",
+    "unread_count_other": "[DZ-PENDING] {{count}} མ་ཀློག་པ།",
     "mark_all_read": "[DZ-PENDING] Mark all read",
     "mark_read":     "[DZ-PENDING] Mark as read",
     "loading":       "[DZ-PENDING] Loading…",

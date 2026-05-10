@@ -29,6 +29,8 @@ type TabId = 'alerts' | 'approvals' | 'system';
 // ---------------------------------------------------------------------------
 
 function tabFor(n: Notification): TabId {
+  // `severity` is sent by the Python notifications path (mobile/JWT). The Node /spa/api/notifications
+  // SELECT does not return this column today; the alerts bucket still works via event_type.startsWith('alert.').
   if (n.event_type?.startsWith('alert.') || n.severity === 'critical') return 'alerts';
   if (n.channel === 'workflow' || n.event_type?.startsWith('workflow.')) return 'approvals';
   return 'system';

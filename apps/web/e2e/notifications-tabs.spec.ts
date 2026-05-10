@@ -41,7 +41,7 @@ test('notifications popover shows 3 tabs and numeric badge', async ({ page }) =>
 });
 
 test('notifications popover error state — mocked 500', async ({ page }) => {
-  await page.route('**/spa/api/notifications/feed**', (route) => {
+  await page.route('**/spa/api/notifications?*', (route) => {
     void route.fulfill({ status: 500, body: '{"error":"server error"}' });
   });
 

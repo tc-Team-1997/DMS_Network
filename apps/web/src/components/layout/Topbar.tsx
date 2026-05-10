@@ -148,7 +148,6 @@ function TenantChip() {
 // ---------------------------------------------------------------------------
 
 function BellButton() {
-  const [open, setOpen] = useState(false);
   const { t } = useTranslation();
   const unread = useUnreadCount();
 
@@ -175,8 +174,6 @@ function BellButton() {
           )}
         </button>
       }
-      open={open}
-      onClose={() => { setOpen(false); }}
       placement="bottom"
     >
       <NotificationFeed />
