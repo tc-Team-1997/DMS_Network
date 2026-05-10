@@ -21,7 +21,7 @@
 const express = require('express');
 const { writeAuditRow } = require('./audit');
 const { buildPolicyDecision } = require('../../services/audit-policy');
-const { requireAuthJson } = require('./_shared');
+const { requireAuthJson, tenantScope } = require('./_shared');
 
 const router = express.Router();
 
@@ -118,7 +118,7 @@ router.post('/audit/events', requireAuthJson, (req, res) => {
     entityType:     entity_type,
     entityId:       entity_id,
     detail,
-    tenantId:       user.tenant_id || 'nbe',
+    tenantId:       tenantScope(req),
     policyDecision: buildPolicyDecision(req, { opaAllow: true }),
   });
 
