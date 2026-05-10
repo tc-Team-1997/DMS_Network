@@ -20,6 +20,7 @@ import { Eye, EyeOff, X } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { HttpError } from '@/lib/http';
 import { t } from '@/lib/i18n';
+import { emitAuditEvent } from '@/lib/audit-events';
 import { revealPii } from '../api';
 
 interface PiiRevealFieldProps {
@@ -53,7 +54,15 @@ export function PiiRevealField({ field, maskedValue, cid, label }: PiiRevealFiel
       const value = data.revealed[field];
       setRevealedValue(typeof value === 'string' ? value : null);
       setShowReasonDialog(false);
+      // Capture reason before clearing it — emitAuditEvent is fire-and-forget.
+      const capturedReason = reason.trim();
       setReason('');
+      emitAuditEvent({
+        action:      'pii_reveal',
+        entity_type: 'customer',
+        entity_id:   cid,
+        detail:      { field, reason: capturedReason },
+      });
     },
     onError: (e: unknown) => {
       setServerErr(e instanceof HttpError ? e.message : t('customer360.error_generic'));
@@ -85,6 +94,7 @@ export function PiiRevealField({ field, maskedValue, cid, label }: PiiRevealFiel
         ) : (
           <button
             type="button"
+            data-testid={`pii-reveal-${field}`}
             onClick={() => { setServerErr(null); setShowReasonDialog(true); }}
             aria-label={t('customer360.reveal_button_aria', { field: label })}
             className="p-1 rounded-input text-muted hover:text-brand-blue hover:bg-brand-skyLight/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue"
