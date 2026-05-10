@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mobile_ux",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "enable_capture_environment": {
+      "type": "boolean",
+      "description": "Add capture=\"environment\" to file inputs on mobile so the rear camera opens directly"
+    },
+    "mobile_breakpoint_lg_px": {
+      "type": "integer",
+      "minimum": 320,
+      "maximum": 2048,
+      "description": "Viewport width (px) below which the off-canvas sidebar drawer is shown (default 1024)"
+    },
+    "mobile_breakpoint_md_px": {
+      "type": "integer",
+      "minimum": 320,
+      "maximum": 2048,
+      "description": "Viewport width (px) below which DataTable switches to card mode and topbar enters compact mode (default 768)"
+    },
+    "min_touch_target_px": {
+      "type": "integer",
+      "minimum": 24,
+      "maximum": 96,
+      "description": "Minimum touch target size in pixels for interactive elements on mobile (default 44, per Apple HIG)"
+    },
+    "default_card_mode_below_md": {
+      "type": "boolean",
+      "description": "Automatically switch DataTable rows to card layout when the viewport is below the md breakpoint"
+    }
+  }
+}

@@ -32,6 +32,7 @@ import {
   ShieldAlert,
   Sparkles,
   FileSpreadsheet,
+  Languages,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -57,9 +58,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: 'Branding & Tenants',
     items: [
-      { label: 'Branding',  path: '/admin/settings/branding',  icon: Palette  },
-      { label: 'Locales',   path: '/admin/settings/locales',   icon: Globe2   },
-      { label: 'Tenants',   path: '/admin/settings/tenants',   icon: Building2 },
+      { label: 'Branding',           path: '/admin/settings/branding',  icon: Palette   },
+      { label: 'Language & i18n',    path: '/admin/settings/i18n',      icon: Languages },
+      { label: 'Locales',            path: '/admin/settings/locales',   icon: Globe2    },
+      { label: 'Tenants',            path: '/admin/settings/tenants',   icon: Building2 },
     ],
   },
   {

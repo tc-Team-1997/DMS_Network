@@ -36,6 +36,20 @@ export const TenantSchema = z.object({
   login_banner:      z.string().nullable(),
   footer_text:       z.string().nullable(),
   environment_label: z.string().nullable(),
+  // Extended branding fields (Wave D) — merged from tenant_config.branding namespace
+  // on the server; optional here because older seeds may not have them.
+  product_name:              z.string().optional(),
+  tagline:                   z.string().optional(),
+  welcome_message:           z.string().optional(),
+  subtitle:                  z.string().optional(),
+  login_logo_url:            z.string().optional(),
+  login_background_color:    z.string().optional(),
+  login_background_image_url: z.string().optional(),
+  footer_copyright:          z.string().optional(),
+  support_email:             z.string().optional(),
+  support_phone:             z.string().optional(),
+  favicon_url:               z.string().optional(),
+  theme_mode:                z.enum(['light', 'dark', 'auto']).optional(),
 });
 export type Tenant = z.infer<typeof TenantSchema>;
 

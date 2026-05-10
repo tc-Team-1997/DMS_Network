@@ -287,12 +287,13 @@ export function PdfCanvas({
         </div>
       )}
 
-      {/* Main PDF canvas */}
-      <div className="relative inline-block" style={{ lineHeight: 0 }}>
+      {/* Main PDF canvas — max-w-full ensures no horizontal scroll on mobile */}
+      <div className="relative inline-block max-w-full" style={{ lineHeight: 0 }}>
         <canvas
           ref={canvasRef}
           data-testid="pdf-canvas"
           aria-label={`PDF page ${page}`}
+          className="max-w-full"
         />
 
         {/* Text layer — transparent spans for search/select */}

@@ -19,13 +19,13 @@
 >   - #4 (Workflows maker-checker): Wave A Workflows v2, step-up enforcement, Approve/Reject/Escalate buttons
 >   - #6 (DataTable with sort/filter): Foundation CC4 Design system v1, DataTable v1 with virtualization, column visibility, mobile card mode
 >   - #8 (Live dashboards): Wave A Dashboard v2, live KPI polling + charts (throughput, funnel, heatmap)
->   - #9 (Demo product visible): Foundation CC5 demo-strip with feature carousel + quarantined seed.js
+>   - #9 (Demo product visible): Foundation CC5 demo-strip with feature carousel + quarantined seed.js. **Wave D further extended**: branding finalize sweep eliminated all 5 remaining hardcoded "DocManager" / "NBE" / "National Bank of Egypt" user-visible strings. Browser tab title, login welcome text, login footer, sidebar header, SAR modal institution, integrations copy all now flow through `tenant_config.branding`. See ADR-0017 and `apps/web/e2e/branding.spec.ts`.
 >   - #11 (User CRUD + MFA): Wave B Users v2, 4-tab UsersPage, MFA factor management, SAML admin, magic-link invite
 >   - #12 (Document type learner): Wave B DocTypes + Learn Wizard v2, 6-step wizard with visual bbox labeler
 >   - #13 (Indexing QA station): Wave B Indexing station, 3-pane claimable queue with confidence overlay
 >   - #14 (Expiry alerts): Wave B DocTypes per-doctype notify_days CSV, services/expiry-job.js rewritten
-> - **Item 5** (Dzongkha + RTL locale pack) and **Item 15** (Mobile capture) planned for Wave D
-> - **Item 10** (Login front-door redesign) deferred per direction; current session-cookie auth sufficient
+> - **Item 5** (Dzongkha + RTL locale pack) and **Item 15** (Mobile capture) planned for Wave D (in parallel with branding finalize)
+> - **Item 10** (Login front-door redesign) partially addressed in Wave D: login screen now shows BoB logo, welcome_message, subtitle, footer_copyright, support_email, support_phone from `tenant_config.branding`. Full SSO / MFA challenge / forgot-password flow remains deferred.
 > - **Items 7, 16–20** (lower-priority axis lifts) deferred to Wave C+
 
 ---
@@ -94,7 +94,7 @@ Twelve UI/UX specialists reviewed the SPA at `apps/web/` against Fortune-50 bank
 | 1 | IA & Navigation | 3/10 | No tenant chip · no Cmd-K · no breadcrumbs · no URL-state |
 | 2 | Design System | 3.5/10 | 6 primitives ship; ~25 needed; DataTable is v0.1 |
 | 3 | Accessibility | 3/10 | Multiple WCAG Level-A failures |
-| 4 | i18n / RTL | **1/10** | `dz.json` is byte-for-byte English; no `ar.json`; no `dir="rtl"` switch |
+| 4 | i18n / RTL | **6/10** | Wave D: react-i18next+ICU shipped; 569 Dzongkha strings translated; Jomolhari font bundled; `<html lang>` switching live; admin i18n namespace #17 wired. RTL (Arabic) remains out of scope. |
 | 5 | Workflows / Maker-Checker | 3/10 | One-click reject with no reason / no e-sign — SOX material weakness |
 | 6 | Capture / OCR | 4.5/10 | 2,450-line god-component + sci-fi animations |
 | 7 | Search | 2/10 | FTS5 indexes 6 columns; UI exposes 15% |
@@ -278,7 +278,7 @@ Eight more specialists drilled into screens wave 1 skimmed.
 | 17 | Users + RBAC mgmt | **2/10** | Admin types passwords into a form; no SSO UI; no MFA mgmt |
 | 18 | Login / first-run | 3.5/10 | Demo creds in prod; no SSO/MFA front door; carousel a11y fail |
 | 19 | CBS / Dedup | 5.5/10 | CIF-only lookup; PII not masked; link dialog context-blind |
-| 20 | Mobile / Responsive | **2/10** | Sidebar 53% of Pixel 7; tables clip; no camera path |
+| 20 | Mobile / Responsive | **7/10** | Wave D (2026-05-10): off-canvas sidebar drawer, DataTable auto-card, touch targets ≥44px, fluid PDF, bottom-sheet AI panel, capture="environment". Mobile Playwright project enabled. |
 
 ### 5.2 Reviewer 13 — AI Chat / Engine / Glossary (5.5/10)
 
@@ -350,7 +350,7 @@ Dedup Settings: no "Try on sample" calibration mode; no audit trail of slider ch
 
 Recommended Customer-360 evolution: today's Lookup + Link dialogs become a unified `CustomerDetailPanel` (right drawer 480px) with tabs Master / Accounts / Documents / Transactions / Activity log.
 
-### 5.9 Reviewer 20 — Mobile / Responsive (2/10)
+### 5.9 Reviewer 20 — Mobile / Responsive (2/10 → 7/10 after Wave D)
 
 **Sidebar fixed `w-[220px] flex-shrink-0` on Pixel 7 (412px) eats 53% of viewport** — no off-canvas/drawer pattern, no hamburger toggle.
 
@@ -538,7 +538,7 @@ Median: **3.4 / 10**.
 17. Users + RBAC mgmt              2 ██▒▒▒▒▒▒▒▒
 18. Login / first-run            3.5 ███▌▒▒▒▒▒▒
 19. CBS / Dedup                  5.5 █████▌▒▒▒▒
-20. Mobile / Responsive            2 ██▒▒▒▒▒▒▒▒
+20. Mobile / Responsive            7 ███████▒▒▒  ← Wave D shipped (off-canvas sidebar, card mode, touch targets, fluid PDF, camera capture)
 ```
 
 ### 9.2 Compliance lines (wave 4)

@@ -16,24 +16,63 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Interpolate {product_name} and {tenant_display_name} placeholders.
+ * Used for welcome_message, subtitle, footer_copyright, tagline.
+ */
+function interpolate(
+  template: string,
+  productName: string,
+  displayName: string,
+): string {
+  return template
+    .replace(/\{product_name\}/g, productName)
+    .replace(/\{tenant_display_name\}/g, displayName)
+    .replace(/\{year\}/g, String(new Date().getFullYear()));
+}
+
+// ---------------------------------------------------------------------------
 // Static hero panel — shows tenant branding from the anonymous endpoint
 // ---------------------------------------------------------------------------
 
 function StaticHeroPanel({ tenant }: { tenant: Tenant | null }) {
   const displayName = tenant?.display_name ?? '';
+  const productName = tenant?.product_name ?? displayName;
   const banner = tenant?.login_banner ?? 'Document operations that survive scrutiny.';
 
+  const tagline = tenant?.tagline
+    ? interpolate(tenant.tagline, productName, displayName)
+    : null;
+
+  const bgColor = tenant?.login_background_color ?? undefined;
+  const bgImage = tenant?.login_background_image_url ?? undefined;
+
   return (
-    <div className="relative h-full w-full overflow-hidden bg-brand-navy">
-      <div
-        className="absolute inset-0 opacity-[0.10] auth-grid"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
-          backgroundSize: '18px 18px',
-        }}
-      />
-      <div className="auth-blob-a absolute -top-24 -right-24 w-[460px] h-[460px] rounded-full bg-brand-blue/35 blur-3xl" />
-      <div className="auth-blob-b absolute -bottom-32 -left-16 w-[380px] h-[380px] rounded-full bg-brand-sky/25 blur-3xl" />
+    <div
+      className="relative h-full w-full overflow-hidden bg-brand-navy"
+      style={bgColor !== undefined ? { backgroundColor: bgColor } : undefined}
+    >
+      {bgImage !== undefined ? (
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${bgImage})` }}
+        />
+      ) : (
+        <>
+          <div
+            className="absolute inset-0 opacity-[0.10] auth-grid"
+            style={{
+              backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+              backgroundSize: '18px 18px',
+            }}
+          />
+          <div className="auth-blob-a absolute -top-24 -right-24 w-[460px] h-[460px] rounded-full bg-brand-blue/35 blur-3xl" />
+          <div className="auth-blob-b absolute -bottom-32 -left-16 w-[380px] h-[380px] rounded-full bg-brand-sky/25 blur-3xl" />
+        </>
+      )}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -44,12 +83,25 @@ function StaticHeroPanel({ tenant }: { tenant: Tenant | null }) {
 
       <div className="relative h-full flex flex-col justify-between p-10">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-brand-blue rounded-lg flex items-center justify-center shadow-lg shadow-brand-blue/30">
-            <FileText size={16} className="text-white" strokeWidth={2.25} />
-          </div>
+          {tenant?.login_logo_url !== undefined || tenant?.logo_path !== null ? (
+            <img
+              src={tenant?.login_logo_url ?? (tenant?.logo_path ?? undefined)}
+              alt={displayName}
+              className="w-9 h-9 object-contain rounded-lg"
+              onError={(e) => {
+                // Fallback to icon if logo fails to load.
+                const target = e.currentTarget;
+                target.style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="w-9 h-9 bg-brand-blue rounded-lg flex items-center justify-center shadow-lg shadow-brand-blue/30">
+              <FileText size={16} className="text-white" strokeWidth={2.25} />
+            </div>
+          )}
           <div>
             <p className="text-white text-[13px] font-semibold leading-tight">
-              {displayName || 'DocManager'}
+              {productName || displayName}
             </p>
             <p className="text-white/60 text-[10px] leading-tight">Enterprise Document Management</p>
           </div>
@@ -63,7 +115,7 @@ function StaticHeroPanel({ tenant }: { tenant: Tenant | null }) {
             {displayName ? `Welcome to ${displayName}.` : 'Capture, classify, index.'}
           </h2>
           <p className="text-white/70 text-[13px] leading-relaxed max-w-md">
-            {banner}
+            {tagline ?? banner}
           </p>
         </div>
 
@@ -86,7 +138,7 @@ export function LoginPage() {
   const [publicTenant, setPublicTenant] = useState<Tenant | null>(null);
 
   // Fetch public tenant branding — anonymous, before user is authenticated.
-  // This powers the hero panel's display_name and login_banner.
+  // This powers the hero panel's display_name, login_banner, branding colours, etc.
   useEffect(() => {
     fetchTenantPublic()
       .then(setPublicTenant)
@@ -98,7 +150,7 @@ export function LoginPage() {
   // Parse the ?next= return URL set by the 401 interceptor or expiry redirect.
   const searchParams = new URLSearchParams(location.search);
   const nextParam = searchParams.get('next');
-  const returnTo = nextParam && nextParam.startsWith('/') ? nextParam : '/';
+  const returnTo = nextParam !== null && nextParam.startsWith('/') ? nextParam : '/';
 
   const {
     register,
@@ -121,6 +173,34 @@ export function LoginPage() {
   });
 
   const displayName = publicTenant?.display_name ?? '';
+  const productName = publicTenant?.product_name ?? displayName;
+
+  // welcome_message with placeholder interpolation.
+  const welcomeMsg = publicTenant?.welcome_message !== undefined
+    ? interpolate(publicTenant.welcome_message, productName, displayName)
+    : (displayName ? `Welcome to ${displayName}` : null);
+
+  // subtitle with placeholder interpolation.
+  const subtitleMsg = publicTenant?.subtitle !== undefined
+    ? interpolate(publicTenant.subtitle, productName, displayName)
+    : (displayName
+        ? `${displayName} document operations for authorised staff only`
+        : 'Document operations for authorised staff only');
+
+  // footer_copyright with {year} and {tenant_display_name} support.
+  const footerText = publicTenant?.footer_copyright !== undefined
+    ? interpolate(publicTenant.footer_copyright, productName, displayName)
+    : publicTenant?.footer_text !== null && publicTenant?.footer_text !== undefined
+      ? publicTenant.footer_text
+      : (displayName
+          ? `© ${new Date().getFullYear()} ${displayName}. All rights reserved.`
+          : null);
+
+  const supportEmail = publicTenant?.support_email;
+  const supportPhone = publicTenant?.support_phone;
+
+  // Logo URL for the mobile header: prefer login_logo_url, then logo_path.
+  const logoUrl = publicTenant?.login_logo_url ?? publicTenant?.logo_path ?? null;
 
   return (
     <div className="min-h-screen flex bg-white">
@@ -143,13 +223,22 @@ export function LoginPage() {
         />
 
         <div className="w-full max-w-[360px] relative">
+          {/* Mobile logo / brand header */}
           <div className="flex items-center gap-2.5 mb-5 lg:hidden">
-            <div className="w-8 h-8 bg-action rounded flex items-center justify-center">
-              <FileText size={14} className="text-white" strokeWidth={2.25} />
-            </div>
+            {logoUrl !== null ? (
+              <img
+                src={logoUrl}
+                alt={displayName}
+                className="w-8 h-8 object-contain rounded"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-action rounded flex items-center justify-center">
+                <FileText size={14} className="text-white" strokeWidth={2.25} />
+              </div>
+            )}
             <div>
               <p className="text-ink text-sm font-semibold leading-tight">
-                {displayName || 'DocManager'}
+                {productName || displayName || 'DocManager'}
               </p>
               <p className="text-muted text-[11px]">Enterprise Document Management</p>
             </div>
@@ -160,11 +249,10 @@ export function LoginPage() {
           </div>
 
           <h2 className="text-xl font-semibold text-ink mb-1 tracking-tight">Sign in</h2>
-          <p className="text-[13px] text-sub mb-5">
-            {displayName
-              ? `${displayName} document operations for authorised staff only`
-              : 'Document operations for authorised staff only'}
-          </p>
+          {welcomeMsg !== null && (
+            <p className="text-[14px] font-medium text-ink mb-0.5">{welcomeMsg}</p>
+          )}
+          <p className="text-[13px] text-sub mb-5">{subtitleMsg}</p>
 
           <form onSubmit={onSubmit} className="space-y-3" noValidate>
             <Input
@@ -185,7 +273,7 @@ export function LoginPage() {
               required
             />
 
-            {serverError && (
+            {serverError !== null && (
               <p className="text-[11px] text-danger bg-danger-bg border border-danger/20 rounded px-3 py-1.5">
                 {serverError}
               </p>
@@ -195,6 +283,36 @@ export function LoginPage() {
               Sign in
             </Button>
           </form>
+
+          {/* Footer — copyright + support contact */}
+          {(footerText !== null || supportEmail !== undefined || supportPhone !== undefined) && (
+            <div className="mt-8 text-center space-y-1">
+              {footerText !== null && (
+                <p className="text-[11px] text-muted">{footerText}</p>
+              )}
+              {(supportEmail !== undefined || supportPhone !== undefined) && (
+                <p className="text-[11px] text-muted">
+                  {supportEmail !== undefined && (
+                    <a
+                      href={`mailto:${supportEmail}`}
+                      className="text-brand-blue hover:underline"
+                    >
+                      {supportEmail}
+                    </a>
+                  )}
+                  {supportEmail !== undefined && supportPhone !== undefined && ' · '}
+                  {supportPhone !== undefined && (
+                    <a
+                      href={`tel:${supportPhone.replace(/\s/g, '')}`}
+                      className="text-brand-blue hover:underline"
+                    >
+                      {supportPhone}
+                    </a>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

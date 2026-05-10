@@ -20,9 +20,14 @@ const variants: Record<Variant, string> = {
   danger:    'bg-danger text-white hover:bg-[#c73b3a]',
 };
 
+/**
+ * Sizes: desktop heights are h-8 (sm) / h-10 (md).
+ * On mobile (below md breakpoint) we enforce min-h-[44px] per HIG / WCAG
+ * touch target guidance. The md: override restores the compact desktop size.
+ */
 const sizes: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs',
-  md: 'h-10 px-4 text-sm',
+  sm: 'h-8 px-3 text-xs min-h-[44px] md:min-h-0',
+  md: 'h-10 px-4 text-sm min-h-[44px] md:min-h-0',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

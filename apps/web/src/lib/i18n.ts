@@ -1,59 +1,112 @@
 /**
- * Lightweight i18n shim — no external library.
- * Reads locale from <html lang> attribute, falls back to 'en'.
- * Full react-i18next can replace this later; the t() call signature is compatible.
+ * i18n — react-i18next + i18next-icu setup (Wave D).
  *
- * Usage:
- *   import { t } from '@/lib/i18n';
- *   t('doctype.thresholds_tab')          // → "Thresholds"
- *   t('doctype.autofill_label_display', { pct: 40 })  // → "Auto-fill at 40%"
+ * Replaces the hand-rolled shim from Wave A. Public API is backwards-compat:
+ *   import { t } from '@/lib/i18n'        — synchronous translate (for non-React code)
+ *   import { useTranslation } from 'react-i18next'  — React hook (preferred in TSX)
+ *
+ * Locale resolution order:
+ *   1. localStorage 'dms_locale' (user override)
+ *   2. tenant_config.i18n.default_locale (injected via initLocale())
+ *   3. 'en' fallback
+ *
+ * ICU MessageFormat enabled via i18next-icu — supports:
+ *   {count, plural, one {# hit} other {# hits}}
+ *   {gender, select, male {his} female {her} other {their}}
+ *
+ * Missing key behaviour:
+ *   - Production: falls back to English silently.
+ *   - Development: console.warn once per missing key.
  */
+
+import i18next from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import ICU from 'i18next-icu';
 
 import enRaw from '@/i18n/en.json';
 import dzRaw from '@/i18n/dz.json';
 
-type Strings = typeof enRaw;
+export const SUPPORTED_LOCALES = ['en', 'dz'] as const;
+export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
-const LOCALES: Record<string, Strings> = {
-  en: enRaw,
-  dz: dzRaw,
-};
+const LS_KEY = 'dms_locale';
 
-function detectLocale(): string {
-  const lang = document.documentElement.lang ?? 'en';
-  const base = lang.split('-')[0] ?? 'en';
-  return base in LOCALES ? base : 'en';
-}
-
-/**
- * Resolve a dot-path string from the locale object.
- * e.g. 'doctype.thresholds_tab' → locale.doctype.thresholds_tab
- */
-function resolve(obj: Record<string, unknown>, path: string): string {
-  const parts = path.split('.');
-  let cur: unknown = obj;
-  for (const part of parts) {
-    if (typeof cur !== 'object' || cur === null || !(part in cur)) {
-      return path; // key not found — return key as fallback
-    }
-    cur = (cur as Record<string, unknown>)[part];
+function storedLocale(): Locale | null {
+  try {
+    const v = localStorage.getItem(LS_KEY);
+    if (v === 'en' || v === 'dz') return v;
+  } catch {
+    // localStorage unavailable (SSR / private browsing hardening)
   }
-  return typeof cur === 'string' ? cur : path;
+  return null;
 }
 
+export function persistLocale(locale: Locale): void {
+  try {
+    localStorage.setItem(LS_KEY, locale);
+  } catch {
+    // ignore
+  }
+}
+
+export function getPersistedLocale(): Locale | null {
+  return storedLocale();
+}
+
+// ── i18next instance ────────────────────────────────────────────────────────
+
+// Use a flat resource structure matching the existing en.json / dz.json shape.
+// Namespace is 'translation' (i18next default). Keys use dot-notation:
+//   t('aml.title') resolves to resources.en.translation.aml.title
+void i18next
+  .use(ICU)
+  .use(initReactI18next)
+  .init({
+    lng: storedLocale() ?? 'en',
+    fallbackLng: 'en',
+    resources: {
+      en: { translation: enRaw },
+      dz: { translation: dzRaw },
+    },
+    interpolation: {
+      // React already escapes; ICU does its own escaping.
+      escapeValue: false,
+    },
+    missingKeyHandler: (lngs, ns, key) => {
+      if (import.meta.env.DEV) {
+        console.warn(`[i18n] missing key: ${ns}:${key} (lngs: ${lngs.join(',')})`);
+      }
+    },
+    saveMissing: import.meta.env.DEV,
+    returnNull: false,
+  });
+
+export { i18next as i18n };
+
 /**
- * Translate a key, optionally interpolating {{placeholder}} variables.
+ * Synchronous translate — wraps i18next.t().
+ * For legacy call sites that cannot use the useTranslation hook.
  */
 export function t(key: string, vars?: Record<string, string | number>): string {
-  const locale = detectLocale();
-  const strings = LOCALES[locale] ?? enRaw;
-  let str = resolve(strings as unknown as Record<string, unknown>, key);
+  return i18next.t(key, vars ?? {});
+}
 
-  if (vars) {
-    for (const [k, v] of Object.entries(vars)) {
-      str = str.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
-    }
-  }
+/**
+ * Called once the tenant config has been loaded — sets the default locale
+ * unless the user already has a localStorage override.
+ */
+export function initLocale(defaultLocale: string): void {
+  if (storedLocale() !== null) return; // user preference wins
+  const locale = (defaultLocale === 'dz' ? 'dz' : 'en') satisfies Locale;
+  void i18next.changeLanguage(locale);
+  document.documentElement.lang = locale;
+}
 
-  return str;
+/**
+ * Switch locale, persist it, and update <html lang>.
+ */
+export function changeLocale(locale: Locale): void {
+  persistLocale(locale);
+  void i18next.changeLanguage(locale);
+  document.documentElement.lang = locale;
 }

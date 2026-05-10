@@ -1,4 +1,20 @@
 {
+  "nav": {
+    "dashboard": "Dashboard",
+    "capture": "Capture",
+    "repository": "Repository",
+    "viewer": "Viewer",
+    "search": "Search",
+    "workflows": "Workflows",
+    "indexing": "Indexing",
+    "reports": "Reports & BI",
+    "ai": "AI Engine",
+    "alerts": "Alerts",
+    "compliance": "Compliance",
+    "settings": "Settings",
+    "audit": "Audit Log",
+    "admin": "System Admin"
+  },
   "aml": {
     "title": "AML Screening",
     "page_title": "AML Compliance Screening",

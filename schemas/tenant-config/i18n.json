@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-config/i18n",
+  "type": "object",
+  "title": "i18n — Localisation Settings",
+  "description": "Controls the default locale, available locales, font override, and date format for this tenant.",
+  "required": [],
+  "additionalProperties": false,
+  "properties": {
+    "default_locale": {
+      "type": "string",
+      "enum": ["en", "dz"],
+      "description": "Default locale presented to users who have no personal preference set. 'en' = English, 'dz' = Dzongkha."
+    },
+    "available_locales": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["en", "dz"]
+      },
+      "description": "Locales exposed in the Topbar locale switcher. Must include default_locale. Leave empty to show all."
+    },
+    "font_override": {
+      "type": "string",
+      "description": "Optional URL to a custom woff2 Dzongkha font hosted locally. Leave blank to use the bundled Jomolhari font.",
+      "maxLength": 512
+    },
+    "date_format": {
+      "type": "string",
+      "enum": ["short", "long", "iso"],
+      "description": "Date display format across all date fields. 'short' = DD/MM/YYYY, 'long' = DD MMMM YYYY, 'iso' = YYYY-MM-DD."
+    }
+  }
+}

@@ -63,8 +63,22 @@ function require(perm) {
  */
 const NAMESPACE_READERS = /** @type {Record<string, string[]>} */ ({
   audit_log: ['Doc Admin', 'auditor', 'compliance'],
+  // mobile_ux is Doc Admin only (default) — listed here for discoverability.
   // future: reports: ['Doc Admin', 'auditor', 'compliance'],
 });
+
+/**
+ * Admin namespace registry — all recognised config namespaces.
+ * Used by config-schema routes and the admin Settings shell to enumerate panels.
+ * Namespace #17 in Wave D: i18n (language + locale settings).
+ * Namespace #18 in Wave D: mobile_ux.
+ */
+const ADMIN_NAMESPACES = [
+  'auth', 'capture', 'viewer', 'workflows', 'workflow_templates',
+  'retention', 'search', 'dashboard', 'notifications', 'audit_log',
+  'integrations', 'indexing', 'dsar', 'rbac', 'regulator_reports',
+  'abac', 'branding', 'i18n', 'mobile_ux',
+];
 
 /**
  * @param {object|null|undefined} user
@@ -103,4 +117,4 @@ function requireNamespacePermJson(namespace, mode = 'write') {
   };
 }
 
-module.exports = { can, require, PERMS, hasNamespacePerm, requireNamespacePermJson };
+module.exports = { can, require, PERMS, hasNamespacePerm, requireNamespacePermJson, ADMIN_NAMESPACES };

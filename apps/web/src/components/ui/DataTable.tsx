@@ -447,7 +447,22 @@ export function DataTable<T extends { id: number | string }>({
   }
 
   // ── Mobile card render ─────────────────────────────────────────────────────
-  if (isMobile && mobileCard !== undefined) {
+  // When isMobile: prefer the caller-supplied mobileCard; fall back to the
+  // built-in auto-card that renders all visible columns as label/value pairs.
+  const defaultMobileCard = (row: T): ReactNode => (
+    <div role="article" data-testid="row-card" className="px-4 py-3 space-y-1.5">
+      {visibleColumns.map((col) => (
+        <div key={col.key} className="flex justify-between gap-2 text-sm">
+          <span className="text-muted text-xs flex-shrink-0">{col.header}</span>
+          <span className="text-ink text-xs text-right">{col.render(row)}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const activeMobileCard = mobileCard ?? defaultMobileCard;
+
+  if (isMobile) {
     return (
       <div className="overflow-hidden rounded-card border border-divider bg-surface">
         {loading ? (
@@ -461,7 +476,7 @@ export function DataTable<T extends { id: number | string }>({
               <button
                 type="button"
                 onClick={onRetry}
-                className="rounded-input border border-border px-3 py-1.5 text-xs hover:bg-divider"
+                className="rounded-input border border-border px-3 py-1.5 text-xs hover:bg-divider min-h-[44px]"
               >
                 Retry
               </button>
@@ -477,7 +492,7 @@ export function DataTable<T extends { id: number | string }>({
                 onClick={onRowClick !== undefined ? () => onRowClick(row) : undefined}
                 className={cn(onRowClick !== undefined && 'cursor-pointer hover:bg-brand-skyLight/40')}
               >
-                {mobileCard(row)}
+                {activeMobileCard(row)}
               </div>
             ))}
           </div>

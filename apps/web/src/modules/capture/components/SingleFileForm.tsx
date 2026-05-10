@@ -17,6 +17,7 @@ import {
   Database,
   Camera,
 } from 'lucide-react';
+import { useIsMobile } from '@/lib/useMatchMedia';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Input, Panel } from '@/components/ui';
 import { cn } from '@/lib/cn';
@@ -310,6 +311,7 @@ export function SingleFileForm({
   onCbsOpen,
 }: SingleFileFormProps) {
   const canCbs = FF_CBS_LIVE && (cbsRole === 'Maker' || cbsRole === 'Doc Admin');
+  const isMobile = useIsMobile();
 
   return (
     <Panel title="Upload document" className="xl:col-span-2">
@@ -321,6 +323,8 @@ export function SingleFileForm({
             'flex flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed',
             'border-border bg-page hover:border-brand-blue hover:bg-brand-skyLight transition-colors cursor-pointer',
             'py-10 px-6 text-center',
+            // Mobile: taller touch target
+            isMobile && 'min-h-[120px]',
             file && 'border-success bg-success-bg',
           )}
           onDragOver={(e) => e.preventDefault()}
@@ -330,14 +334,14 @@ export function SingleFileForm({
             ? <FileText size={28} className="text-success" aria-hidden="true" />
             : <Upload size={28} className="text-brand-blue" aria-hidden="true" />}
           <div className="text-md font-medium text-ink">
-            {file ? file.name : 'Drop files here or click to browse'}
+            {file ? file.name : (isMobile ? 'Tap to choose a file' : 'Drop files here or click to browse')}
           </div>
           <div className="text-xs text-muted">
             {file
               ? `${fmtSize(file.size)} · ${file.type || 'unknown'}`
               : `PDF, JPG, PNG, WEBP, TIFF, DOC, DOCX, TXT · max 50 MB · up to ${MAX_FILES} files`}
           </div>
-          {/* Standard file input */}
+          {/* Standard file input — on mobile includes capture="environment" when cameraEnabled */}
           <input
             ref={fileInputRef as React.RefObject<HTMLInputElement>}
             type="file"
@@ -347,7 +351,8 @@ export function SingleFileForm({
             accept={ALLOWED_MIME_TYPES.join(',')}
             onChange={onInputChange}
           />
-          {/* Camera capture — mobile path, gated by tenant config */}
+          {/* Camera capture — mobile path, gated by tenant config.
+              A separate input with capture="environment" opens the rear camera directly. */}
           {cameraEnabled && !file && (
             <span className="inline-flex items-center gap-1.5 mt-1 text-[11px] text-muted">
               <Camera size={11} aria-hidden="true" />
@@ -363,6 +368,13 @@ export function SingleFileForm({
                 />
               </label>
             </span>
+          )}
+          {/* Mobile visual hint */}
+          {isMobile && cameraEnabled && !file && (
+            <p className="text-[11px] text-muted mt-1 flex items-center gap-1">
+              <Camera size={10} aria-hidden="true" />
+              Tap to take a photo with your camera
+            </p>
           )}
         </label>
 

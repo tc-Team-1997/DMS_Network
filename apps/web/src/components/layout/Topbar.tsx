@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, ChevronDown } from 'lucide-react';
+import { Bell, ChevronDown, Menu, Search, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/store/auth';
 import { useTenant, useAvailableTenants } from '@/store/tenant';
 import { post } from '@/lib/http';
@@ -9,6 +10,9 @@ import { navItems } from './nav';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { Popover } from '@/components/ui/Popover';
 import { NotificationFeed, useUnreadCount } from '@/modules/notifications/NotificationFeed';
+import { useIsMobile } from '@/lib/useMatchMedia';
+import { cn } from '@/lib/cn';
+import { changeLocale, type Locale, SUPPORTED_LOCALES } from '@/lib/i18n';
 
 // ---------------------------------------------------------------------------
 // Tenant chip + dropdown
@@ -68,7 +72,7 @@ function TenantChip() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative hidden md:block">
       <button
         ref={chipRef}
         type="button"
@@ -113,7 +117,7 @@ function TenantChip() {
                 type="button"
                 disabled={switching}
                 onClick={() => { void handleSwitch(t.tenant_id); }}
-                className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-surface-alt transition-colors disabled:opacity-50"
+                className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-surface-alt transition-colors disabled:opacity-50 min-h-[44px]"
               >
                 <div className="w-6 h-6 rounded-full bg-brand-blue flex items-center justify-center flex-shrink-0">
                   <span className="text-white text-[9px] font-bold leading-none">
@@ -153,7 +157,7 @@ function BellButton() {
       trigger={
         <button
           type="button"
-          className="w-9 h-9 flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors relative"
+          className="w-9 h-9 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors relative"
           aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
         >
           <Bell size={15} className="text-ink-sub" />
@@ -175,12 +179,99 @@ function BellButton() {
 }
 
 // ---------------------------------------------------------------------------
+// LocaleSwitcher — EN / DZ pill toggle in Topbar
+// ---------------------------------------------------------------------------
+
+const LOCALE_LABELS: Record<Locale, string> = {
+  en: 'EN',
+  dz: 'DZ',
+};
+
+function LocaleSwitcher() {
+  const { i18n } = useTranslation();
+  const active = (SUPPORTED_LOCALES.includes(i18n.language as Locale)
+    ? i18n.language
+    : 'en') as Locale;
+
+  return (
+    <div
+      role="group"
+      aria-label="Language selector"
+      className="hidden sm:flex items-center rounded-full border border-divider overflow-hidden h-8"
+    >
+      {SUPPORTED_LOCALES.map((locale) => {
+        const isCurrent = locale === active;
+        return (
+          <button
+            key={locale}
+            type="button"
+            onClick={() => { changeLocale(locale); }}
+            aria-pressed={isCurrent}
+            aria-label={`Switch to ${locale === 'en' ? 'English' : 'Dzongkha'}`}
+            data-testid={`locale-btn-${locale}`}
+            className={cn(
+              'px-2.5 h-full text-[11px] font-semibold tracking-wide transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/40 focus:ring-inset',
+              isCurrent
+                ? 'bg-brand-blue text-white'
+                : 'bg-white text-ink-sub hover:bg-surface-alt',
+            )}
+          >
+            {LOCALE_LABELS[locale]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mobile search overlay
+// ---------------------------------------------------------------------------
+
+function MobileSearchOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-divider">
+        <Search size={18} className="text-ink-sub flex-shrink-0" />
+        <input
+          type="search"
+          autoFocus
+          placeholder="Search documents…"
+          className="flex-1 outline-none text-md text-ink bg-transparent placeholder:text-muted"
+          aria-label="Search documents"
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-ink-sub hover:text-ink"
+          aria-label="Close search"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <div className="flex-1 flex items-center justify-center text-sm text-muted">
+        Type to search across all documents
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Topbar
 // ---------------------------------------------------------------------------
 
-export function Topbar() {
+interface TopbarProps {
+  /** Called when hamburger is tapped; only passed on mobile. */
+  onMenuClick?: () => void;
+  /** Whether the mobile drawer is open (for aria-expanded). */
+  menuOpen?: boolean;
+}
+
+export function Topbar({ onMenuClick, menuOpen = false }: TopbarProps) {
   const user = useAuth((s) => s.user);
   const { pathname } = useLocation();
+  const isMobile = useIsMobile();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Find the longest prefix match so /viewer/123 matches the "/viewer" nav item.
   const active =
@@ -194,29 +285,70 @@ export function Topbar() {
   const firstName = (user?.full_name ?? user?.username ?? 'User').split(' ')[0] ?? 'User';
 
   return (
-    <header className="h-[58px] bg-white border-b border-divider flex items-center justify-between px-8 flex-shrink-0">
-      <div className="min-w-0">
-        <p className="module-label">{module}</p>
-        <h1 className="text-base font-semibold text-ink leading-tight mt-0.5">{title}</h1>
-      </div>
+    <>
+      {searchOpen && isMobile && (
+        <MobileSearchOverlay onClose={() => { setSearchOpen(false); }} />
+      )}
 
-      <div className="flex items-center gap-3">
-        <OfflineIndicator />
+      <header className="h-[58px] bg-white border-b border-divider flex items-center justify-between px-4 md:px-8 flex-shrink-0 gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Hamburger — mobile only */}
+          {onMenuClick !== undefined && (
+            <button
+              type="button"
+              onClick={onMenuClick}
+              aria-label="Open navigation menu"
+              aria-controls="mobile-nav-drawer"
+              aria-expanded={menuOpen}
+              data-testid="mobile-hamburger"
+              className={cn(
+                'lg:hidden flex-shrink-0 flex items-center justify-center rounded-input',
+                'min-h-[44px] min-w-[44px] text-ink-sub hover:text-ink hover:bg-surface-alt transition-colors',
+              )}
+            >
+              <Menu size={20} />
+            </button>
+          )}
 
-        {/* Tenant chip — shows once the tenant branding resolves */}
-        <TenantChip />
-
-        <BellButton />
-
-        <div className="h-9 pl-1 pr-4 rounded-full bg-brand-skyLight flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-brand-blue flex items-center justify-center">
-            <span className="text-white text-[11px] font-semibold">
-              {firstName[0]?.toUpperCase() ?? 'U'}
-            </span>
+          <div className="min-w-0">
+            <p className="module-label hidden md:block">{module}</p>
+            <h1 className="text-base font-semibold text-ink leading-tight mt-0.5 truncate">{title}</h1>
           </div>
-          <span className="text-xs font-medium text-brand-blue">{firstName}</span>
         </div>
-      </div>
-    </header>
+
+        <div className="flex items-center gap-2 md:gap-3">
+          <OfflineIndicator />
+
+          {/* Search icon — mobile only, expands to overlay */}
+          {isMobile && (
+            <button
+              type="button"
+              onClick={() => { setSearchOpen(true); }}
+              aria-label="Open search"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full border border-divider hover:bg-surface-alt transition-colors"
+            >
+              <Search size={15} className="text-ink-sub" />
+            </button>
+          )}
+
+          {/* Tenant chip — desktop only */}
+          <TenantChip />
+
+          {/* Locale switcher — EN / DZ toggle */}
+          <LocaleSwitcher />
+
+          <BellButton />
+
+          <div className="h-9 pl-1 pr-3 rounded-full bg-brand-skyLight flex items-center gap-2 min-h-[44px]">
+            <div className="w-7 h-7 rounded-full bg-brand-blue flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-[11px] font-semibold">
+                {firstName[0]?.toUpperCase() ?? 'U'}
+              </span>
+            </div>
+            <span className="text-xs font-medium text-brand-blue hidden sm:block">{firstName}</span>
+          </div>
+        </div>
+      </header>
+    </>
   );
 }

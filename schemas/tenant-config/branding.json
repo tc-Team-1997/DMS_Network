@@ -7,24 +7,83 @@
   "properties": {
     "primary_color": {
       "type": "string",
-      "pattern": "^#[0-9a-fA-F]{6}$"
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "Brand primary color (hex, e.g. #1B3A6B). Wired to CSS custom property --brand-primary."
     },
     "monogram": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 8
+      "maxLength": 8,
+      "description": "Sidebar / topbar initials (1–8 chars). Displayed in the tenant chip monogram."
     },
     "logo_path": {
-      "type": "string"
+      "type": "string",
+      "description": "URL or asset path to the tenant logo. Displayed in the authenticated topbar (left slot) and as a fallback on the login screen."
     },
     "favicon_path": {
-      "type": "string"
+      "type": "string",
+      "description": "Legacy favicon URL applied to <link rel=icon>. Prefer favicon_url for new seeds."
     },
     "login_banner": {
-      "type": "string"
+      "type": "string",
+      "description": "HTML-safe banner text for the LoginPage hero panel (rendered as plain text). Shown below the hero heading when tagline is not set."
     },
     "footer_text": {
-      "type": "string"
+      "type": "string",
+      "description": "Legacy footer text displayed on the login screen when footer_copyright is not set."
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Product name shown in the browser tab title and the sidebar header (e.g. 'DocManager'). Supports no placeholders — must be a literal string."
+    },
+    "tagline": {
+      "type": "string",
+      "description": "Short marketing tagline shown on the login hero panel below the welcome heading. Supports {product_name} and {tenant_display_name} placeholders."
+    },
+    "welcome_message": {
+      "type": "string",
+      "maxLength": 120,
+      "description": "Welcome heading shown in the login form column. Supports {product_name} and {tenant_display_name} placeholders. Default: 'Welcome to {product_name}'."
+    },
+    "subtitle": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Sub-heading under the welcome message on the login form. Supports {product_name} and {tenant_display_name} placeholders. Default: '{tenant_display_name} — Document Operations'."
+    },
+    "login_logo_url": {
+      "type": "string",
+      "description": "URL for the logo shown on the login screen (hero panel and mobile header). Falls back to logo_path if not set."
+    },
+    "login_background_color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "Solid hex background color for the login screen hero panel. Overrides the default brand-navy. Set either this or login_background_image_url, not both."
+    },
+    "login_background_image_url": {
+      "type": "string",
+      "description": "URL for a background image on the login screen hero panel. When set, covers the gradient blobs."
+    },
+    "footer_copyright": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Copyright line shown at the bottom of the login form. Supports {year} and {tenant_display_name} placeholders. Example: '© {year} {tenant_display_name}. All rights reserved.'"
+    },
+    "support_email": {
+      "type": "string",
+      "description": "Support contact email address shown on the login screen footer and error pages."
+    },
+    "support_phone": {
+      "type": "string",
+      "description": "Support phone number shown on the login screen footer and error pages (e.g. '+975 2 322777')."
+    },
+    "favicon_url": {
+      "type": "string",
+      "description": "Favicon URL applied to <link rel=icon> at runtime. Takes precedence over favicon_path."
+    },
+    "theme_mode": {
+      "type": "string",
+      "enum": ["light", "dark", "auto"],
+      "description": "UI color scheme preference. 'light' enforces the light theme, 'dark' enforces dark, 'auto' follows the OS system preference. Default: 'light'."
     }
   }
 }

@@ -50,7 +50,7 @@ export function SarDraftModal({
   const tenant     = useTenant();
 
   const reviewedBy = user?.full_name ?? user?.username ?? 'Unknown reviewer';
-  const tenantName = tenant.display_name || 'National Bank of Egypt';
+  const tenantName = tenant.display_name || 'Bank';
 
   const defaultNarrative =
     `Watchlist match detected for customer ${subjectName}. ` +

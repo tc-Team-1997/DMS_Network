@@ -32,6 +32,7 @@ import { FaceMatchPage } from '@/modules/face-match/FaceMatchPage';
 import { RetentionPage } from '@/modules/retention/Page';
 // CC3 — Admin Settings shell + panels
 import { SettingsLayout } from '@/modules/admin/settings/SettingsLayout';
+import { I18nPanel } from '@/modules/admin/settings/panels/I18nPanel';
 import { BrandingPanel } from '@/modules/admin/settings/panels/BrandingPanel';
 import { LocalesPanel } from '@/modules/admin/settings/panels/LocalesPanel';
 import { TenantsPanel } from '@/modules/admin/settings/panels/TenantsPanel';
@@ -95,19 +96,28 @@ function TenantBrandingEffect() {
     // Only fire once the real tenant payload has landed (display_name is non-empty).
     if (!tenant.display_name) return;
 
-    document.title = `${tenant.display_name} · Document Management`;
+    // Use product_name for the browser tab title when set; fall back to display_name.
+    const pageTitle = tenant.product_name ?? tenant.display_name;
+    document.title = pageTitle;
 
-    // Update favicon if the tenant provides one.
+    // Update favicon: prefer favicon_url (branding namespace), then favicon_path (tenant row).
+    const faviconHref = tenant.favicon_url ?? tenant.favicon_path;
     const link = document.querySelector<HTMLLinkElement>('link[rel=icon]');
-    if (link && tenant.favicon_path) {
-      link.href = tenant.favicon_path;
+    if (link && faviconHref) {
+      link.href = faviconHref;
     }
 
     // Drive the CSS custom property so bg-brand-primary picks up the tenant's
     // primary colour. The static :root fallback in index.css prevents flash
     // before this effect fires on first render.
     document.documentElement.style.setProperty('--brand-primary', tenant.primary_color);
-  }, [tenant.display_name, tenant.favicon_path, tenant.primary_color]);
+  }, [
+    tenant.display_name,
+    tenant.product_name,
+    tenant.favicon_path,
+    tenant.favicon_url,
+    tenant.primary_color,
+  ]);
 
   return null;
 }
@@ -167,6 +177,8 @@ export function App() {
               <Route path="/admin/settings" element={<SettingsLayout />}>
                 <Route index element={<Navigate to="/admin/settings/branding" replace />} />
                 <Route path="branding"      element={<BrandingPanel />} />
+                {/* Wave D — i18n namespace #17 */}
+                <Route path="i18n"          element={<I18nPanel />} />
                 <Route path="locales"       element={<LocalesPanel />} />
                 <Route path="tenants"       element={<TenantsPanel />} />
                 <Route path="capture"       element={<CapturePanel />} />

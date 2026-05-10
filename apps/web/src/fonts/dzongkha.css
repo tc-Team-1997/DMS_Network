@@ -1,0 +1,58 @@
+/**
+ * Jomolhari — Bhutan Government Standard Dzongkha font (Wave D).
+ *
+ * Bundled locally under public/fonts/ (Vite copies public/ → dist/assets/).
+ * Two subsets:
+ *   - Tibetan block: U+0F00–0FFF — the Dzongkha script characters.
+ *   - Latin block: U+0000–00FF — ASCII fallback so numerals/punctuation render.
+ *
+ * When <html lang="dz"> the body stack switches to Jomolhari → DDC Uchen →
+ * Noto Serif Tibetan → system serif. When lang="en" Inter stays unchanged.
+ *
+ * Font source: Jomolhari v21, SIL Open Font License 1.1.
+ * Downloaded from fonts.gstatic.com for local-first compliance (no CDN at runtime).
+ */
+
+@font-face {
+  font-family: 'Jomolhari';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Jomolhari-tibetan.woff2') format('woff2');
+  unicode-range: U+0F00-0FFF, U+200C-200D, U+25CC, U+3008-300B;
+}
+
+@font-face {
+  font-family: 'Jomolhari';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Jomolhari-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/**
+ * When the document is in Dzongkha locale, switch the body typeface to
+ * Jomolhari. The cascade falls back through DDC Uchen (some OS installs)
+ * → Noto Serif Tibetan (widely available) → generic serif.
+ *
+ * Inter is intentionally excluded from the dz stack — it doesn't cover
+ * the Tibetan Unicode block (U+0F00–0FFF).
+ */
+:root:lang(dz) body,
+html[lang='dz'] body {
+  font-family: 'Jomolhari', 'DDC Uchen', 'Noto Serif Tibetan', serif;
+  /* Tibetan script benefits from slightly more line height */
+  line-height: 1.8;
+}
+
+/**
+ * Ensure code/mono blocks still use a system monospace even in dz mode.
+ */
+html[lang='dz'] code,
+html[lang='dz'] pre,
+html[lang='dz'] .font-mono {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+}

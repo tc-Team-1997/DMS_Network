@@ -12,6 +12,12 @@
 
 The platform is **bank-agnostic, local-first, and admin-controlled**. The first deployment is for the Bank of Bhutan (regulator: Royal Monetary Authority); every brand string, threshold, enum, locale, and provider choice resolves through a per-tenant key-value store rather than code.
 
+The Wave D branding finalize pass (ADR-0017) ensures a fully BoB-branded experience on first boot:
+- `tenant_id=bob` + `tenant_id=nbe` (backward-compat alias) seeded with `display_name='Bank of Bhutan'`, `primary_color='#1B3A6B'`, `monogram='BoB'`, `regulator='Royal Monetary Authority'`, `locale='dz-BT'`.
+- The `branding` tenant_config namespace carries 17 keys: `product_name`, `tagline`, `welcome_message`, `subtitle`, `login_logo_url`, `footer_copyright`, `support_email`, `support_phone`, `theme_mode`, and more.
+- BoB SVG placeholder logo at `apps/web/public/branding/bob-logo.svg`.
+- Zero hardcoded "DocManager" / "NBE" / "National Bank of Egypt" user-visible strings survive — all brand copy flows through `useTenant()` and `tenant_config.branding`.
+
 - **Configuration-first** — 16 admin namespaces in `tenant_config` (branding, integrations, capture, ocr, doctypes, workflows, viewer, search, dashboard, indexing, aml, customer_360, retention, abac, rbac, auth, notifications). Every write is hash-chained with a ≥20-char reason. See [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md).
 - **Local-first stack** — Ollama (OCR / LLM / Translate) + Tesseract + dlib face-match + per-tenant KEK envelope encryption + content-addressed FS storage. AWS adapters are registered as integration slots but seeded off; flipping them on is a tenant_config edit, not a redeploy. See [ADR-0009](./adr/0009-local-first-adapter-registry.md).
 - **Admin-controlled** — every operational knob lives in the `/admin/settings/*` UI behind `requireNamespacePermJson`. There are no hardcoded business values in module code.

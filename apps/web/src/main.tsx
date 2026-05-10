@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles/index.css';
+import './fonts/dzongkha.css';
 import { registerServiceWorker } from './lib/sw-register';
 
 // Register Service Worker for offline sync (BHU-57).

@@ -24,5 +24,22 @@ export default defineConfig({
   } : undefined,
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'mobile',
+      use: {
+        ...devices['Pixel 7'],
+        // Pixel 7 viewport: 412×915 CSS pixels
+      },
+      // Mobile specs: run mobile-ux.spec.ts plus the operational specs
+      testMatch: [
+        '**/mobile-ux.spec.ts',
+        '**/dashboard.spec.ts',
+        '**/capture.spec.ts',
+        '**/capture-v2.spec.ts',
+        '**/repository.spec.ts',
+        '**/viewer-v2.spec.ts',
+        '**/workflows.spec.ts',
+      ],
+    },
   ],
 });

@@ -17,6 +17,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useIsMobile } from '@/lib/useMatchMedia';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -47,6 +48,7 @@ import {
   TabPanel,
   statusTone,
 } from '@/components/ui';
+import { Drawer } from '@/components/ui/Drawer';
 import { HttpError } from '@/lib/http';
 import { cn } from '@/lib/cn';
 import { useAuth } from '@/store/auth';
@@ -108,10 +110,13 @@ export function ViewerPage() {
 
   const viewerCfg = useViewerConfig();
 
+  const isMobile = useIsMobile();
+
   const [wormDialog, setWormDialog]               = useState<'lock' | 'unlock' | null>(null);
   const [activeTab, setActiveTab]                 = useState('fields');
   const [showSideBySide, setShowSideBySide]       = useState(false);
   const [translationResult, setTranslationResult] = useState<TranslationResult | null>(null);
+  const [mobileRailOpen, setMobileRailOpen]       = useState(false);
 
   // Reset translation state when docId changes
   const prevDocId = useRef<number | null>(null);
@@ -303,8 +308,8 @@ export function ViewerPage() {
         />
       </div>
 
-      {/* Three-column body */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* Body — desktop: three columns | mobile: stacked with bottom-sheet rail */}
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
 
         {/* Centre: canvas + RAG chat */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -325,64 +330,59 @@ export function ViewerPage() {
           </div>
         </div>
 
-        {/* Right rail: 320px, tabs */}
-        <aside
-          className="w-80 flex-shrink-0 border-l border-divider bg-white flex flex-col overflow-hidden"
-          aria-label="Document details"
-        >
-          <Tabs
-            defaultValue="fields"
-            value={activeTab}
-            onChange={setActiveTab}
-            className="flex flex-col h-full"
+        {/* Right rail: 320px on desktop, bottom-sheet drawer on mobile */}
+        {!isMobile ? (
+          <aside
+            className="w-80 flex-shrink-0 border-l border-divider bg-white flex flex-col overflow-hidden"
+            aria-label="Document details"
           >
-            <TabList className="flex-shrink-0 overflow-x-auto border-b border-divider">
-              <Tab value="fields">
-                <Sparkles size={11} /> Fields
-              </Tab>
-              <Tab value="annotations">
-                <Highlighter size={11} /> Notes
-              </Tab>
-              <Tab value="versions">
-                <GitBranch size={11} /> Versions
-              </Tab>
-              <Tab value="audit">
-                <Clock size={11} /> Audit
-              </Tab>
-            </TabList>
+            <RailTabs
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              d={d}
+              isAdmin={isAdmin}
+              wormStatus={wormStatus.data ?? null}
+              onWormLock={() => { setWormDialog('lock'); }}
+              onWormUnlock={() => { setWormDialog('unlock'); }}
+              types={types.data ?? null}
+              docId={docId}
+            />
+          </aside>
+        ) : (
+          <>
+            {/* Mobile trigger button */}
+            <button
+              type="button"
+              onClick={() => { setMobileRailOpen(true); }}
+              className="absolute bottom-20 right-4 z-30 flex items-center gap-1.5 rounded-full bg-brand-blue text-white px-4 py-2 shadow-card text-sm font-medium min-h-[44px]"
+              aria-label="Open document details"
+              data-testid="viewer-mobile-rail-trigger"
+            >
+              <Sparkles size={14} />
+              Details
+            </button>
 
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <TabPanel value="fields">
-                <ExtractedFields documentId={docId} />
-              </TabPanel>
-              <TabPanel value="annotations">
-                <AnnotationsPanel
-                  documentId={docId}
-                  onAdd={() => { /* AnnotationLayer toolbar handles tool activation */ }}
-                />
-              </TabPanel>
-              <TabPanel value="versions">
-                <VersionsPanel documentId={docId} currentFilename={d.filename} />
-              </TabPanel>
-              <TabPanel value="audit">
-                <AuditPanel documentId={docId} />
-              </TabPanel>
-            </div>
-
-            {/* Core metadata below tabs */}
-            <div className="flex-shrink-0 border-t border-divider overflow-y-auto max-h-72">
-              <CoreMetadataSection
+            {/* Bottom-sheet drawer */}
+            <Drawer
+              open={mobileRailOpen}
+              onClose={() => { setMobileRailOpen(false); }}
+              side="bottom"
+              title="Document details"
+            >
+              <RailTabs
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
                 d={d}
                 isAdmin={isAdmin}
                 wormStatus={wormStatus.data ?? null}
-                onWormLock={() => setWormDialog('lock')}
-                onWormUnlock={() => setWormDialog('unlock')}
+                onWormLock={() => { setWormDialog('lock'); }}
+                onWormUnlock={() => { setWormDialog('unlock'); }}
                 types={types.data ?? null}
                 docId={docId}
               />
-            </div>
-          </Tabs>
-        </aside>
+            </Drawer>
+          </>
+        )}
       </div>
 
       {/* WORM dialogs */}
@@ -410,6 +410,87 @@ export function ViewerPage() {
         />
       )}
     </div>
+  );
+}
+
+// ── RailTabs — right-rail / bottom-sheet shared content ──────────────────────
+
+interface RailTabsProps {
+  activeTab: string;
+  setActiveTab: (v: string) => void;
+  d: DocLike;
+  isAdmin: boolean;
+  wormStatus: WormStatusLike | null;
+  onWormLock: () => void;
+  onWormUnlock: () => void;
+  types: DocumentType[] | null;
+  docId: number;
+}
+
+function RailTabs({
+  activeTab,
+  setActiveTab,
+  d,
+  isAdmin,
+  wormStatus,
+  onWormLock,
+  onWormUnlock,
+  types,
+  docId,
+}: RailTabsProps) {
+  return (
+    <Tabs
+      defaultValue="fields"
+      value={activeTab}
+      onChange={setActiveTab}
+      className="flex flex-col h-full"
+    >
+      <TabList className="flex-shrink-0 overflow-x-auto border-b border-divider">
+        <Tab value="fields">
+          <Sparkles size={11} /> Fields
+        </Tab>
+        <Tab value="annotations">
+          <Highlighter size={11} /> Notes
+        </Tab>
+        <Tab value="versions">
+          <GitBranch size={11} /> Versions
+        </Tab>
+        <Tab value="audit">
+          <Clock size={11} /> Audit
+        </Tab>
+      </TabList>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <TabPanel value="fields">
+          <ExtractedFields documentId={docId} />
+        </TabPanel>
+        <TabPanel value="annotations">
+          <AnnotationsPanel
+            documentId={docId}
+            onAdd={() => { /* AnnotationLayer toolbar handles tool activation */ }}
+          />
+        </TabPanel>
+        <TabPanel value="versions">
+          <VersionsPanel documentId={docId} currentFilename={d.filename} />
+        </TabPanel>
+        <TabPanel value="audit">
+          <AuditPanel documentId={docId} />
+        </TabPanel>
+      </div>
+
+      {/* Core metadata below tabs */}
+      <div className="flex-shrink-0 border-t border-divider overflow-y-auto max-h-72">
+        <CoreMetadataSection
+          d={d}
+          isAdmin={isAdmin}
+          wormStatus={wormStatus}
+          onWormLock={onWormLock}
+          onWormUnlock={onWormUnlock}
+          types={types}
+          docId={docId}
+        />
+      </div>
+    </Tabs>
   );
 }
 

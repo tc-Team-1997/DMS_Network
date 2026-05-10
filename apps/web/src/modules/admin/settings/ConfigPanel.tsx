@@ -51,6 +51,19 @@ const BRANDING_STORE_FIELDS = new Set([
   'favicon_path',
   'login_banner',
   'footer_text',
+  // Wave D extended branding fields
+  'product_name',
+  'tagline',
+  'welcome_message',
+  'subtitle',
+  'login_logo_url',
+  'login_background_color',
+  'login_background_image_url',
+  'footer_copyright',
+  'support_email',
+  'support_phone',
+  'favicon_url',
+  'theme_mode',
 ]);
 
 // ---------------------------------------------------------------------------

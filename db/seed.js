@@ -410,6 +410,10 @@ if (cbsLinkDoc && cbsLinkUser) {
 // tenant_id='nbe' is the historical identifier preserved across all existing
 // rows. display_name='Bank of Bhutan' surfaces in the UI so users never see
 // the internal 'nbe' slug.
+//
+// Wave D: also seed tenant_id='bob' as the canonical fresh-install tenant so
+// new deployments boot with 'bob' as the active tenant. The 'nbe' row stays
+// for backward compatibility of all existing tenant_config partition keys.
 // ---------------------------------------------------------------------------
 db.prepare(
   `INSERT OR IGNORE INTO tenants
@@ -424,10 +428,80 @@ db.prepare(
   'RMA',
   'en',
   '["en","dz"]',
-  '#0D2B6A',
+  '#1B3A6B',
   'BoB'
 );
 console.log('Tenant seeded (nbe / Bank of Bhutan).');
+
+// Seed 'bob' as a canonical tenant_id alias for fresh installs.
+// Skipped on installs where tenant_id='nbe' already represents Bank of Bhutan
+// (the slug 'bob' is UNIQUE so re-using it would conflict). The 'nbe' row above
+// already carries display_name='Bank of Bhutan'; the canonical 'bob' tenant_id
+// is reserved for fresh installs that have never had an 'nbe' row.
+const hasNbeTenant = db
+  .prepare("SELECT 1 FROM tenants WHERE tenant_id = 'nbe'")
+  .get();
+if (!hasNbeTenant) {
+  db.prepare(
+    `INSERT OR IGNORE INTO tenants
+       (tenant_id, slug, display_name, regulator_name, regulator_short,
+        default_locale, allowed_locales, primary_color, monogram, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+  ).run(
+    'bob',
+    'bob',
+    'Bank of Bhutan',
+    'Royal Monetary Authority',
+    'RMA',
+    'dz-BT',
+    '["en","dz"]',
+    '#1B3A6B',
+    'BoB'
+  );
+  console.log('Tenant seeded (bob / Bank of Bhutan — canonical fresh-install default).');
+}
+
+// ---------------------------------------------------------------------------
+// Wave D — BoB branding tenant_config (idempotent via INSERT OR IGNORE).
+// Seeds the 'branding' namespace for the 'nbe' tenant with concrete BoB values
+// so the login screen, topbar, sidebar, and error pages all reflect BoB
+// identity without any admin Settings intervention on a fresh install.
+// ---------------------------------------------------------------------------
+const bobBrandingConfig = [
+  ['product_name',              '"DocManager"'],
+  ['tagline',                   '"Document Operations for Bank of Bhutan"'],
+  ['welcome_message',           '"Welcome to {product_name}"'],
+  ['subtitle',                  '"{tenant_display_name} — Document Operations"'],
+  ['login_logo_url',            '"/branding/bob-logo.svg"'],
+  ['footer_copyright',          '"© {year} {tenant_display_name}. All rights reserved."'],
+  ['support_email',             '"support@bob.bt"'],
+  ['support_phone',             '"+975 2 322777"'],
+  ['theme_mode',                '"light"'],
+  ['primary_color',             '"#1B3A6B"'],
+  ['monogram',                  '"BoB"'],
+];
+
+const insertBobBranding = db.prepare(
+  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+   VALUES ('nbe', 'branding', ?, ?, 1, datetime('now'))`
+);
+for (const [key, value] of bobBrandingConfig) {
+  insertBobBranding.run(key, value);
+}
+// Also seed for the canonical 'bob' tenant_id when it exists (fresh installs).
+const hasBobTenant = db
+  .prepare("SELECT 1 FROM tenants WHERE tenant_id = 'bob'")
+  .get();
+if (hasBobTenant) {
+  const insertBobBrandingCanonical = db.prepare(
+    `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+     VALUES ('bob', 'branding', ?, ?, 1, datetime('now'))`
+  );
+  for (const [key, value] of bobBrandingConfig) {
+    insertBobBrandingCanonical.run(key, value);
+  }
+}
+console.log(`BoB branding tenant_config seeded (${bobBrandingConfig.length} keys).`);
 
 // ---------------------------------------------------------------------------
 // Migration 0028 — wf_actions table (idempotent boot-time CREATE via schema.sql
@@ -825,13 +899,12 @@ const REGULATOR_TEMPLATES = [
   },
 ];
 
-// Also seed BoB tenant (bhu) with the RMA template (its primary regulator).
-const BHU_RMA_TEMPLATE = {
-  ...REGULATOR_TEMPLATES[0],
-  tenant_id: 'bhu',
-};
-
-for (const t of [...REGULATOR_TEMPLATES, BHU_RMA_TEMPLATE]) {
+// Also seed BoB tenant (bhu) with the RMA template — only if bhu tenant exists.
+const bhuTenantRowExists = db.prepare("SELECT 1 FROM tenants WHERE tenant_id = 'bhu'").get();
+const seedTemplates = bhuTenantRowExists
+  ? [...REGULATOR_TEMPLATES, { ...REGULATOR_TEMPLATES[0], tenant_id: 'bhu' }]
+  : REGULATOR_TEMPLATES;
+for (const t of seedTemplates) {
   insertRegReport.run(
     t.tenant_id,
     t.regulator,
@@ -842,7 +915,7 @@ for (const t of [...REGULATOR_TEMPLATES, BHU_RMA_TEMPLATE]) {
     t.schedule_cron ?? null,
   );
 }
-console.log(`Regulator report templates seeded (${REGULATOR_TEMPLATES.length} nbe + 1 bhu = ${REGULATOR_TEMPLATES.length + 1} total).`);
+console.log(`Regulator report templates seeded (${seedTemplates.length} total).`);
 
 // ── regulator_reports namespace defaults for tenant_config ──────────────────
 // These values populate the Admin Settings → Regulator Reports panel via
@@ -863,15 +936,18 @@ const insertRRConfig = db.prepare(
 for (const [key, value] of regulatorReportsConfigDefaults) {
   insertRRConfig.run(key, value);
 }
-// Seed bhu with same defaults.
-const insertRRConfigBhu = db.prepare(
-  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
-   VALUES ('bhu', 'regulator_reports', ?, ?, 1, datetime('now'))`
-);
-for (const [key, value] of regulatorReportsConfigDefaults) {
-  insertRRConfigBhu.run(key, value);
+// Seed bhu with same defaults — only if the bhu tenant row exists.
+const bhuTenantExists = db.prepare("SELECT 1 FROM tenants WHERE tenant_id = 'bhu'").get();
+if (bhuTenantExists) {
+  const insertRRConfigBhu = db.prepare(
+    `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+     VALUES ('bhu', 'regulator_reports', ?, ?, 1, datetime('now'))`
+  );
+  for (const [key, value] of regulatorReportsConfigDefaults) {
+    insertRRConfigBhu.run(key, value);
+  }
 }
-console.log(`Regulator reports tenant_config seeded (${regulatorReportsConfigDefaults.length} keys × 2 tenants).`);
+console.log(`Regulator reports tenant_config seeded (${regulatorReportsConfigDefaults.length} keys).`);
 
 // ---------------------------------------------------------------------------
 // Migration 0042 — Notifications Wave C
@@ -959,14 +1035,17 @@ const insertNotifConfig = db.prepare(
 for (const [key, value] of notifConfigDefaults) {
   insertNotifConfig.run(key, value);
 }
-// Seed bhu tenant with same defaults.
-const insertNotifConfigBhu = db.prepare(
-  `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
-   VALUES ('bhu', 'notifications', ?, ?, 1, datetime('now'))`
-);
-for (const [key, value] of notifConfigDefaults) {
-  insertNotifConfigBhu.run(key, value);
+// Seed bhu tenant with same defaults — only if the bhu tenant row exists.
+const bhuTenantExistsForNotif = db.prepare("SELECT 1 FROM tenants WHERE tenant_id = 'bhu'").get();
+if (bhuTenantExistsForNotif) {
+  const insertNotifConfigBhu = db.prepare(
+    `INSERT OR IGNORE INTO tenant_config (tenant_id, namespace, key, value, schema_version, updated_at)
+     VALUES ('bhu', 'notifications', ?, ?, 1, datetime('now'))`
+  );
+  for (const [key, value] of notifConfigDefaults) {
+    insertNotifConfigBhu.run(key, value);
+  }
 }
-console.log(`[0042] Notifications tenant_config seeded (${notifConfigDefaults.length} keys × 2 tenants).`);
+console.log(`[0042] Notifications tenant_config seeded (${notifConfigDefaults.length} keys).`);
 
 db.close();

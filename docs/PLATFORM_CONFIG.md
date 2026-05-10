@@ -1,6 +1,6 @@
 # Platform Configuration — Tenant Config Namespaces
 
-> **Quick reference for all 16 tenant_config namespaces.**
+> **Quick reference for all 19 tenant_config namespaces.**
 >
 > Every configuration value in DocManager is stored in one of these key-value JSON namespaces. Admin engineers can look up "where do I configure X?" and find the right namespace + admin route in <30 seconds.
 
@@ -29,7 +29,10 @@
 | `retention` | Wave B (Retention admin) | `/admin/settings/retention` | Per-doctype retention days, WORM lock days, legal-hold policy, delete policy |
 | `_user_meta` | Wave B (Users v2) | `/admin/settings/user_meta` | (Internal) User preference overrides, feature flags per role |
 | `_tenant_meta` | Foundation (CC1) | `/admin/settings/tenants` | (Internal) Tenant soft-delete flag, created_at, last_config_version |
-| `mobile` | Foundation (placeholder) | `/admin/settings/mobile` | (Future) Mobile app settings, offline sync policy, camera capture |
+| `i18n` | Wave D (Dzongkha i18n pack) | `/admin/settings/i18n` | Default locale (en/dz), available locales, custom Tibetan font URL, date format |
+| `mobile_ux` | Wave D (Mobile-first refactor) | `/admin/settings/mobile_ux` | Off-canvas sidebar breakpoints, DataTable card-mode default, touch target size, camera capture flag |
+| `dsar` | Wave B (DSAR admin) | `/admin/settings/dsar` | DSAR request handling policy, retention on erasure, export formats |
+| `regulator_reports` | Wave B (Regulator reports) | `/admin/settings/regulator_reports` | Report templates, submission endpoints, scheduling policy |
 
 ---
 
@@ -43,18 +46,32 @@
 
 **RBAC**: `requireNamespacePermJson('branding')` — typically Doc Admin only
 
-**Keys**:
+**Keys** (Wave D expanded — 17 keys total):
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `primary_color` | string (hex) | `#1f2937` | Brand primary color (e.g. `#007bff`). Wired to CSS custom property `--brand-primary`. |
-| `monogram` | string | `BoB` | Sidebar initials (1–8 chars). Displayed in Topbar monogram chip. |
-| `logo_path` | string | `assets/logo.svg` | URL or asset path to tenant logo. Displayed in Topbar left. |
-| `favicon_path` | string | `assets/favicon.ico` | Favicon URL. Applied to `<link rel=icon>` in index.html. |
-| `login_banner` | string | (empty) | HTML-safe banner text for LoginPage hero. Rendered as `<p>{login_banner}</p>`. |
-| `footer_text` | string | (empty) | Footer text. Displayed in Topbar right. |
+| `primary_color` | string (hex) | `#1B3A6B` | Brand primary color. Wired to CSS custom property `--brand-primary`. |
+| `monogram` | string | `BoB` | Sidebar / topbar initials (1–8 chars). Displayed in the tenant monogram chip. |
+| `logo_path` | string | — | URL or asset path to tenant logo. Authenticated topbar left slot. |
+| `favicon_path` | string | — | Legacy favicon URL. Applied to `<link rel=icon>`. Prefer `favicon_url`. |
+| `login_banner` | string | — | Legacy banner text for the LoginPage hero panel. Shown when `tagline` is not set. |
+| `footer_text` | string | — | Legacy footer text. Shown when `footer_copyright` is not set. |
+| `product_name` | string | `DocManager` | Product name in browser tab title and sidebar header. No placeholders — must be a literal string. |
+| `tagline` | string | — | Marketing tagline on login hero. Supports `{product_name}` and `{tenant_display_name}` placeholders. |
+| `welcome_message` | string (max 120) | `Welcome to {product_name}` | Welcome heading on the login form. Supports `{product_name}` and `{tenant_display_name}` placeholders. |
+| `subtitle` | string (max 200) | `{tenant_display_name} — Document Operations` | Sub-heading under welcome message on login. Supports same placeholders. |
+| `login_logo_url` | string | — | Logo URL for login screen (hero panel + mobile header). Falls back to `logo_path`. |
+| `login_background_color` | string (hex) | — | Solid hex background for login hero. Overrides default brand-navy gradient. |
+| `login_background_image_url` | string | — | Background image URL for login hero. Covers gradient blobs when set. |
+| `footer_copyright` | string (max 200) | `© {year} {tenant_display_name}. All rights reserved.` | Copyright line on login screen. Supports `{year}` and `{tenant_display_name}` placeholders. |
+| `support_email` | string | — | Support contact email on login footer and error pages. |
+| `support_phone` | string | — | Support phone number on login footer and error pages. |
+| `favicon_url` | string | — | Favicon URL applied at runtime to `<link rel=icon>`. Takes precedence over `favicon_path`. |
+| `theme_mode` | enum: `light`, `dark`, `auto` | `light` | UI color scheme preference. `auto` follows the OS setting. |
 
-**Notes**: All changes live-update the SPA via ConfigPanel → tenant Zustand store → CSS variable bridge. No page reload required.
+**Precedence chain**: `tenant_config.branding` values → seed defaults → app defaults (see ADR-0017).
+
+**Notes**: All changes live-update the SPA via ConfigPanel → BRANDING_STORE_FIELDS allowlist → tenant Zustand store → CSS variable bridge (Wave D extension). Placeholders (`{product_name}`, `{tenant_display_name}`, `{year}`) are interpolated client-side in LoginPage.
 
 ---
 
