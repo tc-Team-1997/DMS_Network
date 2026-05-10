@@ -578,5 +578,8 @@
     "loading":       "Loading…",
     "empty":         "No notifications",
     "view_all":      "View all notifications"
+  },
+  "cmdk": {
+    "hints": "Try:"
   }
 }

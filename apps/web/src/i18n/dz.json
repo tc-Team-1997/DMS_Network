@@ -686,5 +686,8 @@
     "loading":       "[DZ-PENDING] Loading…",
     "empty":         "[DZ-PENDING] No notifications",
     "view_all":      "[DZ-PENDING] View all notifications"
+  },
+  "cmdk": {
+    "hints": "འདེམས་མཐོང་:"
   }
 }
