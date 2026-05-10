@@ -63,6 +63,8 @@ router.use(require('./spa-api/dashboard'));
 router.use(require('./spa-api/customer-360'));
 // Wave C — Audit log v2
 router.use(require('./spa-api/audit'));
+// Wave E1 — SPA-emitted audit events (pii_reveal, preview_open, export …)
+router.use(require('./spa-api/audit-events'));
 // Wave C — DSAR Console
 router.use(require('./spa-api/dsar'));
 // Wave C — Regulator Reports

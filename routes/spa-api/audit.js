@@ -190,7 +190,7 @@ router.get(
       SELECT
         a.id, a.action, a.entity, a.entity_type, a.entity_id,
         a.detail, a.details, a.result, a.prev_hash, a.hash,
-        a.tenant_id, a.created_at,
+        a.policy_decision, a.tenant_id, a.created_at,
         u.username, u.full_name
       FROM audit_log a
       LEFT JOIN users u ON u.id = a.user_id
@@ -568,4 +568,4 @@ router.post(
   },
 );
 
-module.exports = router;
+module.exports = Object.assign(router, { writeAuditRow });
