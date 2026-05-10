@@ -15,9 +15,9 @@ const base =
 
 const variants: Record<Variant, string> = {
   primary:   'bg-brand-blue text-white hover:bg-brand-blueHover focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-offset-1',
-  secondary: 'bg-brand-skyLight text-brand-blue hover:bg-[#d0e3fb] focus:outline-none focus:ring-2 focus:ring-brand-blue/40',
+  secondary: 'bg-brand-skyLight text-brand-blue hover:bg-secondary-hover focus:outline-none focus:ring-2 focus:ring-brand-blue/40',
   ghost:     'bg-white border border-border text-ink-sub hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-border',
-  danger:    'bg-danger text-white hover:bg-[#c73b3a]',
+  danger:    'bg-danger text-white hover:bg-danger-hover',
 };
 
 /**

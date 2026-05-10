@@ -650,5 +650,8 @@
     "locale_en": "དབྱིན་ཡིག (English)",
     "locale_dz": "རྫོང་ཁ (Dzongkha)",
     "save_success": "གནས་ས་བཀོད་སྒྲིག་ཉར་ཟིན།"
+  },
+  "a11y": {
+    "skip_to_content": "[DZ-PENDING] Skip to main content"
   }
 }

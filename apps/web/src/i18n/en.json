@@ -542,5 +542,8 @@
     "error_generic": "Redaction failed. Please try again.",
     "feature_disabled": "Document redaction is not enabled in this environment.",
     "feature_disabled_hint": "Set VITE_FF_REDACTION=true to enable."
+  },
+  "a11y": {
+    "skip_to_content": "Skip to main content"
   }
 }

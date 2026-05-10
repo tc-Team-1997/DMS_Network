@@ -276,7 +276,10 @@ export function SavedSearchesPanel({ currentFilters, onApply }: SavedSearchesPan
       </div>
 
       {isLoading && (
-        <div className="px-3 py-4 text-xs text-muted animate-pulse">Loading…</div>
+        <div className="px-3 py-4 text-xs text-ink-sub flex items-center gap-1.5" aria-live="polite" aria-busy="true">
+          <span className="inline-block w-3 h-3 rounded-full bg-ink-sub/30 animate-pulse" aria-hidden="true" />
+          Loading…
+        </div>
       )}
 
       {isEmpty && (

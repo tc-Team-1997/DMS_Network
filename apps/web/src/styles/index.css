@@ -76,7 +76,7 @@
   /* ── Typography helpers ────────────────────────────────────── */
   .page-title { @apply text-xl font-semibold text-ink; }
   .section-title { @apply text-md font-semibold text-ink; }
-  .module-label { @apply text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-sky; }
+  .module-label { @apply text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-blue; }
   .caption { @apply text-xs text-muted; }
 
   /* ── Table ─────────────────────────────────────────────────── */

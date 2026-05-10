@@ -4,11 +4,11 @@ import type { HTMLAttributes } from 'react';
 export type BadgeTone = 'success' | 'warning' | 'danger' | 'blue' | 'purple' | 'neutral';
 
 const tones: Record<BadgeTone, string> = {
-  success: 'bg-success-bg text-success',
-  warning: 'bg-warning-bg text-warning',
-  danger:  'bg-danger-bg  text-danger',
+  success: 'bg-success-bg text-success-on-light',
+  warning: 'bg-warning-bg text-warning-on-light',
+  danger:  'bg-danger-bg  text-danger-on-light',
   blue:    'bg-brand-skyLight text-brand-blue',
-  purple:  'bg-purple-bg text-purple',
+  purple:  'bg-purple-bg text-purple-on-light',
   neutral: 'bg-divider    text-ink-sub',
 };
 
