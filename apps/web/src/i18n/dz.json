@@ -528,6 +528,7 @@
     "feature_disabled_hint": "VITE_FF_REDACTION=true བཞག་དགོ།"
   },
   "nav": {
+    "home": "གཙོ་ས།",
     "dashboard": "ལས་ཁུངས་གཙོ།",
     "capture": "ཡིག་ཆ་བྱིན།",
     "repository": "ཡིག་ཚང་།",
@@ -542,6 +543,9 @@
     "settings": "བཀོད་སྒྲིག།",
     "audit": "ལྟ་ཞིབ་ཐོ།",
     "admin": "དོ་དམ།"
+  },
+  "topbar": {
+    "no_branch": "[DZ-PENDING] HQ"
   },
   "common": {
     "save": "ཉར་ཚགས།",
@@ -652,6 +656,7 @@
     "save_success": "གནས་ས་བཀོད་སྒྲིག་ཉར་ཟིན།"
   },
   "a11y": {
-    "skip_to_content": "[DZ-PENDING] Skip to main content"
+    "skip_to_content": "[DZ-PENDING] Skip to main content",
+    "breadcrumb": "[DZ-PENDING] Breadcrumb"
   }
 }

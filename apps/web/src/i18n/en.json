@@ -1,5 +1,6 @@
 {
   "nav": {
+    "home": "Home",
     "dashboard": "Dashboard",
     "capture": "Capture",
     "repository": "Repository",
@@ -14,6 +15,9 @@
     "settings": "Settings",
     "audit": "Audit Log",
     "admin": "System Admin"
+  },
+  "topbar": {
+    "no_branch": "HQ"
   },
   "aml": {
     "title": "AML Screening",
@@ -544,6 +548,7 @@
     "feature_disabled_hint": "Set VITE_FF_REDACTION=true to enable."
   },
   "a11y": {
-    "skip_to_content": "Skip to main content"
+    "skip_to_content": "Skip to main content",
+    "breadcrumb": "Breadcrumb"
   }
 }
