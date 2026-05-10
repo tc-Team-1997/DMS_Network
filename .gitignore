@@ -37,3 +37,11 @@ test-results/
 ~$*.docx
 ~$*.pptx
 .~lock.*
+
+# OS / editor / tool junk
+.DS_Store
+.codegraph/
+graphify-out/
+db/dms.db
+.claude/scheduled_tasks.lock
+CID-*.jpg

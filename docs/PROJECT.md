@@ -4,9 +4,9 @@
 >
 > For the bigger plan itself see [VISION.md](./VISION.md) (*why*), [ROADMAP.md](./ROADMAP.md) (*when*), and the full [docs/README.md](./README.md) index.
 
-Last updated: **2026-05-10** (post-Wave-B).
+Last updated: **2026-05-10** (post-Wave-D).
 
-> **Shipping today:** the platform is bank-agnostic, local-first, admin-controlled. First deployment: Bank of Bhutan (regulator: Royal Monetary Authority). 19 modules shipped across 4 commits — Foundation (`ebae97e`), Wave A operational core (`06d3967`), Wave B admin & access (`9bbae4a`), docs sync (`d63f8e4`). 16 tenant_config namespaces govern every business value. Wave C (compliance & reporting) and Wave D (mobile + Dzongkha + branding finalize) pending. See [CHANGELOG.md](../CHANGELOG.md), [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md), [VISION.md "Shipping today"](./VISION.md).
+> **Shipping today:** the platform is bank-agnostic, local-first, admin-controlled. First deployment: Bank of Bhutan (regulator: Royal Monetary Authority). **28 modules shipped across all four waves** — Foundation (`ebae97e`, 7 cross-cutting), Wave A operational core (`06d3967`, 5 modules), Wave B admin & access (`9bbae4a`, 7 modules), Wave C compliance & reporting + SOX closure (`3308ee8`, 6 modules + 2 SOX gaps closed), Wave D mobile-first + Dzongkha + branding finalize (`8580ba1`, 3 modules). **19 tenant_config namespaces** govern every business value. **17 ADRs** capture every cross-cutting decision. See [CHANGELOG.md](../CHANGELOG.md), [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md), [VISION.md "Shipping today"](./VISION.md).
 
 ---
 

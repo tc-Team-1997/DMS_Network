@@ -2,7 +2,7 @@
 
 > **What we're building, who it's for, what it is not, and why anyone would pay for it.**
 >
-> Last updated: **2026-05-10** (post-Wave-B). For shipped state see [CHANGELOG.md](../CHANGELOG.md); for active config surface see [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md).
+> Last updated: **2026-05-10** (post-Wave-D). For shipped state see [CHANGELOG.md](../CHANGELOG.md); for active config surface see [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md).
 >
 > Companion docs: [ROADMAP.md](./ROADMAP.md) · [TARGET_ARCHITECTURE.md](./TARGET_ARCHITECTURE.md) · [INTEGRATION_STRATEGY.md](./INTEGRATION_STRATEGY.md) · [AI_STRATEGY.md](./AI_STRATEGY.md) · [SECURITY_COMPLIANCE.md](./SECURITY_COMPLIANCE.md) · [ENGINEERING_PRINCIPLES.md](./ENGINEERING_PRINCIPLES.md)
 
@@ -18,11 +18,13 @@ The Wave D branding finalize pass (ADR-0017) ensures a fully BoB-branded experie
 - BoB SVG placeholder logo at `apps/web/public/branding/bob-logo.svg`.
 - Zero hardcoded "DocManager" / "NBE" / "National Bank of Egypt" user-visible strings survive — all brand copy flows through `useTenant()` and `tenant_config.branding`.
 
-- **Configuration-first** — 16 admin namespaces in `tenant_config` (branding, integrations, capture, ocr, doctypes, workflows, viewer, search, dashboard, indexing, aml, customer_360, retention, abac, rbac, auth, notifications). Every write is hash-chained with a ≥20-char reason. See [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md).
-- **Local-first stack** — Ollama (OCR / LLM / Translate) + Tesseract + dlib face-match + per-tenant KEK envelope encryption + content-addressed FS storage. AWS adapters are registered as integration slots but seeded off; flipping them on is a tenant_config edit, not a redeploy. See [ADR-0009](./adr/0009-local-first-adapter-registry.md).
+- **Configuration-first** — **19 admin namespaces** in `tenant_config` (branding, integrations, capture, ocr, doctypes, workflows, viewer, search, dashboard, indexing, aml, customer_360, retention, abac, rbac, auth, notifications, audit_log, regulator_reports, dsar, i18n, mobile_ux). Every write is hash-chained with a ≥20-char reason. See [PLATFORM_CONFIG.md](./PLATFORM_CONFIG.md).
+- **Local-first stack** — Ollama (OCR / LLM / Translate) + Tesseract + dlib face-match + Jomolhari Tibetan font + per-tenant KEK envelope encryption + content-addressed FS storage. AWS adapters are registered as integration slots but seeded off; flipping them on is a tenant_config edit, not a redeploy. See [ADR-0009](./adr/0009-local-first-adapter-registry.md).
 - **Admin-controlled** — every operational knob lives in the `/admin/settings/*` UI behind `requireNamespacePermJson`. There are no hardcoded business values in module code.
-- **Modules shipped** — Foundation (7 cross-cutting modules, commit `ebae97e`), Wave A (Dashboard / Workflows / Viewer+AI / Search / Capture, commit `06d3967`), Wave B (Users / DocTypes+LearnWizard / Templates / Indexing / AML+Customer-360 / ABAC / Retention, commit `9bbae4a`).
-- **Carried-forward debt** — WebAuthn assertion validation and workflow audit-trail unification. Both flagged in [SECURITY_COMPLIANCE.md §18](./SECURITY_COMPLIANCE.md) and scheduled for Wave C.
+- **Modules shipped** — Foundation (7 cross-cutting, commit `ebae97e`), Wave A (Dashboard / Workflows / Viewer+AI / Search / Capture, commit `06d3967`), Wave B (Users / DocTypes+LearnWizard / Templates / Indexing / AML+Customer-360 / ABAC / Retention, commit `9bbae4a`), Wave C (Audit-log v2 / Regulator Reports / DSAR Console / DocBrain v2 / Notifications / SOX closure, commit `3308ee8`), Wave D (Dzongkha i18n / Mobile-first refactor / Branding finalize, commit `8580ba1`). **28 modules total.**
+- **Compliance posture** — Wave C closed both SOX gaps tracked in [SECURITY_COMPLIANCE.md §18](./SECURITY_COMPLIANCE.md): WebAuthn assertion validation (server REJECTS 403 when threshold met but assertion missing or invalid) and workflow audit-trail unification (two-phase commit between Node `wf_actions` and Python `workflow_steps` via `python_step_id` FK). 7 regulator-report templates seeded (RMA / CBE / SAMA / RBI / SOC 2 / GDPR Art-30 RoPA / PDPL) with RSA-PSS signed receipts. DSAR Article-15 export + Article-17 cryptoshred operational with 12-day SLA.
+- **i18n posture** — `react-i18next` + `i18next-icu` framework live; 569 strings hand-translated to Dzongkha; Jomolhari Tibetan font bundled locally (no CDN); `<html lang>` reactive; locale switcher in Topbar. Sidebar nav labels render in Dzongkha; module-body strings to be wired progressively (TODO).
+- **Mobile posture** — Off-canvas drawer Sidebar below `lg`; DataTable card-mode below `md`; ≥44 × 44 touch targets; fluid PDF viewer + bottom-sheet AI rail; `capture="environment"` on Capture. Pixel 7 Playwright project enabled.
 
 The vision below describes the steady-state product. The "Shipping today" section is the honest line between what runs in production and what remains aspirational.
 
