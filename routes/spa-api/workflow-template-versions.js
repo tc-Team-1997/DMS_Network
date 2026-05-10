@@ -31,6 +31,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requireNamespacePermJson, tenantScope } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 const guard = requireNamespacePermJson('workflow_templates');
@@ -110,16 +111,17 @@ function nextVersion(templateId) {
 /**
  * Write an audit log row.
  */
-function writeAudit({ userId, action, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, 'wf_template_version', ?, ?, ?)`,
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, 'wf_template_version', ?, ?, ?, ?)`,
   ).run(
     userId,
     action,
     entityId ?? null,
     typeof details === 'string' ? details : JSON.stringify(details ?? null),
     tenantId || 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null,
   );
 }
 
@@ -201,10 +203,11 @@ router.post('/workflow-templates/:tid/versions', guard, (req, res) => {
 
   writeAudit({
     userId,
-    action:   'WF_TEMPLATE_VERSION_CREATED',
-    entityId: info.lastInsertRowid,
-    details:  { template_id: tid, version, copied_from: body.copy_from_version_id ?? null },
+    action:         'WF_TEMPLATE_VERSION_CREATED',
+    entityId:       info.lastInsertRowid,
+    details:        { template_id: tid, version, copied_from: body.copy_from_version_id ?? null },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   const row = db.prepare('SELECT * FROM wf_template_versions WHERE id = ?')
@@ -367,10 +370,11 @@ router.post('/workflow-templates/:tid/versions/:vid/publish', guard, (req, res) 
 
     writeAudit({
       userId,
-      action:   'WF_TEMPLATE_VERSION_PUBLISHED',
-      entityId: vid,
-      details:  { template_id: tid, version: version.version, reason },
+      action:         'WF_TEMPLATE_VERSION_PUBLISHED',
+      entityId:       vid,
+      details:        { template_id: tid, version: version.version, reason },
       tenantId,
+      policyDecision: buildPolicyDecision(req),
     });
   })();
 
@@ -425,10 +429,11 @@ router.post('/business-calendars', guard, (req, res) => {
 
   writeAudit({
     userId,
-    action:   'BUSINESS_CALENDAR_CREATED',
-    entityId: info.lastInsertRowid,
-    details:  { name, tenant_id: tenantId },
+    action:         'BUSINESS_CALENDAR_CREATED',
+    entityId:       info.lastInsertRowid,
+    details:        { name, tenant_id: tenantId },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   const row = db.prepare('SELECT * FROM business_calendars WHERE id = ?')
@@ -479,11 +484,12 @@ router.patch('/business-calendars/:id', guard, (req, res) => {
   db.prepare(`UPDATE business_calendars SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
 
   writeAudit({
-    userId:   req.session.user?.id ?? null,
-    action:   'BUSINESS_CALENDAR_UPDATED',
-    entityId: id,
-    details:  { updated_fields: Object.keys(body).filter((k) => k !== 'id') },
+    userId:         req.session.user?.id ?? null,
+    action:         'BUSINESS_CALENDAR_UPDATED',
+    entityId:       id,
+    details:        { updated_fields: Object.keys(body).filter((k) => k !== 'id') },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   const updated = db.prepare('SELECT * FROM business_calendars WHERE id = ?').get(id);

@@ -8,6 +8,7 @@ const { URL } = require('url');
 const db = require('../../db');
 const { pyCall, requirePermJson } = require('./_shared');
 const { uploadsDir } = require('./documents');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const PY_BASE = process.env.PYTHON_SERVICE_URL || 'http://localhost:8001';
 const PY_KEY  = process.env.PYTHON_SERVICE_KEY || 'dev-key-change-me';
@@ -502,13 +503,14 @@ router.post('/docbrain/v2/conversations/:id/folder', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 // Inline audit — writeAudit is not exported from documents.js.
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(userId, action, entity, entityId,
     typeof details === 'string' ? details : JSON.stringify(details),
-    tenantId || 'nbe');
+    tenantId || 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null);
 }
 
 // Batch multer — up to 10 files, 25 MB each, same MIME whitelist.
@@ -557,7 +559,7 @@ router.post('/docbrain/doctypes/infer', requirePermJson('admin'), batchUpload.ar
       });
       writeAudit({ userId: req.session.user.id, action: 'doctype_infer', entity: 'doctype',
         entityId: null, details: { file_count: (req.files || []).length },
-        tenantId: req.session.user.tenant_id || 'nbe' });
+        tenantId: req.session.user.tenant_id || 'nbe', policyDecision: buildPolicyDecision(req) });
       res.json(data);
     } catch (err) { res.status(err.status || 502).json({ error: 'doctype_infer_failed', detail: err.message, data: err.data }); }
   });
@@ -572,7 +574,7 @@ router.post('/docbrain/doctypes/commit', requirePermJson('admin'), batchUpload.a
       });
       writeAudit({ userId: req.session.user.id, action: 'doctype_commit', entity: 'doctype',
         entityId: blob.id ?? null, details: { file_count: (req.files || []).length, blob },
-        tenantId: req.session.user.tenant_id || 'nbe' });
+        tenantId: req.session.user.tenant_id || 'nbe', policyDecision: buildPolicyDecision(req) });
       res.json(data);
     } catch (err) { res.status(err.status || 502).json({ error: 'doctype_commit_failed', detail: err.message, data: err.data }); }
   });
@@ -630,7 +632,7 @@ router.delete('/docbrain/doctypes/:id/samples/:sid', requirePermJson('admin'), a
     const data = await pyCall(`${dtPath(req.params.id)}/samples/${encodeURIComponent(req.params.sid)}`, { method: 'DELETE' });
     writeAudit({ userId: req.session.user.id, action: 'doctype_sample_delete', entity: 'doctype_sample',
       entityId: req.params.sid, details: { doctype_id: req.params.id },
-      tenantId: req.session.user.tenant_id || 'nbe' });
+      tenantId: req.session.user.tenant_id || 'nbe', policyDecision: buildPolicyDecision(req) });
     res.json(data);
   } catch (err) { res.status(err.status || 502).json({ error: 'doctype_sample_delete_failed', detail: err.message, data: err.data }); }
 });
@@ -640,7 +642,7 @@ router.post('/docbrain/doctypes/:id/reindex', requirePermJson('admin'), async (r
   try {
     const data = await pyCall(`${dtPath(req.params.id)}/reindex`, { method: 'POST', body: req.body ?? {}, timeout: 1_800_000 });
     writeAudit({ userId: req.session.user.id, action: 'doctype_reindex', entity: 'doctype',
-      entityId: req.params.id, details: {}, tenantId: req.session.user.tenant_id || 'nbe' });
+      entityId: req.params.id, details: {}, tenantId: req.session.user.tenant_id || 'nbe', policyDecision: buildPolicyDecision(req) });
     res.json(data);
   } catch (err) { res.status(err.status || 502).json({ error: 'doctype_reindex_failed', detail: err.message, data: err.data }); }
 });

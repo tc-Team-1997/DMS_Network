@@ -11,6 +11,7 @@ const {
   storeIdempotency,
   sha256,
 } = require('../../services/idempotency');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 // UUID v4 regex for validating Idempotency-Key header values.
 const IDEM_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -19,17 +20,18 @@ const IDEM_KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
  * Write a row to audit_log.
  * Kept inline here; no separate services/audit.js exists yet.
  */
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   db.prepare(
-    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(
     userId,
     action,
     entity,
     entityId,
     typeof details === 'string' ? details : JSON.stringify(details),
-    tenantId || 'nbe'
+    tenantId || 'nbe',
+    policyDecision !== null ? JSON.stringify(policyDecision) : null
   );
 }
 
@@ -271,6 +273,7 @@ router.post(
           source: autoRouted.source,
         },
         tenantId: tenant,
+        policyDecision: buildPolicyDecision(req),
       });
     }
 
@@ -388,6 +391,7 @@ router.post('/documents/:id/rollback/:versionId', (req, res) => {
       user_id: userId,
     },
     tenantId,
+    policyDecision: buildPolicyDecision(req),
   });
 
   return res.json({ ok: true, new_version_id: newVersionId, new_version_number: newVersionLabel });

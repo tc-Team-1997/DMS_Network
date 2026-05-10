@@ -23,6 +23,7 @@
 const express = require('express');
 const db = require('../../db');
 const { requirePermJson, pyCall, tenantScope } = require('./_shared');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -40,11 +41,11 @@ function getVersion(doctypeId, versionId) {
   ).get(versionId, doctypeId);
 }
 
-function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
+function writeAudit({ userId, action, entity, entityId, details, tenantId, policyDecision = null }) {
   try {
     db.prepare(
-      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO audit_log (user_id, action, entity, entity_id, details, tenant_id, policy_decision)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       userId,
       action,
@@ -52,6 +53,7 @@ function writeAudit({ userId, action, entity, entityId, details, tenantId }) {
       entityId,
       typeof details === 'string' ? details : JSON.stringify(details),
       tenantId || 'nbe',
+      policyDecision !== null ? JSON.stringify(policyDecision) : null,
     );
   } catch (_) { /* non-fatal */ }
 }
@@ -157,11 +159,12 @@ router.post('/document-types/:id/versions/:vid/publish', requirePermJson('admin'
 
   writeAudit({
     userId,
-    action: 'DOCTYPE_VERSION_PUBLISHED',
-    entity: 'doctype_versions',
-    entityId: vid,
-    details: { doctype_id: id, version: target.version, reason },
-    tenantId: tenant,
+    action:         'DOCTYPE_VERSION_PUBLISHED',
+    entity:         'doctype_versions',
+    entityId:       vid,
+    details:        { doctype_id: id, version: target.version, reason },
+    tenantId:       tenant,
+    policyDecision: buildPolicyDecision(req),
   });
 
   res.json(db.prepare('SELECT * FROM doctype_versions WHERE id = ?').get(vid));
@@ -208,11 +211,12 @@ router.post('/document-types/:id/versions/:vid/rollback', requirePermJson('admin
 
   writeAudit({
     userId,
-    action: 'DOCTYPE_VERSION_ROLLED_BACK',
-    entity: 'doctype_versions',
-    entityId: vid,
-    details: { doctype_id: id, version: target.version, reason },
-    tenantId: tenant,
+    action:         'DOCTYPE_VERSION_ROLLED_BACK',
+    entity:         'doctype_versions',
+    entityId:       vid,
+    details:        { doctype_id: id, version: target.version, reason },
+    tenantId:       tenant,
+    policyDecision: buildPolicyDecision(req),
   });
 
   res.json(db.prepare('SELECT * FROM doctype_versions WHERE id = ?').get(vid));
