@@ -195,13 +195,12 @@ function PaletteOverlay({ onClose }: PaletteOverlayProps) {
           </button>
         </div>
 
-        {/* Operator-token hints */}
-        <div data-testid="cmdk-hints" className="px-3 py-1.5 border-b border-divider text-[10px] text-muted">
+        {/* Operator-token hints — only operators SearchInput TOKEN_RE actually parses */}
+        <div data-testid="cmdk-hints" className="px-3 py-1.5 border-b border-divider text-2xs text-muted">
           {t('cmdk.hints', 'Try:')}{' '}
-          <code className="text-brand-blue">cid:001234</code>{' · '}
-          <code className="text-brand-blue">expiry:&lt;30d</code>{' · '}
           <code className="text-brand-blue">type:passport</code>{' · '}
-          <code className="text-brand-blue">branch:thimphu</code>
+          <code className="text-brand-blue">branch:thimphu</code>{' · '}
+          <code className="text-brand-blue">customer:001234</code>
         </div>
 
         {/* Results list */}
