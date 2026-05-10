@@ -11,19 +11,19 @@
 
 | Task | Headline | Evidence |
 |------|----------|----------|
-| 1 | `audit_log.policy_decision` column persisted on every mutation | `db/index.js` migration 0038; `routes/spa-api/audit.js#78-141` writeAuditRow persists policyDecisionJson |
+| 1 | `audit_log.policy_decision` column persisted on every mutation | `db/index.js:657-670` migration 0040; `routes/spa-api/audit.js#78-141` writeAuditRow persists policyDecisionJson |
 | 2 | Canonical writeAuditRow helper + buildPolicyDecision factory | `routes/spa-api/audit.js#78-141` + `services/audit-policy.js#13-24` |
-| 3 | SPA-emit audit events via POST /spa/api/audit/events | `routes/spa-api/audit-events.js` (allow-list: pii_reveal, aml_decision, document_expiry_alert); `apps/web/e2e/audit-events.spec.ts` 3 passing tests |
+| 3 | SPA-emit audit events via POST /spa/api/audit/events | `routes/spa-api/audit-events.js` (allow-list: pii_reveal, pii_mask, document.preview_open, export.csv_requested, export.pdf_requested); `apps/web/e2e/audit-events.spec.ts` 3 passing tests |
 | 4–8 | 13 duplicate writeAudit functions wired policyDecision | Grep confirms callers in `routes/spa-api/{workflows,annotations,legal-holds,documents,users,saml-idps,auth,doctype-versions,workflow-template-versions,docbrain,sync,translate,worm}.js` all pass policyDecision |
 | 5 | 5 WCAG Level-A fixes (axe-core) | `apps/web/e2e/wcag-foundation.spec.ts` + fixes: Toast role-prohibited removed + Badge/MetricCard aria-label-required + Sidebar aria-current on nav link + Input aria-describedby merge + SessionExpired focus-trap + color-contrast on light backgrounds |
 | 6 | Topbar breadcrumb + branch+role chip | `apps/web/src/components/layout/Topbar.tsx` + `Breadcrumbs.tsx` (visible on every route); `apps/web/e2e/breadcrumbs.spec.ts` ✓ |
-| 7 | Notifications 3-tab popover (Alerts/Approvals/System) + numeric badge | `apps/web/src/components/layout/NotificationsPopover.tsx` + severity-colored badge; `apps/web/e2e/notifications-tabs.spec.ts` ✓ |
+| 7 | Notifications 3-tab popover (Alerts/Approvals/System) + numeric badge | `apps/web/src/modules/notifications/NotificationFeed.tsx` (3-tab layout) + `apps/web/src/components/layout/Topbar.tsx` (BellButton + numeric badge); `apps/web/e2e/notifications-tabs.spec.ts` ✓ |
 | 8 | Cmd-K palette with operator-token hints | `apps/web/src/components/CommandPalette.tsx` with hints for `type:`, `branch:`, `customer:` operators; `apps/web/e2e/cmdk-hints.spec.ts` ✓ |
 | 9 | Forgot-password full flow (Node + SPA + DB + spec) | `routes/spa-api/auth-reset.js` (POST /forgot-password, POST /reset-password, GET /validate); `apps/web/src/modules/auth/{ForgotPasswordPage,ResetPasswordPage}.tsx`; `db/schema.sql` reset_token columns; `apps/web/e2e/forgot-password.spec.ts` ✓ |
-| 10 | PII reveal emits audit | `apps/web/src/components/PiiRevealField.tsx` calls emitAuditEvent('pii_reveal'); `apps/web/e2e/pii-reveal-audit.spec.ts` 2 tests ✓ |
-| 11 | i18n parity script + 509 Dzongkha keys | `apps/web/scripts/i18n-parity.cjs` verifies parity; `apps/web/src/i18n/dz.json` 509+ keys; `apps/web/package.json` npm run i18n:check wired |
+| 10 | PII reveal emits audit | `apps/web/src/modules/customer-360/components/PiiRevealField.tsx` calls emitAuditEvent('pii_reveal'); `apps/web/e2e/pii-reveal-audit.spec.ts` 2 tests ✓ |
+| 11 | i18n parity script + 509 Dzongkha keys | `apps/web/scripts/i18n-parity.cjs` verifies parity; `apps/web/src/i18n/dz.json` 509+ keys with 5 [DZ-PENDING] markers added (cbs.not_available, customer360.attr_cid, redaction.reason_pii, redaction.manual_x_label, redaction.manual_y_label); total [DZ-PENDING]: 24 across all slices; `apps/web/package.json` npm run i18n:check wired |
 
-**Commits:** 13 commits on branch `wave-e1-plan0-cross-cutting` (6e7cacb tip); all Foundation specs passing.
+**Commits:** 18 commits on branch `wave-e1-plan0-cross-cutting` (6e7cacb tip); all Foundation specs passing.
 
 ---
 
@@ -85,7 +85,7 @@ routes/spa-api/annotations.js writeAudit caller
 ```
 ✅ PASS: reset_token in routes/spa-api/auth-reset.js POST handlers
 routes/spa-api/auth-reset.js:41 (forgot-password), 89 (validate), 126 (reset-password)
-db/index.js:85 migration 0038 adds reset_token + reset_token_expires_at to users table
+db/index.js:657-670 migration 0040 adds reset_token + reset_token_expires_at to users table
 ```
 
 **4d. writeAudit/writeAuditRow merge-guard**
@@ -231,8 +231,8 @@ Every audit_log row written through any path now carries a policy_decision JSON 
 |-------|-------|
 | Postmortem sprint | Plan 0 (Tasks 1–11) |
 | Completion date | 2026-05-10 |
-| Commits | 13 on `wave-e1-plan0-cross-cutting` |
-| Files changed | ~45 (audit, auth-reset, Topbar, Breadcrumbs, Notifications, CommandPalette, ForgotPassword, ResetPassword, PiiRevealField, 13 writeAudit locations, 8 specs, i18n, DB migration) |
+| Commits | 18 on `wave-e1-plan0-cross-cutting` |
+| Files changed | ~45 (audit, auth-reset, Topbar, Breadcrumbs, NotificationFeed, CommandPalette, ForgotPassword, ResetPassword, PiiRevealField, 13 writeAudit locations, 8 specs, i18n, DB migration) |
 | Wave-E DoD status | ✅ All rows green (verified live in code) |
 | Demo-day blocker | ✅ Closed (policy_decision persisted everywhere) |
 | Next action | Full E2E stack test in CI; visual regression sweep on Alerts/Approvals/System tabs |
