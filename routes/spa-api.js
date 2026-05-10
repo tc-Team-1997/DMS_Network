@@ -14,6 +14,9 @@ const router = express.Router();
 // Public — no session required.
 // New canonical paths: /spa/api/auth/*
 router.use('/auth', require('./spa-api/auth'));
+// Forgot-password / reset-password endpoints (Plan 0 / Task 9a-9c).
+// Must remain before requireAuthJson so unauthenticated users can reach them.
+router.use('/auth', require('./spa-api/auth-reset'));
 // Legacy aliases kept for backward-compat with existing SPA calls to
 // /spa/api/login, /spa/api/logout, /spa/api/me.
 router.use(require('./spa-api/auth'));
