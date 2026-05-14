@@ -6,7 +6,8 @@ const PERMS = {
                  'documents:redact','view_unredacted',
                  'kyc:write','kyc:read',
                  'translate:read','translate:delete',
-                 'regulator_reports:read','regulator_reports:admin'],
+                 'regulator_reports:read','regulator_reports:admin',
+                 'dsar:read','dsar:fulfill'],
   'Maker':      ['capture','index','upload','view','workflow',
                  'aml:read',
                  'cbs:read','cbs:write',
@@ -28,9 +29,11 @@ const PERMS = {
   // Extended roles added for AML + CBS compliance surfaces.
   // These roles are set on users whose `role` column carries the value below.
   'auditor':    ['view','aml:read','cbs:read','worm:read','view_unredacted','kyc:read','translate:read',
-                 'regulator_reports:read'],
+                 'regulator_reports:read',
+                 'dsar:read'],
   'compliance': ['view','aml:read','aml:review','cbs:read','worm:read','translate:read',
-                 'regulator_reports:read'],
+                 'regulator_reports:read',
+                 'dsar:read'],
 };
 
 function can(role, perm) {

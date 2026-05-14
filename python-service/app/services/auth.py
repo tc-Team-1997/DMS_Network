@@ -49,6 +49,9 @@ PERMISSIONS = {
     "kyc:read":          {"auditor", "doc_admin"},
     "translate:read":    {"viewer", "maker", "checker", "doc_admin", "auditor", "compliance"},
     "translate:delete":  {"doc_admin"},
+    # Plan 3 (Wave-E1) — DSAR Console perms. Mirrors services/rbac.js bundles.
+    "dsar:read":         {"doc_admin", "auditor", "compliance"},
+    "dsar:fulfill":      {"doc_admin"},
 }
 
 

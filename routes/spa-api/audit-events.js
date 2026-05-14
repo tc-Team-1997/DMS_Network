@@ -35,6 +35,10 @@ const SPA_AUDIT_ACTIONS = new Set([
   'document.preview_open',
   'export.csv_requested',
   'export.pdf_requested',
+  // Plan 3 (Wave-E1) — DSAR Console actions emitted by routes/spa-api/dsar.js.
+  'dsar.lookup',
+  'dsar.fulfill',
+  'dsar.release_hold',
 ]);
 
 // ---------------------------------------------------------------------------
