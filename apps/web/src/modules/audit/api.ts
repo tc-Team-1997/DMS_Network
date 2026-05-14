@@ -12,6 +12,8 @@ import {
   PivotResponseSchema,
   VerifyChainResponseSchema,
   AnchorResponseSchema,
+  ChainVerifyV2ResponseSchema,
+  EventWithContextSchema,
   type AuditFilters,
   type PivotBy,
 } from './schemas';
@@ -60,6 +62,18 @@ export function fetchAuditPivot(by: PivotBy) {
 
 export function verifyChain(limit?: number) {
   return post(`${BASE}/verify-chain`, limit !== undefined ? { limit } : {}, VerifyChainResponseSchema);
+}
+
+// ---------------------------------------------------------------------------
+// Plan 3 (Wave-E1) — full chain walk from genesis + event-with-context
+// ---------------------------------------------------------------------------
+
+export function fetchChainVerify() {
+  return get(`${BASE}/chain/verify`, ChainVerifyV2ResponseSchema);
+}
+
+export function fetchEventWithContext(id: number) {
+  return get(`${BASE}/events/${id}/with-context`, EventWithContextSchema);
 }
 
 // ---------------------------------------------------------------------------

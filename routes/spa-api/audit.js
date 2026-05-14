@@ -29,7 +29,7 @@ const express = require('express');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const db = require('../../db');
 const { computeHash, canonicalJson } = require('../../db/hash-chain');
-const { requireNamespacePermJson, tenantScope } = require('./_shared');
+const { requireNamespacePermJson, requirePermJson, tenantScope } = require('./_shared');
 const { pyCall } = require('./_shared');
 const { buildPolicyDecision } = require('../../services/audit-policy');
 
@@ -567,5 +567,127 @@ router.post(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// Plan 3 (Wave-E1) — Task #4: full chain-verify + event-with-context.
+// ---------------------------------------------------------------------------
+
+const CHAIN_VIEW = requirePermJson('audit:chain_view');
+
+// GET /spa/api/audit/chain/verify
+// Walks the entire audit_log chain from genesis (id ASC), tenant-scoped.
+// Returns { verified, count, latest_anchor, broken_at }.
+// Read-only — no audit row written.
+router.get('/audit/chain/verify', CHAIN_VIEW, (req, res) => {
+  const tenant = tenantScope(req);
+  const rows = db.prepare(`
+    SELECT id, user_id, action, entity, entity_type, entity_id,
+           detail, details, result, prev_hash, hash, tenant_id, created_at
+    FROM audit_log
+    WHERE (tenant_id = ? OR tenant_id IS NULL) AND hash IS NOT NULL
+    ORDER BY id ASC
+  `).all(tenant);
+
+  let prev = null;
+  let brokenAt = null;
+  for (const r of rows) {
+    if ((r.prev_hash ?? null) !== prev) { brokenAt = r.id; break; }
+    const expected = computeHash(prev, rowToDict(r));
+    if (expected !== r.hash) { brokenAt = r.id; break; }
+    prev = r.hash;
+  }
+
+  const latestAnchor = rows.length ? rows[rows.length - 1].hash : null;
+  res.json({
+    verified:      brokenAt === null,
+    count:         rows.length,
+    latest_anchor: latestAnchor,
+    broken_at:     brokenAt,
+  });
+});
+
+// GET /spa/api/audit/events/:id/with-context
+// Returns one audit row + parsed detail + parsed policy_decision + prev/next
+// hash neighbours for the diff drawer's chain-segment panel.
+router.get('/audit/events/:id/with-context', CHAIN_VIEW, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
+  const tenant = tenantScope(req);
+
+  const r = db.prepare(`
+    SELECT a.id, a.user_id, a.action, a.entity, a.entity_type, a.entity_id,
+           a.detail, a.details, a.result, a.prev_hash, a.hash,
+           a.policy_decision, a.tenant_id, a.created_at,
+           u.username, u.full_name
+    FROM audit_log a
+    LEFT JOIN users u ON u.id = a.user_id
+    WHERE a.id = ? AND (a.tenant_id = ? OR a.tenant_id IS NULL)
+  `).get(id, tenant);
+  if (!r) return res.status(404).json({ error: 'not_found' });
+
+  const prev = db.prepare(`
+    SELECT id, hash FROM audit_log
+    WHERE id < ? AND (tenant_id = ? OR tenant_id IS NULL)
+    ORDER BY id DESC LIMIT 1
+  `).get(id, tenant);
+  const next = db.prepare(`
+    SELECT id, hash FROM audit_log
+    WHERE id > ? AND (tenant_id = ? OR tenant_id IS NULL)
+    ORDER BY id ASC LIMIT 1
+  `).get(id, tenant);
+
+  function safeParse(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
+    try { return JSON.parse(raw); } catch { return raw; }
+  }
+
+  res.json({
+    event: {
+      ...r,
+      detail:          safeParse(r.detail ?? r.details),
+      policy_decision: safeParse(r.policy_decision),
+    },
+    chain: {
+      prev: prev ? { id: prev.id, hash: prev.hash } : null,
+      this: { id: r.id, prev_hash: r.prev_hash, hash: r.hash },
+      next: next ? { id: next.id, hash: next.hash } : null,
+    },
+  });
+});
+
+// Test-only chain-tamper endpoints — non-production only.
+if (process.env.NODE_ENV !== 'production') {
+  router.post('/audit/_test_break_chain_at', CHAIN_VIEW, (req, res) => {
+    const id = parseInt(String(req.query.id || ''), 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
+    const tenant = tenantScope(req);
+    db.prepare(`
+      UPDATE audit_log SET hash = 'TAMPERED'
+      WHERE id = ? AND (tenant_id = ? OR tenant_id IS NULL)
+    `).run(id, tenant);
+    res.json({ ok: true, broken_at: id });
+  });
+
+  router.post('/audit/_test_repair_chain', CHAIN_VIEW, (req, res) => {
+    // Re-derive hashes by walking forward from genesis. In the test suite we
+    // just walk the tenant's rows and recompute prev_hash → hash transitions.
+    const tenant = tenantScope(req);
+    const rows = db.prepare(`
+      SELECT id, user_id, action, entity, entity_type, entity_id,
+             detail, details, result, tenant_id, created_at
+      FROM audit_log
+      WHERE (tenant_id = ? OR tenant_id IS NULL)
+      ORDER BY id ASC
+    `).all(tenant);
+    const upd = db.prepare('UPDATE audit_log SET prev_hash = ?, hash = ? WHERE id = ?');
+    let prev = null;
+    for (const r of rows) {
+      const h = computeHash(prev, rowToDict(r));
+      upd.run(prev, h, r.id);
+      prev = h;
+    }
+    res.json({ ok: true, repaired: rows.length });
+  });
+}
 
 module.exports = Object.assign(router, { writeAuditRow });

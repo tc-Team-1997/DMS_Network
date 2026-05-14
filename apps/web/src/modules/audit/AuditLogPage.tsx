@@ -29,7 +29,7 @@ import {
 } from '@/components/ui';
 import { Search } from 'lucide-react';
 import { useAuth } from '@/store/auth';
-import { fetchAuditEvents, searchAuditEvents, verifyChain } from './api';
+import { fetchAuditEvents, searchAuditEvents, verifyChain, fetchChainVerify } from './api';
 import type { AuditEvent } from './schemas';
 import { ChainVerifyBadge } from './components/ChainVerifyBadge';
 import { AuditFilterBar, useAuditFilters } from './components/AuditFilterBar';
@@ -292,14 +292,22 @@ export function AuditLogPage() {
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
   const [activeTab, setActiveTab] = useState('events');
 
-  // Shared verify-chain result for badge + anchor.
+  // Plan 3 (Wave-E1) — full chain walk from genesis for the banner.
   const chainQ = useQuery({
+    queryKey: ['audit', 'chain-verify-v2'],
+    queryFn: fetchChainVerify,
+    staleTime: 60_000,
+  });
+
+  // Legacy POST /verify-chain still backs the AnchorBadge (it returns head_hash
+  // for OTS anchoring). Keep it alive until anchor flow migrates.
+  const anchorQ = useQuery({
     queryKey: ['audit', 'verify-chain', 1000],
     queryFn: () => verifyChain(1000),
     staleTime: 60_000,
   });
 
-  const headHash = chainQ.data?.head_hash ?? null;
+  const headHash = chainQ.data?.latest_anchor ?? anchorQ.data?.head_hash ?? null;
 
   // Derive role-based capability from session user injected into page by EJS layout.
   const role = useAuth((s) => s.user?.role) ?? '';
@@ -309,13 +317,9 @@ export function AuditLogPage() {
 
   return (
     <div className="space-y-4" data-testid="audit-log-page">
-      {/* Chain + anchor header */}
+      {/* Chain + anchor header — Plan 3 (Wave-E1) banner promoted above tabs. */}
       <div className="space-y-2">
-        {chainQ.data !== undefined ? (
-          <ChainVerifyBadge window={1000} serverResult={chainQ.data} />
-        ) : (
-          <ChainVerifyBadge window={1000} />
-        )}
+        <ChainVerifyBadge serverResult={chainQ.data} />
         <AnchorBadge headHash={headHash} canAnchor={isDocAdmin} />
       </div>
 
