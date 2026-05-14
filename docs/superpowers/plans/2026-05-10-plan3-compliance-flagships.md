@@ -36,6 +36,31 @@ The rest of the original File-Structure table (Node routes, SPA pages, tests, i1
 
 **Effect on code blocks below:** every `INSERT INTO dsar_requests (subject_cid, axis, regulator, opened_at, sla_due_at, ...)` should be read as `INSERT INTO dsar_requests (customer_cid, axis, regulator, requested_at, sla_due_at, action, params_json, ...)`. Every `INSERT INTO regulator_templates (country_code, name, frequency, sla_days, json_schema, ...)` should be read as `INSERT INTO regulator_reports (tenant_id, regulator, name, parameters_schema_json, format, schedule_cron, ...)`. Every `regulator_submissions` reference should be read as `submission_receipts`.
 
+### Task #5 (DocBrain Chat v2) testid contract — amended 2026-05-14
+
+The existing `apps/web/src/modules/ai/ChatPage.tsx` (Wave-C, 870+ lines) already implements the 3-pane shell, hover toolbar, citation buttons, and amber halt banner — but with legacy `chat-*` / `citation-btn-*` / `evidence-rail` / `amber-halt-banner` testids that three other Playwright specs (`docbrain.spec.ts`, `chat.spec.ts`, `agent.spec.ts`) still assert on. Renaming would break those.
+
+Plan 3 adds **wrapper** testids on the three panes + the three sidebar sections so the contract testids in the Playwright spec match without touching the form-element testids the legacy specs depend on. The Plan 3 spec (`apps/web/e2e/docbrain-v2.spec.ts`) uses this hybrid mapping:
+
+| Plan 3 contract | Actual surface |
+|---|---|
+| `docbrain-conversations-sidebar` | NEW wrapper div around the sidebar |
+| `docbrain-message-thread`        | NEW wrapper div around the center pane |
+| `docbrain-evidence-rail`         | NEW wrapper div around the right pane (legacy `evidence-rail` retained on the inner content) |
+| `docbrain-conv-section-pinned/today/earlier` | NEW `<section>` wrappers (always rendered; empty when the bucket has zero rows) |
+| `docbrain-conv-search-input`     | use existing `chat-search` |
+| `docbrain-msg-input`             | use existing `chat-input` |
+| `docbrain-msg-send`              | use existing `chat-send` |
+| `docbrain-message-{role}`        | use existing `chat-msg-{role}` |
+| `docbrain-msg-toolbar`           | use existing `msg-toolbar-{id}` |
+| `docbrain-msg-copy/-retry/-edit-resend/-regenerate/-cite-as-comment` | use existing `msg-edit-{id}` / `msg-retry-{id}` / `msg-regenerate-{id}`; copy button has no testid today; cite-as-comment is deferred (postmortem-listed) |
+| `docbrain-citation-N`            | use existing `citation-btn-N` |
+| `docbrain-halt-banner`           | refactored AmberHaltBanner — primary testid now `docbrain-halt-banner`; hidden `<span data-testid="amber-halt-banner" />` alias retained for legacy specs |
+| `docbrain-halt-search-adjacent`  | NEW button inside AmberHaltBanner |
+| `docbrain-halt-override`         | NEW button inside AmberHaltBanner |
+
+App.tsx adds `/docbrain` as a route alias to the existing `/ai` so the Plan 3 spec's `await page.goto('/docbrain')` resolves.
+
 ---
 
 **Goal:** Close the customer-blocking compliance flagship gaps from Wave-E §3.10 — DSAR Console (mockup screen 15), Regulator Reports RMA template (mockup screen 14), Audit Log v2 chain-verify banner + diff drawer (mockup screen 13), DocBrain Chat v2 3-pane shell + has_evidence halt banner (mockup screen 16), Search Results v2 facets + operator-token chips + FTS5-highlighted snippets (mockup screen 17).

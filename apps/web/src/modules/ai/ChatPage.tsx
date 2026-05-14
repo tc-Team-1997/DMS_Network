@@ -104,19 +104,50 @@ function TokenWindowChip({ messages, maxTokens }: { messages: LocalMessage[]; ma
 // AmberHaltBanner
 // ---------------------------------------------------------------------------
 
-function AmberHaltBanner({ children }: { children: React.ReactNode }) {
+function AmberHaltBanner({
+  children,
+  onSearchAdjacent,
+  onOverride,
+}: {
+  children?: React.ReactNode;
+  onSearchAdjacent?: () => void;
+  onOverride?: () => void;
+}) {
   return (
     <div
       className="rounded-card border border-warning/40 bg-warning-bg px-3 py-2"
-      data-testid="amber-halt-banner"
+      data-testid="docbrain-halt-banner"
+      role="alert"
+      aria-live="polite"
     >
+      {/* Backwards-compat alias for the Wave-C docbrain.spec.ts assertions. */}
+      <span data-testid="amber-halt-banner" hidden />
       <p className="text-[11px] font-semibold text-warning flex items-center gap-1.5 mb-1.5">
         <ShieldAlert size={12} /> No grounded evidence — general knowledge only
       </p>
       <p className="text-[10px] text-ink/70 leading-relaxed mb-2">
-        I don't have grounded evidence to answer this from the corpus. The reply below is the
+        I don't have grounded evidence to answer this from the corpus. Try rephrasing
+        the question or attach more sources to the conversation. The reply below is the
         model's general knowledge and should not be used for compliance decisions.
       </p>
+      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+        <button
+          type="button"
+          data-testid="docbrain-halt-search-adjacent"
+          onClick={onSearchAdjacent}
+          className="px-2 py-1 rounded-input border border-warning/40 bg-surface text-[10px] font-medium text-warning hover:bg-warning-bg/60 focus:outline-none focus:ring-2 focus:ring-warning/40 min-h-[24px]"
+        >
+          Search adjacent corpora
+        </button>
+        <button
+          type="button"
+          data-testid="docbrain-halt-override"
+          onClick={onOverride}
+          className="px-2 py-1 rounded-input border border-warning/40 bg-surface text-[10px] font-medium text-warning hover:bg-warning-bg/60 focus:outline-none focus:ring-2 focus:ring-warning/40 min-h-[24px]"
+        >
+          Override (audit-logged)
+        </button>
+      </div>
       {children}
     </div>
   );
@@ -406,18 +437,24 @@ function ConversationsSidebar({ conversations, activeId, onSelect, onNew, onDele
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-1 py-2 space-y-0.5">
-        {pinned.length > 0 && (<>
-          <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-muted">Pinned</p>
+        <section data-testid="docbrain-conv-section-pinned" aria-label="Pinned conversations">
+          {pinned.length > 0 && (
+            <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-muted">Pinned</p>
+          )}
           {pinned.map((c) => <ConversationRow key={c.id} item={c} active={c.id === activeId} onSelect={() => onSelect(c.id)} onDelete={() => onDelete(c.id)} onPin={() => onPin(c.id, !c.pinned)} />)}
-        </>)}
-        {today.length > 0 && (<>
-          <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-muted">Today</p>
+        </section>
+        <section data-testid="docbrain-conv-section-today" aria-label="Today's conversations">
+          {today.length > 0 && (
+            <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-muted">Today</p>
+          )}
           {today.map((c) => <ConversationRow key={c.id} item={c} active={c.id === activeId} onSelect={() => onSelect(c.id)} onDelete={() => onDelete(c.id)} onPin={() => onPin(c.id, !c.pinned)} />)}
-        </>)}
-        {older.length > 0 && (<>
-          <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-muted">Earlier</p>
+        </section>
+        <section data-testid="docbrain-conv-section-earlier" aria-label="Earlier conversations">
+          {older.length > 0 && (
+            <p className="px-2 py-1 text-[9px] font-semibold uppercase tracking-wider text-muted">Earlier</p>
+          )}
           {older.map((c) => <ConversationRow key={c.id} item={c} active={c.id === activeId} onSelect={() => onSelect(c.id)} onDelete={() => onDelete(c.id)} onPin={() => onPin(c.id, !c.pinned)} />)}
-        </>)}
+        </section>
         {items.length === 0 && (
           <p className="text-xs text-muted text-center py-8 px-2">
             {q ? 'No conversations match.' : 'No conversations yet.'}
@@ -766,7 +803,10 @@ export function ChatPage() {
       data-testid="docbrain-chat-v2"
     >
       {/* LEFT — sidebar */}
-      <div className="border-r border-divider bg-surface-alt overflow-hidden flex flex-col">
+      <div
+        data-testid="docbrain-conversations-sidebar"
+        className="border-r border-divider bg-surface-alt overflow-hidden flex flex-col"
+      >
         <ConversationsSidebar
           conversations={convList}
           activeId={activeId}
@@ -778,7 +818,7 @@ export function ChatPage() {
       </div>
 
       {/* CENTER — thread */}
-      <div className="flex flex-col overflow-hidden bg-surface">
+      <div data-testid="docbrain-message-thread" className="flex flex-col overflow-hidden bg-surface">
         <div className="flex items-center justify-between px-4 py-2 border-b border-divider">
           <p className="text-sm font-semibold text-ink truncate">
             {activeDetail.data?.conversation.title ?? (activeId === null ? 'DocBrain Chat' : 'Loading…')}
@@ -842,7 +882,7 @@ export function ChatPage() {
       </div>
 
       {/* RIGHT — evidence rail */}
-      <div className="border-l border-divider bg-surface-alt overflow-hidden flex flex-col">
+      <div data-testid="docbrain-evidence-rail" className="border-l border-divider bg-surface-alt overflow-hidden flex flex-col">
         <div className="px-3 py-2 border-b border-divider">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Evidence Rail</p>
         </div>

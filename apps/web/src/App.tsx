@@ -158,6 +158,8 @@ export function App() {
               <Route path="/indexing" element={<IndexingPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/ai" element={<ChatPage />} />
+              {/* Plan 3 (Wave-E1) — DocBrain Chat v2 contract path alias. */}
+              <Route path="/docbrain" element={<ChatPage />} />
               <Route path="/ai/engine" element={<AIEnginePage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/integration" element={<IntegrationsPage />} />
