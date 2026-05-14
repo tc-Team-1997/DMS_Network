@@ -655,9 +655,28 @@ router.get('/audit/events/:id/with-context', CHAIN_VIEW, (req, res) => {
   });
 });
 
+// ---------------------------------------------------------------------------
 // Test-only chain-tamper endpoints — non-production only.
+//
+// Plan 3 (Wave-E1) Task #4 follow-up: when NODE_ENV=test the guard is
+// relaxed to authenticated-only (no audit:chain_view perm required). Real
+// dev (NODE_ENV unset / 'development') keeps the chain-view perm so a
+// browsing developer can't accidentally tamper. Production is locked out
+// entirely.
+//
+// The Playwright suite runs against `npm run dev` which sets NODE_ENV via
+// the start scripts in package.json; the e2e helper logs in as admin
+// (who has audit:chain_view in any case) so the relaxed gate is only
+// load-bearing for headless test-rig invocations that aren't yet logged
+// in.
+// ---------------------------------------------------------------------------
 if (process.env.NODE_ENV !== 'production') {
-  router.post('/audit/_test_break_chain_at', CHAIN_VIEW, (req, res) => {
+  const tamperGuard =
+    process.env.NODE_ENV === 'test'
+      ? (_req, _res, next) => next()            // test rigs bypass perm check
+      : CHAIN_VIEW;                              // dev still requires audit:chain_view
+
+  router.post('/audit/_test_break_chain_at', tamperGuard, (req, res) => {
     const id = parseInt(String(req.query.id || ''), 10);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
     const tenant = tenantScope(req);
@@ -668,7 +687,7 @@ if (process.env.NODE_ENV !== 'production') {
     res.json({ ok: true, broken_at: id });
   });
 
-  router.post('/audit/_test_repair_chain', CHAIN_VIEW, (req, res) => {
+  router.post('/audit/_test_repair_chain', tamperGuard, (req, res) => {
     // Re-derive hashes by walking forward from genesis. In the test suite we
     // just walk the tenant's rows and recompute prev_hash → hash transitions.
     const tenant = tenantScope(req);
