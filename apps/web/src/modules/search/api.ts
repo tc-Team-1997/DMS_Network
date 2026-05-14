@@ -7,11 +7,14 @@ import {
   CmdkResponseSchema,
   OkSchema,
   RebuildFtsResponseSchema,
+  SearchV2ResponseSchema,
   type SearchFilters,
   type CreateSavedSearchBody,
   type SearchResponse,
   type SavedSearch,
   type CmdkResponse,
+  type SearchV2Response,
+  type SearchV2Filters,
 } from './schemas';
 
 // ---------------------------------------------------------------------------
@@ -73,4 +76,16 @@ export function fetchCmdk(q: string): Promise<CmdkResponse> {
 
 export function rebuildFts(): Promise<z.infer<typeof RebuildFtsResponseSchema>> {
   return post('/spa/api/admin/search/rebuild-fts', {}, RebuildFtsResponseSchema);
+}
+
+// ---------------------------------------------------------------------------
+// GET /spa/api/search/v2 — Plan 3 (Wave-E1) Task #7
+// ---------------------------------------------------------------------------
+
+export function fetchSearchV2(filters: SearchV2Filters): Promise<SearchV2Response> {
+  const params: Record<string, unknown> = { q: filters.q };
+  if (filters.type)   params.type   = filters.type;
+  if (filters.branch) params.branch = filters.branch;
+  if (filters.status) params.status = filters.status;
+  return get('/spa/api/search/v2', SearchV2ResponseSchema, params);
 }

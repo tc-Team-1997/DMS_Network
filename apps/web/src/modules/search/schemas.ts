@@ -132,3 +132,45 @@ export const CmdkResponseSchema = z.object({
   groups: z.array(PaletteGroupSchema),
 });
 export type CmdkResponse = z.infer<typeof CmdkResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Search v2 — Plan 3 (Wave-E1) Task #7
+// ---------------------------------------------------------------------------
+
+export const SearchV2ResultSchema = z.object({
+  id:            z.number().int(),
+  original_name: z.string().nullable(),
+  customer_name: z.string().nullable(),
+  customer_cid:  z.string().nullable(),
+  doc_number:    z.string().nullable(),
+  branch_id:     z.string().nullable(),
+  status:        z.string().nullable(),
+  doctype:       z.string().nullable(),
+  snippet:       z.string().nullable(),
+  score:         z.number().nullable(),
+});
+export type SearchV2Result = z.infer<typeof SearchV2ResultSchema>;
+
+export const SearchV2FacetsSchema = z.object({
+  type:   z.record(z.number().int()),
+  branch: z.record(z.number().int()),
+  status: z.record(z.number().int()),
+});
+export type SearchV2Facets = z.infer<typeof SearchV2FacetsSchema>;
+
+export const SearchV2ResponseSchema = z.object({
+  query:   z.string(),
+  results: z.array(SearchV2ResultSchema),
+  facets:  SearchV2FacetsSchema,
+  total:   z.number().int(),
+  took_ms: z.number().int(),
+  error:   z.string().optional(),
+});
+export type SearchV2Response = z.infer<typeof SearchV2ResponseSchema>;
+
+export interface SearchV2Filters {
+  q: string;
+  type?: string | null;
+  branch?: string | null;
+  status?: string | null;
+}

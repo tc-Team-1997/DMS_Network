@@ -10,6 +10,7 @@ import { CapturePage } from '@/modules/capture/CapturePage';
 import { RepositoryPage } from '@/modules/repository/RepositoryPage';
 import { ViewerPage } from '@/modules/viewer/ViewerPage';
 import { SearchPage } from '@/modules/search/SearchPage';
+import { SearchPageV2 } from '@/modules/search/SearchPageV2';
 import { AlertsPage } from '@/modules/alerts/AlertsPage';
 import { WorkflowsPage } from '@/modules/workflows/WorkflowsPage';
 import { IndexingPage } from '@/modules/indexing/IndexingPage';
@@ -151,6 +152,8 @@ export function App() {
               <Route path="/viewer" element={<ViewerPage />} />
               <Route path="/viewer/:id" element={<ViewerPage />} />
               <Route path="/search" element={<SearchPage />} />
+              {/* Plan 3 (Wave-E1) — Search Results v2 with facets + chips. */}
+              <Route path="/search/v2" element={<SearchPageV2 />} />
               <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/workflows" element={<WorkflowsPage />} />
               <Route path="/workflows/templates" element={<TemplatesPage />} />

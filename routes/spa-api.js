@@ -38,6 +38,8 @@ router.use(require('./spa-api/document-types'));
 router.use(require('./spa-api/doctype-versions'));
 router.use(require('./spa-api/alerts'));
 router.use(require('./spa-api/search'));
+// Plan 3 (Wave-E1) — Search Results v2 with facets + FTS5 highlighted snippets.
+router.use(require('./spa-api/search-v2'));
 router.use(require('./spa-api/indexing'));
 router.use(require('./spa-api/reports'));
 router.use(require('./spa-api/compliance'));
