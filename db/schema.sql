@@ -845,3 +845,18 @@ CREATE INDEX IF NOT EXISTS idx_sr_tenant_template
 
 CREATE INDEX IF NOT EXISTS idx_sr_generated_at
   ON submission_receipts(generated_at);
+
+-- ---------------------------------------------------------------------------
+-- Migration 0045 (Plan 3, Wave-E1) — dsar_requests additive columns
+-- Five nullable columns added to support DSAR Console Plan 3 features:
+--   dpo_user_id         INTEGER  — user_id of the assigned DPO
+--   audit_chain_head    TEXT     — SHA-256 of the latest audit log hash for chain verification
+--   inventory_snapshot  TEXT     — JSON snapshot of document inventory at request time
+--   branch_id           TEXT     — branch scope for non-admin DSAR requests
+--   axis                TEXT     — compliance axis tag (GDPR/PDPL/DPDP/etc.)
+-- NOTE: dsar_requests lives in the Python Alembic schema only (0040_dsar_requests.py).
+--       These columns are managed by python-service/migrations/versions/0045_dsar_requests_extend.py.
+--       The Node SQLite DB does not replicate dsar_requests; all DSAR reads go through
+--       the Python FastAPI routers (python-service/app/routers/dsar.py).
+--       No addColumnIfMissing() calls are needed in db/index.js for this table.
+-- ---------------------------------------------------------------------------

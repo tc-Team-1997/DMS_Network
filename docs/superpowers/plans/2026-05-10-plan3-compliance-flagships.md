@@ -2,9 +2,45 @@
 
 > For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development.
 
+## Amendments — 2026-05-14 (lead, post-stale-state audit)
+
+The original draft was written assuming `main` was at migration `0040`. Actual head on `main@ff8bfd0` is `0044_workflow_audit_unification`, and `dsar_requests` + `regulator_reports` + `submission_receipts` already exist. **All references below to "0041", "0042", "subject_cid", "fulfillment_kind", "regulator_templates", and "regulator_submissions" are amended as follows; wherever the original text below conflicts with this table, this table wins.**
+
+| Original draft (stale) | Amended (actual) |
+|---|---|
+| Migration `0041_dsar_requests.py` (CREATE TABLE) | Migration `0045_dsar_requests_extend.py` — additive `op.add_column()` only: `dpo_user_id INT NULL`, `audit_chain_head TEXT NULL`, `inventory_snapshot TEXT NULL`, `branch_id TEXT NULL`. The table already exists from `0040_dsar_requests.py`. |
+| Migration `0042_regulator_rma_template.py` (creates `regulator_submissions`, INSERTs into `regulator_templates`) | Migration `0046_regulator_rma_seed.py` — INSERT one row into the existing `regulator_reports` table; do NOT create `regulator_submissions` (the audit table is the existing `submission_receipts` from `0039_regulator_reports.py`). |
+| Column `subject_cid` | Column `customer_cid` (existing) |
+| Column `axis` | **New** column added by `0045_dsar_requests_extend.py` as `axis TEXT NULL` — needed by Plan 3 mockup, not in 0040. Append to migration 0045's `add_column` list. |
+| Column `fulfillment_kind` | Column `action` (existing). Maps: `article15` → existing `action='article15_export'`, `article17` → `action='article17_cryptoshred'`, `litigation_hold` → existing, `fulfillment_letter` → existing. |
+| Column `opened_at` | Column `requested_at` (existing) |
+| Column `fulfilled_at` | Column `completed_at` (existing) |
+| Table `regulator_templates` | Table `regulator_reports` (existing). Identity for BT row: `tenant_id='bhu', regulator='RMA', name='RMA Quarterly Compliance Report'`. There is no `country_code` column — encode country via `tenant_id`. |
+| Field `frequency`, `sla_days`, `json_schema` (on regulator_templates) | Stored inside `parameters_schema_json` as nested keys (`{"frequency": "quarterly", "sla_days": 15, "controls": [...]}`) on `regulator_reports`. |
+| Table `regulator_submissions` | Table `submission_receipts` (existing). Use its `report_template_id` (FK to `regulator_reports.id`), `params_json`, `file_path`, `sha256`, `signature`, `submitted_at` columns. |
+| RBAC `regulator:export` / `regulator:submit` | Extend existing `regulator_reports:admin` (already in `services/rbac.js`) — or add fine-grained `regulator_reports:export` / `regulator_reports:submit` keys (postmortem-listed for lead to apply). |
+| RBAC `dsar:read` / `dsar:fulfill` | Same naming; new keys, must be added in postmortem additions. |
+
+**Final migration filenames Plan 3 owns:** `python-service/migrations/versions/0045_dsar_requests_extend.py` and `python-service/migrations/versions/0046_regulator_rma_seed.py`.
+
+**Updated File-Structure overrides** for the table below (lines 15–18 of the original file structure are wrong; use these instead):
+
+| Layer | File | Change |
+|---|---|---|
+| DB | `db/schema.sql` | Append `ALTER TABLE dsar_requests ADD COLUMN …` block guarded by `db/index.js#addColumnIfMissing()` for the 5 new columns. **Do not re-issue `CREATE TABLE dsar_requests`** — already there. |
+| DB | `db/seed.js` | Append BT RMA seed: `INSERT OR IGNORE INTO regulator_reports (tenant_id, regulator, name, parameters_schema_json, format, schedule_cron) VALUES ('bhu', 'RMA', 'RMA Quarterly Compliance Report', ?, 'pdf', '0 6 1 1,4,7,10 *')`. |
+| DB migration | `python-service/migrations/versions/0045_dsar_requests_extend.py` | NEW — `op.add_column()` ×5 on existing `dsar_requests`: `dpo_user_id`, `audit_chain_head`, `inventory_snapshot`, `branch_id`, `axis`. All nullable; idempotent via `if_not_exists` where supported. `down_revision='0044_workflow_audit_unification'`. |
+| DB migration | `python-service/migrations/versions/0046_regulator_rma_seed.py` | NEW — `op.execute("INSERT INTO regulator_reports …")` with `ON CONFLICT DO NOTHING` for the BT RMA row. `down_revision='0045_dsar_requests_extend'`. |
+
+The rest of the original File-Structure table (Node routes, SPA pages, tests, i18n, postmortem) is unchanged.
+
+**Effect on code blocks below:** every `INSERT INTO dsar_requests (subject_cid, axis, regulator, opened_at, sla_due_at, ...)` should be read as `INSERT INTO dsar_requests (customer_cid, axis, regulator, requested_at, sla_due_at, action, params_json, ...)`. Every `INSERT INTO regulator_templates (country_code, name, frequency, sla_days, json_schema, ...)` should be read as `INSERT INTO regulator_reports (tenant_id, regulator, name, parameters_schema_json, format, schedule_cron, ...)`. Every `regulator_submissions` reference should be read as `submission_receipts`.
+
+---
+
 **Goal:** Close the customer-blocking compliance flagship gaps from Wave-E §3.10 — DSAR Console (mockup screen 15), Regulator Reports RMA template (mockup screen 14), Audit Log v2 chain-verify banner + diff drawer (mockup screen 13), DocBrain Chat v2 3-pane shell + has_evidence halt banner (mockup screen 16), Search Results v2 facets + operator-token chips + FTS5-highlighted snippets (mockup screen 17).
 
-**Architecture:** SPA-heavy (most backends already exist per Plan 0 audit). Adds 2 nullable migrations (dsar_requests + regulator_templates BT row), 6 RBAC keys, 4 new SPA pages, 4 backend route mounts.
+**Architecture:** SPA-heavy (most backends already exist per Plan 0 audit). Adds 2 additive migrations (`0045_dsar_requests_extend` adds 5 nullable cols; `0046_regulator_rma_seed` INSERTs BT row into existing `regulator_reports`), 6 RBAC keys, 4 new SPA pages, 4 backend route mounts.
 
 **Tech Stack:** React 18 + TypeScript + Vite + Tailwind, Node 20 Express, Python FastAPI (DSAR backend already shipped), better-sqlite3, react-i18next + i18next-icu.
 
