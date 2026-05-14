@@ -6,11 +6,13 @@ import {
   CreateRequestResponseSchema,
   FulfillReceiptSchema,
   ReleaseHoldResponseSchema,
+  SlaDetailSchema,
   type LookupAxis,
   type DsarAction,
   type CreateRequestResponse,
   type FulfillReceipt,
   type ReleaseHoldResponse,
+  type SlaDetail,
 } from './schemas';
 
 // ---------------------------------------------------------------------------
@@ -47,8 +49,23 @@ export const createRequest = (body: {
 // Fulfillment actions
 // ---------------------------------------------------------------------------
 
-export const fulfillRequest = (requestId: string): Promise<FulfillReceipt> =>
-  post(`/spa/api/dsar/requests/${encodeURIComponent(requestId)}/fulfill`, {}, FulfillReceiptSchema);
+// Plan 3 — Wave-E1: fulfill now takes a structured body so the Article 17
+// double-confirm + min-20-char reason can be enforced server-side.
+export interface FulfillBody {
+  kind: DsarAction;
+  reason: string;
+  destroy_token?: string;
+}
+
+export const fulfillRequest = (
+  requestId: string,
+  body: FulfillBody = { kind: 'article15_export', reason: 'Plan 3 fulfillment — reason placeholder' },
+): Promise<FulfillReceipt> =>
+  post(`/spa/api/dsar/requests/${encodeURIComponent(requestId)}/fulfill`, body, FulfillReceiptSchema);
 
 export const releaseHold = (requestId: string): Promise<ReleaseHoldResponse> =>
   post(`/spa/api/dsar/requests/${encodeURIComponent(requestId)}/release-hold`, {}, ReleaseHoldResponseSchema);
+
+// SLA detail for a single DSAR request (Plan 3 — Wave-E1).
+export const fetchSla = (requestId: string): Promise<SlaDetail> =>
+  get(`/spa/api/dsar/requests/${encodeURIComponent(requestId)}/sla`, SlaDetailSchema);

@@ -102,10 +102,12 @@ export function RequestList({ items }: Props) {
                 </span>
               </td>
               <td className="px-4 py-2.5">
-                <SlaCountdown
-                  daysRemaining={req.days_remaining}
-                  status={req.status}
-                />
+                <span data-testid="dsar-sla-countdown" aria-live="polite">
+                  <SlaCountdown
+                    daysRemaining={req.days_remaining}
+                    status={req.status}
+                  />
+                </span>
               </td>
               <td className="px-4 py-2.5 text-ink-sub text-xs">
                 {req.requested_by}

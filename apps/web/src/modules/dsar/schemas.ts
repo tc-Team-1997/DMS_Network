@@ -117,3 +117,12 @@ export const ReleaseHoldResponseSchema = z.object({
   documents_released: z.number().int(),
 });
 export type ReleaseHoldResponse = z.infer<typeof ReleaseHoldResponseSchema>;
+
+// SLA detail (Plan 3 — Wave-E1)
+export const SlaDetailSchema = z.object({
+  id: z.union([z.string(), z.number()]),
+  sla_due_at: z.string().nullable(),
+  days_remaining: z.number().int().nullable(),
+  status: z.string().nullable(),
+});
+export type SlaDetail = z.infer<typeof SlaDetailSchema>;
