@@ -134,3 +134,29 @@ test('audit diff drawer renders before/after section for DSAR fulfill rows', asy
   // Status field is one of the keys we wrote (NEW → COMPLETED diff).
   await expect(drawer.getByTestId('audit-before-after')).toContainText(/status/i);
 });
+
+/**
+ * Task #4 follow-up — clicking the new Re-verify button on the chain banner
+ * emits an `audit.chain_verify` row via POST /spa/api/audit/events. The page-
+ * load auto-verify does NOT emit (would create one row per page view).
+ */
+test('chain banner Re-verify button emits audit.chain_verify row', async ({ page, request }) => {
+  await login(page, 'admin', 'admin123');
+  await page.goto('/admin/audit');
+
+  // Snapshot the latest audit.chain_verify row count BEFORE the click.
+  async function countChainVerify() {
+    const r = await request.get('/spa/api/audit/events?action=audit.chain_verify&per_page=50&page=1');
+    if (!r.ok()) return 0;
+    const body = await r.json();
+    return Array.isArray(body.events) ? body.events.length : 0;
+  }
+  const before = await countChainVerify();
+
+  const banner = page.getByTestId('audit-chain-banner');
+  await expect(banner).toBeVisible();
+  await banner.getByTestId('audit-chain-reverify').click();
+
+  // Allow up to 5s for the fire-and-forget emit to land.
+  await expect.poll(async () => await countChainVerify(), { timeout: 5_000 }).toBeGreaterThan(before);
+});

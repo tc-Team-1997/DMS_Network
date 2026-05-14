@@ -7,6 +7,9 @@
  * Allowed action values (enforced server-side allow-list):
  *   'pii_reveal' | 'pii_mask' | 'document.preview_open'
  *   | 'export.csv_requested' | 'export.pdf_requested'
+ *   | 'dsar.lookup' | 'dsar.fulfill' | 'dsar.release_hold'
+ *   | 'regulator.report_export' | 'regulator.report_submit'
+ *   | 'audit.chain_verify'
  */
 
 import { post } from './http';

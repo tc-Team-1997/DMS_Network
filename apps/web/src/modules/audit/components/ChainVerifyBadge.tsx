@@ -1,24 +1,30 @@
 /**
- * ChainVerifyBadge — Plan 3 (Wave-E1) banner shape.
+ * ChainVerifyBadge — Plan 3 (Wave-E1) banner shape + re-verify control.
  *
  * Renders a prominent green "Chain verified through N events (SHA-256 forward
  * chain)" banner — or a red "broken at event #N" banner — at the top of the
  * Audit Log page. Pulls from GET /spa/api/audit/chain/verify (the new full-walk
  * endpoint) and falls back to a checking state while the query is in flight.
  *
- * Testid `audit-chain-banner` is the Plan-3 contract (Task #4). The legacy
- * `chain-verify-badge` testid is kept as an alias for backwards compat.
+ * Testid `audit-chain-banner` is the Plan-3 contract (Task #4).
+ *
+ * Plan 3 Task #4 follow-up — "Re-verify chain" button: explicit operator-
+ * triggered re-verification refetches the query AND emits an
+ * `audit.chain_verify` SPA audit row so the audit log can answer
+ * "who verified the integrity, and when". The page-load auto-verify does
+ * NOT emit (would create one row per page view).
  *
  * Hash algorithm (server-side; client just renders the verdict):
  *   canonical_json = JSON.stringify(sortedKeys(rowDict))   // no whitespace
  *   hash = sha256( (prevHash || '') + canonical_json )
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { ShieldCheck, ShieldAlert, Loader2, RefreshCw } from 'lucide-react';
 import { fetchChainVerify } from '../api';
 import type { ChainVerifyV2Response } from '../schemas';
 import { cn } from '@/lib/cn';
+import { emitAuditEvent } from '@/lib/audit-events';
 
 interface Props {
   /** Optional pre-fetched server result so the badge can be parented from a single query. */
@@ -26,6 +32,7 @@ interface Props {
 }
 
 export function ChainVerifyBadge({ serverResult }: Props) {
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ['audit', 'chain-verify-v2'],
     queryFn: fetchChainVerify,
@@ -34,6 +41,23 @@ export function ChainVerifyBadge({ serverResult }: Props) {
   });
 
   const result = serverResult ?? q.data;
+
+  async function handleReverify() {
+    // Emit BEFORE the refetch so the audit row is written ASAP and the
+    // verification verdict (which we'll see next render) is independent of
+    // whether the audit row ends up in the new chain count.
+    emitAuditEvent({
+      action:      'audit.chain_verify',
+      entity_type: 'audit_log',
+      detail: {
+        trigger:        'user_reverify_button',
+        latest_anchor:  result?.latest_anchor ?? null,
+        prior_verdict:  result ? result.verified : null,
+        prior_count:    result?.count ?? null,
+      },
+    });
+    await qc.invalidateQueries({ queryKey: ['audit', 'chain-verify-v2'] });
+  }
 
   // Checking state.
   if (!result) {
@@ -72,6 +96,21 @@ export function ChainVerifyBadge({ serverResult }: Props) {
             )}
           </p>
         </div>
+        <button
+          type="button"
+          data-testid="audit-chain-reverify"
+          onClick={handleReverify}
+          disabled={q.isFetching}
+          aria-label="Re-verify chain integrity (emits audit.chain_verify)"
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-input border px-3 py-1.5 text-xs font-medium transition min-h-[32px]',
+            'border-success/40 bg-surface text-success hover:bg-success-bg/60 focus:outline-none focus:ring-2 focus:ring-success/40',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+          )}
+        >
+          {q.isFetching ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          Re-verify
+        </button>
       </div>
     );
   }
@@ -95,6 +134,21 @@ export function ChainVerifyBadge({ serverResult }: Props) {
           SHA-256 forward chain · {result.count} event{result.count === 1 ? '' : 's'} scanned
         </p>
       </div>
+      <button
+        type="button"
+        data-testid="audit-chain-reverify"
+        onClick={handleReverify}
+        disabled={q.isFetching}
+        aria-label="Re-verify chain integrity (emits audit.chain_verify)"
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-input border px-3 py-1.5 text-xs font-medium transition min-h-[32px]',
+          'border-danger/40 bg-surface text-danger hover:bg-danger-bg/60 focus:outline-none focus:ring-2 focus:ring-danger/40',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
+        )}
+      >
+        {q.isFetching ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+        Re-verify
+      </button>
     </div>
   );
 }

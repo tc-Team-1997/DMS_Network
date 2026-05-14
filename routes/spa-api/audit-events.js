@@ -43,6 +43,9 @@ const SPA_AUDIT_ACTIONS = new Set([
   // routes/spa-api/regulator-reports.js (POST /generate and /submit).
   'regulator.report_export',
   'regulator.report_submit',
+  // Plan 3 (Wave-E1) Task #4 follow-up — user-triggered re-verify of the
+  // audit hash chain (ChainVerifyBadge "Re-verify chain" button).
+  'audit.chain_verify',
 ]);
 
 // ---------------------------------------------------------------------------
