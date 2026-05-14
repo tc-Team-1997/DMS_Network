@@ -255,19 +255,37 @@ router.post('/reports/templates/:id/generate', readPerm, async (req, res) => {
     // Plan 3 (Wave-E1) — emit regulator.report_export audit row with the
     // OPA policy_decision blob. This is the binding audit hook for the
     // "Export bundle" CTA on the RMA Quarterly detail page.
+    //
+    // Task #4 follow-up: detail.before / detail.after let DiffDrawer render
+    // the audit-before-after section. Export is a pure-add (no prior receipt
+    // existed for this generation call), so "before" is the empty receipt
+    // and "after" is the freshly-signed bundle's identity + hash.
     writeAuditRow({
       userId:         req.session?.user?.id ?? null,
       action:         'regulator.report_export',
       entity:         'regulator_report_template',
       entityType:     'regulator_report_template',
       entityId:       String(id),
-      detail:         {
+      detail: {
         as_of_date,
         format:       format ?? 'pdf',
         receipt_id:   data && data.receipt_id != null ? data.receipt_id : null,
         sha256:       data && data.sha256 ? data.sha256 : null,
         rows:         data && data.rows != null ? data.rows : null,
         params:       params || null,
+        before: {
+          receipt_id:    null,
+          sha256:        null,
+          rows:          null,
+          generated_at:  null,
+        },
+        after: {
+          receipt_id:    data && data.receipt_id != null ? data.receipt_id : null,
+          sha256:        data && data.sha256 ? data.sha256 : null,
+          rows:          data && data.rows != null ? data.rows : null,
+          generated_at:  data && data.generated_at ? data.generated_at : new Date().toISOString(),
+          format:        format ?? 'pdf',
+        },
       },
       result:         'allow',
       tenantId:       tenantScope(req),
@@ -320,11 +338,25 @@ router.post('/reports/submissions/:id/submit', adminPerm, async (req, res) => {
   const id = parseInt(req.params['id'], 10);
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
 
+  // Plan 3 (Wave-E1) Task #4 follow-up — capture the receipt row BEFORE the
+  // submit call so the audit detail can carry a real diff. submission_receipts
+  // is Node-side SQLite (created by 0039_regulator_reports.py mirrored into
+  // db/schema.sql), so we can query it directly.
+  const beforeRow = db.prepare(`
+    SELECT id, submitted_at, regulator_endpoint, response_code
+    FROM submission_receipts WHERE id = ?
+  `).get(id) || null;
+
   try {
     const data = await pyCall(
       `/api/v1/regulator-reports/submissions/${id}/submit`,
       { method: 'POST', body: {} },
     );
+
+    const afterRow = db.prepare(`
+      SELECT id, submitted_at, regulator_endpoint, response_code
+      FROM submission_receipts WHERE id = ?
+    `).get(id) || null;
 
     // Plan 3 (Wave-E1) — emit regulator.report_submit audit row.
     writeAuditRow({
@@ -333,10 +365,31 @@ router.post('/reports/submissions/:id/submit', adminPerm, async (req, res) => {
       entity:         'submission_receipt',
       entityType:     'submission_receipt',
       entityId:       String(id),
-      detail:         {
+      detail: {
         regulator_endpoint: data && data.regulator_endpoint ? data.regulator_endpoint : null,
         status:             data && data.status ? data.status : null,
         response_code:      data && data.response_code != null ? data.response_code : null,
+        // Real before/after — the Node SQLite mirror of the receipt row.
+        before: beforeRow
+          ? {
+              submitted_at:        beforeRow.submitted_at,
+              regulator_endpoint:  beforeRow.regulator_endpoint,
+              response_code:       beforeRow.response_code,
+            }
+          : { submitted_at: null, regulator_endpoint: null, response_code: null },
+        after: afterRow
+          ? {
+              submitted_at:        afterRow.submitted_at,
+              regulator_endpoint:  afterRow.regulator_endpoint,
+              response_code:       afterRow.response_code,
+            }
+          : {
+              // Fallback when the Node mirror hasn't been written yet — use
+              // the upstream Python response so the diff drawer renders.
+              submitted_at:        data && data.submitted_at ? data.submitted_at : new Date().toISOString(),
+              regulator_endpoint:  data && data.regulator_endpoint ? data.regulator_endpoint : null,
+              response_code:       data && data.response_code != null ? data.response_code : null,
+            },
       },
       result:         'allow',
       tenantId:       tenantScope(req),

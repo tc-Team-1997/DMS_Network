@@ -108,7 +108,24 @@ router.post('/dsar/requests', DSAR_READ, async (req, res) => {
       entity:         'dsar_request',
       entityType:     'dsar_request',
       entityId:       data && data.id != null ? String(data.id) : null,
-      detail:         { customer_cid, action, regulator: regulator || null },
+      // Plan 3 (Wave-E1) Task #4 follow-up — before/after for DiffDrawer.
+      // "Before" is the empty pre-state (request did not exist); "after" is
+      // the freshly-created row's identity + SLA window. The diff drawer
+      // renders adds-only.
+      detail: {
+        customer_cid,
+        action,
+        regulator: regulator || null,
+        before: { id: null, status: null, customer_cid: null, action: null },
+        after: {
+          id:           data && data.id != null ? data.id : null,
+          status:       (data && data.status) || 'NEW',
+          customer_cid,
+          action,
+          regulator:    regulator || null,
+          sla_due_at:   (data && data.sla_due_at) || null,
+        },
+      },
       result:         'allow',
       tenantId:       tenantScope(req),
       policyDecision: buildPolicyDecision(req),
@@ -188,13 +205,36 @@ router.post('/dsar/requests/:id/fulfill', DSAR_FULFILL, async (req, res) => {
       body: {},
     });
 
+    // Plan 3 (Wave-E1) Task #4 follow-up — before/after for DiffDrawer.
+    // The Node tier doesn't see dsar_requests directly (Python-managed),
+    // so the diff captures the intent of the mutation: status NEW → COMPLETED,
+    // action NULL → kind, completed_at NULL → now. The Python service has the
+    // authoritative row; the Node-side audit row carries the operator-visible
+    // delta. Article 17 also records the destroy-token confirmation.
+    const completedAt = new Date().toISOString();
     writeAuditRow({
       userId:         req.session?.user?.id ?? null,
       action:         'dsar.fulfill',
       entity:         'dsar_request',
       entityType:     'dsar_request',
       entityId:       String(id),
-      detail:         { kind, reason, destroy_confirmed: kind === 'article17_cryptoshred' },
+      detail: {
+        kind,
+        reason: reason.trim(),
+        destroy_confirmed: kind === 'article17_cryptoshred' ? true : undefined,
+        py_artifact: data && data.artifact_path ? data.artifact_path : null,
+        before: {
+          status:                 'NEW',
+          completed_at:           null,
+          fulfillment_artifact:   null,
+        },
+        after: {
+          status:                 'COMPLETED',
+          completed_at:           completedAt,
+          fulfillment_artifact:   data && data.artifact_path ? data.artifact_path : null,
+          kind,
+        },
+      },
       result:         'allow',
       tenantId:       tenantScope(req),
       policyDecision: buildPolicyDecision(req),
@@ -220,13 +260,24 @@ router.post('/dsar/requests/:id/release-hold', DSAR_FULFILL, async (req, res) =>
       body: {},
     });
 
+    // Plan 3 (Wave-E1) Task #4 follow-up — release-hold flips status.
     writeAuditRow({
       userId:         req.session?.user?.id ?? null,
       action:         'dsar.release_hold',
       entity:         'dsar_request',
       entityType:     'dsar_request',
       entityId:       String(id),
-      detail:         { released_by: req.session?.user?.username || null },
+      detail: {
+        released_by: req.session?.user?.username || null,
+        before: {
+          status:                'HOLD',
+          documents_released:    null,
+        },
+        after: {
+          status:                'IN_PROGRESS',
+          documents_released:    data && data.documents_released != null ? data.documents_released : null,
+        },
+      },
       result:         'allow',
       tenantId:       tenantScope(req),
       policyDecision: buildPolicyDecision(req),

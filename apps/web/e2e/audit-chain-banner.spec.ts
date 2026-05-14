@@ -84,3 +84,53 @@ test('clicking an audit row opens diff drawer with policy_decision + chain segme
   await expect(drawer.getByTestId('audit-chain-segment')).toContainText(/prev:/);
   await expect(drawer.getByTestId('audit-chain-segment')).toContainText(/this:/);
 });
+
+/**
+ * Task #4 follow-up — DSAR + RMA mutations now carry detail.before /
+ * detail.after JSON so the DiffDrawer's `audit-before-after` section renders.
+ * The spec triggers a DSAR fulfill via API request, then opens the most-recent
+ * dsar.fulfill row in the audit log and asserts the before/after panel.
+ */
+test('audit diff drawer renders before/after section for DSAR fulfill rows', async ({ page, request }) => {
+  await login(page, 'admin', 'admin123');
+
+  // Open a fresh DSAR request so we have a known fulfill candidate.
+  const openResp = await request.post('/spa/api/dsar/requests', {
+    data: {
+      customer_cid: 'CID-001234',
+      action:       'article15_export',
+      regulator:    'GDPR',
+      reason:       'Plan 3 before/after audit-trail backfill verification',
+    },
+  });
+  test.skip(!openResp.ok(), 'POST /spa/api/dsar/requests returned non-2xx; Python service may be offline');
+  const openBody = await openResp.json();
+  const requestId = openBody && (openBody.id != null) ? openBody.id : null;
+  test.skip(requestId === null, 'DSAR open returned no id; cannot fulfill');
+
+  // Fulfill it. The Node-side audit hook attaches detail.before / detail.after.
+  const fulfillResp = await request.post(`/spa/api/dsar/requests/${requestId}/fulfill`, {
+    data: {
+      kind:   'article15_export',
+      reason: 'Customer subject access request — Article 15 export of all held data',
+    },
+  });
+  test.skip(!fulfillResp.ok(), 'POST .../fulfill returned non-2xx; Python service may be offline');
+
+  // Navigate to /admin/audit and filter by action=dsar.fulfill so the first
+  // row is guaranteed to be the one we just created.
+  await page.goto('/admin/audit?action=dsar.fulfill');
+  const eventsTab = page.getByTestId('events-tab');
+  await expect(eventsTab).toBeVisible();
+  const firstRow = eventsTab.locator('tr').filter({ has: page.locator('td') }).first();
+  await firstRow.click();
+
+  const drawer = page.getByTestId('audit-diff-drawer');
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByTestId('audit-before-after')).toBeVisible();
+  // The before/after table contains both column headers.
+  await expect(drawer.getByTestId('audit-before-after')).toContainText(/Before/i);
+  await expect(drawer.getByTestId('audit-before-after')).toContainText(/After/i);
+  // Status field is one of the keys we wrote (NEW → COMPLETED diff).
+  await expect(drawer.getByTestId('audit-before-after')).toContainText(/status/i);
+});
