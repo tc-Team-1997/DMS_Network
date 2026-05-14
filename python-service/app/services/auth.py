@@ -52,6 +52,8 @@ PERMISSIONS = {
     # Plan 3 (Wave-E1) — DSAR Console perms. Mirrors services/rbac.js bundles.
     "dsar:read":         {"doc_admin", "auditor", "compliance"},
     "dsar:fulfill":      {"doc_admin"},
+    # Plan 3 (Wave-E1) — Audit Log chain-verify banner + diff drawer.
+    "audit:chain_view":  {"doc_admin", "auditor", "compliance"},
 }
 
 

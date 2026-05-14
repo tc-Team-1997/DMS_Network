@@ -7,7 +7,8 @@ const PERMS = {
                  'kyc:write','kyc:read',
                  'translate:read','translate:delete',
                  'regulator_reports:read','regulator_reports:admin',
-                 'dsar:read','dsar:fulfill'],
+                 'dsar:read','dsar:fulfill',
+                 'audit:chain_view'],
   'Maker':      ['capture','index','upload','view','workflow',
                  'aml:read',
                  'cbs:read','cbs:write',
@@ -30,10 +31,12 @@ const PERMS = {
   // These roles are set on users whose `role` column carries the value below.
   'auditor':    ['view','aml:read','cbs:read','worm:read','view_unredacted','kyc:read','translate:read',
                  'regulator_reports:read',
-                 'dsar:read'],
+                 'dsar:read',
+                 'audit:chain_view'],
   'compliance': ['view','aml:read','aml:review','cbs:read','worm:read','translate:read',
                  'regulator_reports:read',
-                 'dsar:read'],
+                 'dsar:read',
+                 'audit:chain_view'],
 };
 
 function can(role, perm) {
