@@ -64,6 +64,7 @@ import { DsarPanel } from '@/modules/admin/settings/panels/DsarPanel';
 // Wave C — Regulator Reports
 import { RegulatorReportsPage } from '@/modules/regulator-reports/Page';
 import { TemplateDetail } from '@/modules/regulator-reports/TemplateDetail';
+import { RmaQuarterlyDetail } from '@/modules/regulator-reports/RmaQuarterlyDetail';
 import { RegulatorReportsPanel } from '@/modules/admin/settings/panels/RegulatorReportsPanel';
 // Wave C — Notifications feed
 import { NotificationsPage } from '@/modules/notifications/Page';
@@ -176,6 +177,9 @@ export function App() {
               <Route path="/notifications" element={<NotificationsPage />} />
               {/* Wave C — Regulator Reports */}
               <Route path="/regulator-reports" element={<RegulatorReportsPage />} />
+              {/* Plan 3 (Wave-E1) — RMA Quarterly Compliance Report. */}
+              {/* MUST sit before /:id so "rma" isn't matched as an id param. */}
+              <Route path="/regulator-reports/rma/:id" element={<RmaQuarterlyDetail />} />
               <Route path="/regulator-reports/:id" element={<TemplateDetail />} />
 
               {/* CC3 — Admin Settings */}

@@ -26,13 +26,46 @@ function RegulatorIcon({ code }: { code: string }) {
   );
 }
 
+/**
+ * Parse the JSON-Schema-ish parameters_schema_json string for the optional
+ * Plan 3 (Wave-E1) `frequency` + `sla_days` fields. Used to surface the
+ * cadence and SLA window on the library card.
+ */
+function readScheduleHints(raw: string): { frequency: string | null; slaDays: number | null } {
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      frequency: typeof parsed?.frequency === 'string' ? parsed.frequency : null,
+      slaDays: typeof parsed?.sla_days === 'number' ? parsed.sla_days : null,
+    };
+  } catch {
+    return { frequency: null, slaDays: null };
+  }
+}
+
 function TemplateCard({ template }: { template: Template }) {
   const hasSchedule = template.schedule_cron !== null && template.schedule_cron !== '';
+  const { frequency, slaDays } = readScheduleHints(template.parameters_schema_json);
+
+  // Plan 3 (Wave-E1) — the BT RMA quarterly template is the demo flagship.
+  // Route it to the structured RMA detail page; everything else goes through
+  // the generic TemplateDetail.
+  const isRmaQuarterlyBt =
+    template.tenant_id === 'bhu' &&
+    template.regulator === 'RMA' &&
+    frequency === 'quarterly';
+  const href = isRmaQuarterlyBt
+    ? `/regulator-reports/rma/${template.id}`
+    : `/regulator-reports/${template.id}`;
+  const cardTestId = isRmaQuarterlyBt
+    ? 'regulator-template-card-rma-quarterly-bt'
+    : `template-card-${template.id}`;
+
   return (
     <Link
-      to={`/regulator-reports/${template.id}`}
+      to={href}
       className="group flex items-center gap-4 rounded-card border border-divider bg-surface px-4 py-3 transition-all hover:border-brand-blue/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
-      data-testid={`template-card-${template.id}`}
+      data-testid={cardTestId}
     >
       <RegulatorIcon code={template.regulator} />
       <div className="flex-1 min-w-0">
@@ -44,6 +77,15 @@ function TemplateCard({ template }: { template: Template }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge tone="blue">{template.regulator}</Badge>
+          {isRmaQuarterlyBt && <Badge tone="neutral">Bhutan</Badge>}
+          {frequency && (
+            <Badge tone="neutral">
+              {frequency.charAt(0).toUpperCase() + frequency.slice(1)}
+            </Badge>
+          )}
+          {slaDays !== null && (
+            <Badge tone="neutral">{slaDays} days</Badge>
+          )}
           <Badge tone="neutral">{template.format.toUpperCase()}</Badge>
           {hasSchedule && (
             <span className="flex items-center gap-1 text-[10px] text-muted">

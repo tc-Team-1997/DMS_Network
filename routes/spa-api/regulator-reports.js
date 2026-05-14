@@ -27,6 +27,8 @@
 const express = require('express');
 const db = require('../../db');
 const { requirePermJson, tenantScope, pyCall } = require('./_shared');
+const { writeAuditRow } = require('./audit');
+const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
@@ -249,6 +251,29 @@ router.post('/reports/templates/:id/generate', readPerm, async (req, res) => {
         timeout: 120_000,
       },
     );
+
+    // Plan 3 (Wave-E1) — emit regulator.report_export audit row with the
+    // OPA policy_decision blob. This is the binding audit hook for the
+    // "Export bundle" CTA on the RMA Quarterly detail page.
+    writeAuditRow({
+      userId:         req.session?.user?.id ?? null,
+      action:         'regulator.report_export',
+      entity:         'regulator_report_template',
+      entityType:     'regulator_report_template',
+      entityId:       String(id),
+      detail:         {
+        as_of_date,
+        format:       format ?? 'pdf',
+        receipt_id:   data && data.receipt_id != null ? data.receipt_id : null,
+        sha256:       data && data.sha256 ? data.sha256 : null,
+        rows:         data && data.rows != null ? data.rows : null,
+        params:       params || null,
+      },
+      result:         'allow',
+      tenantId:       tenantScope(req),
+      policyDecision: buildPolicyDecision(req),
+    });
+
     return res.json(data);
   } catch (err) {
     const status = err.status ?? 500;
@@ -300,6 +325,24 @@ router.post('/reports/submissions/:id/submit', adminPerm, async (req, res) => {
       `/api/v1/regulator-reports/submissions/${id}/submit`,
       { method: 'POST', body: {} },
     );
+
+    // Plan 3 (Wave-E1) — emit regulator.report_submit audit row.
+    writeAuditRow({
+      userId:         req.session?.user?.id ?? null,
+      action:         'regulator.report_submit',
+      entity:         'submission_receipt',
+      entityType:     'submission_receipt',
+      entityId:       String(id),
+      detail:         {
+        regulator_endpoint: data && data.regulator_endpoint ? data.regulator_endpoint : null,
+        status:             data && data.status ? data.status : null,
+        response_code:      data && data.response_code != null ? data.response_code : null,
+      },
+      result:         'allow',
+      tenantId:       tenantScope(req),
+      policyDecision: buildPolicyDecision(req),
+    });
+
     return res.json(data);
   } catch (err) {
     const status = err.status ?? 500;
