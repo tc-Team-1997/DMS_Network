@@ -10,6 +10,7 @@ import { CapturePage } from '@/modules/capture/CapturePage';
 import { RepositoryPage } from '@/modules/repository/RepositoryPage';
 import { ViewerPage } from '@/modules/viewer/ViewerPage';
 import { SearchPage } from '@/modules/search/SearchPage';
+import { SearchPageV2 } from '@/modules/search/SearchPageV2';
 import { AlertsPage } from '@/modules/alerts/AlertsPage';
 import { WorkflowsPage } from '@/modules/workflows/WorkflowsPage';
 import { IndexingPage } from '@/modules/indexing/IndexingPage';
@@ -64,6 +65,7 @@ import { DsarPanel } from '@/modules/admin/settings/panels/DsarPanel';
 // Wave C — Regulator Reports
 import { RegulatorReportsPage } from '@/modules/regulator-reports/Page';
 import { TemplateDetail } from '@/modules/regulator-reports/TemplateDetail';
+import { RmaQuarterlyDetail } from '@/modules/regulator-reports/RmaQuarterlyDetail';
 import { RegulatorReportsPanel } from '@/modules/admin/settings/panels/RegulatorReportsPanel';
 // Wave C — Notifications feed
 import { NotificationsPage } from '@/modules/notifications/Page';
@@ -150,6 +152,8 @@ export function App() {
               <Route path="/viewer" element={<ViewerPage />} />
               <Route path="/viewer/:id" element={<ViewerPage />} />
               <Route path="/search" element={<SearchPage />} />
+              {/* Plan 3 (Wave-E1) — Search Results v2 with facets + chips. */}
+              <Route path="/search/v2" element={<SearchPageV2 />} />
               <Route path="/alerts" element={<AlertsPage />} />
               <Route path="/workflows" element={<WorkflowsPage />} />
               <Route path="/workflows/templates" element={<TemplatesPage />} />
@@ -157,6 +161,8 @@ export function App() {
               <Route path="/indexing" element={<IndexingPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/ai" element={<ChatPage />} />
+              {/* Plan 3 (Wave-E1) — DocBrain Chat v2 contract path alias. */}
+              <Route path="/docbrain" element={<ChatPage />} />
               <Route path="/ai/engine" element={<AIEnginePage />} />
               <Route path="/compliance" element={<CompliancePage />} />
               <Route path="/integration" element={<IntegrationsPage />} />
@@ -176,6 +182,9 @@ export function App() {
               <Route path="/notifications" element={<NotificationsPage />} />
               {/* Wave C — Regulator Reports */}
               <Route path="/regulator-reports" element={<RegulatorReportsPage />} />
+              {/* Plan 3 (Wave-E1) — RMA Quarterly Compliance Report. */}
+              {/* MUST sit before /:id so "rma" isn't matched as an id param. */}
+              <Route path="/regulator-reports/rma/:id" element={<RmaQuarterlyDetail />} />
               <Route path="/regulator-reports/:id" element={<TemplateDetail />} />
 
               {/* CC3 — Admin Settings */}

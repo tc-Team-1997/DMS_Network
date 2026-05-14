@@ -899,12 +899,10 @@ const REGULATOR_TEMPLATES = [
   },
 ];
 
-// Also seed BoB tenant (bhu) with the RMA template — only if bhu tenant exists.
-const bhuTenantRowExists = db.prepare("SELECT 1 FROM tenants WHERE tenant_id = 'bhu'").get();
-const seedTemplates = bhuTenantRowExists
-  ? [...REGULATOR_TEMPLATES, { ...REGULATOR_TEMPLATES[0], tenant_id: 'bhu' }]
-  : REGULATOR_TEMPLATES;
-for (const t of seedTemplates) {
+// Seed NBE templates only. The bhu (BoB) tenant gets its real RMA template
+// from seedBhuRmaTemplate() below (Plan 3) — no placeholder clone of the first
+// NBE template for bhu.
+for (const t of REGULATOR_TEMPLATES) {
   insertRegReport.run(
     t.tenant_id,
     t.regulator,
@@ -915,7 +913,43 @@ for (const t of seedTemplates) {
     t.schedule_cron ?? null,
   );
 }
-console.log(`Regulator report templates seeded (${seedTemplates.length} total).`);
+console.log(`Regulator report templates seeded (${REGULATOR_TEMPLATES.length} total).`);
+
+// ---------------------------------------------------------------------------
+// Migration 0046 (Plan 3, Wave-E1) — BT RMA quarterly template for bhu tenant
+// Uses Plan 3 parameters_schema_json format (frequency/sla_days/controls)
+// distinct from the JSON Schema draft-07 format used by the 7 nbe templates above.
+// INSERT OR IGNORE is safe because regulator_reports has no unique constraint
+// on (tenant_id, regulator, name); the Python migration 0046 uses ON CONFLICT
+// DO NOTHING (SQLite 3.24+) for the same idempotency guarantee.
+// ---------------------------------------------------------------------------
+function seedBhuRmaTemplate() {
+  const rmaSchema = JSON.stringify({
+    frequency: 'quarterly',
+    sla_days: 15,
+    filing_format: 'RMA-CR-2026',
+    period_options: ['Q1', 'Q2', 'Q3', 'Q4'],
+    controls: [
+      { id: 'AML_KYC',        label: 'AML/KYC compliance',                evidence_required: ['sar_filings_count', 'kyc_refresh_count'] },
+      { id: 'CDD',            label: 'Customer Due Diligence',            evidence_required: ['high_risk_count', 'edd_count'] },
+      { id: 'RECORD_KEEPING', label: 'Record keeping (7-year retention)', evidence_required: ['docs_purged_count', 'retention_violations'] },
+      { id: 'REPORTING',      label: 'Suspicious transaction reporting',  evidence_required: ['str_count', 'ctr_count'] },
+      { id: 'GOVERNANCE',     label: 'Board oversight + MLRO sign-off',   evidence_required: ['mlro_signoff_date', 'board_minutes_link'] },
+    ],
+  });
+  // Only seed if the bhu tenant row exists (prevents FK violation on fresh DBs
+  // where the BoB tenant hasn't been created yet).
+  const bhuExists = db.prepare("SELECT 1 FROM tenants WHERE tenant_id = 'bhu'").get();
+  if (!bhuExists) return;
+  db.prepare(`
+    INSERT OR IGNORE INTO regulator_reports
+      (tenant_id, regulator, name, parameters_schema_json, query_template, format, schedule_cron, is_active)
+    VALUES
+      ('bhu', 'RMA', 'RMA Quarterly Compliance Report', ?, '', 'pdf', '0 6 1 1,4,7,10 *', 1)
+  `).run(rmaSchema);
+}
+seedBhuRmaTemplate();
+console.log('[0046] BT RMA quarterly template seeded for bhu tenant (INSERT OR IGNORE).');
 
 // ── regulator_reports namespace defaults for tenant_config ──────────────────
 // These values populate the Admin Settings → Regulator Reports panel via

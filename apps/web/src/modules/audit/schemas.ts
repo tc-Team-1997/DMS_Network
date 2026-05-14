@@ -22,6 +22,9 @@ export const AuditEventSchema = z.object({
   result:      z.string().nullable(),
   prev_hash:   z.string().nullable(),
   hash:        z.string().nullable(),
+  // Plan 3 (Wave-E1) — OPA decision JSON blob (stringified). Nullish so legacy
+  // rows from before commit 9935b77 still parse.
+  policy_decision: z.string().nullish(),
   tenant_id:   z.string().nullable(),
   created_at:  z.string().nullable(),
   username:    z.string().nullable(),
@@ -104,6 +107,50 @@ export const AnchorResponseSchema = z.object({
   record:     z.record(z.unknown()).nullable(),
 });
 export type AnchorResponse = z.infer<typeof AnchorResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Plan 3 (Wave-E1) — Task #4 schemas
+// ---------------------------------------------------------------------------
+
+// GET /spa/api/audit/chain/verify — full walk from genesis.
+export const ChainVerifyV2ResponseSchema = z.object({
+  verified:      z.boolean(),
+  count:         z.number(),
+  latest_anchor: z.string().nullable(),
+  broken_at:     z.number().nullable(),
+});
+export type ChainVerifyV2Response = z.infer<typeof ChainVerifyV2ResponseSchema>;
+
+// GET /spa/api/audit/events/:id/with-context — payload for DiffDrawer.
+export const EventWithContextSchema = z.object({
+  event: z.object({
+    id:              z.number(),
+    action:          z.string().nullable(),
+    entity:          z.string().nullable(),
+    entity_type:     z.string().nullable(),
+    entity_id:       z.number().nullable(),
+    detail:          z.unknown(),
+    policy_decision: z.unknown().nullable(),
+    result:          z.string().nullable(),
+    prev_hash:       z.string().nullable(),
+    hash:            z.string().nullable(),
+    tenant_id:       z.string().nullable(),
+    user_id:         z.number().nullable(),
+    created_at:      z.string().nullable(),
+    username:        z.string().nullable(),
+    full_name:       z.string().nullable(),
+  }),
+  chain: z.object({
+    prev: z.object({ id: z.number(), hash: z.string().nullable() }).nullable(),
+    this: z.object({
+      id:        z.number(),
+      prev_hash: z.string().nullable(),
+      hash:      z.string().nullable(),
+    }),
+    next: z.object({ id: z.number(), hash: z.string().nullable() }).nullable(),
+  }),
+});
+export type EventWithContext = z.infer<typeof EventWithContextSchema>;
 
 // ---------------------------------------------------------------------------
 // Filter params (shared between events + export)
