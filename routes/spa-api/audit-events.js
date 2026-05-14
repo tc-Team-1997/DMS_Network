@@ -39,6 +39,10 @@ const SPA_AUDIT_ACTIONS = new Set([
   'dsar.lookup',
   'dsar.fulfill',
   'dsar.release_hold',
+  // Plan 3 (Wave-E1) — RMA Quarterly Compliance Report actions emitted by
+  // routes/spa-api/regulator-reports.js (POST /generate and /submit).
+  'regulator.report_export',
+  'regulator.report_submit',
 ]);
 
 // ---------------------------------------------------------------------------
