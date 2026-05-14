@@ -3,11 +3,12 @@
  *
  * Every route:
  *   1. Requires a valid session (enforced globally in routes/spa-api.js).
- *   2. Is guarded by requireNamespacePermJson('dsar') — Doc Admin today.
- *      TODO(lead): once Plan 3 RBAC additions land in services/rbac.js,
- *      swap to requirePermJson('dsar:read') on GET and requirePermJson(
- *      'dsar:fulfill') on the fulfill mutation. Keys are listed in the
- *      Plan 3 postmortem under §Postmortem additions.
+ *   2. Is guarded by requirePermJson('dsar:read') for GETs and dsar:fulfill
+ *      for the fulfill / release-hold mutations. The perm keys live in
+ *      services/rbac.js (added by Plan 3 / Wave-E1 commit fac2356) and are
+ *      mirrored in python-service/app/services/auth.py PERMISSIONS dict.
+ *      Bundles: dsar:read → Doc Admin + auditor + compliance.
+ *               dsar:fulfill → Doc Admin only.
  *   3. Forwards to Python /api/v1/dsar/* via pyCall() with X-API-Key injected
  *      server-side. The key is NEVER exposed to the browser.
  *   4. Every mutation writes to audit_log via writeAuditRow() with a
@@ -29,13 +30,15 @@
 'use strict';
 
 const express = require('express');
-const { pyCall, requireNamespacePermJson, tenantScope, branchScope } = require('./_shared');
+const { pyCall, requirePermJson, tenantScope, branchScope } = require('./_shared');
 const { writeAuditRow } = require('./audit');
 const { buildPolicyDecision } = require('../../services/audit-policy');
 
 const router = express.Router();
 
-const DSAR_GUARD = requireNamespacePermJson('dsar');
+// Plan 3 (Wave-E1) RBAC keys — landed on main at fac2356.
+const DSAR_READ    = requirePermJson('dsar:read');
+const DSAR_FULFILL = requirePermJson('dsar:fulfill');
 
 const VALID_ACTIONS = new Set([
   'article15_export', 'article17_cryptoshred', 'litigation_hold', 'fulfillment_letter',
@@ -45,7 +48,7 @@ const VALID_ACTIONS = new Set([
 // Subject lookup
 // GET /spa/api/dsar/lookup?axis=cid|email|phone|national_id&value=...
 // ---------------------------------------------------------------------------
-router.get('/dsar/lookup', DSAR_GUARD, async (req, res) => {
+router.get('/dsar/lookup', DSAR_READ, async (req, res) => {
   const { axis, value } = req.query;
   if (!axis || !value) {
     return res.status(400).json({ error: 'axis and value query parameters are required' });
@@ -67,7 +70,7 @@ router.get('/dsar/lookup', DSAR_GUARD, async (req, res) => {
 // Artifact inventory
 // GET /spa/api/dsar/subjects/:cid/inventory
 // ---------------------------------------------------------------------------
-router.get('/dsar/subjects/:cid/inventory', DSAR_GUARD, async (req, res) => {
+router.get('/dsar/subjects/:cid/inventory', DSAR_READ, async (req, res) => {
   const cid = req.params.cid;
   try {
     const data = await pyCall(`/api/v1/dsar/subjects/${encodeURIComponent(cid)}/inventory`);
@@ -83,7 +86,7 @@ router.get('/dsar/subjects/:cid/inventory', DSAR_GUARD, async (req, res) => {
 // POST /spa/api/dsar/requests
 // Audit: action=dsar.lookup (Plan 3 vocabulary)
 // ---------------------------------------------------------------------------
-router.post('/dsar/requests', DSAR_GUARD, async (req, res) => {
+router.post('/dsar/requests', DSAR_READ, async (req, res) => {
   const { customer_cid, action, regulator, reason, params } = req.body || {};
   if (!customer_cid || !action) {
     return res.status(400).json({ error: 'customer_cid and action are required' });
@@ -123,7 +126,7 @@ router.post('/dsar/requests', DSAR_GUARD, async (req, res) => {
 // GET /spa/api/dsar/requests
 // Branch-scoped: non-admin Viewer/Maker see only their branch.
 // ---------------------------------------------------------------------------
-router.get('/dsar/requests', DSAR_GUARD, async (req, res) => {
+router.get('/dsar/requests', DSAR_READ, async (req, res) => {
   try {
     const branch = branchScope(req.session?.user || {});
     const qs = branch ? `?branch_id=${encodeURIComponent(branch)}` : '';
@@ -140,7 +143,7 @@ router.get('/dsar/requests', DSAR_GUARD, async (req, res) => {
 // GET /spa/api/dsar/requests/:id/sla
 // Returns { id, sla_due_at, days_remaining, status }. Read-only — no audit row.
 // ---------------------------------------------------------------------------
-router.get('/dsar/requests/:id/sla', DSAR_GUARD, async (req, res) => {
+router.get('/dsar/requests/:id/sla', DSAR_READ, async (req, res) => {
   const id = req.params.id;
   try {
     const listData = await pyCall('/api/v1/dsar/requests');
@@ -165,7 +168,7 @@ router.get('/dsar/requests/:id/sla', DSAR_GUARD, async (req, res) => {
 // Article 17 cryptoshred: require destroy_token === 'DESTROY' (double-confirm).
 // Audit: action=dsar.fulfill (Plan 3 vocabulary).
 // ---------------------------------------------------------------------------
-router.post('/dsar/requests/:id/fulfill', DSAR_GUARD, async (req, res) => {
+router.post('/dsar/requests/:id/fulfill', DSAR_FULFILL, async (req, res) => {
   const id = req.params.id;
   const { kind, reason, destroy_token } = req.body || {};
 
@@ -209,7 +212,7 @@ router.post('/dsar/requests/:id/fulfill', DSAR_GUARD, async (req, res) => {
 // POST /spa/api/dsar/requests/:id/release-hold
 // Audit: action=dsar.release_hold (Plan 3 vocabulary).
 // ---------------------------------------------------------------------------
-router.post('/dsar/requests/:id/release-hold', DSAR_GUARD, async (req, res) => {
+router.post('/dsar/requests/:id/release-hold', DSAR_FULFILL, async (req, res) => {
   const id = req.params.id;
   try {
     const data = await pyCall(`/api/v1/dsar/requests/${encodeURIComponent(id)}/release-hold`, {
