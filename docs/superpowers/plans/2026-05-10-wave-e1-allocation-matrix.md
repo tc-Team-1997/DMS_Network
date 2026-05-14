@@ -13,14 +13,21 @@
 
 ## 1. Migration numbers (one assigner per plan; never re-use)
 
-Last shipped on main: migration **0040** (Plan 0 — `audit_log.policy_decision` + `users.reset_token`).
+**Amended 2026-05-14** — original matrix assumed `0040` was head, but the actual head on `main@ff8bfd0` is `0044_workflow_audit_unification`. Numbers shifted by +4 to preserve merge-order semantics (Plan 3 keeps lowest numbers).
+
+Migrations already on main (do not re-claim):
+- `0040_dsar_requests` — `dsar_requests` + `dsar_artifacts` (UUID PK, columns: `customer_cid`, `action`, `requested_at`, `sla_due_at`, `completed_at`, `regulator`, `params_json`, `fulfillment_artifact_path`, `signed_receipt`)
+- `0041_docbrain_conversations`
+- `0042_notifications_feed`
+- `0043_stepup_validation`
+- `0044_workflow_audit_unification`
 
 | Plan 3 (compliance) | Plan 2 (admin) | Plan 1 (operational) |
 |---|---|---|
-| 0041 — `dsar_requests` table + `dsar_artifacts` join | 0043 — `mfa_factors` table + `users.mfa_factor_default` | 0045 — `redaction_pages` composite-PK migration finalisation |
-| 0042 — `regulator_templates.country_code = 'BT'` row + `regulator_submissions` audit table | 0044 — `tenant_calendars (tenant_id, holiday_date, label)` | 0046 — `dashboard_kpi_views (user_id, view_json)` |
+| **0045** — `dsar_requests` additive cols (`dpo_user_id`, `audit_chain_head`, `inventory_snapshot`, `branch_id`) — `dsar_requests` and `dsar_artifacts` already exist | **0047** — `mfa_factors` table + `users.mfa_factor_default` | **0049** — `redaction_pages` composite-PK migration finalisation |
+| **0046** — INSERT BT row into existing `regulator_reports` (column is `regulator`, not `country_code`); no new `regulator_submissions` table — `submission_receipts` already exists from 0039 | **0048** — `tenant_calendars (tenant_id, holiday_date, label)` | **0050** — `dashboard_kpi_views (user_id, view_json)` |
 
-If a plan needs a third migration, claim 0047/0048/0049 in the matrix update before adding.
+If a plan needs a third migration, claim 0051/0052/0053 in the matrix update before adding.
 
 ## 2. RBAC permission keys (parity required: `services/rbac.js` + `python-service/app/services/auth.py`)
 
