@@ -1,0 +1,66 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import request from "supertest";
+import { buildServiceKnex } from "@zordms/db";
+import { loadConfig } from "@zordms/config";
+import { signToken } from "@zordms/auth";
+import { createApp } from "../app.js";
+import { SqlSearchBackend } from "../backend/SqlSearchBackend.js";
+
+const migrationsDir = new URL("../migrations", import.meta.url).pathname;
+const seedsDir = new URL("../seeds", import.meta.url).pathname;
+const db = { client: "sqlite3" as const, host: "", port: 0, user: "", password: "", name: "", oracleConnectString: "" };
+const knex = buildServiceKnex({ migrationsDir, seedsDir, db });
+const backend = new SqlSearchBackend(knex);
+const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv), backend });
+let adminToken = "";
+let viewerThimphuToken = "";
+
+beforeAll(async () => {
+  await knex.migrate.latest();
+  await knex.seed.run();
+  const admin = await knex("users").where({ username: "admin" }).first();
+  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+
+  // a Viewer scoped to Thimphu (no crossbranch:read)
+  const [vid] = await knex("users").insert({ username: "viewerT", password_hash: "x", status: "Active", branch: "Thimphu" }).returning("id");
+  const userId = typeof vid === "object" ? (vid as any).id : vid;
+  const viewerRole = await knex("roles").where({ name: "Viewer" }).first();
+  await knex("user_roles").insert({ user_id: userId, role_id: viewerRole.id });
+  viewerThimphuToken = signToken({ sub: userId, username: "viewerT" }, "t");
+
+  await backend.index({ doc_id: "D1", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Thimphu", status: "indexed", risk_band: "low", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });
+  await backend.index({ doc_id: "D2", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Paro", status: "indexed", risk_band: "high", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });
+});
+afterAll(async () => { await knex.destroy(); });
+
+describe("POST /search", () => {
+  it("requires authentication", async () => {
+    expect((await request(app).post("/search").send({ text: "dorji", mode: "fulltext" })).status).toBe(401);
+  });
+
+  it("admin (crossbranch) sees results from all branches", async () => {
+    const res = await request(app).post("/search").set("Authorization", `Bearer ${adminToken}`).send({ text: "dorji", mode: "fulltext" });
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(2);
+    expect(res.body.facets.branch.length).toBe(2);
+  });
+
+  it("Thimphu Viewer (no crossbranch) only sees Thimphu results", async () => {
+    const res = await request(app).post("/search").set("Authorization", `Bearer ${viewerThimphuToken}`).send({ text: "dorji", mode: "fulltext" });
+    expect(res.status).toBe(200);
+    expect(res.body.hits.map((h: any) => h.doc_id)).toEqual(["D1"]);
+  });
+
+  it("rejects a malformed query with 400", async () => {
+    const res = await request(app).post("/search").set("Authorization", `Bearer ${adminToken}`).send({ mode: "regex" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /facets", () => {
+  it("returns facet dimensions for the caller scope", async () => {
+    const res = await request(app).get("/facets").set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.facets.doc_type.length).toBeGreaterThan(0);
+  });
+});
