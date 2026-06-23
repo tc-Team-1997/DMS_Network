@@ -2,6 +2,12 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
+  test: {
+    // Only pick up TypeScript test files — exclude compiled .js counterparts
+    // that tsc produces alongside .ts source in src/ (those are gitignored
+    // but may exist on disk after a build run).
+    include: ["src/**/*.test.ts"],
+  },
   resolve: {
     alias: {
       // Point workspace packages to their TypeScript source so tests run
