@@ -4,3 +4,4 @@ packages:
   - "apps/*"
 allowBuilds:
   esbuild: true
+  sqlite3: true
