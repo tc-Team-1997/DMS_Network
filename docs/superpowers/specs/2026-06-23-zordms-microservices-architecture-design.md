@@ -64,6 +64,16 @@ semantic vector search, fraud/face/voice, PAdES signing, envelope encryption/KMS
 CBE reports, retention, AML watchlist, Kafka/SIEM, OIDC/SAML. Already Postgres/Oracle-capable
 via SQLAlchemy `DATABASE_URL`.
 
+### Authoritative IDP design (ZorFinotech, v1.0, June 2026)
+`docs/superpowers/specs/2026-06-23-zordms-idp-design.md` is the **binding design** for the
+four Intelligent Document Processing capabilities (Metadata Extraction, Auto Cataloging,
+Auto Directory Mapping, Auto Doc-Type Mapping). It supersedes the "Tesseract-only" framing
+above for the AI service: production inference is a **two-stage Vision-Language-Model (VLM)
+pipeline** — Granite 3.2 Vision 2B classifier → Qwen2.5-VL 7B extractor — served by **vLLM on
+NVIDIA L40S GPUs in an air-gapped on-prem data centre** (Thimphu DC + DR), with token-level
+constrained JSON (Pydantic-validated). Tesseract is retained only as a fallback/full-text OCR
+engine. The Bhutan taxonomy/schemas come from the India + Bhutan DMS Reference Pack (Excel).
+
 ---
 
 ## 3. System Topology
@@ -84,10 +94,10 @@ React SPA (apps/web)  ──HTTPS/REST+WS──►  GATEWAY / IDENTITY (Node)
    branch, reports        │              │                │                  │
         └───────────────────────── EVENT BUS (Redis Streams; Kafka opt.) ───┘
                               │
-                  AI / OCR (Python FastAPI)
-                  Tesseract OCR, CID/Passport classification,
-                  Name/DOB/DocNo/Expiry + MRZ extraction,
-                  expiry detection, vector/fraud (optional)
+                  AI / IDP (Python FastAPI + vLLM on GPU)
+                  Stage1 classify (Granite 3.2 Vision 2B) →
+                  Stage2 extract (Qwen2.5-VL 7B) → constrained JSON;
+                  Tesseract fallback OCR; confidence routing
 
   Shared infra: DB = PostgreSQL ⇄ Oracle 19c (env switch) · Redis (cache/queue) ·
                 Object store (MinIO on-prem / S3 cloud) · Elasticsearch (Phase 2)
@@ -166,12 +176,12 @@ gate is RBAC.
 | # | Service | Stack | Responsibilities (domains / prototype screens) |
 |---|---------|-------|-----------------------------------------------|
 | 1 | **Gateway / Identity** | Node/Express | AuthN (session + JWT), **RBAC engine (data-driven roles + `resource:action` permissions) — the system backbone**, **supervisor-managed unlimited user provisioning** (create/role/branch/lock/reset, no licensing), MFA (TOTP), SSO (SAML2 / AD), API keys, rate-limiting, request routing/aggregation (BFF), centralized tamper-evident audit log, **authority resolution for the workflow engine**. → *Security & Access Control, login*. |
-| 2 | **Core DMS** | Node/Express | Documents, folders/repository, multi-channel capture orchestration, indexing/metadata + QA, versioning + rollback, viewer data (annotations/redaction/stamps), **Records Mgmt** (retention/legal-hold/disposal), **Customer 360**, **Branch Network**, **Document Lifecycle**, **Reports/BI/dashboards**, exports. → *Dashboard, Capture, Indexing, Repository, Viewer, Records, Customer360, Branch, Lifecycle, Reports, Admin*. |
+| 2 | **Core DMS** | Node/Express | Documents, folders/repository, multi-channel capture orchestration, indexing/metadata + QA, versioning + rollback, viewer data (annotations/redaction/stamps), **Auto-Catalog rule engine** (catalog category + mandatory index fields + alert-schedule population), **Auto Directory Mapper** (deterministic path templates → folder routing with **per-folder ACL inheritance**), **Records Mgmt** (retention/legal-hold/disposal), **Customer 360**, **Branch Network**, **Document Lifecycle**, **Reports/BI/dashboards**, exports. → *Dashboard, Capture, Indexing, Repository, Viewer, Records, Customer360, Branch, Lifecycle, Reports, Admin*. |
 | 3 | **Workflow & Cases** | Node/Express | Maker-checker, BPMN-style builder, confidence gates (≥90%), SLA countdown & escalation, **Case Management** (KYC/Loan/Account/AML), workflow templates. → *Workflow Engine, Case Management*. |
 | 4 | **Notification & Alerts** | Node/Express | Alert-rule engine, multi-channel dispatch (Email/SMS/WhatsApp/Teams/in-app), escalation routing to named roles, expiry campaigns, realtime WebSocket/SSE. → *Alerts & Event Management*. |
 | 5 | **Search** | Node + Elasticsearch | Full-text OCR, boolean/wildcard/fuzzy/semantic, faceted filters, saved searches, relevance scoring. **Phase 1: PostgreSQL FTS; Phase 2: Elasticsearch.** → *Enterprise Search*. |
 | 6 | **Integration Hub** | Node/Express | Connectors: CBS (TCS BaNCS/GBP, Temenos), LOS, KYC, ERP, CRM, Contact Center, mBoB/goBoB/Internet Banking; inbound/outbound webhooks (HMAC), API request logs & status. → *Integration Hub*. |
-| 7 | **AI / OCR** | Python/FastAPI | OCR (Tesseract), CID/Passport auto-classification, Name/DOB/DocNo/Expiry extraction + MRZ, expiry detection at scan time, confidence scoring, vector & fraud (optional). Slimmed from existing service. → *AI Engine*. |
+| 7 | **AI / IDP** | Python/FastAPI + **vLLM (GPU)** | **Two-stage IDP**: Stage-1 doc-type classifier (Granite 3.2 Vision 2B, INT4) → Stage-2 metadata extractor (Qwen2.5-VL 7B) with **token-level constrained JSON** (Pydantic-validated); MRZ/regex/logo/header signal priority; confidence-band routing to a **human-review queue** (SLA tiers); Tesseract fallback OCR; vector & fraud (optional). Air-gapped GPU deployment. See IDP design doc. → *AI Engine*. |
 
 Each service is independently deployable, owns its schema namespace, communicates
 synchronously via the gateway/REST and asynchronously via the event bus, and can be
@@ -280,19 +290,27 @@ All 29 mapped → comfortably clears the 85% responsiveness threshold.
 
 ## 9. Deployment
 
-- **On-Premises:** `docker-compose` single-box or small K8s; Oracle 19c or PostgreSQL on-prem;
-  MinIO; all services containerized.
-- **Cloud / Hybrid:** Helm chart on K8s; managed DB (RDS/OCI); S3; managed Elasticsearch.
-- **One build, two targets:** identical container images, env-driven config.
+- **On-Premises (BoB primary target — air-gapped):** RKE2 Kubernetes on BoB hardware
+  (Thimphu DC + DR site, no cloud dependency); Oracle 19c or PostgreSQL on-prem; MinIO object
+  storage; **offline Harbor registry** with pre-bundled images and HuggingFace model bundles.
+  **AI/IDP runs on dedicated NVIDIA L40S GPU nodes** (≥2) serving vLLM, scaled via K8s HPA
+  (1–4 GPU pods); model weights on a shared NFS PVC. ⚠️ GPU procurement has a 4–6 month lead
+  time to Bhutan — see roadmap in the IDP design doc.
+- **Cloud / Hybrid:** Helm chart on K8s; managed DB (RDS/OCI); S3; managed Elasticsearch;
+  GPU node pool for the IDP service.
+- **One build, two targets:** identical container images, env-driven config. Data residency
+  and RAA/RMA audit compliance are first-class constraints for the on-prem deployment.
 
 ---
 
 ## 10. Phasing (within full v4.2 parity)
 
 **Phase 1 — tender-responsive core**
-Gateway/Identity, Core DMS (docs/repo/capture/index/version/viewer), Workflow, Notify,
-Search (PG-FTS), Integration (CBS/LOS/KYC), AI (OCR/classify/extract).
-→ Covers all 29 specs.
+Gateway/Identity, Core DMS (docs/repo/capture/index/version/viewer + auto-catalog + directory
+mapper), Workflow, Notify (incl. expiry alert tiers), Search (PG-FTS), Integration (CBS/LOS/KYC),
+AI/IDP (two-stage VLM classify→extract; can run CPU-degraded until GPU nodes land).
+→ Covers all 29 specs. **Note:** GPU procurement (4–6 mo lead) runs in parallel; IDP can be
+validated on CPU/smaller models pre-hardware per the IDP roadmap.
 
 **Phase 2 — enterprise depth**
 Branch Network, Customer 360°, Case Management, Records/Legal-Hold/Disposal, Compliance
@@ -316,6 +334,8 @@ Center/mBoB/goBoB).
 | RBAC | **System backbone** — data-driven roles + `resource:action` perms; drives UI, APIs, and the workflow engine |
 | Build quality | **All services fully functional** (no mocks/stubs) |
 | Login UX | Split-screen: left blue dotted carousel panel + right sign-in form (§3a) |
+| AI/IDP engine | **Two-stage VLM** (Granite 3.2 Vision 2B → Qwen2.5-VL 7B) via **vLLM on NVIDIA L40S GPUs**, constrained JSON; Tesseract fallback. Air-gapped. Per ZorFinotech IDP design doc v1.0 |
+| AI deployment | **On-prem air-gapped** (Thimphu DC + DR), RKE2 + offline Harbor + GPU nodes; data residency + RAA/RMA audit |
 
 ---
 
@@ -330,4 +350,11 @@ Center/mBoB/goBoB).
   branch/region scoping; seed of default roles; permission catalog (`resource:action`).
 - Workflow ↔ RBAC contract: how a workflow step declares required permissions and how the
   engine resolves actor authority/step-up/escalation from RBAC.
+- **IDP (Plan 7) detail** — port the ZorFinotech IDP design doc into a plan: vLLM serving of
+  Granite + Qwen2.5-VL, constrained-JSON schemas, doc-type registry + signal priority,
+  confidence-band routing, human-review queue with SLA tiers, GPU/air-gap packaging.
+- **Bhutan taxonomy/schemas (Plan 2/7)** — Pydantic + DB metadata schemas for BT_CID_4G,
+  BT_PASSPORT, BOB_LOAN_APPLICATION, etc.; catalog taxonomy; directory path templates;
+  per-folder ACL inheritance model — sourced from the India + Bhutan DMS Reference Pack.
+- **Human-review queue** — schema + UI for confidence-band review with 24/48-hr SLAs.
 - CI matrix for PG + Oracle migration testing.
