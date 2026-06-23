@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { buildServiceKnex } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
+import { signToken } from "@zordms/auth";
 import { createApp } from "../app.js";
 import { createRecordingBus } from "../events.js";
 import type { AuthorityClient } from "../authority.js";
@@ -27,23 +28,36 @@ const authority: AuthorityClient = {
   },
 };
 
-const app = createApp({
-  knex,
-  config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv),
-  authority,
-  events,
-});
+const config = loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv);
+const app = createApp({ knex, config, authority, events });
+
+// F2/F14: Tokens are signed with permissions embedded; actor identity comes
+// from the verified JWT (req.authUser.id) — NOT from request body.
+// userId=1 → allowed by authority stub above.
+// userId=2 → denied by authority stub.
+const checkerToken = signToken(
+  { sub: 1, username: "checker1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
+  "t",
+);
+const viewerToken = signToken(
+  { sub: 2, username: "viewer1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
+  "t",
+);
 
 async function makeWorkflow(): Promise<number> {
-  const tpl = await request(app).post("/templates").send({
-    name: "T",
-    steps_json: JSON.stringify([
-      { name: "Maker", required_permissions: ["workflow:act"] },
-      { name: "Checker", required_permissions: ["document:approve"] },
-    ]),
-  });
+  const tpl = await request(app)
+    .post("/templates")
+    .set("Authorization", `Bearer ${checkerToken}`)
+    .send({
+      name: "T",
+      steps_json: JSON.stringify([
+        { name: "Maker", required_permissions: ["workflow:act"] },
+        { name: "Checker", required_permissions: ["document:approve"] },
+      ]),
+    });
   const wf = await request(app)
     .post("/workflows")
+    .set("Authorization", `Bearer ${checkerToken}`)
     .send({ title: "W", template_id: tpl.body.template.id, doc_confidence: 0.99 });
   return wf.body.workflow.id;
 }
@@ -56,11 +70,32 @@ afterAll(async () => {
 });
 
 describe("POST /workflows/:id/act", () => {
-  it("403 when the gateway denies authority (no state change)", async () => {
+  it("F1: 401 without a Bearer token", async () => {
     const id = await makeWorkflow();
+    const res = await request(app).post(`/workflows/${id}/act`).send({ action: "approve" });
+    expect(res.status).toBe(401);
+  });
+
+  it("F2: actor identity comes from JWT (not body) — viewer denied because authority stub rejects userId=2", async () => {
+    const id = await makeWorkflow();
+    // viewerToken has sub=2 which authority stub denies
     const res = await request(app)
       .post(`/workflows/${id}/act`)
-      .send({ userId: 2, action: "approve" });
+      .set("Authorization", `Bearer ${viewerToken}`)
+      .send({ action: "approve" }); // no userId in body
+    expect(res.status).toBe(403);
+    expect(res.body.missing.length).toBeGreaterThan(0);
+    const wf = await knex("workflows").where({ id }).first();
+    expect(wf.status).toBe("Active");
+  });
+
+  it("403 when the gateway denies authority (no state change)", async () => {
+    const id = await makeWorkflow();
+    // viewerToken → sub=2 → authority stub denies
+    const res = await request(app)
+      .post(`/workflows/${id}/act`)
+      .set("Authorization", `Bearer ${viewerToken}`)
+      .send({ action: "approve" });
     expect(res.status).toBe(403);
     expect(res.body.missing.length).toBeGreaterThan(0);
     const wf = await knex("workflows").where({ id }).first();
@@ -71,21 +106,23 @@ describe("POST /workflows/:id/act", () => {
     const id = await makeWorkflow();
     const res = await request(app)
       .post(`/workflows/${id}/act`)
-      .send({ userId: 1, action: "approve" });
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "approve" });
     expect(res.status).toBe(200);
     expect(res.body.workflow.stage).toBe("Checker"); // advanced to step 2
     const step1 = await knex("workflow_steps").where({ workflow_id: id, seq: 1 }).first();
     expect(step1.status).toBe("Approved");
-    expect(step1.actor_id).toBe(1);
+    expect(step1.actor_id).toBe(1); // actor from JWT sub=1
     expect(events.events.some((e) => e.event === "workflow.approved")).toBe(true);
   });
 
   it("completes the workflow as Approved on the final approval", async () => {
     const id = await makeWorkflow();
-    await request(app).post(`/workflows/${id}/act`).send({ userId: 1, action: "approve" }); // step 1
+    await request(app).post(`/workflows/${id}/act`).set("Authorization", `Bearer ${checkerToken}`).send({ action: "approve" }); // step 1
     const res = await request(app)
       .post(`/workflows/${id}/act`)
-      .send({ userId: 1, action: "approve" }); // step 2
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "approve" }); // step 2
     expect(res.body.workflow.status).toBe("Approved");
   });
 
@@ -93,7 +130,8 @@ describe("POST /workflows/:id/act", () => {
     const id = await makeWorkflow();
     const res = await request(app)
       .post(`/workflows/${id}/act`)
-      .send({ userId: 1, action: "reject", comment: "bad scan" });
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "reject", comment: "bad scan" });
     expect(res.body.workflow.status).toBe("Rejected");
     expect(events.events.some((e) => e.event === "workflow.rejected")).toBe(true);
   });
@@ -102,8 +140,44 @@ describe("POST /workflows/:id/act", () => {
     const id = await makeWorkflow();
     const res = await request(app)
       .post(`/workflows/${id}/act`)
-      .send({ userId: 1, action: "escalate" });
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "escalate" });
     expect(res.body.workflow.status).toBe("Escalated");
     expect(events.events.some((e) => e.event === "workflow.escalated")).toBe(true);
+  });
+
+  it("F4: OnHold workflow cannot receive act action", async () => {
+    const id = await makeWorkflow();
+    // First hold the workflow
+    const holdRes = await request(app)
+      .post(`/workflows/${id}/act`)
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "hold" });
+    expect(holdRes.body.workflow.status).toBe("OnHold");
+
+    // Now try to approve the held workflow — should be 409
+    const approveRes = await request(app)
+      .post(`/workflows/${id}/act`)
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "approve" });
+    expect(approveRes.status).toBe(409);
+    expect(approveRes.body.error).toBe("workflow_inactive");
+  });
+
+  it("F4: Escalated workflow cannot receive act action", async () => {
+    const id = await makeWorkflow();
+    // Escalate the workflow
+    await request(app)
+      .post(`/workflows/${id}/act`)
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "escalate" });
+
+    // Try to approve the escalated workflow — should be 409
+    const res = await request(app)
+      .post(`/workflows/${id}/act`)
+      .set("Authorization", `Bearer ${checkerToken}`)
+      .send({ action: "approve" });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("workflow_inactive");
   });
 });

@@ -18,8 +18,13 @@ const events = createRecordingBus();
 
 beforeAll(async () => {
   await knex.migrate.latest();
+  // F13: seed template with at least one valid step (steps_json:"[]" violates schema).
   const tpl = await knex("workflow_templates")
-    .insert({ name: "T", steps_json: "[]", active: true })
+    .insert({
+      name: "T",
+      steps_json: JSON.stringify([{ name: "Review", required_permissions: ["workflow:act"] }]),
+      active: true,
+    })
     .returning("id");
   const tplId = typeof tpl[0] === "object" ? (tpl[0] as { id: number }).id : tpl[0];
   const wf = await knex("workflows")

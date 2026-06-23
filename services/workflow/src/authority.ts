@@ -9,6 +9,8 @@ export interface AuthorityClient {
 
 export interface AuthorityOptions {
   gatewayUrl: string;
+  /** Must match the gateway's INTERNAL_SERVICE_TOKEN env var (timingSafeEqual check). */
+  internalServiceToken?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -19,7 +21,12 @@ export function createAuthorityClient(opts: AuthorityOptions): AuthorityClient {
     async check(userId, permissions) {
       const res = await doFetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(opts.internalServiceToken
+            ? { "x-internal-token": opts.internalServiceToken }
+            : {}),
+        },
         body: JSON.stringify({ userId, permissions }),
       });
       if (!res.ok) {

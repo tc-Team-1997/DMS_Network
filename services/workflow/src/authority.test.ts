@@ -21,7 +21,6 @@ describe("authority client", () => {
       "http://gw:4000/authz/check",
       expect.objectContaining({
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: 7, permissions: ["document:approve", "workflow:act"] }),
       }),
     );
@@ -53,5 +52,41 @@ describe("authority client", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
     await expect(client.check(1, ["workflow:act"])).rejects.toThrow(/authz_check_failed/);
+  });
+
+  it("F3: sends x-internal-token header when internalServiceToken is configured", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ allowed: true, missing: [] }),
+    });
+    const client = createAuthorityClient({
+      gatewayUrl: "http://gw:4000",
+      internalServiceToken: "supersecret",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await client.check(1, ["workflow:act"]);
+
+    const callArgs = fetchImpl.mock.calls[0][1] as { headers: Record<string, string> };
+    expect(callArgs.headers["x-internal-token"]).toBe("supersecret");
+    expect(callArgs.headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("F3: does not send x-internal-token when not configured (backwards compat)", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ allowed: true, missing: [] }),
+    });
+    const client = createAuthorityClient({
+      gatewayUrl: "http://gw:4000",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await client.check(1, ["workflow:act"]);
+
+    const callArgs = fetchImpl.mock.calls[0][1] as { headers: Record<string, string> };
+    expect(callArgs.headers["x-internal-token"]).toBeUndefined();
   });
 });

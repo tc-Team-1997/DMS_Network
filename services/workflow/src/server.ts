@@ -16,7 +16,10 @@ const events = createEventBus();
 const app = createApp({
   knex,
   config,
-  authority: createAuthorityClient({ gatewayUrl }),
+  authority: createAuthorityClient({
+    gatewayUrl,
+    internalServiceToken: config.internalServiceToken,
+  }),
   events,
 });
 
