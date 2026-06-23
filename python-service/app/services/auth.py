@@ -3,7 +3,7 @@
 Claims shape:
     {
       "sub": "ahmed.m",
-      "tenant": "nbe",
+      "tenant": "zordms",
       "branch": "Cairo West",
       "roles": ["doc_admin"]           # any of: viewer | maker | checker | doc_admin | auditor
     }

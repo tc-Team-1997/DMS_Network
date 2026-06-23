@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
         with: {version: "v3.14.0"}
-      - run: helm lint python-service/helm/nbe-dms
+      - run: helm lint python-service/helm/zordms
 
   e2e:
     runs-on: ubuntu-latest

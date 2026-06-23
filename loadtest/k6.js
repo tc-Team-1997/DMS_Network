@@ -1,4 +1,4 @@
-// Load test for NBE DMS Python service.
+// Load test for ZorDMS Python service.
 // Run:  k6 run --vus 50 --duration 2m loadtest/k6.js
 // Env:  BASE_URL, API_KEY
 

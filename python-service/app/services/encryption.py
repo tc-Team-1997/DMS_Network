@@ -149,7 +149,7 @@ def encrypt_bytes(data: bytes, dek: bytes) -> bytes:
 def decrypt_bytes(blob: bytes, dek: bytes) -> bytes:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     if not blob.startswith(b"NBE1"):
-        raise ValueError("not an NBE envelope")
+        raise ValueError("not an ZorDMS envelope")
     raw = blob[4:]
     nonce, ct = raw[:12], raw[12:]
     return AESGCM(dek).decrypt(nonce, ct, b"doc")

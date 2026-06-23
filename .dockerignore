@@ -1,6 +1,6 @@
 node_modules
 uploads/*
 !uploads/.gitkeep
-db/nbe-dms.db*
+db/zordms.db*
 .env
 .git

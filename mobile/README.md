@@ -1,4 +1,4 @@
-# NBE DMS — Mobile Capture (Expo / React Native)
+# ZorDMS — Mobile Capture (Expo / React Native)
 
 Branch officers scan customer documents in the field, attach minimal metadata,
 and submit straight to the Python DMS API. OCR runs server-side via the task queue.

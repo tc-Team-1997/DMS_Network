@@ -155,7 +155,7 @@ def _explain(doc: Document, approvable: bool,
     """Plain-language summary. Uses Claude / OpenAI if configured, else templated."""
     if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY"):
         prompt = (
-            "You are a KYC compliance coach at National Bank of Egypt. A checker is "
+            "You are a KYC compliance coach at ZorDMS. A checker is "
             "reviewing this document. In 2-3 sentences, tell them whether they can "
             "approve and what to do next. Cite rule ids in brackets.\n\n"
             f"Document: #{doc.id} {doc.doc_type or ''} for {doc.customer_cid or '-'}\n"

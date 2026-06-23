@@ -1,16 +1,16 @@
 """Per-tenant key isolation.
 
 Default envelope encryption uses one bank-wide KEK. In a multi-tenant deployment
-(e.g. NBE + sister banks / sub-banks) each tenant should have a DISTINCT KEK so
+(e.g. ZorDMS + sister banks / sub-banks) each tenant should have a DISTINCT KEK so
 compromise of one tenant's DEK store cannot affect others.
 
 Strategy:
   - Each tenant maps to a KEK label: the env TENANT_KEK_MAP provides the mapping,
-    e.g.  TENANT_KEK_MAP='{"nbe":"arn:aws:kms:...:nbe","audi-eg":"arn:..."}'
+    e.g.  TENANT_KEK_MAP='{"zordms":"arn:aws:kms:...:zordms","audi-eg":"arn:..."}'
   - When wrapping/unwrapping, the lookup is tenant-scoped.
   - Admin endpoints let SREs list and rotate tenant KEKs.
 
-For air-gap / local setups, TENANT_LOCAL_KEKS='{"nbe":"hex64","audi":"hex64"}'
+For air-gap / local setups, TENANT_LOCAL_KEKS='{"zordms":"hex64","audi":"hex64"}'
 provides per-tenant hex keys.
 
 Reuses the AEAD file envelope from encryption.py so data layout stays identical.

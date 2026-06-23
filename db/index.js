@@ -1,5 +1,5 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-const db = new Database(path.join(__dirname, 'nbe-dms.db'));
+const db = new Database(path.join(__dirname, 'zordms.db'));
 db.pragma('journal_mode = WAL');
 module.exports = db;

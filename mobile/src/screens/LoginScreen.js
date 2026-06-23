@@ -21,7 +21,7 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>National Bank of Egypt</Text>
+      <Text style={styles.title}>ZorDMS</Text>
       <Text style={styles.sub}>Document Management — Mobile Capture</Text>
       <TextInput value={u} onChangeText={setU} placeholder="Username" placeholderTextColor="#8da0b8" style={styles.input} autoCapitalize="none" />
       <TextInput value={p} onChangeText={setP} placeholder="Password" placeholderTextColor="#8da0b8" style={styles.input} secureTextEntry />

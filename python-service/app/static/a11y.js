@@ -1,7 +1,7 @@
 // Toggle WCAG 2.2 AAA compliance mode. Persists in localStorage.
-// Usage: window.NBE_A11Y.toggle() or a button bound to it.
+// Usage: window.ZorDMS_A11Y.toggle() or a button bound to it.
 
-const KEY = "nbe.dms.a11y_mode";
+const KEY = "zordms.a11y_mode";
 
 export function getMode() {
   return localStorage.getItem(KEY) || "aa";   // "aa" (default) | "aaa"
@@ -30,7 +30,7 @@ export function toggle() {
 }
 
 if (typeof window !== "undefined") {
-  window.NBE_A11Y = { getMode, setMode, toggle };
+  window.ZorDMS_A11Y = { getMode, setMode, toggle };
   // Apply persisted preference on load + respect system preferences.
   document.addEventListener("DOMContentLoaded", () => {
     const prefer = getMode();

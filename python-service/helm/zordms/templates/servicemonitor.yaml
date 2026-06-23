@@ -2,12 +2,12 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "nbe-dms.fullname" . }}
-  labels: {{- include "nbe-dms.labels" . | nindent 4 }}
+  name: {{ include "zordms.fullname" . }}
+  labels: {{- include "zordms.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "nbe-dms.name" . }}
+      app.kubernetes.io/name: {{ include "zordms.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   endpoints:
     - port: http

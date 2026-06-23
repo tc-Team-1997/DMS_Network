@@ -17,7 +17,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-REGION = os.environ.get("NBE_REGION", "default")
+REGION = os.environ.get("ZorDMS_REGION", "default")
 
 
 def _parse(clock_json: str | None) -> dict[str, int]:

@@ -1,6 +1,6 @@
 variable "region"       { type = string  default = "eu-west-1" }
 variable "environment"  { type = string  default = "dev" }
-variable "name_prefix"  { type = string  default = "nbe-dms" }
+variable "name_prefix"  { type = string  default = "zordms" }
 variable "vpc_cidr"     { type = string  default = "10.40.0.0/16" }
 
 variable "eks_version"  { type = string  default = "1.29" }

@@ -91,7 +91,7 @@ def _structured_answer(db: Session, q: str, tenant: str, branch_scope: str | Non
 def _llm_answer(question: str, context: str) -> str | None:
     """Optional LLM call. Returns None if no provider configured/available."""
     prompt = (
-        "You are the NBE DMS assistant. Answer the question using only the context. "
+        "You are the ZorDMS assistant. Answer the question using only the context. "
         "If the answer is not in the context, say you don't know.\n\n"
         f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
     )

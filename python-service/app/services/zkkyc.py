@@ -146,7 +146,7 @@ def issue(db: Session, customer_cid: str, claim: str, ttl_days: int = 90) -> dic
     exp = now + timedelta(days=ttl_days)
 
     payload = {
-        "iss": "NBE-DMS", "claim": claim,
+        "iss": "ZorDMS", "claim": claim,
         "commitment": commitment,
         "issued_at": issued_at,
         "expires_at": exp.isoformat() + "Z",

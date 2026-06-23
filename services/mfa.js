@@ -3,8 +3,8 @@ const QRCode = require('qrcode');
 
 function generateSecret(username) {
   return speakeasy.generateSecret({
-    name: `NBE-DMS (${username})`,
-    issuer: 'NBE DMS'
+    name: `ZorDMS (${username})`,
+    issuer: 'ZorDMS'
   });
 }
 

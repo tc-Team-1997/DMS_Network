@@ -2,9 +2,9 @@
 // Zero-dependency, keyboard-accessible, remembers recent turns in localStorage so
 // users can refresh the page mid-conversation without losing context.
 
-const BTN_ID = "nbe-assistant-btn";
-const PANE_ID = "nbe-assistant-pane";
-const HISTORY_KEY = "nbe.dms.assistant_history";
+const BTN_ID = "zordms-assistant-btn";
+const PANE_ID = "zordms-assistant-pane";
+const HISTORY_KEY = "zordms.assistant_history";
 
 const STYLE = `
 #${BTN_ID} {
@@ -78,8 +78,8 @@ function render(pane, history) {
 }
 
 async function ask(text) {
-  const apiKey = window.NBE_API_KEY
-    || document.querySelector('meta[name="nbe-api-key"]')?.content
+  const apiKey = window.ZorDMS_API_KEY
+    || document.querySelector('meta[name="zordms-api-key"]')?.content
     || (typeof API_KEY !== "undefined" ? API_KEY : "");
   try {
     const r = await fetch("/api/v1/copilot/ask", {

@@ -26,7 +26,7 @@ export default function App() {
           headerTitleStyle: { fontWeight: '700' },
         }}
       >
-        <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'NBE DMS' }} />
+        <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'ZorDMS' }} />
         <Stack.Screen name="Capture" component={CaptureScreen} options={{ title: 'Capture Document' }} />
         <Stack.Screen name="Recent" component={RecentScreen} options={{ title: 'Recent Uploads' }} />
       </Stack.Navigator>

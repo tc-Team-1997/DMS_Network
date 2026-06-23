@@ -24,7 +24,7 @@ router.post('/verify', (req, res) => {
 });
 
 router.post('/api-key', (req, res) => {
-  const key = 'nbe_' + crypto.randomBytes(24).toString('hex');
+  const key = 'zordms_' + crypto.randomBytes(24).toString('hex');
   db.prepare('UPDATE users SET api_key=? WHERE id=?').run(key, req.session.user.id);
   res.render('api-key', { active: 'admin', key });
 });

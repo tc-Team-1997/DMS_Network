@@ -15,11 +15,11 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 DEMO_USERS = {
-    "ahmed.m":   {"password": "demo", "tenant": "nbe", "branch": "Cairo West",  "roles": ["doc_admin"]},
-    "sara.k":    {"password": "demo", "tenant": "nbe", "branch": "Giza",        "roles": ["maker"]},
-    "mohamed.a": {"password": "demo", "tenant": "nbe", "branch": "Alexandria",  "roles": ["checker"]},
-    "nour.r":    {"password": "demo", "tenant": "nbe", "branch": "Cairo East",  "roles": ["viewer"]},
-    "auditor":   {"password": "demo", "tenant": "nbe", "branch": None,          "roles": ["auditor"]},
+    "ahmed.m":   {"password": "demo", "tenant": "zordms", "branch": "Cairo West",  "roles": ["doc_admin"]},
+    "sara.k":    {"password": "demo", "tenant": "zordms", "branch": "Giza",        "roles": ["maker"]},
+    "mohamed.a": {"password": "demo", "tenant": "zordms", "branch": "Alexandria",  "roles": ["checker"]},
+    "nour.r":    {"password": "demo", "tenant": "zordms", "branch": "Cairo East",  "roles": ["viewer"]},
+    "auditor":   {"password": "demo", "tenant": "zordms", "branch": None,          "roles": ["auditor"]},
 }
 
 

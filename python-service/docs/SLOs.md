@@ -1,4 +1,4 @@
-# NBE DMS — Service Level Objectives
+# ZorDMS — Service Level Objectives
 
 All targets measured over a **rolling 28-day window**. SLIs come from Prometheus
 `dms_*` metrics. Each SLO has an associated error budget and a burn-rate alert.

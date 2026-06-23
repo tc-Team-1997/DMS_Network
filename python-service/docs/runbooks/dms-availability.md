@@ -10,12 +10,12 @@ Ack in PagerDuty and in `#dms-incident`. Post the current burn rate
 
 ## 1. Triage (under 10 min)
 
-Open the Grafana dashboard **NBE DMS — Python Service**. Check:
+Open the Grafana dashboard **ZorDMS — Python Service**. Check:
 
 - [ ] Which endpoint is spiking 5xx? (`sum by (path)(rate(dms_http_requests_total{status=~"5.."}[5m]))`)
 - [ ] Which pod? (`kube_pod_status_phase`)
 - [ ] Database latency? (`pg_stat_activity` / RDS dashboard)
-- [ ] Any recent deploy? `kubectl rollout history deploy/dms-python -n nbe-dms`
+- [ ] Any recent deploy? `kubectl rollout history deploy/dms-python -n zordms`
 
 ## 2. Common causes and fixes
 
@@ -31,14 +31,14 @@ Open the Grafana dashboard **NBE DMS — Python Service**. Check:
 
 ```bash
 # Scale out immediately
-kubectl scale deploy/dms-python -n nbe-dms --replicas=6
+kubectl scale deploy/dms-python -n zordms --replicas=6
 
 # Temporarily shed non-critical traffic via ingress rate limit (annotation already present)
-kubectl annotate ingress dms-python -n nbe-dms \
+kubectl annotate ingress dms-python -n zordms \
   nginx.ingress.kubernetes.io/limit-rpm=300 --overwrite
 
 # Roll back last deploy if correlated with incident
-kubectl rollout undo deploy/dms-python -n nbe-dms
+kubectl rollout undo deploy/dms-python -n zordms
 ```
 
 ## 4. Mitigations (risky — get second pair of eyes)

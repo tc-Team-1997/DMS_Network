@@ -42,11 +42,11 @@ def _normalize(event: dict[str, Any]) -> dict[str, Any]:
             "kind": "event",
             "category": "process",
             "action": event.get("type", "unknown"),
-            "dataset": "nbe.dms",
+            "dataset": "zordms",
         },
-        "service": {"name": "nbe-dms-python"},
+        "service": {"name": "zordms-python"},
         "labels": {k: v for k, v in event.items() if k != "type" and isinstance(v, (str, int, float, bool))},
-        "nbe": event,
+        "zordms": event,
     }
 
 
@@ -62,7 +62,7 @@ def _splunk_send(record: dict) -> bool:
         return False
     try:
         payload = {"time": int(time.time()), "sourcetype": "_json",
-                   "source": "nbe-dms", "event": record}
+                   "source": "zordms", "event": record}
         with httpx.Client(timeout=2.0, verify=True) as c:
             r = c.post(url, headers={"Authorization": f"Splunk {tok}"}, json=payload)
             return 200 <= r.status_code < 300
@@ -72,7 +72,7 @@ def _splunk_send(record: dict) -> bool:
 
 def _elastic_send(record: dict) -> bool:
     url = os.environ.get("SIEM_ELASTIC_URL", "").strip()
-    index = os.environ.get("SIEM_ELASTIC_INDEX", "nbe-dms-audit").strip()
+    index = os.environ.get("SIEM_ELASTIC_INDEX", "zordms-audit").strip()
     key = os.environ.get("SIEM_ELASTIC_API_KEY", "").strip()
     if not url:
         return False
@@ -93,7 +93,7 @@ def _syslog_send(record: dict) -> bool:
     if not host:
         return False
     try:
-        msg = f"<134>1 {record['@timestamp']} nbe-dms app - - - {json.dumps(record)}"
+        msg = f"<134>1 {record['@timestamp']} zordms app - - - {json.dumps(record)}"
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(msg.encode("utf-8"), (host, port))
         return True

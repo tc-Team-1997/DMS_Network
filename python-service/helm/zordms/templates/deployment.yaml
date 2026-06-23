@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "nbe-dms.fullname" . }}
-  labels: {{- include "nbe-dms.labels" . | nindent 4 }}
+  name: {{ include "zordms.fullname" . }}
+  labels: {{- include "zordms.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
-    matchLabels: {app.kubernetes.io/name: {{ include "nbe-dms.name" . }}, app.kubernetes.io/instance: {{ .Release.Name }}}
+    matchLabels: {app.kubernetes.io/name: {{ include "zordms.name" . }}, app.kubernetes.io/instance: {{ .Release.Name }}}
   template:
     metadata:
-      labels: {app.kubernetes.io/name: {{ include "nbe-dms.name" . }}, app.kubernetes.io/instance: {{ .Release.Name }}}
+      labels: {app.kubernetes.io/name: {{ include "zordms.name" . }}, app.kubernetes.io/instance: {{ .Release.Name }}}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.service.port }}"
@@ -27,7 +27,7 @@ spec:
             - {name: {{ $k }}, value: "{{ $v }}"}
             {{- end }}
           envFrom:
-            - secretRef: {name: {{ include "nbe-dms.fullname" . }}-secrets}
+            - secretRef: {name: {{ include "zordms.fullname" . }}-secrets}
           readinessProbe: {httpGet: {path: /health, port: {{ .Values.service.port }}}, initialDelaySeconds: 5, periodSeconds: 10}
           livenessProbe:  {httpGet: {path: /health, port: {{ .Values.service.port }}}, initialDelaySeconds: 20, periodSeconds: 30}
           resources: {{- toYaml .Values.resources | nindent 12 }}
@@ -37,5 +37,5 @@ spec:
       {{- if .Values.persistence.enabled }}
       volumes:
         - name: data
-          persistentVolumeClaim: {claimName: {{ include "nbe-dms.fullname" . }}-data}
+          persistentVolumeClaim: {claimName: {{ include "zordms.fullname" . }}-data}
       {{- end }}

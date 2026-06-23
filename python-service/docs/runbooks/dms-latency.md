@@ -17,11 +17,11 @@ Grafana → `histogram_quantile(0.95, sum by (path, le) (rate(dms_http_request_s
 
 ## 3. Generic mitigations
 
-- Scale pods: `kubectl scale deploy/dms-python --replicas=+2 -n nbe-dms`
+- Scale pods: `kubectl scale deploy/dms-python --replicas=+2 -n zordms`
 - Bounce pods to shake loose bad connections: `kubectl rollout restart deploy/dms-python`
 - If a single noisy tenant: apply per-tenant rate limit (WAF has per-IP, extend to `X-Tenant`)
 
 ## 4. Post-event
 
 Open a perf ticket if it recurs more than twice in a week. Re-run k6:
-`k6 run -e BASE_URL=https://dms.nbe.local -e API_KEY=$KEY loadtest/k6.js`
+`k6 run -e BASE_URL=https://dms.zordms.local -e API_KEY=$KEY loadtest/k6.js`

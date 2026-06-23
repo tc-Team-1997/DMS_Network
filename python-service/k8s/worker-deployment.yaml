@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dms-python-worker
-  namespace: nbe-dms
+  namespace: zordms
   labels: {app: dms-python-worker}
 spec:
   replicas: 2
@@ -14,14 +14,14 @@ spec:
     spec:
       containers:
         - name: worker
-          image: nbe/dms-python-worker:latest
+          image: zordms/dms-python-worker:latest
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef: {name: dms-python-config}
             - secretRef: {name: dms-python-secrets}
           env:
             - name: REDIS_URL
-              value: "redis://redis.nbe-dms.svc:6379/0"
+              value: "redis://redis.zordms.svc:6379/0"
             - name: RQ_QUEUE
               value: "dms-default"
           resources:

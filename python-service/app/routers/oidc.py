@@ -26,7 +26,7 @@ def jwks():
 # ---------- Authorization (login + consent) ----------
 _LOGIN_HTML = """
 <!doctype html><html><body style="font-family:sans-serif;background:#0a1628;color:#e8eef6;padding:40px">
-<h2 style="color:#e8c96b">NBE DMS — Partner Sign-in</h2>
+<h2 style="color:#e8c96b">ZorDMS — Partner Sign-in</h2>
 <p>Grant <b>{client}</b> access to scopes: <code>{scope}</code></p>
 <form method="post" style="max-width:360px">
   <label>Username<br><input name="username" value="sara.k"/></label><br>
@@ -135,7 +135,7 @@ def userinfo(authorization: str = Header(default="")):
         "sub": claims.get("sub"),
         "tenant": claims.get("tenant"),
         "name": claims.get("sub"),
-        "email": f"{claims.get('sub')}@nbe.local",
+        "email": f"{claims.get('sub')}@zordms.local",
         "branch": u.get("branch"),
         "roles": u.get("roles", []),
     }

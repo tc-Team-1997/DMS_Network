@@ -2,7 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: dms-slo-burn-rates
-  namespace: nbe-dms
+  namespace: zordms
   labels:
     prometheus: main
     role: alert-rules
@@ -33,7 +33,7 @@ spec:
           labels: {severity: page, slo: availability, burn: fast}
           annotations:
             summary: "DMS availability burning 14.4× budget (1h)"
-            runbook_url: "https://nbe.local/runbooks/dms-availability"
+            runbook_url: "https://zordms.local/runbooks/dms-availability"
 
         - alert: DmsAvailabilitySlowBurn
           expr: |
@@ -42,7 +42,7 @@ spec:
           labels: {severity: ticket, slo: availability, burn: slow}
           annotations:
             summary: "DMS availability burning 6× budget (6h)"
-            runbook_url: "https://nbe.local/runbooks/dms-availability"
+            runbook_url: "https://zordms.local/runbooks/dms-availability"
 
     - name: dms-latency
       interval: 30s
@@ -57,7 +57,7 @@ spec:
           labels: {severity: page, slo: latency}
           annotations:
             summary: "p95 latency > 500ms for 10m"
-            runbook_url: "https://nbe.local/runbooks/dms-latency"
+            runbook_url: "https://zordms.local/runbooks/dms-latency"
 
     - name: dms-ocr
       interval: 1m

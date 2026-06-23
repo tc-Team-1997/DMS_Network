@@ -11,7 +11,7 @@ provider "aws" {
   region = var.dr_region
   default_tags {
     tags = {
-      Project     = "nbe-dms"
+      Project     = "zordms"
       ManagedBy   = "terraform"
       Environment = var.environment
       Role        = "dr"

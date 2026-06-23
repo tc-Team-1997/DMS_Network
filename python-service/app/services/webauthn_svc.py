@@ -26,9 +26,9 @@ from sqlalchemy.orm import Session
 from ..models import WebAuthnCredential, StepUpChallenge
 
 
-RP_ID = os.environ.get("WEBAUTHN_RP_ID", "dms.nbe.local")
-RP_NAME = os.environ.get("WEBAUTHN_RP_NAME", "NBE DMS")
-ORIGIN = os.environ.get("WEBAUTHN_ORIGIN", "https://dms.nbe.local")
+RP_ID = os.environ.get("WEBAUTHN_RP_ID", "dms.zordms.local")
+RP_NAME = os.environ.get("WEBAUTHN_RP_NAME", "ZorDMS")
+ORIGIN = os.environ.get("WEBAUTHN_ORIGIN", "https://dms.zordms.local")
 CHALLENGE_TTL_MIN = 5
 
 

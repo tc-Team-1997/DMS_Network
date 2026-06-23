@@ -38,8 +38,8 @@ SMS_TOKEN = os.environ.get("SMS_TOKEN", "").strip()
 
 
 TEMPLATES = {
-    ("en", 90): "Dear {{name}}, your {{doc_type}} with NBE expires on {{expiry}} — renew anytime before then to avoid service interruption.",
-    ("en", 60): "Reminder: your {{doc_type}} expires in ~60 days ({{expiry}}). Visit any NBE branch or reply to book a renewal appointment.",
+    ("en", 90): "Dear {{name}}, your {{doc_type}} with ZorDMS expires on {{expiry}} — renew anytime before then to avoid service interruption.",
+    ("en", 60): "Reminder: your {{doc_type}} expires in ~60 days ({{expiry}}). Visit any ZorDMS branch or reply to book a renewal appointment.",
     ("en", 30): "Only 30 days left before your {{doc_type}} expires ({{expiry}}). Please bring the renewed copy to your branch.",
     ("en", 7):  "Urgent: your {{doc_type}} expires in a week on {{expiry}}. After that date your account services may be suspended.",
     ("en", 0):  "Your {{doc_type}} EXPIRED on {{expiry}}. Please renew immediately to restore banking services.",

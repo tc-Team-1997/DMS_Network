@@ -8,7 +8,7 @@ receivers:
       http: {endpoint: 0.0.0.0:4318}
 
   filelog:
-    include: [/var/log/pods/nbe-dms*/**/*.log]
+    include: [/var/log/pods/zordms*/**/*.log]
     start_at: end
     include_file_path: true
     operators:
@@ -24,7 +24,7 @@ receivers:
         - job_name: "dms-python"
           scrape_interval: 15s
           static_configs:
-            - targets: ["dms-python.nbe-dms.svc:8000"]
+            - targets: ["dms-python.zordms.svc:8000"]
           metrics_path: /metrics
 
 processors:
@@ -33,7 +33,7 @@ processors:
   resource:
     attributes:
       - {key: deployment.environment, value: "${env:APP_ENV}", action: upsert}
-      - {key: service.namespace, value: "nbe-dms", action: upsert}
+      - {key: service.namespace, value: "zordms", action: upsert}
   attributes/pii:
     actions:
       - {key: customer_cid, action: delete}

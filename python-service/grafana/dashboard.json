@@ -1,9 +1,9 @@
 {
   "annotations": {"list": []},
-  "title": "NBE DMS — Python Service",
-  "uid": "nbe-dms-python",
+  "title": "ZorDMS — Python Service",
+  "uid": "zordms-python",
   "schemaVersion": 38,
-  "tags": ["nbe", "dms"],
+  "tags": ["zordms", "dms"],
   "timezone": "",
   "refresh": "30s",
   "time": {"from": "now-6h", "to": "now"},

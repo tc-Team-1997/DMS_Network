@@ -106,7 +106,7 @@ export function openSigPad({ documentId, onDone }) {
       strokes: strokes.map((s) => s.map((p) => [Math.round(p.x), Math.round(p.y),
                                                 Math.round((p.p || 0.5) * 100)])),
     };
-    const apiKey = document.querySelector('meta[name="nbe-api-key"]')?.content || "";
+    const apiKey = document.querySelector('meta[name="zordms-api-key"]')?.content || "";
     const r = await fetch(`/api/v1/signatures/${documentId}/ink`, {
       method: "POST",
       headers: { "X-API-Key": apiKey, "Content-Type": "application/json" },
@@ -139,5 +139,5 @@ export function openSigPad({ documentId, onDone }) {
 }
 
 if (typeof window !== "undefined") {
-  window.NBE_SigPad = { openSigPad };
+  window.ZorDMS_SigPad = { openSigPad };
 }

@@ -1,4 +1,4 @@
-# NBE DMS — Python Microservice
+# ZorDMS — Python Microservice
 
 FastAPI microservice that implements the architecture in `DMS Architecture.pdf`:
 Document Service, OCR Engine (AI), Workflow Engine, Search, Integration Layer, Duplicate Detection.
@@ -268,10 +268,10 @@ kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/
 ```
 
-Helm chart at [helm/nbe-dms/](helm/nbe-dms/):
+Helm chart at [helm/zordms/](helm/zordms/):
 
 ```bash
-helm install dms ./helm/nbe-dms -n nbe-dms --create-namespace \
+helm install dms ./helm/zordms -n zordms --create-namespace \
   --set image.tag=1.0.0 \
   --set secrets.API_KEY=$(openssl rand -hex 32) \
   --set secrets.JWT_SECRET=$(openssl rand -hex 32)
@@ -300,7 +300,7 @@ FastAPI, httpx (integration calls), and SQLAlchemy. For quick local inspection:
 
 ```bash
 cd terraform
-terraform init -backend-config="bucket=nbe-dms-tf-state" \
+terraform init -backend-config="bucket=zordms-tf-state" \
                -backend-config="key=python-service/terraform.tfstate" \
                -backend-config="region=eu-west-1"
 terraform apply -var="db_password=$(openssl rand -hex 16)" -var="environment=dev"
@@ -309,7 +309,7 @@ terraform apply -var="db_password=$(openssl rand -hex 16)" -var="environment=dev
 Outputs feed directly into the Helm install:
 ```bash
 export DATABASE_URL=$(terraform output -raw database_url)
-helm upgrade --install dms ../helm/nbe-dms -n nbe-dms --create-namespace \
+helm upgrade --install dms ../helm/zordms -n zordms --create-namespace \
   --set secrets.DATABASE_URL="$DATABASE_URL"
 ```
 
@@ -349,8 +349,8 @@ Endpoints under `/saml`:
 Configure via env (Azure AD / ADFS / Okta / OneLogin compatible):
 
 ```
-SAML_SP_ENTITY_ID=https://dms.nbe.local/saml/metadata
-SAML_SP_ACS_URL=https://dms.nbe.local/saml/acs
+SAML_SP_ENTITY_ID=https://dms.zordms.local/saml/metadata
+SAML_SP_ACS_URL=https://dms.zordms.local/saml/acs
 SAML_IDP_ENTITY_ID=https://login.microsoftonline.com/<tenant>/
 SAML_IDP_SSO_URL=https://login.microsoftonline.com/<tenant>/saml2
 SAML_IDP_X509_CERT=MIID...   # PEM body, no headers
@@ -372,7 +372,7 @@ by Redis + RQ — no handler changes. Run dedicated worker pods with
 [Dockerfile.worker](Dockerfile.worker) and [k8s/worker-deployment.yaml](k8s/worker-deployment.yaml):
 
 ```bash
-docker build -f Dockerfile.worker -t nbe/dms-python-worker:latest .
+docker build -f Dockerfile.worker -t zordms/dms-python-worker:latest .
 kubectl apply -f k8s/worker-deployment.yaml
 ```
 
@@ -658,9 +658,9 @@ enforced in [routers/workflow.py](app/routers/workflow.py). Flow:
 
 Env for production:
 ```
-WEBAUTHN_RP_ID=dms.nbe.local
-WEBAUTHN_ORIGIN=https://dms.nbe.local
-WEBAUTHN_RP_NAME=NBE DMS
+WEBAUTHN_RP_ID=dms.zordms.local
+WEBAUTHN_ORIGIN=https://dms.zordms.local
+WEBAUTHN_RP_NAME=ZorDMS
 ```
 Install `webauthn` from [requirements-extras.txt](requirements-extras.txt) for full
 FIDO2 attestation/assertion verification; without it a challenge-only fallback runs
@@ -728,7 +728,7 @@ resolves scalar fields via last-writer-wins Lamport order, with append-only coll
 
 Env:
 ```
-NBE_REGION=eu-west-1        # set per region
+ZorDMS_REGION=eu-west-1        # set per region
 ```
 
 Terraform in [terraform/multi-region.tf](terraform/multi-region.tf) provisions a second
@@ -800,15 +800,15 @@ Install Arabic traineddata on the container: `apt-get install tesseract-ocr-ara`
 Set `KAFKA_BOOTSTRAP=broker-1:9092,broker-2:9092` and every `emit()` call also publishes
 to Kafka via [services/kafka_bus.py](app/services/kafka_bus.py):
 
-- Topic pattern: `nbe.dms.<event-prefix>` (e.g. `nbe.dms.document`, `nbe.dms.workflow`,
-  `nbe.dms.fraud`); override the prefix with `KAFKA_TOPIC_PREFIX`.
+- Topic pattern: `zordms.<event-prefix>` (e.g. `zordms.document`, `zordms.workflow`,
+  `zordms.fraud`); override the prefix with `KAFKA_TOPIC_PREFIX`.
 - Key: `document_id` (so per-doc ordering holds).
 - Value: ECS-normalized JSON identical to SIEM.
 - Idempotence + zstd compression + ack=all by default; silent no-op if
   `confluent-kafka` isn't installed or the broker is unreachable.
 
 Downstream consumers (BI ETL, fraud model trainer, data-lake sink) just subscribe to
-`nbe.dms.*` and don't need any coupling to the DMS.
+`zordms.*` and don't need any coupling to the DMS.
 
 ## Differential-privacy analytics
 
@@ -1121,13 +1121,13 @@ emits `remediation.applied` so audit trails stay reconstructible.
 ## Air-gap installer bundle
 
 [scripts/build_airgap.sh](scripts/build_airgap.sh) produces a single `.tar.zst`
-containing everything an air-gapped NBE branch needs: docker-saved images, Python
+containing everything an air-gapped ZorDMS branch needs: docker-saved images, Python
 wheels, Helm chart, k8s manifests, SPDX SBOMs, install/verify/uninstall scripts,
 and SHA-256 checksums. Full runbook in [docs/AIRGAP.md](docs/AIRGAP.md).
 
 ```bash
 bash scripts/build_airgap.sh 1.0.0
-# ship nbe-dms-airgap-1.0.0.tar.zst on two independent USBs
+# ship zordms-airgap-1.0.0.tar.zst on two independent USBs
 ```
 
 ## FIDO2 passwordless login (portal)
@@ -1233,13 +1233,13 @@ Uses the AST, not runtime hooks — zero overhead.
 
 ## Per-tenant key isolation
 
-When the stack is multi-tenant (NBE + sister banks), each tenant gets a **distinct
+When the stack is multi-tenant (ZorDMS + sister banks), each tenant gets a **distinct
 KEK** so compromise of one tenant's data can't affect another.
 
 Config:
 ```
-TENANT_KEK_MAP='{"nbe":"arn:aws:kms:eu-west-1:...:key/nbe","audi":"arn:...audi"}'
-TENANT_LOCAL_KEKS='{"nbe":"<64-hex>","audi":"<64-hex>"}'
+TENANT_KEK_MAP='{"zordms":"arn:aws:kms:eu-west-1:...:key/zordms","audi":"arn:...audi"}'
+TENANT_LOCAL_KEKS='{"zordms":"<64-hex>","audi":"<64-hex>"}'
 ```
 
 Endpoints (admin):
@@ -1253,7 +1253,7 @@ Falls back to the bank-wide KEK when no per-tenant mapping is set.
 ## WCAG 2.2 AAA compliance mode (opt-in)
 
 Users can toggle a stricter accessibility mode via the `AAA` button in the top
-bar (or `window.NBE_A11Y.toggle()`). Enables:
+bar (or `window.ZorDMS_A11Y.toggle()`). Enables:
 
 - Contrast ratios ≥ 7:1 for body text, ≥ 4.5:1 for large text
 - Hit targets ≥ 44×44 px (POUR 2.5.5)
@@ -1492,7 +1492,7 @@ in the provenance chain automatically.
 
 Open from anywhere in the UI:
 ```js
-window.NBE_SigPad.openSigPad({ documentId: 42, onDone: console.log });
+window.ZorDMS_SigPad.openSigPad({ documentId: 42, onDone: console.log });
 ```
 
 ## Multi-language OCR router

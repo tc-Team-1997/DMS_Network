@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from ..models import ProvenanceEvent
 
-REGION = os.environ.get("NBE_REGION", "default")
+REGION = os.environ.get("ZorDMS_REGION", "default")
 
 
 def _hash(payload: dict, hash_prev: str) -> str:
@@ -31,7 +31,7 @@ def _hash(payload: dict, hash_prev: str) -> str:
 
 
 def record(db: Session, document_id: int, kind: str, *,
-           system: str = "nbe-dms", actor: str = "system",
+           system: str = "zordms", actor: str = "system",
            parent_event_id: Optional[int] = None,
            payload: Optional[dict] = None) -> ProvenanceEvent:
     prev = (

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds a single-tarball offline installer:
-#   nbe-dms-airgap-<version>.tar.zst
+#   zordms-airgap-<version>.tar.zst
 #
 # Contents:
 #   images/            docker save of api + worker + required deps (postgres, redis, es)
@@ -20,8 +20,8 @@ rm -rf "$OUT" && mkdir -p "$OUT"/{images,charts,wheels,manifests,scripts,sboms}
 
 # 1. Docker images (pin exact digests so the install is reproducible)
 IMAGES=(
-  "nbe/dms-python:$VERSION"
-  "nbe/dms-python-worker:$VERSION"
+  "zordms/dms-python:$VERSION"
+  "zordms/dms-python-worker:$VERSION"
   "postgres:16.3-alpine"
   "redis:7.2-alpine"
   "docker.elastic.co/elasticsearch/elasticsearch:8.13.4"
@@ -35,10 +35,10 @@ for img in "${IMAGES[@]}"; do
 done
 
 # 2. Helm chart
-cp -r helm/nbe-dms "$OUT/charts/"
+cp -r helm/zordms "$OUT/charts/"
 cat > "$OUT/charts/values-airgap.yaml" <<'YAML'
 image:
-  repository: localhost:5000/nbe/dms-python
+  repository: localhost:5000/zordms/dms-python
   pullPolicy: IfNotPresent
 ingress: {enabled: false}
 serviceMonitor: {enabled: false}
@@ -82,17 +82,17 @@ for t in images/*.tar; do
   docker push "localhost:5000/$name"
 done
 echo ">>> Helm upgrade"
-helm upgrade --install dms charts/nbe-dms -f charts/values-airgap.yaml \
-  --namespace nbe-dms --create-namespace
-kubectl apply -f manifests/ -n nbe-dms || true
-echo ">>> Done. Check: kubectl -n nbe-dms get pods"
+helm upgrade --install dms charts/zordms -f charts/values-airgap.yaml \
+  --namespace zordms --create-namespace
+kubectl apply -f manifests/ -n zordms || true
+echo ">>> Done. Check: kubectl -n zordms get pods"
 BASH
 chmod +x "$OUT/scripts/install.sh"
 
 cat > "$OUT/scripts/verify.sh" <<'BASH'
 #!/usr/bin/env bash
 set -euo pipefail
-kubectl -n nbe-dms rollout status deploy/dms-python
+kubectl -n zordms rollout status deploy/dms-python
 curl -f -H "X-API-Key: ${API_KEY:-dev-key-change-me}" http://localhost:8000/health
 BASH
 chmod +x "$OUT/scripts/verify.sh"
@@ -100,8 +100,8 @@ chmod +x "$OUT/scripts/verify.sh"
 cat > "$OUT/scripts/uninstall.sh" <<'BASH'
 #!/usr/bin/env bash
 set -euo pipefail
-helm uninstall dms -n nbe-dms || true
-kubectl delete ns nbe-dms || true
+helm uninstall dms -n zordms || true
+kubectl delete ns zordms || true
 BASH
 chmod +x "$OUT/scripts/uninstall.sh"
 
@@ -109,6 +109,6 @@ chmod +x "$OUT/scripts/uninstall.sh"
 (cd "$OUT" && find . -type f ! -name checksums.txt -print0 | xargs -0 sha256sum > checksums.txt)
 
 # 8. Compress
-tar -I 'zstd -19 -T0' -cvf "nbe-dms-airgap-$VERSION.tar.zst" "$OUT"
-ls -lh "nbe-dms-airgap-$VERSION.tar.zst"
-echo "Built nbe-dms-airgap-$VERSION.tar.zst — ship on USB / WORM media to the airgap site."
+tar -I 'zstd -19 -T0' -cvf "zordms-airgap-$VERSION.tar.zst" "$OUT"
+ls -lh "zordms-airgap-$VERSION.tar.zst"
+echo "Built zordms-airgap-$VERSION.tar.zst — ship on USB / WORM media to the airgap site."

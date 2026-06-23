@@ -1,5 +1,5 @@
 // Lightweight guided tour engine — zero dependencies, WCAG-aware.
-// Usage:  NBE_Tour.start("dashboard")
+// Usage:  ZorDMS_Tour.start("dashboard")
 
 const TOURS = {
   dashboard: [
@@ -22,7 +22,7 @@ const TOURS = {
   ],
 };
 
-const SEEN_KEY = "nbe.dms.tours_seen";
+const SEEN_KEY = "zordms.tours_seen";
 const seen = () => JSON.parse(localStorage.getItem(SEEN_KEY) || "{}");
 const markSeen = (name) => {
   const s = seen(); s[name] = Date.now();
@@ -116,5 +116,5 @@ export function maybeAutoStart(name) {
 }
 
 if (typeof window !== "undefined") {
-  window.NBE_Tour = { start, maybeAutoStart };
+  window.ZorDMS_Tour = { start, maybeAutoStart };
 }

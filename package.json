@@ -1,7 +1,7 @@
 {
-  "name": "nbe-dms",
+  "name": "zordms",
   "version": "1.0.0",
-  "description": "National Bank of Egypt - Document Management System",
+  "description": "ZorDMS - Document Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

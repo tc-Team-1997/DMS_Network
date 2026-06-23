@@ -5,8 +5,8 @@ to a JWT (tenant/branch/roles) so the rest of the app keeps using the existing
 JWT auth flow unchanged.
 
 Required env (Settings JSON is built dynamically from these to keep ops simple):
-    SAML_SP_ENTITY_ID         e.g. https://dms.nbe.local/saml/metadata
-    SAML_SP_ACS_URL           e.g. https://dms.nbe.local/saml/acs
+    SAML_SP_ENTITY_ID         e.g. https://dms.zordms.local/saml/metadata
+    SAML_SP_ACS_URL           e.g. https://dms.zordms.local/saml/acs
     SAML_IDP_ENTITY_ID        from IdP
     SAML_IDP_SSO_URL          from IdP
     SAML_IDP_X509_CERT        PEM body, no headers, single line OK

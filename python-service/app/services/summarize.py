@@ -16,7 +16,7 @@ from ..models import Document, OcrResult, EFormSubmission
 
 
 PROMPT_HEADER = (
-    "You are a loan underwriter assistant at National Bank of Egypt. Read the document "
+    "You are a loan underwriter assistant at ZorDMS. Read the document "
     "extracts below and produce a 1-page brief with these sections:\n"
     "  ### Applicant\n"
     "  ### Documents on file\n"

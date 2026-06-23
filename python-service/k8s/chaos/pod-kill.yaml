@@ -4,10 +4,10 @@ apiVersion: litmuschaos.io/v1alpha1
 kind: ChaosEngine
 metadata:
   name: dms-pod-kill
-  namespace: nbe-dms
+  namespace: zordms
 spec:
   appinfo:
-    appns: nbe-dms
+    appns: zordms
     applabel: "app=dms-python"
     appkind: deployment
   chaosServiceAccount: litmus-admin
@@ -30,7 +30,7 @@ spec:
               interval: 10
               stopOnFailure: false
             httpProbe/inputs:
-              url: http://dms-python.nbe-dms.svc:8000/health
+              url: http://dms-python.zordms.svc:8000/health
               insecureSkipVerify: true
               method:
                 get:

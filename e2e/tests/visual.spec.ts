@@ -50,7 +50,7 @@ for (const screen of SCREENS) {
 test("visual — guided tour overlay", async ({ page }) => {
   await page.goto("/");
   await page.waitForTimeout(200);
-  await page.evaluate(() => (window as any).NBE_Tour.start("dashboard"));
+  await page.evaluate(() => (window as any).ZorDMS_Tour.start("dashboard"));
   await page.waitForSelector(".tour-pop");
   await expect(page).toHaveScreenshot("guided-tour.png", { maxDiffPixelRatio: 0.003 });
 });

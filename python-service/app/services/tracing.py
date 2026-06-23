@@ -5,7 +5,7 @@ to any collector: Jaeger, Tempo, Honeycomb, Datadog via OTLP, etc.
 
 Env:
     OTEL_EXPORTER_OTLP_ENDPOINT   e.g. http://otel-collector:4318
-    OTEL_SERVICE_NAME             default "nbe-dms-python"
+    OTEL_SERVICE_NAME             default "zordms-python"
     OTEL_TRACES_EXPORTER          "otlp" (default) | "console"
 """
 import os
@@ -30,7 +30,7 @@ def setup_tracing(app, engine) -> bool:
         return False
 
     resource = Resource.create({
-        SERVICE_NAME: os.environ.get("OTEL_SERVICE_NAME", "nbe-dms-python"),
+        SERVICE_NAME: os.environ.get("OTEL_SERVICE_NAME", "zordms-python"),
         "deployment.environment": os.environ.get("APP_ENV", "dev"),
     })
     provider = TracerProvider(resource=resource)

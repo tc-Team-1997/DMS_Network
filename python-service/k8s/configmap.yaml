@@ -2,14 +2,14 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dms-python-config
-  namespace: nbe-dms
+  namespace: zordms
 data:
   APP_ENV: "prod"
   STORAGE_DIR: "/data/documents"
   TESSERACT_CMD: "/usr/bin/tesseract"
   ELASTICSEARCH_URL: "http://elasticsearch:9200"
   ELASTICSEARCH_INDEX: "dms_documents"
-  CBS_BASE_URL: "http://cbs-mock.nbe-dms.svc:8080/api"
-  LOS_BASE_URL: "http://los-mock.nbe-dms.svc:8080/api"
-  AML_BASE_URL: "http://aml-mock.nbe-dms.svc:8080/api"
-  IFRS9_BASE_URL: "http://ifrs9-mock.nbe-dms.svc:8080/api"
+  CBS_BASE_URL: "http://cbs-mock.zordms.svc:8080/api"
+  LOS_BASE_URL: "http://los-mock.zordms.svc:8080/api"
+  AML_BASE_URL: "http://aml-mock.zordms.svc:8080/api"
+  IFRS9_BASE_URL: "http://ifrs9-mock.zordms.svc:8080/api"

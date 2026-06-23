@@ -1,4 +1,4 @@
-# NBE DMS — Disaster Recovery Runbook
+# ZorDMS — Disaster Recovery Runbook
 
 **Scope**: Python microservice + Postgres metadata + S3 document store + Redis queue.
 **RPO target**: ≤ 15 min · **RTO target**: ≤ 30 min · **Drill cadence**: quarterly.
@@ -9,10 +9,10 @@
 
 | Component         | Primary (eu-west-1)            | DR (eu-central-1)                 | Replication                     |
 |-------------------|--------------------------------|-----------------------------------|---------------------------------|
-| EKS cluster       | `nbe-dms-prod-eks`             | `nbe-dms-prod-eks-dr` (pilot)     | GitOps — ArgoCD, same manifests |
-| RDS Postgres 16   | `nbe-dms-prod-db`              | `nbe-dms-prod-db-dr` (replica)    | Cross-region read replica       |
-| S3 documents      | `nbe-dms-prod-docs-<hex>`      | `…-docs-dr-<hex>`                 | Cross-region replication        |
-| ElastiCache Redis | `nbe-dms-prod-redis`           | Rebuilt on failover               | N/A (ephemeral queue)           |
+| EKS cluster       | `zordms-prod-eks`             | `zordms-prod-eks-dr` (pilot)     | GitOps — ArgoCD, same manifests |
+| RDS Postgres 16   | `zordms-prod-db`              | `zordms-prod-db-dr` (replica)    | Cross-region read replica       |
+| S3 documents      | `zordms-prod-docs-<hex>`      | `…-docs-dr-<hex>`                 | Cross-region replication        |
+| ElastiCache Redis | `zordms-prod-redis`           | Rebuilt on failover               | N/A (ephemeral queue)           |
 | Secrets           | Secrets Manager eu-west-1      | Replica in eu-central-1           | Automatic via replica config    |
 
 Provisioned via [terraform/dr.tf](../terraform/dr.tf).
@@ -36,11 +36,11 @@ Call it via the on-call bridge. DR commander is **Head of Infrastructure**; back
 ### T+0 — Declare and freeze
 - [ ] Page `#dms-oncall` Slack channel; start incident Zoom
 - [ ] Update status page → "Investigating"
-- [ ] **Freeze writes**: `kubectl scale deploy/dms-nbe-dms --replicas=0 -n nbe-dms` (primary region)
+- [ ] **Freeze writes**: `kubectl scale deploy/dms-zordms --replicas=0 -n zordms` (primary region)
 - [ ] Confirm last successful backup timestamp in RDS console
 
 ### T+5 — Promote database
-- [ ] In eu-central-1 RDS console: **Promote** `nbe-dms-prod-db-dr` → standalone primary
+- [ ] In eu-central-1 RDS console: **Promote** `zordms-prod-db-dr` → standalone primary
 - [ ] Verify: `psql -h <new-primary> -c 'SELECT now();'`
 - [ ] Capture new endpoint → update Secrets Manager `APP_DATABASE_URL` in DR region
 
@@ -50,16 +50,16 @@ Call it via the on-call bridge. DR commander is **Head of Infrastructure**; back
 - [ ] If app reads from S3 via env `STORAGE_S3_BUCKET`, update it to DR bucket name
 
 ### T+15 — Deploy app in DR
-- [ ] `aws eks update-kubeconfig --region eu-central-1 --name nbe-dms-prod-eks-dr`
-- [ ] `helm upgrade --install dms ./helm/nbe-dms -n nbe-dms --create-namespace \`
+- [ ] `aws eks update-kubeconfig --region eu-central-1 --name zordms-prod-eks-dr`
+- [ ] `helm upgrade --install dms ./helm/zordms -n zordms --create-namespace \`
       `  --set image.tag=<last-known-good>` \
       `  --set secrets.DATABASE_URL=$NEW_DB_URL \`
       `  --set env.STORAGE_S3_BUCKET=<dr-bucket>`
-- [ ] `kubectl rollout status deploy/dms-nbe-dms -n nbe-dms --timeout=10m`
+- [ ] `kubectl rollout status deploy/dms-zordms -n zordms --timeout=10m`
 
 ### T+20 — DNS switch
-- [ ] Route 53 weighted record `dms.nbe.local` → shift 100% to DR ALB
-- [ ] Confirm `curl https://dms.nbe.local/health` returns 200 from DR
+- [ ] Route 53 weighted record `dms.zordms.local` → shift 100% to DR ALB
+- [ ] Confirm `curl https://dms.zordms.local/health` returns 200 from DR
 - [ ] Flush CDN / Cloudflare cache if applicable
 
 ### T+25 — Validate

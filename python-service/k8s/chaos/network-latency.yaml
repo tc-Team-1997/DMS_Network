@@ -3,10 +3,10 @@ apiVersion: litmuschaos.io/v1alpha1
 kind: ChaosEngine
 metadata:
   name: dms-network-latency
-  namespace: nbe-dms
+  namespace: zordms
 spec:
   appinfo:
-    appns: nbe-dms
+    appns: zordms
     applabel: "app=dms-python"
     appkind: deployment
   chaosServiceAccount: litmus-admin

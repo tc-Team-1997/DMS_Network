@@ -36,8 +36,8 @@ def _ensure_cert():
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, "EG"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "National Bank of Egypt"),
-        x509.NameAttribute(NameOID.COMMON_NAME, "NBE DMS Signer"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "ZorDMS"),
+        x509.NameAttribute(NameOID.COMMON_NAME, "ZorDMS Signer"),
     ])
     cert = (
         x509.CertificateBuilder()

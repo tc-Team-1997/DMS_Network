@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: dms-python
-  namespace: nbe-dms
+  namespace: zordms
   labels: {app: dms-python}
 spec:
   selector: {app: dms-python}

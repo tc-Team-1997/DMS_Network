@@ -34,7 +34,7 @@ def _user_handle(customer_cid: str) -> str:
     # Deterministic 32-byte handle so the authenticator can discover credentials
     # when the user types the CID on a new device.
     import hashlib
-    return hashlib.sha256(f"nbe|{customer_cid}".encode()).hexdigest()[:32]
+    return hashlib.sha256(f"zordms|{customer_cid}".encode()).hexdigest()[:32]
 
 
 # In-memory nonce store (for simplicity — fall back to DB in prod replicas).

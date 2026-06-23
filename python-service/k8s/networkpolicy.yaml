@@ -4,7 +4,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: dms-default-deny
-  namespace: nbe-dms
+  namespace: zordms
 spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
@@ -13,7 +13,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: dms-python-allow
-  namespace: nbe-dms
+  namespace: zordms
 spec:
   podSelector:
     matchLabels: {app: dms-python}

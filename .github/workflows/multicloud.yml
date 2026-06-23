@@ -77,12 +77,12 @@ jobs:
         with: {version: "v3.14.0"}
 
       - name: Helm lint (portability check)
-        run: helm lint python-service/helm/nbe-dms
+        run: helm lint python-service/helm/zordms
 
       - name: Template-render for target cloud
         if: steps.detect.outputs.skip_guard == '0'
         run: |
-          helm template dms python-service/helm/nbe-dms \
+          helm template dms python-service/helm/zordms \
             --set image.tag=latest \
             --set secrets.API_KEY=ci-key \
             --set secrets.JWT_SECRET=ci-key \
@@ -93,8 +93,8 @@ jobs:
       - name: Install + smoke test (kind only)
         if: matrix.target.cloud == 'kind' && steps.detect.outputs.skip_guard == '0'
         run: |
-          kubectl create ns nbe-dms
-          helm upgrade --install dms python-service/helm/nbe-dms -n nbe-dms \
+          kubectl create ns zordms
+          helm upgrade --install dms python-service/helm/zordms -n zordms \
             --set image.repository=python --set image.tag=3.11-slim \
             --set persistence.enabled=false \
             --set secrets.API_KEY=ci-key \
@@ -104,4 +104,4 @@ jobs:
               echo "::warning::kind install skipped — this is a portability render test, not a functional one."
               exit 0
             }
-          kubectl -n nbe-dms get pods
+          kubectl -n zordms get pods

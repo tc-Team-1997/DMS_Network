@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'nbe-dms.db'));
+const db = new Database(path.join(__dirname, 'zordms.db'));
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 db.exec(schema);
 

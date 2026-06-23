@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dms-python
-  namespace: nbe-dms
+  namespace: zordms
   labels:
     app: dms-python
 spec:
@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: nbe/dms-python:latest
+          image: zordms/dms-python:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000

@@ -49,7 +49,7 @@ const I18N = {
   },
 };
 
-const LANG_KEY = "nbe.dms.lang";
+const LANG_KEY = "zordms.lang";
 
 export function getLang() {
   return localStorage.getItem(LANG_KEY) || (navigator.language?.startsWith("ar") ? "ar" : "en");
@@ -79,6 +79,6 @@ export function applyLang() {
 }
 
 if (typeof window !== "undefined") {
-  window.NBE_I18N = { getLang, setLang, t, applyLang };
+  window.ZorDMS_I18N = { getLang, setLang, t, applyLang };
   document.addEventListener("DOMContentLoaded", applyLang);
 }

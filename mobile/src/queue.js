@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { uploadDocument, enqueueOcr } from './api';
 
-const KEY = 'nbe.dms.offline_queue';
+const KEY = 'zordms.offline_queue';
 
 export async function enqueueLocal(item) {
   const raw = await AsyncStorage.getItem(KEY);

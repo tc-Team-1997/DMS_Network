@@ -14,7 +14,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use(session({
-  secret: 'nbe-dms-secret-change-me',
+  secret: 'zordms-secret-change-me',
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 8 * 60 * 60 * 1000 }
@@ -86,4 +86,4 @@ require('./services/retention').start();
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 ws.attach(server);
-server.listen(PORT, () => console.log(`NBE DMS running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`ZorDMS running on http://localhost:${PORT}`));

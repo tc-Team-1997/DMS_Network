@@ -15,7 +15,7 @@ Env:
     AISP_ACCOUNTS_URL  (e.g. https://aspsp.example.com/open-banking/v3.1/aisp/accounts)
     AISP_CLIENT_ID
     AISP_CLIENT_SECRET
-    AISP_REDIRECT_URI  (e.g. https://dms.nbe.local/aisp/callback)
+    AISP_REDIRECT_URI  (e.g. https://dms.zordms.local/aisp/callback)
 """
 from __future__ import annotations
 import json

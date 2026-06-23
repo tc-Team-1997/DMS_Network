@@ -17,9 +17,9 @@ def sign_pdf_pades(
     pdf_path: str,
     signer_name: str,
     reason: str = "Approved",
-    location: str = "NBE DMS",
+    location: str = "ZorDMS",
     tsa_url: Optional[str] = None,
-    field_name: str = "NBE-Signature-1",
+    field_name: str = "ZorDMS-Signature-1",
 ) -> dict:
     """Produce a PAdES-B-LT / PAdES-B-T signature inside the PDF."""
     _ensure_cert()

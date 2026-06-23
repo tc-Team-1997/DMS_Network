@@ -91,5 +91,5 @@ export async function classifyFile(file) {
 }
 
 if (typeof window !== "undefined") {
-  window.NBE_DocClassifier = { classifyFile };
+  window.ZorDMS_DocClassifier = { classifyFile };
 }

@@ -1,5 +1,5 @@
 image:
-  repository: nbe/dms-python
+  repository: zordms/dms-python
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -12,10 +12,10 @@ service:
 ingress:
   enabled: true
   className: nginx
-  host: dms.nbe.local
+  host: dms.zordms.local
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
-    nginx.ingress.kubernetes.io/websocket-services: "{{ include \"nbe-dms.fullname\" . }}"
+    nginx.ingress.kubernetes.io/websocket-services: "{{ include \"zordms.fullname\" . }}"
 
 persistence:
   enabled: true

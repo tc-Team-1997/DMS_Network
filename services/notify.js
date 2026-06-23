@@ -11,7 +11,7 @@ async function notify(userId, channel, subject, body) {
   try {
     if (channel === 'email' && user.email) {
       const info = await transport.sendMail({
-        from: 'dms@nbe.local',
+        from: 'dms@zordms.local',
         to: user.email,
         subject,
         text: body

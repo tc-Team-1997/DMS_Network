@@ -79,10 +79,10 @@ def _scan_references() -> dict[str, dict[str, list[str]]]:
 
 def _openlineage_dataset(table: str, cols: list[str]) -> dict:
     return {
-        "name": f"nbe_dms.{table}",
-        "namespace": "postgresql://nbe-dms",
+        "name": f"zordms.{table}",
+        "namespace": "postgresql://zordms",
         "facets": {
-            "schema": {"_producer": "nbe-dms",
+            "schema": {"_producer": "zordms",
                        "fields": [{"name": c, "type": "STRING"} for c in cols]}
         },
     }

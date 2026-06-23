@@ -54,7 +54,7 @@ def verify(doc_id: int, db: Session = Depends(get_db)):
 class PadesIn(BaseModel):
     signer: str
     reason: str = "Approved"
-    location: str = "NBE DMS"
+    location: str = "ZorDMS"
     tsa_url: str | None = None
 
 

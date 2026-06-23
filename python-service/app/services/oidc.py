@@ -31,7 +31,7 @@ KEYS_DIR = Path(settings.STORAGE_DIR).parent / "keys"
 KEYS_DIR.mkdir(parents=True, exist_ok=True)
 OIDC_PRIV = KEYS_DIR / "oidc.key.pem"
 OIDC_PUB = KEYS_DIR / "oidc.pub.pem"
-KID = os.environ.get("OIDC_KID", "nbe-dms-oidc-1")
+KID = os.environ.get("OIDC_KID", "zordms-oidc-1")
 
 ID_TOKEN_TTL_MIN = 10
 ACCESS_TOKEN_TTL_MIN = 60

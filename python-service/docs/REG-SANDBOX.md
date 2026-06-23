@@ -1,13 +1,13 @@
 # CBE Regulatory Sandbox — Submission Pack
 
 Reference pack for applying to the **Central Bank of Egypt FinTech & Innovation
-Regulatory Sandbox** (Regulation No. 22/2022) with the NBE DMS stack.
+Regulatory Sandbox** (Regulation No. 22/2022) with the ZorDMS stack.
 
 ## 1. Cover brief (1 page)
 
 - **Innovation**: AI-assisted document lifecycle management with on-chain
   anchoring, federated fraud learning, and zero-knowledge KYC proofs.
-- **Target users**: NBE branches, NBE customers (portal), partner fintechs
+- **Target users**: ZorDMS branches, ZorDMS customers (portal), partner fintechs
   (OIDC / verifiable KYC claims).
 - **Problem solved**: weeks-long manual KYC refresh cycles; duplicated customer
   files across branches; AML false-positive tuning without cross-branch data
@@ -61,7 +61,7 @@ CBE Supervisors receive a read-only OIDC client (`cli_cbe_supervisor`) scoped to
 `openid profile email audit:read`. Issue via:
 
 ```bash
-curl -X POST http://dms.nbe.local/oidc/clients \
+curl -X POST http://dms.zordms.local/oidc/clients \
   -F "name=CBE Supervisor (sandbox cohort 2026)" \
   -F "redirect_uri=https://cbe.gov.eg/sso/callback" \
   -F "scopes=openid profile email audit:read"

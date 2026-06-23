@@ -67,8 +67,8 @@ jobs:
         with: {version: "v3.14.0"}
       - name: Helm upgrade
         run: |
-          helm upgrade --install dms python-service/helm/nbe-dms \
-            --namespace nbe-dms --create-namespace \
+          helm upgrade --install dms python-service/helm/zordms \
+            --namespace zordms --create-namespace \
             --set image.repository=${{ env.IMAGE_NAME }} \
             --set image.tag=${{ needs.build-and-push.outputs.image_tag }} \
             --set secrets.API_KEY=${{ secrets.APP_API_KEY }} \
@@ -76,4 +76,4 @@ jobs:
             --set secrets.DATABASE_URL=${{ secrets.APP_DATABASE_URL }} \
             --atomic --wait --timeout 10m
       - name: Verify rollout
-        run: kubectl rollout status deploy/dms-nbe-dms -n nbe-dms --timeout=5m
+        run: kubectl rollout status deploy/dms-zordms -n zordms --timeout=5m

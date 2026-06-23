@@ -8,7 +8,7 @@ terraform {
   }
   backend "s3" {
     # Configure via `terraform init -backend-config=...` in CI.
-    # bucket  = "nbe-dms-tf-state"
+    # bucket  = "zordms-tf-state"
     # key     = "python-service/terraform.tfstate"
     # region  = "eu-west-1"
     # encrypt = true
@@ -19,7 +19,7 @@ provider "aws" {
   region = var.region
   default_tags {
     tags = {
-      Project     = "nbe-dms"
+      Project     = "zordms"
       ManagedBy   = "terraform"
       Environment = var.environment
     }

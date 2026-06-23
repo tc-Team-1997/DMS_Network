@@ -2,7 +2,7 @@
 
     python scripts/journey_run.py                       # run all
     python scripts/journey_run.py branch_onboarding
-    BASE=http://dms.nbe.local:443 python scripts/journey_run.py
+    BASE=http://dms.zordms.local:443 python scripts/journey_run.py
 """
 import json, os, sys
 from pathlib import Path

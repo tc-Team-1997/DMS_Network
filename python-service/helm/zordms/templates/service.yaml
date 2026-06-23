@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "nbe-dms.fullname" . }}
-  labels: {{- include "nbe-dms.labels" . | nindent 4 }}
+  name: {{ include "zordms.fullname" . }}
+  labels: {{- include "zordms.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   selector:
-    app.kubernetes.io/name: {{ include "nbe-dms.name" . }}
+    app.kubernetes.io/name: {{ include "zordms.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
     - name: http

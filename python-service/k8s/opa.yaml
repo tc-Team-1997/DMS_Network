@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: dms-opa-policies
-  namespace: nbe-dms
+  namespace: zordms
 data:
   dms.rego: |-
     # Copy of opa/policies/dms.rego — mounted as /policies into OPA sidecar.
@@ -13,7 +13,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: opa
-  namespace: nbe-dms
+  namespace: zordms
 spec:
   replicas: 2
   selector:
@@ -41,7 +41,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: opa
-  namespace: nbe-dms
+  namespace: zordms
 spec:
   selector: {app: opa}
   ports: [{port: 8181, targetPort: 8181}]

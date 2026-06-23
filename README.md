@@ -1,6 +1,6 @@
-# NBE Document Management System
+# ZorDMS Document Management System
 
-Localhost web app scaffold for the NBE DMS mockup.
+Localhost web app scaffold for the ZorDMS mockup.
 
 ## Stack
 - Node.js + Express
@@ -12,7 +12,7 @@ Localhost web app scaffold for the NBE DMS mockup.
 ## Setup
 
 ```bash
-cd C:\Users\Amit\nbe-dms
+cd C:\Users\Amit\zordms
 npm install
 node db/seed.js      # creates DB + seed data
 npm start            # http://localhost:3000
@@ -47,7 +47,7 @@ npm start            # http://localhost:3000
 
 ## Folder Layout
 ```
-nbe-dms/
+zordms/
   server.js           Express entry
   db/
     schema.sql        Tables

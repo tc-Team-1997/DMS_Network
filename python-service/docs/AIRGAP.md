@@ -1,13 +1,13 @@
 # Air-gap Deployment
 
-For NBE branches or regulator-segregated environments that never touch the public internet.
+For ZorDMS branches or regulator-segregated environments that never touch the public internet.
 
 ## Build (on a connected build host)
 
 ```bash
 cd python-service
 bash scripts/build_airgap.sh 1.0.0
-# → produces nbe-dms-airgap-1.0.0.tar.zst (~4-6 GB)
+# → produces zordms-airgap-1.0.0.tar.zst (~4-6 GB)
 ```
 
 The bundle contains:
@@ -34,8 +34,8 @@ Prereqs (must pre-exist on the host — they are NOT in the bundle intentionally
   `docker run -d -p 5000:5000 registry:2`)
 
 ```bash
-zstd -d nbe-dms-airgap-1.0.0.tar.zst -o nbe-dms-airgap.tar
-tar -xvf nbe-dms-airgap.tar
+zstd -d zordms-airgap-1.0.0.tar.zst -o zordms-airgap.tar
+tar -xvf zordms-airgap.tar
 cd airgap-bundle
 bash scripts/install.sh
 API_KEY=... bash scripts/verify.sh

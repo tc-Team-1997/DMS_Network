@@ -23,7 +23,7 @@ from ..config import settings
 
 EMBED_DIM = 384
 QDRANT_URL = os.environ.get("QDRANT_URL", "").strip()
-QDRANT_COLLECTION = os.environ.get("QDRANT_COLLECTION", "nbe_dms_ocr")
+QDRANT_COLLECTION = os.environ.get("QDRANT_COLLECTION", "zordms_ocr")
 
 
 _model = None

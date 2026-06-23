@@ -3,7 +3,7 @@
 apiVersion: policy.sigstore.dev/v1beta1
 kind: ClusterImagePolicy
 metadata:
-  name: require-nbe-dms-signed
+  name: require-zordms-signed
 spec:
   images:
     - glob: "ghcr.io/**/dms-python*"
@@ -13,7 +13,7 @@ spec:
         url: https://fulcio.sigstore.dev
         identities:
           - issuer: https://token.actions.githubusercontent.com
-            subjectRegExp: "^https://github.com/.+/nbe-dms/"
+            subjectRegExp: "^https://github.com/.+/zordms/"
         ctlog:
           url: https://rekor.sigstore.dev
       attestations:
@@ -31,6 +31,6 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: nbe-dms
+  name: zordms
   labels:
     policy.sigstore.dev/include: "true"   # opt this namespace into enforcement

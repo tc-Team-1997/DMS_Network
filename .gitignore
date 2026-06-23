@@ -1,7 +1,7 @@
 node_modules/
 uploads/*
 !uploads/.gitkeep
-db/nbe-dms.db*
+db/zordms.db*
 .env
 
 # Python
@@ -24,6 +24,6 @@ python-service/*.db
 *.pades.pdf
 *.redacted.pdf
 airgap-bundle/
-nbe-dms-airgap-*.tar.zst
+zordms-airgap-*.tar.zst
 playwright-report/
 test-results/

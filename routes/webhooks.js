@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const ws = require('../services/ws');
 
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'nbe-webhook-secret';
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'zordms-webhook-secret';
 
 function verifySignature(req, res, next) {
   const sig = req.headers['x-webhook-signature'];

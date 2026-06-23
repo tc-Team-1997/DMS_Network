@@ -1,4 +1,4 @@
-# ABAC policy for NBE DMS. Layers on top of the RBAC matrix in app/services/auth.py.
+# ABAC policy for ZorDMS. Layers on top of the RBAC matrix in app/services/auth.py.
 # Returns a structured decision: {allow: bool, reason: string}.
 package dms.authz
 

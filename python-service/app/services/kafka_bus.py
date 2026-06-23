@@ -2,8 +2,8 @@
 
 Every emit() already fans out to the local WebSocket bus + SIEM; now it also
 publishes to Kafka when KAFKA_BOOTSTRAP is configured. Topics default to
-`nbe.dms.<event-type-first-segment>` (e.g. `nbe.dms.document`, `nbe.dms.workflow`,
-`nbe.dms.fraud`) — override with the `KAFKA_TOPIC_PREFIX` env.
+`zordms.<event-type-first-segment>` (e.g. `zordms.document`, `zordms.workflow`,
+`zordms.fraud`) — override with the `KAFKA_TOPIC_PREFIX` env.
 
 Consumers (BI ETL, fraud ML trainer, data-lake sink) subscribe to a topic glob
 and get ECS-normalized JSON identical to what the SIEM pipeline sees.
@@ -20,8 +20,8 @@ from datetime import datetime
 from typing import Any, Optional
 
 KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "").strip()
-TOPIC_PREFIX = os.environ.get("KAFKA_TOPIC_PREFIX", "nbe.dms").strip()
-CLIENT_ID = os.environ.get("KAFKA_CLIENT_ID", "nbe-dms-python")
+TOPIC_PREFIX = os.environ.get("KAFKA_TOPIC_PREFIX", "zordms").strip()
+CLIENT_ID = os.environ.get("KAFKA_CLIENT_ID", "zordms-python")
 
 _producer = None
 _lock = threading.Lock()
@@ -68,9 +68,9 @@ def publish(event: dict[str, Any]) -> bool:
     try:
         record = {
             "@timestamp": datetime.utcnow().isoformat() + "Z",
-            "service": {"name": "nbe-dms-python"},
-            "event": {"action": event.get("type", "unknown"), "dataset": "nbe.dms"},
-            "nbe": event,
+            "service": {"name": "zordms-python"},
+            "event": {"action": event.get("type", "unknown"), "dataset": "zordms"},
+            "zordms": event,
         }
         key = str(event.get("document_id") or event.get("id") or "").encode() or None
         p.produce(topic_for(event.get("type", "event")),

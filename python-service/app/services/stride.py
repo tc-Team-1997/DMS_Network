@@ -200,7 +200,7 @@ def build() -> dict[str, Any]:
 def build_markdown() -> str:
     g = build()
     lines = [
-        "# NBE DMS — Auto-generated STRIDE Threat Model",
+        "# ZorDMS — Auto-generated STRIDE Threat Model",
         f"_Generated {g['generated_at']} · {g['endpoint_count']} endpoints_\n",
         "| Method | Path | Class | Category | Risk | Mitigation | Evidence |",
         "|---|---|---|---|---|---|---|",

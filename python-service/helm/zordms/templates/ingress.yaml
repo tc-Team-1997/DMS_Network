@@ -2,8 +2,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "nbe-dms.fullname" . }}
-  labels: {{- include "nbe-dms.labels" . | nindent 4 }}
+  name: {{ include "zordms.fullname" . }}
+  labels: {{- include "zordms.labels" . | nindent 4 }}
   annotations:
     {{- range $k, $v := .Values.ingress.annotations }}
     {{ $k }}: {{ tpl $v $ | quote }}
@@ -18,6 +18,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "nbe-dms.fullname" . }}
+                name: {{ include "zordms.fullname" . }}
                 port: {number: {{ .Values.service.port }}}
 {{- end }}

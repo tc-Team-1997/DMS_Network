@@ -4,7 +4,7 @@ let wss = null;
 function attach(server) {
   wss = new WebSocket.Server({ server, path: '/ws' });
   wss.on('connection', (ws) => {
-    ws.send(JSON.stringify({ type: 'hello', message: 'NBE DMS live alerts connected' }));
+    ws.send(JSON.stringify({ type: 'hello', message: 'ZorDMS live alerts connected' }));
   });
   console.log('[ws] live alert channel attached at /ws');
 }

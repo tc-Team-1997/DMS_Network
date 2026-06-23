@@ -61,7 +61,7 @@ resource "aws_route53_record" "dms_latency_secondary" {
 }
 
 variable "route53_zone_id"      { type = string  default = "" }
-variable "domain"               { type = string  default = "nbe.local" }
+variable "domain"               { type = string  default = "zordms.local" }
 variable "primary_alb_dns"      { type = string  default = "" }
 variable "primary_alb_zone"     { type = string  default = "" }
 variable "secondary_alb_dns"    { type = string  default = "" }

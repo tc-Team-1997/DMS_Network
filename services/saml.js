@@ -3,7 +3,7 @@ const db = require('../db');
 
 function configure(app) {
   const entryPoint = process.env.SAML_ENTRY_POINT;
-  const issuer = process.env.SAML_ISSUER || 'nbe-dms';
+  const issuer = process.env.SAML_ISSUER || 'zordms';
   const cert = process.env.SAML_IDP_CERT;
 
   if (!entryPoint || !cert) {

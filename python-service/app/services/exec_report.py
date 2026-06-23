@@ -88,7 +88,7 @@ def _render_reportlab(data: dict) -> bytes | None:
     c.rect(0, H - 3 * cm, W, 3 * cm, fill=1, stroke=0)
     c.setFillColorRGB(0.91, 0.79, 0.42)
     c.setFont("Helvetica-Bold", 22)
-    c.drawString(2 * cm, H - 2 * cm, "National Bank of Egypt")
+    c.drawString(2 * cm, H - 2 * cm, "ZorDMS")
     c.setFont("Helvetica", 11)
     c.setFillColorRGB(0.85, 0.88, 0.94)
     c.drawString(2 * cm, H - 2.6 * cm,
@@ -154,7 +154,7 @@ def _render_pil(data: dict) -> bytes:
     except Exception:
         title = ImageFont.load_default()
         body = ImageFont.load_default()
-    d.text((60, 45), "National Bank of Egypt", fill=(232, 201, 107), font=title)
+    d.text((60, 45), "ZorDMS", fill=(232, 201, 107), font=title)
     d.text((60, 120),
            f"Executive Brief — DMS · {data['period']['start']} → {data['period']['end']}",
            fill=(217, 223, 234), font=body)

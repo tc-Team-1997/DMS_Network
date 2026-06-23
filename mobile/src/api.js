@@ -1,8 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
-const BASE = Constants.expoConfig?.extra?.apiBaseUrl || 'https://dms.nbe.local';
-const TOKEN_KEY = 'nbe.dms.token';
+const BASE = Constants.expoConfig?.extra?.apiBaseUrl || 'https://dms.zordms.local';
+const TOKEN_KEY = 'zordms.token';
 
 export async function getToken() {
   return SecureStore.getItemAsync(TOKEN_KEY);

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<title>NBE DMS — Live</title>
+<title>ZorDMS — Live</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/static/app.css"/>
@@ -14,15 +14,15 @@
 <script type="module" src="/static/doc_classifier.js"></script>
 <script type="module" src="/static/assistant.js"></script>
 <script type="module" src="/static/sigpad.js"></script>
-<meta name="nbe-api-key" content="{{ api_key }}"/>
+<meta name="zordms-api-key" content="{{ api_key }}"/>
 </head>
 <body>
 <a href="#main" class="skip-link">Skip to main content</a>
 <header id="topbar" role="banner">
   <div class="bank-logo">
-    <div class="logo-mark">NBE</div>
+    <div class="logo-mark">ZorDMS</div>
     <div>
-      <div class="bank-name">National Bank of Egypt</div>
+      <div class="bank-name">ZorDMS</div>
       <div class="bank-sub">Document Management System</div>
     </div>
   </div>
@@ -32,11 +32,11 @@
   </div>
   <div class="topbar-actions">
     <div class="lang-switch" role="group" aria-label="Language selection">
-      <button id="lang-en" aria-label="Switch to English" onclick="window.NBE_I18N.setLang('en'); refreshLangButtons()">EN</button>
-      <button id="lang-ar" aria-label="التبديل إلى العربية" onclick="window.NBE_I18N.setLang('ar'); refreshLangButtons()">عربي</button>
+      <button id="lang-en" aria-label="Switch to English" onclick="window.ZorDMS_I18N.setLang('en'); refreshLangButtons()">EN</button>
+      <button id="lang-ar" aria-label="التبديل إلى العربية" onclick="window.ZorDMS_I18N.setLang('ar'); refreshLangButtons()">عربي</button>
     </div>
-    <button type="button" class="btn btn-secondary" aria-label="Start guided tour" onclick="window.NBE_Tour.start(currentScreen())" style="padding:6px 12px;font-size:11px">Guide me</button>
-    <button type="button" class="btn btn-secondary" aria-label="Toggle high-contrast AAA mode" onclick="window.NBE_A11Y.toggle()" style="padding:6px 12px;font-size:11px">AAA</button>
+    <button type="button" class="btn btn-secondary" aria-label="Start guided tour" onclick="window.ZorDMS_Tour.start(currentScreen())" style="padding:6px 12px;font-size:11px">Guide me</button>
+    <button type="button" class="btn btn-secondary" aria-label="Toggle high-contrast AAA mode" onclick="window.ZorDMS_A11Y.toggle()" style="padding:6px 12px;font-size:11px">AAA</button>
     <button class="upload-btn" data-i18n="btn_upload" aria-label="Upload new document" onclick="document.getElementById('uploadInput').click()">Quick Upload</button>
     <input id="uploadInput" type="file" style="display:none" onchange="uploadFile(this.files[0])" aria-label="File to upload"/>
   </div>
@@ -176,7 +176,7 @@ function showScreen(name, el) {
 }
 
 function refreshLangButtons() {
-  const lang = window.NBE_I18N?.getLang?.() || 'en';
+  const lang = window.ZorDMS_I18N?.getLang?.() || 'en';
   document.getElementById('lang-en')?.classList.toggle('active', lang === 'en');
   document.getElementById('lang-ar')?.classList.toggle('active', lang === 'ar');
 }
@@ -184,7 +184,7 @@ window.addEventListener('DOMContentLoaded', refreshLangButtons);
 
 async function loadDashboard() {
   const k = await (await fetch('/api/v1/dashboard/kpis', {headers: H()})).json();
-  const T = (key) => window.NBE_I18N?.t?.(key) || key;
+  const T = (key) => window.ZorDMS_I18N?.t?.(key) || key;
   document.getElementById('kpiRow').innerHTML = `
     <div class="kpi gold-kpi"><div class="kpi-label">${T('kpi_total')}</div><div class="kpi-val">${k.total_documents}</div></div>
     <div class="kpi blue-kpi"><div class="kpi-label">${T('kpi_ocr')}</div><div class="kpi-val">${k.ocr_processed_pct}%</div></div>
@@ -230,7 +230,7 @@ async function uploadFile(f) {
   if (!f) return;
   let predicted = null;
   try {
-    predicted = await window.NBE_DocClassifier?.classifyFile(f);
+    predicted = await window.ZorDMS_DocClassifier?.classifyFile(f);
   } catch (_) {}
   const fd = new FormData();
   fd.append('file', f);
@@ -286,7 +286,7 @@ async function callIntegration() {
 }
 
 loadDashboard();
-window.addEventListener('load', () => setTimeout(() => window.NBE_Tour?.maybeAutoStart('dashboard'), 500));
+window.addEventListener('load', () => setTimeout(() => window.ZorDMS_Tour?.maybeAutoStart('dashboard'), 500));
 </script>
 </body>
 </html>
