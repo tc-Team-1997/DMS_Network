@@ -1,0 +1,6 @@
+# Compiled TypeScript artifacts — tsc writes these into src/ when outDir is not
+# explicitly set to dist/. Never commit compiled output alongside source files.
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+src/**/*.d.ts.map
