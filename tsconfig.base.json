@@ -8,8 +8,6 @@
     "skipLibCheck": true,
     "declaration": true,
     "composite": false,
-    "resolveJsonModule": true,
-    "outDir": "dist",
-    "rootDir": "src"
+    "resolveJsonModule": true
   }
 }
