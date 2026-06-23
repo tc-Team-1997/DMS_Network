@@ -35,7 +35,17 @@ export function authRouter(): Router {
       }
 
       const authz = await resolveUserAuthz(knex, user.id);
-      const token = signToken({ sub: user.id, username: user.username }, config.jwtSecret);
+      // Embed RBAC claims so downstream microservices can authorize from the
+      // token without their own user DB (the gateway re-checks status on its
+      // own routes; downstream services trust the gateway-issued claims).
+      const token = signToken({
+        sub: user.id,
+        username: user.username,
+        roles: authz.roles,
+        permissions: authz.permissions,
+        branch: user.branch ?? undefined,
+        region: user.region ?? undefined,
+      }, config.jwtSecret);
       await writeAudit(knex, { actor_id: user.id, actor_username: user.username, action: "LOGIN" });
       res.json({
         token,

@@ -1,6 +1,15 @@
 import jwt from "jsonwebtoken";
 
-export interface TokenPayload { sub: number; username: string; }
+export interface TokenPayload {
+  sub: number;
+  username: string;
+  // Optional RBAC claims embedded by the gateway at login so that downstream
+  // microservices can authorize from the token without a shared user DB.
+  roles?: string[];
+  permissions?: string[];
+  branch?: string;
+  region?: string;
+}
 
 export function signToken(payload: TokenPayload, secret: string): string {
   return jwt.sign(payload, secret, { expiresIn: "1h", algorithm: "HS256" });
