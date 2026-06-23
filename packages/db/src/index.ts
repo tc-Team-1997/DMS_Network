@@ -14,3 +14,5 @@ export function getKnex(db: AppConfig["db"] = loadConfig().db): Knex {
 export async function destroyKnex(): Promise<void> {
   if (instance) { await instance.destroy(); instance = undefined; }
 }
+
+export { buildServiceKnex } from "./serviceKnex.js";

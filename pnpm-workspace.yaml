@@ -4,5 +4,6 @@ packages:
   - "apps/*"
 allowBuilds:
   esbuild: true
+  msgpackr-extract: false
   oracledb: false
   sqlite3: true
