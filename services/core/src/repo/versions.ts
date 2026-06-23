@@ -5,8 +5,8 @@ import type { DocumentVersion } from "./documents.js";
 
 export interface VersionDeps { knex: Knex; storage: StorageBackend; events: EventBus; }
 
-async function nextVersionNo(knex: Knex, docId: number): Promise<number> {
-  const row = await knex("document_versions").where({ document_id: docId }).max("version_no as m");
+async function nextVersionNo(tx: Knex, docId: number): Promise<number> {
+  const row = await tx("document_versions").where({ document_id: docId }).max("version_no as m");
   return Number(row[0]?.m ?? 0) + 1;
 }
 
@@ -15,24 +15,27 @@ async function insertVersion(
   docId: number,
   args: { buffer: Buffer; mimeType?: string; createdBy?: string; comment?: string },
 ): Promise<DocumentVersion> {
-  const stored = await deps.storage.put(args.buffer);
-  const version_no = await nextVersionNo(deps.knex, docId);
-  await deps.knex("document_versions").insert({
-    document_id: docId,
-    version_no,
-    storage_key: stored.key,
-    file_hash_sha256: stored.hash,
-    file_size_bytes: stored.size,
-    mime_type: args.mimeType ?? null,
-    created_by: args.createdBy ?? null,
-    comment: args.comment ?? null,
+  // I3: wrap the read-max + insert in a transaction to prevent version_no race conditions
+  return deps.knex.transaction(async (tx) => {
+    const stored = await deps.storage.put(args.buffer);
+    const version_no = await nextVersionNo(tx, docId);
+    await tx("document_versions").insert({
+      document_id: docId,
+      version_no,
+      storage_key: stored.key,
+      file_hash_sha256: stored.hash,
+      file_size_bytes: stored.size,
+      mime_type: args.mimeType ?? null,
+      created_by: args.createdBy ?? null,
+      comment: args.comment ?? null,
+    });
+    await tx("documents").where({ id: docId }).update({
+      current_version: version_no,
+      file_hash_sha256: stored.hash,
+      file_size_bytes: stored.size,
+    });
+    return (await tx("document_versions").where({ document_id: docId, version_no }).first()) as DocumentVersion;
   });
-  await deps.knex("documents").where({ id: docId }).update({
-    current_version: version_no,
-    file_hash_sha256: stored.hash,
-    file_size_bytes: stored.size,
-  });
-  return (await deps.knex("document_versions").where({ document_id: docId, version_no }).first()) as DocumentVersion;
 }
 
 export async function addVersion(

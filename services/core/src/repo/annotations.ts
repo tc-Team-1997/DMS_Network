@@ -60,6 +60,8 @@ export async function listAnnotations(knex: Knex, docId: number): Promise<Annota
   return (await knex("annotations").where({ document_id: docId }).orderBy("id")) as Annotation[];
 }
 
-export async function deleteAnnotation(knex: Knex, id: number): Promise<void> {
-  await knex("annotations").where({ id }).del();
+export async function deleteAnnotation(knex: Knex, id: number, documentId: number): Promise<boolean> {
+  // C4: enforce document_id ownership to prevent cross-document IDOR
+  const deleted = await knex("annotations").where({ id, document_id: documentId }).del();
+  return deleted > 0;
 }

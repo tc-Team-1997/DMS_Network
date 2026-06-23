@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "../middleware.js";
+import { can } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { resolvePath, defaultAcls, domainForPath } from "../mapper/directory.js";
 import { ROOT_PATH } from "../repo/folders.js";
@@ -43,18 +44,23 @@ export function mapperRouter(): Router {
   r.use(requireAuth);
 
   r.post("/:documentId", requirePermission("document:map"), async (req, res) => {
-    const deps = req.app.locals.deps as CoreDeps;
-    const document = await getDocument(deps.knex, Number(req.params.documentId));
-    if (!document) { res.status(404).json({ error: "not_found" }); return; }
+    try {
+      const deps = req.app.locals.deps as CoreDeps;
+      const canCrossBranch = can({ permissions: req.authUser!.permissions }, "crossbranch:read");
+      const viewer = { branch: req.authUser!.branch, canCrossBranch };
+      // C1: pass viewer so branch-isolation is enforced
+      const document = await getDocument(deps.knex, Number(req.params.documentId), viewer);
+      if (!document) { res.status(404).json({ error: "not_found" }); return; }
 
-    const path = resolvePath(req.body.docType, req.body.fields ?? {});
-    const folderId = await ensureFolderChain(deps.knex, path, req.authUser!.username);
-    const domain = domainForPath(path);
-    await setFolderAcls(deps.knex, folderId, defaultAcls(domain), false);
-    await deps.knex("documents").where({ id: document.id }).update({ folder_id: folderId });
+      const path = resolvePath(req.body.docType, req.body.fields ?? {});
+      const folderId = await ensureFolderChain(deps.knex, path, req.authUser!.username);
+      const domain = domainForPath(path);
+      await setFolderAcls(deps.knex, folderId, defaultAcls(domain), false);
+      await deps.knex("documents").where({ id: document.id }).update({ folder_id: folderId });
 
-    const acls = await effectiveAcls(deps.knex, folderId);
-    res.json({ path, folderId, acls });
+      const acls = await effectiveAcls(deps.knex, folderId);
+      res.json({ path, folderId, acls });
+    } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
   return r;

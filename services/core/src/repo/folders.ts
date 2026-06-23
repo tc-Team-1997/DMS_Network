@@ -69,7 +69,14 @@ export async function moveFolder(
 
   const oldPath = node.path as string;
   const newPath = `${parent.path}/${node.name}`;
-  const descendants = await knex("folders").where("path", "like", `${oldPath}/%`);
+
+  // I6: check for path conflict at destination before moving
+  const conflicting = await knex("folders").where({ path: newPath }).whereNot({ id }).first();
+  if (conflicting) throw new Error(`duplicate_path:${newPath}`);
+
+  // M4: escape LIKE metacharacters in oldPath to avoid unintended wildcard matches
+  const escapedOldPath = oldPath.replace(/[%_\\]/g, "\\$&");
+  const descendants = await knex("folders").whereRaw("path LIKE ? ESCAPE '\\'", [`${escapedOldPath}/%`]);
 
   await knex.transaction(async (tx) => {
     await tx("folders").where({ id }).update({ parent_id: newParentId, path: newPath });

@@ -97,13 +97,33 @@ export async function listDocuments(
   knex: Knex,
   viewer: { branch?: string; canCrossBranch: boolean },
 ): Promise<DocumentRecord[]> {
+  // I1: fail-closed — users without crossbranch:read AND without a branch see nothing
+  if (!viewer.canCrossBranch && !viewer.branch) return [];
   const q = knex("documents").where({ status: "Active" });
-  if (!viewer.canCrossBranch && viewer.branch) q.andWhere({ branch: viewer.branch });
-  return (await q.orderBy("id", "desc")) as DocumentRecord[];
+  if (!viewer.canCrossBranch) q.andWhere({ branch: viewer.branch });
+  return (await q.orderBy("id", "desc")).map(normalizeDoc) as DocumentRecord[];
 }
 
-export async function getDocument(knex: Knex, id: number): Promise<DocumentRecord | undefined> {
-  return (await knex("documents").where({ id, status: "Active" }).first()) as DocumentRecord | undefined;
+export async function getDocument(
+  knex: Knex,
+  id: number,
+  viewer?: { branch?: string; canCrossBranch: boolean },
+): Promise<DocumentRecord | undefined> {
+  // C1: branch-aware fetch; fail-closed when viewer has no branch and no crossbranch:read
+  const q = knex("documents").where({ id, status: "Active" });
+  if (viewer) {
+    if (!viewer.canCrossBranch) {
+      if (!viewer.branch) return undefined; // no branch, no access
+      q.andWhere({ branch: viewer.branch });
+    }
+  }
+  const row = await q.first();
+  return row ? normalizeDoc(row) : undefined;
+}
+
+function normalizeDoc(row: Record<string, unknown>): DocumentRecord {
+  // I7: normalize SQLite boolean 0/1 to true/false
+  return { ...row, review_flag: Boolean(row.review_flag) } as DocumentRecord;
 }
 
 export async function softDeleteDocument(knex: Knex, id: number): Promise<void> {

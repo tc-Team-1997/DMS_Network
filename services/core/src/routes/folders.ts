@@ -23,8 +23,10 @@ export function foldersRouter(): Router {
   });
 
   r.get("/", requirePermission("folder:read"), async (req, res) => {
-    const { knex } = req.app.locals.deps as { knex: Knex };
-    res.json({ tree: await listTree(knex) });
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      res.json({ tree: await listTree(knex) });
+    } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
   r.post("/:id/move", requirePermission("folder:create"), async (req, res) => {

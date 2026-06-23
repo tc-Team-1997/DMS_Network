@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth, requirePermission } from "../middleware.js";
+import { can } from "@zordms/auth";
 import { EVENTS } from "../events/index.js";
 import type { CoreDeps } from "../deps.js";
 import { catalog } from "../catalog/engine.js";
@@ -17,32 +18,40 @@ export function catalogRouter(): Router {
   r.use(requireAuth);
 
   r.post("/:documentId", requirePermission("document:catalog"), async (req, res) => {
-    const deps = req.app.locals.deps as CoreDeps;
-    const document = await getDocument(deps.knex, Number(req.params.documentId));
-    if (!document) { res.status(404).json({ error: "not_found" }); return; }
+    try {
+      const deps = req.app.locals.deps as CoreDeps;
+      const canCrossBranch = can({ permissions: req.authUser!.permissions }, "crossbranch:read");
+      const viewer = { branch: req.authUser!.branch, canCrossBranch };
+      // C1: pass viewer so branch-isolation is enforced
+      const document = await getDocument(deps.knex, Number(req.params.documentId), viewer);
+      if (!document) { res.status(404).json({ error: "not_found" }); return; }
 
-    const result = catalog({
-      docType: req.body.docType,
-      confidence: Number(req.body.confidence ?? 1),
-      fields: req.body.fields ?? {},
-    });
-
-    if (result.route !== "HUMAN_REVIEW") {
-      const ingest = (document.ingest_timestamp as string | undefined) ?? new Date().toISOString();
-      await deps.knex("documents").where({ id: document.id }).update({
-        catalog_category: result.category,
-        retention_years: result.retentionYears,
-        destruction_date: addYears(ingest, result.retentionYears),
-        review_flag: result.reviewFlag ?? document.review_flag,
+      const result = catalog({
+        docType: req.body.docType,
+        confidence: Number(req.body.confidence ?? 1),
+        fields: req.body.fields ?? {},
       });
-      await deps.events.emit(EVENTS.DOCUMENT_CATALOGED, {
-        docId: document.id,
-        category: result.category,
-        route: result.route,
-      });
-    }
 
-    res.json({ result });
+      if (result.route !== "HUMAN_REVIEW") {
+        const ingest = (document.ingest_timestamp as string | undefined) ?? new Date().toISOString();
+        await deps.knex("documents").where({ id: document.id }).update({
+          catalog_category: result.category,
+          retention_years: result.retentionYears,
+          destruction_date: addYears(ingest, result.retentionYears),
+          review_flag: result.reviewFlag ?? document.review_flag,
+        });
+        await deps.events.emit(EVENTS.DOCUMENT_CATALOGED, {
+          docId: document.id,
+          category: result.category,
+          route: result.route,
+        });
+      } else {
+        // C3: set review_flag even in HUMAN_REVIEW path so the pending-review queue is correct
+        await deps.knex("documents").where({ id: document.id }).update({ review_flag: true });
+      }
+
+      res.json({ result });
+    } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
   return r;

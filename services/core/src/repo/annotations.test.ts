@@ -31,9 +31,23 @@ describe("annotations repo", () => {
   });
 
   it("deletes an annotation", async () => {
-    const id = await doc();
-    const a = await createAnnotation(h.knex, id, { kind: "highlight", page: 1, x: 1, y: 1, width: 5, height: 5 });
-    await deleteAnnotation(h.knex, a.id);
-    expect((await listAnnotations(h.knex, id)).find((x) => x.id === a.id)).toBeUndefined();
+    const docId = await doc();
+    const a = await createAnnotation(h.knex, docId, { kind: "highlight", page: 1, x: 1, y: 1, width: 5, height: 5 });
+    // C4: deleteAnnotation now requires the documentId to prevent cross-document IDOR
+    const deleted = await deleteAnnotation(h.knex, a.id, docId);
+    expect(deleted).toBe(true);
+    expect((await listAnnotations(h.knex, docId)).find((x) => x.id === a.id)).toBeUndefined();
+  });
+
+  it("C4: delete ignores annotation id that does not belong to the given document", async () => {
+    const docA = await doc();
+    const docB = await doc();
+    const a = await createAnnotation(h.knex, docA, { kind: "note", page: 1, x: 0, y: 0, width: 1, height: 1, content: "owned by docA" });
+    // Attempt to delete annotation from docA but pass docB as documentId — should not delete
+    const deleted = await deleteAnnotation(h.knex, a.id, docB);
+    expect(deleted).toBe(false);
+    // annotation still exists on docA
+    const remaining = await listAnnotations(h.knex, docA);
+    expect(remaining.find((x) => x.id === a.id)).toBeDefined();
   });
 });
