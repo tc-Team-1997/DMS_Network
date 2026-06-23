@@ -39,8 +39,8 @@ export async function seed(knex: Knex): Promise<void> {
   for (const [name, perms] of Object.entries(ROLES)) {
     let role = await knex("roles").where({ name }).first();
     if (!role) {
-      const [id] = await knex("roles").insert({ name, description: `${name} role`, system: true }).returning("id");
-      role = { id: typeof id === "object" ? (id as any).id : id };
+      await knex("roles").insert({ name, description: `${name} role`, system: true });
+      role = await knex("roles").where({ name }).first();
     }
     for (const key of perms) {
       const perm = await knex("permissions").where({ key }).first();
@@ -53,15 +53,15 @@ export async function seed(knex: Knex): Promise<void> {
   // bootstrap admin only if no users
   const userCount = Number((await knex("users").count<{ c: number }[]>("id as c"))[0].c);
   if (userCount === 0) {
-    const [uid] = await knex("users").insert({
+    await knex("users").insert({
       username: "admin",
       password_hash: bcrypt.hashSync("admin123", 10),
       full_name: "System Administrator",
       status: "Active",
       created_by: "system",
-    }).returning("id");
-    const userId = typeof uid === "object" ? (uid as any).id : uid;
+    });
+    const adminUser = await knex("users").where({ username: "admin" }).first();
     const cdo = await knex("roles").where({ name: "CDO" }).first();
-    await knex("user_roles").insert({ user_id: userId, role_id: cdo.id });
+    await knex("user_roles").insert({ user_id: adminUser.id, role_id: cdo.id });
   }
 }
