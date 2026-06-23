@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@zordms/db": "workspace:*",
-    "@zordms/types": "workspace:*",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.3",
     "speakeasy": "^2.0.0"

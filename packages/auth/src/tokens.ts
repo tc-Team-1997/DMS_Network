@@ -7,6 +7,13 @@ export function signToken(payload: TokenPayload, secret: string): string {
 }
 
 export function verifyToken(token: string, secret: string): TokenPayload {
-  const decoded = jwt.verify(token, secret) as jwt.JwtPayload;
+  const raw = jwt.verify(token, secret);
+  if (typeof raw === "string") {
+    throw new Error("invalid token payload: string payload");
+  }
+  const decoded = raw as jwt.JwtPayload;
+  if (decoded.sub == null || decoded.username == null) {
+    throw new Error("invalid token payload: missing fields");
+  }
   return { sub: Number(decoded.sub), username: String(decoded.username) };
 }

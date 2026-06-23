@@ -27,5 +27,6 @@ export function can(authz: { permissions: string[] }, required: string): boolean
 }
 
 export function canAll(authz: { permissions: string[] }, required: string[]): boolean {
+  if (required.length === 0) return false;
   return required.every((r) => authz.permissions.includes(r));
 }

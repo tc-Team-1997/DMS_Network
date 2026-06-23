@@ -23,9 +23,6 @@ importers:
       '@zordms/db':
         specifier: workspace:*
         version: link:../db
-      '@zordms/types':
-        specifier: workspace:*
-        version: link:../types
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3

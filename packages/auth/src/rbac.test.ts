@@ -23,4 +23,9 @@ describe("rbac engine", () => {
     const authz = { permissions: ["document:read"] };
     expect(can(authz, "user:create")).toBe(false);
   });
+
+  it("denies when required permissions array is empty (fail-closed)", () => {
+    const authz = { permissions: ["document:read"] };
+    expect(canAll(authz, [])).toBe(false);
+  });
 });

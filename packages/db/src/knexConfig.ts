@@ -5,7 +5,9 @@ import path from "path";
 
 type DbCfg = AppConfig["db"];
 
-/** Filter helper: exclude .d.ts/.d.js, test files, and deduplicate (prefer .ts over .js). */
+/** Filter helper: exclude .d.ts/.d.js, test files, and deduplicate (prefer .ts over .js).
+ * After .sort(), all .js files come before .ts files for the same base name,
+ * so we only need to replace .js with .ts when a .ts variant is encountered. */
 function filterAndDedup(files: string[]): string[] {
   return files
     .filter((f) => {
@@ -19,10 +21,6 @@ function filterAndDedup(files: string[]): string[] {
     .reduce<string[]>((acc, f) => {
       const ext = path.extname(f);
       const base = path.basename(f, ext);
-      const alreadyHasTs = acc.some(
-        (x) => path.basename(x, path.extname(x)) === base && x.endsWith(".ts")
-      );
-      if (ext === ".js" && alreadyHasTs) return acc;
       const jsIdx = acc.findIndex(
         (x) => path.basename(x, path.extname(x)) === base && x.endsWith(".js")
       );
@@ -43,7 +41,7 @@ const migrationSource: Knex.MigrationSource<string> = {
     return filterAndDedup(files);
   },
   getMigrationName(migration: string): string {
-    return migration;
+    return path.basename(migration, path.extname(migration));
   },
   async getMigration(migration: string): Promise<Knex.Migration> {
     const filePath = path.join(migrationsDir, migration);
@@ -54,10 +52,18 @@ const migrationSource: Knex.MigrationSource<string> = {
 
 // Custom seed source that loads .ts and .js files but excludes test files and .d.ts
 const seedsDir = new URL("./seeds", import.meta.url).pathname;
-const seedSource = {
-  async getSeeds(): Promise<string[]> {
+const seedSource: Knex.SeedSource<string> = {
+  async getSeeds(config: Knex.SeederConfig): Promise<string[]> {
     const files = await readdir(seedsDir);
-    return filterAndDedup(files).map((f) => path.join(seedsDir, f));
+    const all = filterAndDedup(files).map((f) => path.join(seedsDir, f));
+    if (config.specific) {
+      return all.filter(
+        (f) =>
+          path.basename(f) === config.specific ||
+          path.basename(f, path.extname(f)) === config.specific
+      );
+    }
+    return all;
   },
   async getSeed(filepath: string): Promise<Knex.Seed> {
     const mod = await import(filepath);
