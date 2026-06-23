@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 
+from zordms_ai.auth import require_auth
 from zordms_ai.review.models import ReviewItem
 from zordms_ai.review.service import claim, list_pending, resolve
 
-review_router = APIRouter(prefix="/idp/review")
+# Every route under this router requires a valid Bearer JWT (F-01).
+review_router = APIRouter(prefix="/idp/review", dependencies=[Depends(require_auth)])
 
 
 def _dump(item: ReviewItem) -> dict:
@@ -37,7 +39,9 @@ def claim_item(request: Request, item_id: int, user_id: str = Form(...)) -> dict
         try:
             item = claim(session, item_id, user_id)
         except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
+            # Distinguish "not found" (404) from "wrong state" (409) — F-02
+            status_code = 404 if "not found" in str(exc) else 409
+            raise HTTPException(status_code=status_code, detail=str(exc)) from exc
         return _dump(item)
 
 
@@ -45,5 +49,10 @@ def claim_item(request: Request, item_id: int, user_id: str = Form(...)) -> dict
 def resolve_item(request: Request, item_id: int, resolution: str = Form(...)) -> dict:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     with request.app.state.session_factory() as session:
-        item = resolve(session, item_id, resolution, now=now)
+        try:
+            item = resolve(session, item_id, resolution, now=now)
+        except ValueError as exc:
+            # Distinguish "not found" (404) from "wrong state" (409) — F-02
+            status_code = 404 if "not found" in str(exc) else 409
+            raise HTTPException(status_code=status_code, detail=str(exc)) from exc
         return _dump(item)

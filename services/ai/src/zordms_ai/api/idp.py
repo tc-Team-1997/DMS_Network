@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
+from zordms_ai.auth import require_auth
 from zordms_ai.pipeline.preprocess import b64_png, to_page_images
 
-idp_router = APIRouter(prefix="/idp")
+# Every route under this router requires a valid Bearer JWT (F-01).
+idp_router = APIRouter(prefix="/idp", dependencies=[Depends(require_auth)])
 
 
 @idp_router.post("/classify")

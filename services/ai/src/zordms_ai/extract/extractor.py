@@ -38,7 +38,19 @@ class Extractor:
         self._model = model
 
     async def extract(self, doc_type: str, image_b64: str) -> ExtractResult:
-        model_cls = schema_for(doc_type)
+        # Guard against doc_types that are in the classification registry but have
+        # no extraction schema (e.g. "UNKNOWN") — F-06.
+        try:
+            model_cls = schema_for(doc_type)
+        except KeyError:
+            return ExtractResult(
+                doc_type=doc_type,
+                data=None,
+                partial=None,
+                valid=False,
+                errors=[f"no extraction schema for doc_type={doc_type!r}"],
+                review_flag=True,
+            )
         json_schema = model_cls.model_json_schema()
         raw = await self._client.chat_json(
             model=self._model,

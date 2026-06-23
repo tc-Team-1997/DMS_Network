@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
 from zordms_ai.review.models import ReviewItem
@@ -38,10 +38,17 @@ def enqueue(
 
 
 def list_pending(session: Session) -> list[ReviewItem]:
+    # Use a portable CASE-based secondary sort key instead of NULLS LAST so this
+    # compiles correctly on PostgreSQL, Oracle 19c, and SQLite (F-03).
+    # NULLs sort after non-NULL deadlines (deadline=NULL means no SLA pressure).
+    null_last_key = case(
+        (ReviewItem.sla_deadline.is_(None), 1),
+        else_=0,
+    )
     stmt = (
         select(ReviewItem)
         .where(ReviewItem.status == "PENDING")
-        .order_by(ReviewItem.sla_deadline.asc().nulls_last())
+        .order_by(null_last_key, ReviewItem.sla_deadline.asc())
     )
     return list(session.scalars(stmt))
 

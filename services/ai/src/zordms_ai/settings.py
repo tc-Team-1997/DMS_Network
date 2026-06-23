@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     inference_mode: Literal["gpu", "cpu_degraded"] = "gpu"
     request_timeout_s: float = 8.0
     review_low_conf_threshold: float = 0.85
+    # Shared secret for HS256 JWT verification (must match gateway JWT_SECRET)
+    jwt_secret: str = "change-me-in-production"
 
     @property
     def is_degraded(self) -> bool:

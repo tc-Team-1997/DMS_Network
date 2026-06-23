@@ -40,7 +40,7 @@ class ExtractionBase(BaseModel):
 
     @model_validator(mode="after")
     def _set_review_flag(self) -> "ExtractionBase":
-        object.__setattr__(self, "review_flag", self.confidence < REVIEW_THRESHOLD)
+        self.review_flag = self.confidence < REVIEW_THRESHOLD
         return self
 
 

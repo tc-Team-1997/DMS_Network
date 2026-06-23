@@ -54,3 +54,16 @@ async def test_extract_invalid_returns_partial_and_review_flag():
     assert res.partial == bad
     assert res.review_flag is True
     assert res.errors
+
+
+@pytest.mark.asyncio
+async def test_extract_unknown_doc_type_returns_review_flagged_error():
+    """doc_type='UNKNOWN' has no extraction schema — must return review_flag=True, not raise (F-06)."""
+    # The FakeClient will never be called because the KeyError is caught first.
+    ex = Extractor(FakeClient({}), model="qwen2.5-vl-7b")
+    res = await ex.extract("UNKNOWN", image_b64="QUJD")
+    assert res.valid is False
+    assert res.data is None
+    assert res.partial is None
+    assert res.review_flag is True
+    assert any("no extraction schema" in e for e in res.errors)

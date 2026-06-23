@@ -12,6 +12,7 @@ dependencies = [
     "alembic>=1.13",
     "httpx>=0.27",
     "python-multipart>=0.0.9",
+    "pyjwt>=2.8",
 ]
 
 [project.optional-dependencies]

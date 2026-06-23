@@ -1,9 +1,12 @@
+"""Tests for /idp/* endpoints — auth-aware."""
 import io
 from datetime import datetime
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
+from tests.conftest import TEST_JWT_SECRET, make_token
 from zordms_ai.app import create_app
 from zordms_ai.classify.classifier import ClassifyResult
 from zordms_ai.extract.extractor import ExtractResult
@@ -45,27 +48,64 @@ class FakeOrchestrator:
 
 
 def _client() -> TestClient:
-    app = create_app(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    app = create_app(Settings(
+        database_url="sqlite+pysqlite:///:memory:",
+        jwt_secret=TEST_JWT_SECRET,
+    ))
     app.state.classifier = FakeClassifier()
     app.state.extractor = FakeExtractor()
     app.state.orchestrator = FakeOrchestrator()
     return TestClient(app)
 
 
+def _auth() -> dict[str, str]:
+    return {"Authorization": f"Bearer {make_token()}"}
+
+
 def _png():
     return ("x.png", io.BytesIO(b"\x89PNG"), "image/png")
 
 
+# --- Auth enforcement tests (F-01) ---
+
+def test_classify_requires_auth():
+    res = _client().post("/idp/classify", files={"file": _png()}, data={"ocr_text": ""})
+    assert res.status_code == 401
+
+
+def test_extract_requires_auth():
+    res = _client().post("/idp/extract", files={"file": _png()}, data={"doc_type": "BT_CID_4G"})
+    assert res.status_code == 401
+
+
+def test_process_requires_auth():
+    # process_endpoint does not call to_page_images in FakeOrchestrator, so no mock needed
+    res = _client().post("/idp/process", files={"file": _png()}, data={"doc_id": "d1"})
+    assert res.status_code == 401
+
+
+# --- Functional tests (now with valid auth) ---
+
 @patch("zordms_ai.api.idp.to_page_images", return_value=[b"FAKEPNG"])
 def test_classify_endpoint(_mock_preproc):
-    res = _client().post("/idp/classify", files={"file": _png()}, data={"ocr_text": "10112345678"})
+    res = _client().post(
+        "/idp/classify",
+        files={"file": _png()},
+        data={"ocr_text": "10112345678"},
+        headers=_auth(),
+    )
     assert res.status_code == 200
     assert res.json()["doc_type"] == "BT_CID_4G"
 
 
 @patch("zordms_ai.api.idp.to_page_images", return_value=[b"FAKEPNG"])
 def test_extract_endpoint(_mock_preproc):
-    res = _client().post("/idp/extract", files={"file": _png()}, data={"doc_type": "BT_CID_4G"})
+    res = _client().post(
+        "/idp/extract",
+        files={"file": _png()},
+        data={"doc_type": "BT_CID_4G"},
+        headers=_auth(),
+    )
     assert res.status_code == 200
     body = res.json()
     assert body["valid"] is True
@@ -73,7 +113,12 @@ def test_extract_endpoint(_mock_preproc):
 
 
 def test_process_endpoint():
-    res = _client().post("/idp/process", files={"file": _png()}, data={"doc_id": "d1"})
+    res = _client().post(
+        "/idp/process",
+        files={"file": _png()},
+        data={"doc_id": "d1"},
+        headers=_auth(),
+    )
     assert res.status_code == 200
     body = res.json()
     assert body["handoff"]["doc_type"] == "BT_CID_4G"

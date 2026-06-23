@@ -54,3 +54,29 @@ def test_double_claim_raises(session):
     claim(session, item.id, "A")
     with pytest.raises(ValueError):
         claim(session, item.id, "B")
+
+
+def test_list_pending_null_deadline_sorts_last(session):
+    """Items with sla_deadline=None (AUTO_VERIFIED band) should sort after timed items (F-13)."""
+    # AUTO_VERIFIED band has sla_hours=None → sla_deadline=None
+    enqueue(session, doc_id="no-deadline", doc_type="X", confidence=0.88,
+            decision=route_by_confidence(0.88), payload_json="{}", now=NOW)
+    # HUMAN_REVIEW band has sla_hours=24 → sla_deadline=NOW+24h
+    enqueue(session, doc_id="has-deadline", doc_type="X", confidence=0.60,
+            decision=route_by_confidence(0.60), payload_json="{}", now=NOW)
+    pending = list_pending(session)
+    # The item with a concrete deadline should come first
+    assert pending[0].doc_id == "has-deadline"
+    assert pending[1].doc_id == "no-deadline"
+
+
+def test_resolve_not_found_raises_value_error(session):
+    """resolve() must raise ValueError('not found') for a missing id (verified: causes 404 via API)."""
+    with pytest.raises(ValueError, match="not found"):
+        resolve(session, 99999, "APPROVED", now=NOW)
+
+
+def test_claim_not_found_raises_value_error(session):
+    """claim() must raise ValueError('not found') for a missing id (verified: causes 404 via API)."""
+    with pytest.raises(ValueError, match="not found"):
+        claim(session, 99999, "STAFF1")
