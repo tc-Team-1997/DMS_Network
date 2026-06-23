@@ -14,7 +14,9 @@ export function alertsRouter(): Router {
     let q = knex("alerts").orderBy("id", "desc");
     if (req.query.level) q = q.where({ level: String(req.query.level) });
     if (req.query.unread === "true") q = q.where({ is_read: false });
-    res.json({ alerts: await q });
+    const rows = await q;
+    const alerts = rows.map((a: any) => ({ ...a, is_read: Boolean(a.is_read) }));
+    res.json({ alerts });
   });
 
   r.post("/:id/read", requirePermission("alert:read"), async (req, res) => {
@@ -29,6 +31,7 @@ export function alertsRouter(): Router {
     const alert = await knex("alerts").where({ id: req.params.id }).first();
     if (!alert) { res.status(404).json({ error: "not_found" }); return; }
     const target = String(req.body.target ?? "");
+    if (!target) { res.status(400).json({ error: "target_required" }); return; }
     const recipients = await resolveEscalationRecipients([{ kind: "role", value: target }], { knex });
     for (const rcpt of recipients) {
       const [d] = await registry.dispatch(["email"], { recipient: rcpt.address, subject: `Escalated: ${alert.title}`, body: alert.title });

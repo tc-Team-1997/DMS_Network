@@ -29,4 +29,26 @@ describe("attachConsumer", () => {
     expect(alert).toBeTruthy();
     expect(alert.level).toBe("critical");
   });
+
+  // I2: Consumer error boundary — a DB failure must not crash the event pipeline
+  it("I2: consumer swallows a DB error and does not propagate the rejection", async () => {
+    // Use a broken knex proxy that throws on any table access
+    const brokenKnex = new Proxy({} as any, {
+      get: (_t, prop) => {
+        if (prop === "destroy") return async () => {};
+        // Any table accessor returns an object whose chainable methods throw
+        return () => { throw new Error("simulated_db_failure"); };
+      },
+    });
+
+    const bus = new InMemoryBus();
+    const registry = new ChannelRegistry();
+    const hub = new RealtimeHub();
+
+    // Should NOT throw even though the knex call will fail
+    attachConsumer({ knex: brokenKnex, registry, hub, bus });
+    await expect(
+      bus.publish({ type: "document.expiring", payload: { docId: "D-ERR", daysToExpiry: 1 } })
+    ).resolves.toBeUndefined();
+  });
 });

@@ -32,7 +32,8 @@ export function evaluateRule(rule: AlertRule, event: DomainEvent): RuleDecision 
   if (rule.trigger !== event.type) return noFire("trigger_mismatch");
 
   const payload = (event.payload ?? {}) as Record<string, any>;
-  if (rule.scope && payload.branch && payload.branch !== rule.scope) return noFire("out_of_scope");
+  // Fail-closed: if scope is set and branch is absent or mismatched, do not fire
+  if (rule.scope && payload.branch !== rule.scope) return noFire("out_of_scope");
 
   if (event.type === "document.expiring") {
     const days = Number(payload.daysToExpiry ?? Infinity);

@@ -39,6 +39,14 @@ describe("evaluateRule", () => {
     expect(d.reason).toBe("out_of_scope");
   });
 
+  // C2: Branch-scope fail-closed — scoped rule must NOT fire when event has no branch
+  it("respects scope: does NOT fire when event has no branch (fails closed)", () => {
+    const scoped: AlertRule = { ...expiryRule, scope: "Thimphu" };
+    const d = evaluateRule(scoped, { type: "document.expiring", payload: { daysToExpiry: 1 } });
+    expect(d.fire).toBe(false);
+    expect(d.reason).toBe("out_of_scope");
+  });
+
   it("escalation rule fires critical to the escalation target role", () => {
     const escRule: AlertRule = { id: 2, name: "esc", trigger: "workflow.escalated", params: {}, channels: ["teams"], escalationTarget: "Supervisor", scope: null, enabled: true };
     const d = evaluateRule(escRule, { type: "workflow.escalated", payload: { workflowId: "WF7", assignees: ["alice"] } });

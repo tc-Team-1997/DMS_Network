@@ -42,4 +42,29 @@ describe("alert-rule CRUD", () => {
     const after = await knex("alert_rules").where({ id: rule.id }).first();
     expect(Boolean(after.enabled)).toBe(false);
   });
+
+  // I4: POST /rules must validate name and trigger are present
+  it("I4: POST /rules returns 400 when name is missing", async () => {
+    const res = await request(app).post("/rules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ trigger: "document.expiring" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("name_and_trigger_required");
+  });
+
+  it("I4: POST /rules returns 400 when trigger is missing", async () => {
+    const res = await request(app).post("/rules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "Some Rule" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("name_and_trigger_required");
+  });
+
+  it("I4: POST /rules returns 400 when body is empty", async () => {
+    const res = await request(app).post("/rules")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("name_and_trigger_required");
+  });
 });

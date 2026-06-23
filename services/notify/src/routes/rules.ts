@@ -17,6 +17,7 @@ export function rulesRouter(): Router {
   r.post("/", requirePermission("alert_rule:manage"), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     const b = req.body as { name: string; trigger: string; params?: object; channels?: string[]; escalationTarget?: string; scope?: string };
+    if (!b.name || !b.trigger) { res.status(400).json({ error: "name_and_trigger_required" }); return; }
     const inserted = await knex("alert_rules").insert({
       name: b.name, trigger: b.trigger,
       params_json: JSON.stringify(b.params ?? {}),
