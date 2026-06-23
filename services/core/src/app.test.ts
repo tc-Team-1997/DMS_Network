@@ -1,21 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
-import { buildServiceKnex } from "@zordms/db";
-import { loadConfig } from "@zordms/config";
-import { createApp } from "./app.js";
+import { makeTestApp } from "./testutil.js";
 
-const migrationsDir = new URL("./migrations", import.meta.url).pathname;
-const db = { client: "sqlite3" as const, host: "", port: 0, user: "", password: "", name: "", oracleConnectString: "" };
-const knex = buildServiceKnex({ migrationsDir, db });
-const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv) });
-
-beforeAll(async () => { await knex.migrate.latest(); });
-afterAll(async () => { await knex.destroy(); });
+const h = await makeTestApp();
+afterAll(async () => { await h.cleanup(); });
 
 describe("core health", () => {
   it("GET /health returns ok", async () => {
-    const res = await request(app).get("/health");
+    const res = await request(h.app).get("/health");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
+    expect(res.body.service).toBe("core");
   });
 });
