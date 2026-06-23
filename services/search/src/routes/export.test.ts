@@ -47,4 +47,25 @@ describe("POST /search/export.csv", () => {
   it("401 without a token", async () => {
     expect((await request(app).post("/search/export.csv").send({ text: "x", mode: "fulltext" })).status).toBe(401);
   });
+
+  // CRITICAL-3: export must return more than 100 rows when available (the EXPORT_CAP is 5000)
+  it("returns more than 100 rows when the index has >100 matching documents", async () => {
+    // Index 110 documents to exceed the normal paginate() cap of 100.
+    for (let i = 2; i <= 111; i++) {
+      await backend.index({
+        doc_id: `EXPORT${i}`, ocr_text: "exportterm", metadata_text: "",
+        doc_type: "X", branch: "Thimphu", status: "indexed", risk_band: "low",
+        legal_hold: false, expiry_status: "none", uploaded_by: "u",
+        indexed_at: "2026-06-23T00:00:00Z",
+      });
+    }
+    const res = await request(app)
+      .post("/search/export.csv")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ text: "exportterm", mode: "fulltext" });
+    expect(res.status).toBe(200);
+    // Count data rows (total lines minus 1 header minus trailing newline)
+    const dataRows = res.text.trim().split("\n").length - 1;
+    expect(dataRows).toBeGreaterThan(100);
+  });
 });

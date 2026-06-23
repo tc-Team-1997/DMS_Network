@@ -14,6 +14,7 @@ const backend = new SqlSearchBackend(knex);
 const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv), backend });
 let adminToken = "";
 let viewerThimphuToken = "";
+let nullBranchViewerToken = "";
 
 beforeAll(async () => {
   await knex.migrate.latest();
@@ -27,6 +28,12 @@ beforeAll(async () => {
   const viewerRole = await knex("roles").where({ name: "Viewer" }).first();
   await knex("user_roles").insert({ user_id: userId, role_id: viewerRole.id });
   viewerThimphuToken = signToken({ sub: userId, username: "viewerT" }, "t");
+
+  // IMPORTANT-2 / CRITICAL-1: a Viewer with NO branch assigned (branch = null)
+  const [nbvid] = await knex("users").insert({ username: "viewerNoBranch", password_hash: "x", status: "Active", branch: null }).returning("id");
+  const nullBranchUserId = typeof nbvid === "object" ? (nbvid as any).id : nbvid;
+  await knex("user_roles").insert({ user_id: nullBranchUserId, role_id: viewerRole.id });
+  nullBranchViewerToken = signToken({ sub: nullBranchUserId, username: "viewerNoBranch" }, "t");
 
   await backend.index({ doc_id: "D1", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Thimphu", status: "indexed", risk_band: "low", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });
   await backend.index({ doc_id: "D2", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Paro", status: "indexed", risk_band: "high", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });
@@ -54,6 +61,25 @@ describe("POST /search", () => {
   it("rejects a malformed query with 400", async () => {
     const res = await request(app).post("/search").set("Authorization", `Bearer ${adminToken}`).send({ mode: "regex" });
     expect(res.status).toBe(400);
+  });
+
+  // IMPORTANT-2 / CRITICAL-1: null-branch user must see zero results (fail-closed)
+  it("user with null branch and no crossbranch:read sees zero results", async () => {
+    const res = await request(app).post("/search").set("Authorization", `Bearer ${nullBranchViewerToken}`).send({ text: "dorji", mode: "fulltext" });
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(0);
+    expect(res.body.hits).toHaveLength(0);
+  });
+
+  // IMPORTANT-2 / CRITICAL-2: boolean OR must not escape branch scope
+  it("Thimphu Viewer using boolean OR does not see Paro results", async () => {
+    // D1 is in Thimphu (contains "loan"), D2 is in Paro (contains "loan").
+    // Without the fix, "loan OR dorji" would leak D2 via the top-level OR.
+    const res = await request(app).post("/search").set("Authorization", `Bearer ${viewerThimphuToken}`).send({ text: "loan OR dorji", mode: "boolean" });
+    expect(res.status).toBe(200);
+    const ids = res.body.hits.map((h: any) => h.doc_id);
+    expect(ids).toContain("D1");
+    expect(ids).not.toContain("D2");
   });
 });
 

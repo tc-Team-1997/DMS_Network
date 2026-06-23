@@ -13,12 +13,20 @@ const knex = buildServiceKnex({ migrationsDir, seedsDir, db });
 const backend = new SqlSearchBackend(knex);
 const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv), backend });
 let adminToken = "";
+let viewerToken = "";
 
 beforeAll(async () => {
   await knex.migrate.latest();
   await knex.seed.run();
   const admin = await knex("users").where({ username: "admin" }).first();
   adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+
+  // IMPORTANT-4: a non-admin Viewer — has document:read but NOT admin:access
+  const [vid] = await knex("users").insert({ username: "viewerReindex", password_hash: "x", status: "Active", branch: "Thimphu" }).returning("id");
+  const viewerUserId = typeof vid === "object" ? (vid as any).id : vid;
+  const viewerRole = await knex("roles").where({ name: "Viewer" }).first();
+  await knex("user_roles").insert({ user_id: viewerUserId, role_id: viewerRole.id });
+  viewerToken = signToken({ sub: viewerUserId, username: "viewerReindex" }, "t");
 });
 afterAll(async () => { await knex.destroy(); });
 
@@ -33,5 +41,20 @@ describe("POST /admin/reindex", () => {
 
   it("401 without a token", async () => {
     expect((await request(app).post("/admin/reindex").send({ docs: [] })).status).toBe(401);
+  });
+
+  // IMPORTANT-4: authenticated non-admin must be denied with 403
+  it("403 for authenticated non-admin user", async () => {
+    const res = await request(app).post("/admin/reindex").set("Authorization", `Bearer ${viewerToken}`).send({ docs: [] });
+    expect(res.status).toBe(403);
+  });
+
+  // IMPORTANT-4: doc_id validation — empty doc_id must return 400
+  it("400 when a doc is missing doc_id", async () => {
+    const res = await request(app).post("/admin/reindex").set("Authorization", `Bearer ${adminToken}`).send({
+      docs: [{ doc_id: "", ocr_text: "alpha", metadata_text: "", doc_type: "X", branch: "Thimphu", status: "indexed", risk_band: "low", legal_hold: false, expiry_status: "none", uploaded_by: "u", indexed_at: "2026-06-23T00:00:00Z" }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("invalid_doc");
   });
 });

@@ -22,14 +22,16 @@ export function toCsv(hits: SearchHit[]): string {
 export function exportRouter(): Router {
   const r = Router();
   r.use(requireAuth);
-  r.post("/search/export.csv", requirePermission("document:read"), async (req, res) => {
-    const { backend } = req.app.locals.deps as { backend: SearchBackend };
-    const body = req.body as SearchQuery;
-    if (!isSearchQuery(body)) { res.status(400).json({ error: "invalid_query" }); return; }
-    const results = await backend.search({ ...body, page: 1, pageSize: EXPORT_CAP }, scopeFromUser(req.authUser!));
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", 'attachment; filename="zordms-search.csv"');
-    res.send(toCsv(results.hits));
+  r.post("/search/export.csv", requirePermission("document:read"), async (req, res, next) => {
+    try {
+      const { backend } = req.app.locals.deps as { backend: SearchBackend };
+      const body = req.body as SearchQuery;
+      if (!isSearchQuery(body)) { res.status(400).json({ error: "invalid_query" }); return; }
+      const results = await backend.search({ ...body, page: 1, pageSize: EXPORT_CAP }, scopeFromUser(req.authUser!));
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="zordms-search.csv"');
+      res.send(toCsv(results.hits));
+    } catch (err) { next(err); }
   });
   return r;
 }

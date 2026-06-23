@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
@@ -11,7 +11,7 @@ import { exportRouter } from "./routes/export.js";
 export interface AppDeps {
   knex: Knex;
   config: AppConfig;
-  backend?: SearchBackend;
+  backend: SearchBackend;
 }
 
 export function createApp(deps: AppDeps): Express {
@@ -20,13 +20,18 @@ export function createApp(deps: AppDeps): Express {
   app.use(express.json({ limit: "1mb" }));
   app.locals.deps = deps;
 
-  const backend = deps.backend ?? { name: "sql" as const };
-
-  app.get("/health", (_req, res) => res.json({ status: "ok", backend: backend.name }));
+  app.get("/health", (_req, res) => res.json({ status: "ok", backend: deps.backend.name }));
   app.use("/admin", reindexRouter());
   app.use("/", searchRouter());
   app.use("/saved", savedRouter());
   app.use("/", exportRouter());
+
+  // Global error handler — catches any error passed via next(err) from async handlers.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("[search] unhandled error:", err);
+    res.status(500).json({ error: "internal_error" });
+  });
 
   return app;
 }

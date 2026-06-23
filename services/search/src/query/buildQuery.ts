@@ -2,7 +2,13 @@ import type { Knex } from "knex";
 import type { SearchFilters, SearchMode, SearchScope } from "../types.js";
 
 export function applyScope(qb: Knex.QueryBuilder, scope: SearchScope): Knex.QueryBuilder {
-  if (!scope.crossBranch && scope.branch) qb.where("branch", scope.branch);
+  if (scope.crossBranch) return qb;
+  if (scope.branch) {
+    qb.where("branch", scope.branch);
+  } else {
+    // No branch assigned and no crossbranch permission: deny everything (fail closed).
+    qb.whereRaw("1 = 0");
+  }
   return qb;
 }
 
@@ -30,24 +36,28 @@ export function applyTextMatch(qb: Knex.QueryBuilder, text: string, mode: Search
 
   if (mode === "boolean") {
     const toks = text.split(/\s+/);
-    let i = 0;
-    while (i < toks.length) {
-      const t = toks[i];
-      const up = t.toUpperCase();
-      if (up === "OR") {
-        const next = toks[i + 1];
-        if (next) qb.orWhereILike("tokens", `%${next.toLowerCase()}%`);
-        i += 2; continue;
+    // Wrap all OR/AND positive terms in a grouped sub-clause so the outer branch
+    // scope filter (set by applyScope) cannot be short-circuited by a top-level OR.
+    qb.where((group) => {
+      let i = 0;
+      while (i < toks.length) {
+        const t = toks[i];
+        const up = t.toUpperCase();
+        if (up === "OR") {
+          const next = toks[i + 1];
+          if (next) group.orWhereILike("tokens", `%${next.toLowerCase()}%`);
+          i += 2; continue;
+        }
+        if (up === "NOT") {
+          const next = toks[i + 1];
+          if (next) group.whereNot((b) => b.whereILike("tokens", `%${next.toLowerCase()}%`));
+          i += 2; continue;
+        }
+        if (up === "AND") { i += 1; continue; }
+        group.whereILike("tokens", `%${t.toLowerCase()}%`);
+        i += 1;
       }
-      if (up === "NOT") {
-        const next = toks[i + 1];
-        if (next) qb.whereNot((b) => b.whereILike("tokens", `%${next.toLowerCase()}%`));
-        i += 2; continue;
-      }
-      if (up === "AND") { i += 1; continue; }
-      qb.whereILike("tokens", `%${t.toLowerCase()}%`);
-      i += 1;
-    }
+    });
     return qb;
   }
 
@@ -76,8 +86,8 @@ export function scoreHit(tokens: string, queryTerms: string[]): number {
   return Math.min(1, matched / queryTerms.length);
 }
 
-export function paginate(page = 1, pageSize = 20): { limit: number; offset: number } {
-  const size = Math.min(Math.max(1, pageSize), 100);
+export function paginate(page = 1, pageSize = 20, maxSize = 100): { limit: number; offset: number } {
+  const size = Math.min(Math.max(1, pageSize), maxSize);
   const p = Math.max(1, page);
   return { limit: size, offset: (p - 1) * size };
 }

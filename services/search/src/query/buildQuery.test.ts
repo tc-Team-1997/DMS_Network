@@ -15,6 +15,26 @@ describe("applyScope", () => {
     const sql = applyScope(base(), { crossBranch: true }).toString();
     expect(sql).not.toMatch(/where/i);
   });
+  // CRITICAL-1: null branch without crossbranch must produce a deny-all clause
+  it("produces a deny-all clause when branch is null and crossBranch is false", () => {
+    const sql = applyScope(base(), { crossBranch: false, branch: undefined }).toString();
+    expect(sql).toMatch(/1\s*=\s*0/);
+  });
+});
+
+describe("applyTextMatch boolean OR grouping", () => {
+  // CRITICAL-2: the OR group must be wrapped so it cannot escape the outer branch scope
+  it("wraps boolean OR terms in a grouped sub-clause (not a top-level OR)", () => {
+    const sql = applyTextMatch(base(), "loan OR dorji", "boolean").toString();
+    // Both terms should appear inside parentheses, meaning the OR is scoped.
+    // The simplest invariant: the generated SQL contains both LIKE terms and
+    // also contains a parenthesised group (knex renders this as `(... or ...)`)
+    expect(sql).toMatch(/like.*%loan%/i);
+    expect(sql).toMatch(/like.*%dorji%/i);
+    // With the fix, there should be a subgroup parenthesis enclosing the OR.
+    // Knex renders grouped wheres as `where (... or ...)`.
+    expect(sql).toMatch(/\(.*like.*%loan%.*or.*like.*%dorji%.*\)/i);
+  });
 });
 
 describe("applyFilters", () => {

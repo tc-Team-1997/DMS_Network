@@ -48,7 +48,10 @@ export class SqlSearchBackend implements SearchBackend {
     const started = Date.now();
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
-    const { limit, offset } = paginate(page, pageSize);
+    // Allow up to EXPORT_CAP (5000) rows when the caller explicitly requests a large page.
+    // Normal user queries are still capped at 100 by the default maxSize.
+    const maxSize = pageSize > 100 ? 5000 : 100;
+    const { limit, offset } = paginate(page, pageSize, maxSize);
     const qTerms = query.text.toLowerCase().split(/\s+/).filter((t) => t && !["and", "or", "not"].includes(t));
 
     const predicate = (qb: Knex.QueryBuilder) => {
