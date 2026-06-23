@@ -13,6 +13,12 @@ export function authzRouter(): Router {
     // Fix 2: require internal service token to prevent unauthenticated permission enumeration
     const provided = req.headers["x-internal-token"] ?? "";
     const expected = config.internalServiceToken;
+
+    // Reject if configured token is empty (never allow)
+    if (!expected || expected.length === 0) {
+      res.status(401).json({ error: "unauthorized" }); return;
+    }
+
     const providedBuf = Buffer.from(String(provided).padEnd(expected.length, "\0").slice(0, expected.length));
     const expectedBuf = Buffer.from(expected);
     const valid = providedBuf.length === expectedBuf.length && timingSafeEqual(providedBuf, expectedBuf);

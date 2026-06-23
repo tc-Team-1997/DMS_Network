@@ -23,5 +23,7 @@ export interface CreateUserRequest {
 export function isAuthUser(x: unknown): x is AuthUser {
   const u = x as AuthUser;
   return !!u && typeof u.id === "number" && typeof u.username === "string"
-    && Array.isArray(u.roles) && Array.isArray(u.permissions);
+    && Array.isArray(u.roles) && Array.isArray(u.permissions)
+    && u.roles.every(r => typeof r === "string")
+    && u.permissions.every(p => typeof p === "string");
 }
