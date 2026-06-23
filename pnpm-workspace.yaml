@@ -4,4 +4,5 @@ packages:
   - "apps/*"
 allowBuilds:
   esbuild: true
+  oracledb: false
   sqlite3: true
