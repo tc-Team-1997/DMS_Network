@@ -5,17 +5,30 @@ import { loadConfig } from "@zordms/config";
 import { createApp } from "./app.js";
 
 const migrationsDir = new URL("./migrations", import.meta.url).pathname;
-const db = { client: "sqlite3" as const, host: "", port: 0, user: "", password: "", name: "", oracleConnectString: "" };
+const db = {
+  client: "sqlite3" as const,
+  host: "",
+  port: 0,
+  user: "",
+  password: "",
+  name: "",
+  oracleConnectString: "",
+};
 const knex = buildServiceKnex({ migrationsDir, db });
 const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv) });
 
-beforeAll(async () => { await knex.migrate.latest(); });
-afterAll(async () => { await knex.destroy(); });
+beforeAll(async () => {
+  await knex.migrate.latest();
+});
+afterAll(async () => {
+  await knex.destroy();
+});
 
 describe("workflow health", () => {
-  it("GET /health returns ok", async () => {
+  it("GET /health returns ok for the workflow service", async () => {
     const res = await request(app).get("/health");
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
+    expect(res.body.service).toBe("workflow");
   });
 });
