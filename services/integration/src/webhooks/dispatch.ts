@@ -3,12 +3,15 @@ import { signBody } from "./hmac.js";
 
 export interface DispatchReport { delivered: number; failed: number; attempts: number; }
 
-interface DispatchDeps { knex: Knex; fetchImpl?: typeof fetch; maxAttempts?: number; }
+// F7 (minor): delayMs defaults to 0 (test-friendly) but can be set to ~1000 in production
+// to avoid rapid-fire retries against a target that just returned 5xx.
+interface DispatchDeps { knex: Knex; fetchImpl?: typeof fetch; maxAttempts?: number; delayMs?: number; }
 
 export async function dispatchEvent(deps: DispatchDeps, event: string, payload: unknown): Promise<DispatchReport> {
   const { knex } = deps;
   const doFetch = deps.fetchImpl ?? globalThis.fetch;
   const maxAttempts = deps.maxAttempts ?? 3;
+  const delayMs = deps.delayMs ?? 0;
 
   const hooks = await knex("outbound_webhooks").where({ enabled: true });
   const subscribers = hooks.filter((h) =>
@@ -33,6 +36,10 @@ export async function dispatchEvent(deps: DispatchDeps, event: string, payload: 
         if (res.ok) { ok = true; break; }
       } catch {
         lastStatus = 0;
+      }
+      // F7: Configurable inter-retry delay (0 in tests, set to ~1000ms in production).
+      if (!ok && attempt < maxAttempts && delayMs > 0) {
+        await new Promise<void>((r) => setTimeout(r, delayMs));
       }
     }
 

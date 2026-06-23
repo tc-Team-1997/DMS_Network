@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
@@ -18,7 +18,8 @@ export interface AppDeps {
 
 export function createApp(deps: AppDeps): Express {
   const app = express();
-  app.use(cors());
+  // F3: Restrict CORS to the configured origin instead of wildcard.
+  app.use(cors({ origin: deps.config.corsOrigin }));
   // verify hook captures req.rawBody for every JSON request (used by webhook HMAC).
   app.use(express.json({ verify: captureRawBody }));
   app.locals.deps = deps;
@@ -28,6 +29,14 @@ export function createApp(deps: AppDeps): Express {
   app.use("/webhooks", webhooksRouter());
   app.use("/outbound", outboundRouter());
   app.use("/integration", managementRouter());
+
+  // F2: Global error handler — catches any error passed to next(err) from async handlers.
+  // Must be registered AFTER routes (Express 4 signature must be exactly 4 args).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("[integration] unhandled route error:", err);
+    res.status(500).json({ error: "internal_server_error" });
+  });
 
   return app;
 }

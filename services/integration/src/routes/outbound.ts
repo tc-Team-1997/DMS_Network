@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "../middleware/requireAuth.js";
 import { dispatchEvent } from "../webhooks/dispatch.js";
@@ -7,29 +7,55 @@ export function outboundRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
-  r.post("/", requirePermission("integration:manage"), async (req, res) => {
-    const { knex } = req.app.locals.deps as { knex: Knex };
-    const { url, events, auth_method, secret } = req.body as
-      { url: string; events: string[]; auth_method?: string; secret?: string };
-    const [id] = await knex("outbound_webhooks").insert({
-      url, events: (events ?? []).join(","), auth_method: auth_method ?? "hmac",
-      secret: secret ?? null, enabled: true,
-    }).returning("id");
-    const webhookId = typeof id === "object" ? (id as any).id : id;
-    res.status(201).json({ webhook: { id: webhookId, url, events: events ?? [], auth_method: auth_method ?? "hmac" } });
+  // F2: Every async handler has try/catch and passes errors to next(err).
+  // F4: Validate required fields before touching the DB; return 400 on bad input.
+  // F8 (minor): Treat empty or missing events array as 400 so callers are warned early.
+  r.post("/", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const { url, events, auth_method, secret } = req.body as
+        { url?: unknown; events?: unknown; auth_method?: string; secret?: string };
+
+      // Validate required fields
+      if (!url || typeof url !== "string") {
+        res.status(400).json({ error: "url is required and must be a string" });
+        return;
+      }
+      if (!Array.isArray(events) || events.length === 0) {
+        res.status(400).json({ error: "events is required and must be a non-empty array" });
+        return;
+      }
+
+      // Insert and then refetch id for Oracle compatibility (no .returning("id")).
+      await knex("outbound_webhooks").insert({
+        url, events: events.join(","), auth_method: auth_method ?? "hmac",
+        secret: secret ?? null, enabled: true,
+      });
+      const created = await knex("outbound_webhooks").where({ url }).orderBy("id", "desc").first();
+      res.status(201).json({ webhook: { id: created.id, url, events, auth_method: auth_method ?? "hmac" } });
+    } catch (err) { next(err); }
   });
 
-  r.get("/", requirePermission("integration:read"), async (req, res) => {
-    const { knex } = req.app.locals.deps as { knex: Knex };
-    const rows = await knex("outbound_webhooks").select("id", "url", "events", "auth_method", "enabled");
-    res.json({ webhooks: rows.map((w) => ({ ...w, events: String(w.events).split(",").filter(Boolean) })) });
+  r.get("/", requirePermission("integration:read"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const rows = await knex("outbound_webhooks").select("id", "url", "events", "auth_method", "enabled");
+      res.json({ webhooks: rows.map((w) => ({ ...w, events: String(w.events).split(",").filter(Boolean) })) });
+    } catch (err) { next(err); }
   });
 
-  r.post("/test", requirePermission("integration:manage"), async (req, res) => {
-    const { knex } = req.app.locals.deps as { knex: Knex };
-    const { event, payload } = req.body as { event: string; payload?: unknown };
-    const report = await dispatchEvent({ knex }, event, payload ?? {});
-    res.json({ report });
+  // F9 (minor): Validate that event field is present; return 400 otherwise.
+  r.post("/test", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const { event, payload } = req.body as { event?: unknown; payload?: unknown };
+      if (!event || typeof event !== "string") {
+        res.status(400).json({ error: "event is required and must be a string" });
+        return;
+      }
+      const report = await dispatchEvent({ knex }, event, payload ?? {});
+      res.json({ report });
+    } catch (err) { next(err); }
   });
 
   return r;
