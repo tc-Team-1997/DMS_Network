@@ -56,7 +56,7 @@ export function Login() {
           </>)}
 
           {error && <p style={{ color: "#b91c1c", fontSize: 13 }}>{error}</p>}
-          <button className="btn-primary" aria-label="Sign in" disabled={busy} style={{ marginTop: 18 }}>{busy ? "…" : "Continue"}</button>
+          <button className="btn-primary" disabled={busy} style={{ marginTop: 18 }}>{busy ? "…" : "Sign in"}</button>
         </form>
       </div>
     </div>

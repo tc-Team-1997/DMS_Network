@@ -8,7 +8,7 @@ export function Carousel({ slides }: { slides: Slide[] }) {
   return (
     <div style={{ position: "absolute", bottom: 48, left: 48, right: 48, color: "#fff" }}>
       <div style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "rgba(255,255,255,.12)", borderRadius: 10, fontSize: 20 }}>{s.icon}</div>
-      <h1 style={{ fontSize: 30, margin: "20px 0 10px" }}>{s.title}</h1>
+      <h2 style={{ fontSize: 30, margin: "20px 0 10px" }}>{s.title}</h2>
       <p style={{ maxWidth: 420, opacity: .8, lineHeight: 1.5 }}>{s.body}</p>
       <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
         {slides.map((_, idx) => (

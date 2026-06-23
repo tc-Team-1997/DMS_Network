@@ -9,7 +9,7 @@ describe("Login", () => {
       ok: true, json: async () => ({ token: "t", user: { id: 1, username: "admin", roles: ["CDO"], permissions: [] } }),
     }) as any;
     render(<AuthProvider><Login /></AuthProvider>);
-    expect(screen.getByText(/Sign in/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Sign in/i })).toBeInTheDocument();
     expect(screen.getByText(/Capture, classify, index\./i)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: "admin123" } });
