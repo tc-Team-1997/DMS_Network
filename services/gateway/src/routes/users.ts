@@ -25,6 +25,18 @@ export function usersRouter(): Router {
   r.post("/", requirePermission("user:create"), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     const body = req.body as CreateUserRequest;
+
+    // Fix 3: validate required fields
+    if (!body.username || typeof body.username !== "string" || body.username.trim() === "") {
+      res.status(400).json({ error: "username is required" }); return;
+    }
+    if (!body.password || typeof body.password !== "string" || body.password.trim() === "") {
+      res.status(400).json({ error: "password is required" }); return;
+    }
+    if (!Array.isArray(body.roles)) {
+      res.status(400).json({ error: "roles must be an array" }); return;
+    }
+
     const exists = await knex("users").where({ username: body.username }).first();
     if (exists) { res.status(409).json({ error: "username_taken" }); return; }
     const [uid] = await knex("users").insert({
@@ -48,11 +60,13 @@ export function usersRouter(): Router {
 
   r.post("/:id/lock", requirePermission("user:update"), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
-    const user = await knex("users").where({ id: req.params.id }).first();
+    // Fix 4: use Number() to ensure numeric comparison (pg id type safety)
+    const userId = Number(req.params.id);
+    const user = await knex("users").where({ id: userId }).first();
     if (!user) { res.status(404).json({ error: "not_found" }); return; }
     const status = user.status === "Locked" ? "Active" : "Locked";
-    await knex("users").where({ id: user.id }).update({ status });
-    await writeAudit(knex, { actor_id: req.authUser!.id, actor_username: req.authUser!.username, action: "USER_LOCK", entity: "user", entity_id: req.params.id, details: status });
+    await knex("users").where({ id: userId }).update({ status });
+    await writeAudit(knex, { actor_id: req.authUser!.id, actor_username: req.authUser!.username, action: "USER_LOCK", entity: "user", entity_id: String(userId), details: status });
     res.json({ ok: true, status });
   });
 

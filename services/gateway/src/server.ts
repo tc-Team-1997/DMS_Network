@@ -5,6 +5,7 @@ import { loadConfig } from "@zordms/config";
 const config = loadConfig();
 const knex = getKnex();
 await knex.migrate.latest();
+// Bootstrap the idempotent admin seed (safe to re-run; skips if admin already exists)
 await knex.seed.run();
 const app = createApp({ knex, config });
 app.listen(config.gatewayPort, () => console.log(`ZorDMS gateway on :${config.gatewayPort}`));

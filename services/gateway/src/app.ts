@@ -10,7 +10,8 @@ export interface AppDeps { knex: Knex; config: AppConfig; }
 
 export function createApp(deps: AppDeps): Express {
   const app = express();
-  app.use(cors());
+  // Fix 7: restrict CORS to configured origin (env CORS_ORIGIN or dev default)
+  app.use(cors({ origin: deps.config.corsOrigin }));
   app.use(express.json());
   app.locals.deps = deps;
 

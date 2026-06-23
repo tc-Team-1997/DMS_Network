@@ -13,6 +13,8 @@ export interface AppConfig {
   jwtSecret: string;
   sessionSecret: string;
   gatewayPort: number;
+  internalServiceToken: string;
+  corsOrigin: string;
 }
 
 const VALID: DbClient[] = ["pg", "oracledb", "sqlite3"];
@@ -35,5 +37,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     jwtSecret: env.JWT_SECRET ?? "change-me-in-prod",
     sessionSecret: env.SESSION_SECRET ?? "change-me-in-prod",
     gatewayPort: Number(env.GATEWAY_PORT ?? 4000),
+    internalServiceToken: env.INTERNAL_SERVICE_TOKEN ?? "change-me-internal",
+    corsOrigin: env.CORS_ORIGIN ?? "http://localhost:5174",
   };
 }
