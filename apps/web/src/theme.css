@@ -1,0 +1,6 @@
+:root{ --navy:#0b2e6b; --navy-deep:#072350; --gold:#e8c96b; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --bg:#ffffff; }
+*{box-sizing:border-box} body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:var(--ink)}
+.btn-primary{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:12px 16px;font-weight:600;cursor:pointer;width:100%}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed}
+.field{display:block;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+.label{font-size:13px;color:var(--muted)}
