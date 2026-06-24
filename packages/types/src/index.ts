@@ -20,6 +20,8 @@ export interface CreateUserRequest {
   branch?: string; region?: string; roles: string[];
 }
 
+export * from "./enterprise.js";
+
 export function isAuthUser(x: unknown): x is AuthUser {
   const u = x as AuthUser;
   return !!u && typeof u.id === "number" && typeof u.username === "string"

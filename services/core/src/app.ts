@@ -8,6 +8,12 @@ import { annotationsRouter } from "./routes/annotations.js";
 import { catalogRouter } from "./routes/catalog.js";
 import { mapperRouter } from "./routes/mapper.js";
 import { dashboardRouter } from "./routes/dashboard.js";
+import { branchesRouter } from "./routes/branches.js";
+import { customersRouter } from "./routes/customers.js";
+import { recordsRouter } from "./routes/records.js";
+import { complianceRouter } from "./routes/compliance.js";
+import { lifecycleRouter } from "./routes/lifecycle.js";
+import { sysadminRouter } from "./routes/sysadmin.js";
 
 export function createApp(deps: CoreDeps): Express {
   const app = express();
@@ -26,6 +32,14 @@ export function createApp(deps: CoreDeps): Express {
   app.use("/catalog", catalogRouter());
   app.use("/mapper", mapperRouter());
   app.use("/dashboard", dashboardRouter());
+
+  // Enterprise Plan 8 routes
+  app.use("/branches", branchesRouter());
+  app.use("/customers", customersRouter());
+  app.use("/records", recordsRouter());
+  app.use("/compliance", complianceRouter());
+  app.use("/lifecycle", lifecycleRouter());
+  app.use("/admin", sysadminRouter());
 
   // I2: global error handler so unhandled async throws return 500 instead of hanging
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

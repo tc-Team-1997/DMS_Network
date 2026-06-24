@@ -15,6 +15,8 @@ export interface AppConfig {
   gatewayPort: number;
   internalServiceToken: string;
   corsOrigin: string;
+  ops: { drPrimarySite: string; drSite: string; rpoMinutes: number; rtoMinutes: number; replicationLagSeconds: number };
+  search: { backend: "sql" | "elasticsearch"; esNode: string; esIndex: string };
 }
 
 const VALID: DbClient[] = ["pg", "oracledb", "sqlite3"];
@@ -39,5 +41,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     gatewayPort: Number(env.GATEWAY_PORT ?? 4000),
     internalServiceToken: env.INTERNAL_SERVICE_TOKEN ?? "change-me-internal",
     corsOrigin: env.CORS_ORIGIN ?? "http://localhost:5174",
+    ops: {
+      drPrimarySite: env.DR_PRIMARY_SITE ?? "Thimphu DC",
+      drSite: env.DR_SITE ?? "DR Site (Phuentsholing)",
+      rpoMinutes: Number(env.RPO_MINUTES ?? 15),
+      rtoMinutes: Number(env.RTO_MINUTES ?? 60),
+      replicationLagSeconds: Number(env.REPLICATION_LAG_SECONDS ?? 5),
+    },
+    search: {
+      backend: (env.SEARCH_BACKEND ?? "sql") as "sql" | "elasticsearch",
+      esNode: env.ES_NODE ?? "http://localhost:9200",
+      esIndex: env.ES_INDEX ?? "zordms-documents",
+    },
   };
 }
