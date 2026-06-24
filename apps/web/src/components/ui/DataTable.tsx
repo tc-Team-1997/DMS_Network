@@ -9,7 +9,7 @@ export interface Column<T> {
   width?:   string | number;
 }
 
-export interface DataTableProps<T extends Record<string, unknown>> {
+export interface DataTableProps<T extends object> {
   columns:  Column<T>[];
   rows:     T[];
   rowKey:   (row: T) => string | number;
@@ -17,7 +17,7 @@ export interface DataTableProps<T extends Record<string, unknown>> {
   emptyMessage?: string;
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T extends object>({
   columns, rows, rowKey, onRowClick, emptyMessage = "No records found",
 }: DataTableProps<T>) {
   const [sortKey, setSortKey]   = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
   const sorted = sortKey
     ? [...rows].sort((a, b) => {
-        const av = a[sortKey]; const bv = b[sortKey];
+        const av = (a as Record<string, unknown>)[sortKey]; const bv = (b as Record<string, unknown>)[sortKey];
         const cmp = String(av ?? "").localeCompare(String(bv ?? ""), undefined, { numeric: true });
         return sortAsc ? cmp : -cmp;
       })
@@ -61,7 +61,7 @@ export function DataTable<T extends Record<string, unknown>>({
               style={onRowClick ? { cursor: "pointer" } : undefined}>
             {columns.map(col => (
               <td key={col.key}>
-                {col.render ? col.render(row) : String(row[col.key] ?? "")}
+                {col.render ? col.render(row) : String((row as Record<string, unknown>)[col.key] ?? "")}
               </td>
             ))}
           </tr>

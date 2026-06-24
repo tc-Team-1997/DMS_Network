@@ -1,10 +1,437 @@
-export default function SystemAdministration() {
+import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "../auth/AuthContext.js";
+import {
+  KpiCard, Card, DataTable, Tag, StatusDot, Tabs,
+} from "../components/ui/index.js";
+import type { Column } from "../components/ui/index.js";
+import { systemAdministrationApi } from "../api/systemAdministration.js";
+import type {
+  ServiceHealth,
+  DrPosture,
+  ScheduleEntry,
+} from "../api/systemAdministration.js";
+
+/* ─── helpers ─── */
+function healthVariant(s: ServiceHealth["status"]): "green" | "amber" | "red" {
+  if (s === "Up") return "green";
+  if (s === "Degraded") return "amber";
+  return "red";
+}
+
+function healthTagVariant(s: ServiceHealth["status"]): "green" | "amber" | "red" | "blue" | "purple" | "gold" {
+  if (s === "Up") return "green";
+  if (s === "Degraded") return "amber";
+  return "red";
+}
+
+function kindTagVariant(k: "backup" | "maintenance"): "green" | "amber" | "red" | "blue" | "purple" | "gold" {
+  return k === "backup" ? "blue" : "gold";
+}
+
+const TABS = [
+  { key: "health", label: "Service Health" },
+  { key: "dr", label: "Disaster Recovery" },
+  { key: "schedules", label: "Backup & Maintenance" },
+];
+
+type HealthRow = ServiceHealth & { _key: string };
+type ScheduleRow = ScheduleEntry & { _key: string };
+
+export function SystemAdministration() {
+  const { user } = useAuth();
+  const canAdmin = Boolean(user?.permissions.includes("admin:access"));
+
+  const [tab, setTab] = useState("health");
+  const [health, setHealth] = useState<HealthRow[]>([]);
+  const [dr, setDr] = useState<DrPosture | null>(null);
+  const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  const loadAll = useCallback(async () => {
+    if (!canAdmin) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [h, d, s] = await Promise.all([
+        systemAdministrationApi.getHealth(),
+        systemAdministrationApi.getDrPosture(),
+        systemAdministrationApi.getSchedules(),
+      ]);
+      setHealth(h.health.map((svc) => ({ ...svc, _key: svc.service })));
+      setDr(d.dr);
+      setSchedules(s.schedules.map((e, i) => ({ ...e, _key: `${e.name}-${i}` })));
+      setLastRefresh(new Date());
+    } catch (e: any) {
+      setError(String(e?.message ?? "Failed to load system administration data"));
+    } finally {
+      setLoading(false);
+    }
+  }, [canAdmin]);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  if (!canAdmin) {
+    return (
+      <div className="fade-up">
+        <div className="page-header">
+          <div>
+            <h2 className="serif">System Administration</h2>
+            <p>You do not have permission to view this page.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── derived stats ─── */
+  const upCount = health.filter((h) => h.status === "Up").length;
+  const degradedCount = health.filter((h) => h.status === "Degraded").length;
+  const downCount = health.filter((h) => h.status === "Down").length;
+  const avgLatency = health.length
+    ? Math.round(health.reduce((s, h) => s + h.latency_ms, 0) / health.length)
+    : 0;
+
+  /* ─── table columns ─── */
+  const healthCols: Column<HealthRow>[] = [
+    {
+      key: "service", header: "Service", sortable: true,
+      render: (r) => (
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <StatusDot
+            color={healthVariant(r.status)}
+            pulse={r.status === "Up"}
+          />
+          <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{r.service}</span>
+        </span>
+      ),
+    },
+    {
+      key: "status", header: "Status", width: 120,
+      render: (r) => <Tag variant={healthTagVariant(r.status)}>{r.status}</Tag>,
+    },
+    {
+      key: "latency_ms", header: "Latency", width: 100, sortable: true,
+      render: (r) => (
+        <span
+          style={{
+            fontSize: 12, fontWeight: 600,
+            color: r.latency_ms > 500 ? "var(--R)" : r.latency_ms > 100 ? "var(--W)" : "var(--G)",
+          }}
+        >
+          {r.latency_ms > 0 ? `${r.latency_ms}ms` : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "_bar", header: "Load", width: 140,
+      render: (r) => {
+        const pct = Math.min(100, r.latency_ms > 0 ? Math.min(r.latency_ms / 10, 100) : 0);
+        const barColor = pct > 80 ? "var(--R)" : pct > 50 ? "var(--W)" : "var(--G)";
+        return (
+          <div style={{ background: "rgba(255,255,255,.07)", borderRadius: 3, height: 6, overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: 3, minWidth: pct > 0 ? 4 : 0 }} />
+          </div>
+        );
+      },
+    },
+  ];
+
+  const scheduleCols: Column<ScheduleRow>[] = [
+    { key: "name", header: "Task", sortable: true },
+    {
+      key: "kind", header: "Kind", width: 120,
+      render: (r) => <Tag variant={kindTagVariant(r.kind)}>{r.kind}</Tag>,
+    },
+    {
+      key: "cron", header: "Schedule", width: 130,
+      render: (r) => <span className="mono" style={{ fontSize: 11 }}>{r.cron}</span>,
+    },
+    {
+      key: "last_run", header: "Last Run", width: 170,
+      render: (r) => (
+        <span style={{ fontSize: 11, color: "var(--sil)" }}>
+          {r.last_run ? new Date(r.last_run).toLocaleString() : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "next_run", header: "Next Run", width: 170,
+      render: (r) => (
+        <span style={{ fontSize: 11, color: "var(--gold3)" }}>
+          {r.next_run ? new Date(r.next_run).toLocaleString() : "—"}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="fade-up">
+      {/* ── page header ── */}
       <div className="page-header">
-        <div><h2 className="serif">System Administration</h2><p>Service health, configuration, branch provisioning and platform settings</p></div>
+        <div>
+          <h2 className="serif">System Administration</h2>
+          <p>Platform health · Disaster Recovery · Backup · Storage · Maintenance scheduling</p>
+        </div>
+        <div className="phr">
+          <button className="btn bg sm" onClick={loadAll} disabled={loading}>
+            {loading ? "Loading…" : "Run Diagnostics"}
+          </button>
+        </div>
       </div>
-      <p style={{ color: "var(--sil)", fontSize: 12 }}>SystemAdministration — stub. Screen agent will populate this view.</p>
+
+      {error && (
+        <div style={{ padding: "10px 14px", background: "var(--RT)", border: "1px solid rgba(224,82,82,.3)", borderRadius: 8, marginBottom: 14, fontSize: 12, color: "var(--R)" }}>
+          {error}
+        </div>
+      )}
+
+      {lastRefresh && (
+        <div style={{ marginBottom: 12, fontSize: 11, color: "var(--sil)" }}>
+          Last refreshed: {lastRefresh.toLocaleTimeString()}
+        </div>
+      )}
+
+      {/* ── KPI row ── */}
+      <div className="g4" style={{ marginBottom: 18 }}>
+        <KpiCard
+          label="Services Up"
+          value={`${upCount} / ${health.length}`}
+          sub={downCount > 0
+            ? <Tag variant="red">{downCount} down</Tag>
+            : <span style={{ color: "var(--G)" }}>All systems operational</span>}
+          variant="green"
+        />
+        <KpiCard
+          label="Degraded"
+          value={degradedCount}
+          sub={degradedCount > 0 ? "Elevated latency detected" : "None — stable"}
+          variant={degradedCount > 0 ? "amber" : "green"}
+        />
+        <KpiCard
+          label="Avg Response"
+          value={`${avgLatency}ms`}
+          sub="Cross-service average latency"
+          variant="blue"
+        />
+        <KpiCard
+          label="DR Posture"
+          value={dr ? `${dr.rpo_minutes}m RPO` : "—"}
+          sub={dr ? `${dr.rto_minutes}m RTO · ${dr.replication_lag_seconds}s lag` : "Loading…"}
+          variant="gold"
+        />
+      </div>
+
+      {/* ── Tabs ── */}
+      <Tabs items={TABS} active={tab} onChange={setTab} />
+
+      {/* ═══ SERVICE HEALTH TAB ═══ */}
+      {tab === "health" && (
+        <div style={{ marginTop: 14 }}>
+          <Card
+            title={
+              <span>
+                Service Health Monitor{" "}
+                {degradedCount > 0 && <Tag variant="amber">{degradedCount} degraded</Tag>}
+                {downCount > 0 && <Tag variant="red">{downCount} down</Tag>}
+              </span>
+            }
+          >
+            {loading ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>Probing services…</div>
+            ) : (
+              <DataTable<HealthRow>
+                columns={healthCols}
+                rows={health}
+                rowKey={(r) => r._key}
+                emptyMessage="No service health data"
+              />
+            )}
+          </Card>
+
+          {/* inline health cards when data present */}
+          {health.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, marginTop: 14 }}>
+              {health.map((h) => (
+                <div key={h.service} style={{
+                  padding: 14,
+                  background: "var(--ink3)",
+                  border: `1px solid ${h.status === "Up" ? "rgba(46,204,138,.15)" : h.status === "Degraded" ? "rgba(240,160,48,.25)" : "rgba(224,82,82,.3)"}`,
+                  borderRadius: 9,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontWeight: 700, textTransform: "capitalize", fontSize: 12 }}>{h.service}</span>
+                    <StatusDot color={healthVariant(h.status)} pulse={h.status === "Up"} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Tag variant={healthTagVariant(h.status)}>{h.status}</Tag>
+                    <span style={{ fontSize: 11, color: "var(--sil)" }}>
+                      {h.latency_ms > 0 ? `${h.latency_ms}ms` : "—"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ DISASTER RECOVERY TAB ═══ */}
+      {tab === "dr" && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          {dr ? (
+            <>
+              <div className="g2">
+                {/* Primary site */}
+                <div style={{
+                  background: "var(--ink3)",
+                  border: "1px solid rgba(46,204,138,.2)",
+                  borderRadius: 10, padding: "16px 18px",
+                  display: "flex", alignItems: "center", gap: 14,
+                }}>
+                  <div style={{ flexShrink: 0 }}>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--G)", marginBottom: 4 }}>Primary Site</div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{dr.primary_site}</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: "var(--sil)", marginBottom: 6 }}>Active production site — all live traffic</div>
+                    <Tag variant="green">Live · Active</Tag>
+                  </div>
+                </div>
+
+                {/* DR site */}
+                <div style={{
+                  background: "var(--ink3)",
+                  border: "1px solid rgba(58,159,208,.2)",
+                  borderRadius: 10, padding: "16px 18px",
+                  display: "flex", alignItems: "center", gap: 14,
+                }}>
+                  <div style={{ flexShrink: 0 }}>
+                    <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "1.5px", color: "var(--B)", marginBottom: 4 }}>DR Site</div>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{dr.dr_site}</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: "var(--sil)", marginBottom: 6 }}>
+                      Standby · {dr.replication_lag_seconds}s replication lag
+                    </div>
+                    <Tag variant="blue">Synced · Active-Passive</Tag>
+                  </div>
+                </div>
+              </div>
+
+              {/* DR metrics */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                {[
+                  { label: "RPO", value: `${dr.rpo_minutes} min`, hint: "Recovery Point Objective", color: "var(--G)" },
+                  { label: "RTO", value: `${dr.rto_minutes} min`, hint: "Recovery Time Objective", color: "var(--G)" },
+                  { label: "Replication Lag", value: `${dr.replication_lag_seconds}s`, hint: "Average lag behind primary", color: dr.replication_lag_seconds > 30 ? "var(--W)" : "var(--G)" },
+                  { label: "Last DR Test", value: dr.last_failover_test ?? "—", hint: "Most recent failover test", color: "var(--B)" },
+                ].map((kv) => (
+                  <div key={kv.label} style={{ background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 9, padding: "12px 14px" }}>
+                    <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{kv.label}</div>
+                    <div style={{ fontWeight: 700, fontSize: 18, color: kv.color }}>{kv.value}</div>
+                    <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 3 }}>{kv.hint}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* DR readiness checklist */}
+              <Card title="DR Readiness Checklist">
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    { item: "Replication verified — lag within SLA", ok: dr.replication_lag_seconds <= 60 },
+                    { item: "RPO target achievable", ok: dr.rpo_minutes <= 30 },
+                    { item: "RTO target achievable", ok: dr.rto_minutes <= 120 },
+                    { item: "Last failover test recorded", ok: Boolean(dr.last_failover_test) },
+                  ].map((c) => (
+                    <div key={c.item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12 }}>
+                      <span style={{ color: c.ok ? "var(--G)" : "var(--R)", fontSize: 14, flexShrink: 0 }}>
+                        {c.ok ? "✓" : "✗"}
+                      </span>
+                      <span style={{ color: c.ok ? "var(--mist)" : "var(--sil)" }}>{c.item}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <div style={{ padding: 40, textAlign: "center", color: "var(--sil)" }}>
+                {loading ? "Loading DR posture…" : "No DR data available"}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ═══ SCHEDULES TAB ═══ */}
+      {tab === "schedules" && (
+        <div style={{ marginTop: 14 }}>
+          {/* summary */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 14 }}>
+            {["backup", "maintenance"].map((kind) => {
+              const group = schedules.filter((s) => s.kind === kind);
+              return (
+                <div key={kind} style={{ background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 9, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    {kind} tasks
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 22 }}>{group.length}</div>
+                  <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 3 }}>
+                    Scheduled jobs
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <Card title="Backup &amp; Maintenance Schedule">
+            {loading ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>Loading schedules…</div>
+            ) : (
+              <DataTable<ScheduleRow>
+                columns={scheduleCols}
+                rows={schedules}
+                rowKey={(r) => r._key}
+                emptyMessage="No scheduled tasks configured"
+              />
+            )}
+          </Card>
+
+          {/* Schedule details cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12, marginTop: 14 }}>
+            {schedules.map((s) => (
+              <div key={s._key} style={{ background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 9, padding: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>{s.name}</span>
+                  <Tag variant={kindTagVariant(s.kind)}>{s.kind}</Tag>
+                </div>
+                <div style={{ fontSize: 11, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--sil)" }}>Cron</span>
+                    <span className="mono" style={{ fontSize: 10 }}>{s.cron}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--sil)" }}>Last run</span>
+                    <span style={{ color: "var(--G)", fontSize: 10 }}>
+                      {s.last_run ? new Date(s.last_run).toLocaleDateString() : "—"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--sil)" }}>Next run</span>
+                    <span style={{ color: "var(--gold3)", fontSize: 10 }}>
+                      {s.next_run ? new Date(s.next_run).toLocaleDateString() : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default SystemAdministration;
