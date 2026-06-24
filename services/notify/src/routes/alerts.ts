@@ -1,7 +1,6 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-import { requireAuth } from "../middleware/requireAuth.js";
-import { requirePermission } from "../middleware/requirePermission.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
 import { resolveEscalationRecipients } from "../services/escalation.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 

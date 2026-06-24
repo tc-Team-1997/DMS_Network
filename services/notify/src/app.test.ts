@@ -3,6 +3,7 @@ import request from "supertest";
 import express from "express";
 import { buildServiceKnex } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
+import { errorHandler } from "@zordms/auth";
 import { createApp } from "./app.js";
 import { ChannelRegistry } from "./channels/registry.js";
 import { InMemoryBus } from "./bus/fake.js";
@@ -43,14 +44,10 @@ describe("global error handler", () => {
     crashApp.get("/crash-test", (_req, _res, next) => {
       next(new Error("boom"));
     });
-    // Register the same global error handler that createApp registers
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    crashApp.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      console.error("[notify] unhandled error", err);
-      res.status(500).json({ error: "internal_server_error" });
-    });
+    // Register the shared error handler from @zordms/auth (same as createApp uses)
+    crashApp.use(errorHandler);
     const res = await request(crashApp).get("/crash-test");
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe("internal_server_error");
+    expect(res.body.error).toBe("internal_error");
   });
 });

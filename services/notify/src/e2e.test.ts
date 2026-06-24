@@ -21,12 +21,20 @@ const hub = new RealtimeHub();
 const bus = new InMemoryBus();
 const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv), registry, bus, hub });
 
+const CDO_PERMISSIONS = [
+  "user:create", "user:update", "user:read", "role:assign",
+  "document:capture", "document:index", "document:read", "document:approve",
+  "document:reject", "document:delete", "workflow:act", "legal_hold:place",
+  "compliance:read", "admin:access", "crossbranch:read",
+  "alert:read", "alert:manage", "alert_rule:manage",
+];
+
 let adminToken = "";
 beforeAll(async () => {
   await knex.migrate.latest(); await knex.seed.run();
   attachConsumer({ knex, registry, hub, bus });
   const admin = await knex("users").where({ username: "admin" }).first();
-  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+  adminToken = signToken({ sub: admin.id, username: "admin", roles: ["CDO"], permissions: CDO_PERMISSIONS, branch: "HQ" }, "t");
 });
 afterAll(async () => { await knex.destroy(); });
 

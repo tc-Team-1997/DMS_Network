@@ -1,7 +1,8 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, { type Express } from "express";
 import cors from "cors";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
+import { errorHandler } from "@zordms/auth";
 import type { ChannelRegistry } from "./channels/registry.js";
 import type { EventBus } from "./bus/types.js";
 import type { RealtimeHub } from "./realtime/hub.js";
@@ -29,12 +30,8 @@ export function createApp(deps: NotifyDeps): Express {
   app.use("/alerts", alertsRouter());         // REST: GET /alerts, POST /alerts/:id/read, etc.
   app.use("/rules", rulesRouter());
 
-  // Global error handler — catches unhandled async exceptions from route handlers
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("[notify] unhandled error", err);
-    res.status(500).json({ error: "internal_server_error" });
-  });
+  // Shared error handler from @zordms/auth (must be registered LAST)
+  app.use(errorHandler);
 
   return app;
 }
