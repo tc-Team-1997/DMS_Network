@@ -15,8 +15,15 @@
     "jsonwebtoken": "^9.0.3",
     "speakeasy": "^2.0.0"
   },
+  "peerDependencies": {
+    "express": "^4.19.0"
+  },
+  "peerDependenciesMeta": {
+    "express": { "optional": true }
+  },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.0.0",
     "@types/speakeasy": "^2.0.8",
