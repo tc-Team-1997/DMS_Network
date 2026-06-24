@@ -1,5 +1,5 @@
 import type { Connector } from "../connectors/types.js";
-import type { ConnectorResult } from "../types.js";
+import type { ConnectorResult } from "@zordms/types";
 
 export interface CbsCustomer { cid: string; name: string; branch?: string; segment?: string; }
 export interface CbsKycSyncResult { cid: string; kycStatus: string; syncedAt?: string; }

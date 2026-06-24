@@ -15,7 +15,7 @@ let adminToken = "";
 beforeAll(async () => {
   await knex.migrate.latest(); await knex.seed.run();
   const admin = await knex("users").where({ username: "admin" }).first();
-  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+  adminToken = signToken({ sub: admin.id, username: "admin", roles: ["CDO"], permissions: ["integration:read", "integration:manage"] }, "t");
 });
 afterAll(async () => { await knex.destroy(); });
 

@@ -1,7 +1,8 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, { type Express } from "express";
 import cors from "cors";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
+import { errorHandler } from "@zordms/auth";
 import { captureRawBody } from "./middleware/rawBody.js";
 import type { EventSink } from "./events/sink.js";
 import type { Connector } from "./connectors/types.js";
@@ -32,11 +33,7 @@ export function createApp(deps: AppDeps): Express {
 
   // F2: Global error handler — catches any error passed to next(err) from async handlers.
   // Must be registered AFTER routes (Express 4 signature must be exactly 4 args).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("[integration] unhandled route error:", err);
-    res.status(500).json({ error: "internal_server_error" });
-  });
+  app.use(errorHandler);
 
   return app;
 }

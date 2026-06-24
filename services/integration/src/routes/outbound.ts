@@ -1,6 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Knex } from "knex";
-import { requireAuth, requirePermission } from "../middleware/requireAuth.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
 import { dispatchEvent } from "../webhooks/dispatch.js";
 
 export function outboundRouter(): Router {

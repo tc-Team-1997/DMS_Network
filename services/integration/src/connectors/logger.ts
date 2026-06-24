@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 import type { Connector } from "./types.js";
-import type { ConnectorResult } from "../types.js";
+import type { ConnectorResult } from "@zordms/types";
 
 // Wrap any connector so every call is timed and persisted to integration_logs.
 export function withLogging(inner: Connector, knex: Knex): Connector {

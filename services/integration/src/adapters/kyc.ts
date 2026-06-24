@@ -1,5 +1,5 @@
 import type { Connector } from "../connectors/types.js";
-import type { ConnectorResult } from "../types.js";
+import type { ConnectorResult } from "@zordms/types";
 
 export interface KycSubject { cid: string; documentType: string; documentNo: string; }
 export interface KycVerdict { match: boolean; score: number; decision: string; }

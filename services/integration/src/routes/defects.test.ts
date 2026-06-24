@@ -28,9 +28,10 @@ beforeAll(async () => {
   await knex("integration_config").where({ system: "cbs" }).update({ secret: "whsec_cbs" });
 
   const admin = await knex("users").where({ username: "admin" }).first();
-  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+  adminToken = signToken({ sub: admin.id, username: "admin", roles: ["CDO"], permissions: ["integration:read", "integration:manage"] }, "t");
 
   // Create a user with only integration:read (no integration:manage).
+  // No DB role setup needed — permissions are embedded in the JWT claims.
   await knex("users").insert({
     username: "auditor_defect",
     password_hash: "x",
@@ -39,9 +40,7 @@ beforeAll(async () => {
     created_by: "system",
   });
   const auditor = await knex("users").where({ username: "auditor_defect" }).first();
-  const auditorRole = await knex("roles").where({ name: "Auditor" }).first();
-  await knex("user_roles").insert({ user_id: auditor.id, role_id: auditorRole.id });
-  readerToken = signToken({ sub: auditor.id, username: "auditor_defect" }, "t");
+  readerToken = signToken({ sub: auditor.id, username: "auditor_defect", roles: ["Auditor"], permissions: ["integration:read"] }, "t");
 });
 
 afterAll(async () => { await knex.destroy(); });

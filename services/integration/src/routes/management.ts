@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Knex } from "knex";
-import { requireAuth, requirePermission } from "../middleware/requireAuth.js";
-import type { ConnectedSystem } from "../types.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
+import type { ConnectedSystem } from "@zordms/types";
 
 export function managementRouter(): Router {
   const r = Router();

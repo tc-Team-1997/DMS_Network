@@ -1,5 +1,5 @@
 import type { Knex } from "knex";
-import type { ConnectorResult } from "../types.js";
+import type { ConnectorResult } from "@zordms/types";
 
 export type { ConnectorResult };
 

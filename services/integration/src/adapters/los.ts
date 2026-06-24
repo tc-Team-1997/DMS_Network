@@ -1,5 +1,5 @@
 import type { Connector } from "../connectors/types.js";
-import type { ConnectorResult } from "../types.js";
+import type { ConnectorResult } from "@zordms/types";
 
 export interface LoanPush { applicationId: string; cid: string; amount: number; }
 export interface LoanRef { loanId: string; state: string; }

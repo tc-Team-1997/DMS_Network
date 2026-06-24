@@ -1,5 +1,5 @@
 import type { Connector } from "./types.js";
-import type { ConnectorResult } from "../types.js";
+import type { ConnectorResult } from "@zordms/types";
 
 export class MockConnector implements Connector {
   constructor(

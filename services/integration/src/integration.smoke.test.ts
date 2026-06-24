@@ -21,7 +21,7 @@ beforeAll(async () => {
   await knex.migrate.latest(); await knex.seed.run();
   await knex("integration_config").where({ system: "cbs" }).update({ secret: "whsec_cbs" });
   const admin = await knex("users").where({ username: "admin" }).first();
-  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+  adminToken = signToken({ sub: admin.id, username: "admin", roles: ["CDO"], permissions: ["integration:read", "integration:manage"] }, "t");
 });
 afterAll(async () => { await knex.destroy(); });
 
