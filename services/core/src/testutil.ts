@@ -9,7 +9,7 @@ import { loadConfig } from "@zordms/config";
 import { LocalStorage } from "./storage/local.js";
 import type { StorageBackend } from "./storage/index.js";
 import { InMemoryEventBus, type EventBus, type DomainEvent } from "./events/index.js";
-import { signToken } from "@zordms/auth";
+import { signToken, resolveUserAuthz } from "@zordms/auth";
 import { createApp } from "./app.js";
 
 const migrationsDir = fileURLToPath(new URL("./migrations", import.meta.url));
@@ -43,7 +43,16 @@ export async function makeTestApp(): Promise<TestHarness> {
     app, knex, storage, events,
     async tokenFor(username: string): Promise<string> {
       const u = await knex("users").where({ username }).first();
-      return signToken({ sub: u.id, username }, "t");
+      // Resolve permissions from DB so the token carries full RBAC claims
+      const authz = await resolveUserAuthz(knex, u.id);
+      return signToken({
+        sub: u.id,
+        username: u.username,
+        roles: authz.roles,
+        permissions: authz.permissions,
+        branch: u.branch ?? undefined,
+        region: u.region ?? undefined,
+      }, "t");
     },
     async cleanup() {
       await knex.destroy();

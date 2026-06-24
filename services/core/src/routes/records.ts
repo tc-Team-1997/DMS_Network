@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requirePermission } from "../middleware.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
 import {
   listFilePlan, listLegalHolds, placeLegalHold, releaseLegalHold, disposalEligibility, certifiedDisposal,
 } from "../modules/records.js";

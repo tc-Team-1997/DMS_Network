@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-import { requireAuth, requirePermission } from "../middleware.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
 import { createFolder, listTree, moveFolder } from "../repo/folders.js";
 
 export function foldersRouter(): Router {

@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requirePermission } from "../middleware.js";
-import { can } from "@zordms/auth";
+import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import { EVENTS } from "../events/index.js";
 import type { CoreDeps } from "../deps.js";
 import { validateMetadata } from "../schemas/index.js";
@@ -13,8 +12,7 @@ export function indexRouter(): Router {
   r.post("/:documentId", requirePermission("document:index"), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
-      const canCrossBranch = can({ permissions: req.authUser!.permissions }, "crossbranch:read");
-      const viewer = { branch: req.authUser!.branch, canCrossBranch };
+      const viewer = makeViewer(req);
       // C1: pass viewer so branch-isolation is enforced
       const document = await getDocument(deps.knex, Number(req.params.documentId), viewer);
       if (!document) { res.status(404).json({ error: "not_found" }); return; }

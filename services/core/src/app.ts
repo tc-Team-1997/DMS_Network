@@ -1,5 +1,6 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, { type Express } from "express";
 import cors from "cors";
+import { errorHandler } from "@zordms/auth";
 import type { CoreDeps } from "./deps.js";
 import { foldersRouter } from "./routes/folders.js";
 import { documentsRouter } from "./routes/documents.js";
@@ -42,11 +43,7 @@ export function createApp(deps: CoreDeps): Express {
   app.use("/admin", sysadminRouter());
 
   // I2: global error handler so unhandled async throws return 500 instead of hanging
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("[core] unhandled error:", err);
-    res.status(500).json({ error: "internal" });
-  });
+  app.use(errorHandler);
 
   return app;
 }

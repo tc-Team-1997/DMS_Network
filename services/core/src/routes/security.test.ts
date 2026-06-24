@@ -1,41 +1,46 @@
 /**
  * Security regression tests for review findings C1–C5, I1, I2, I3, I5, I6.
  * Each test corresponds to a specific review finding and proves the hole is closed.
+ *
+ * Auth is now CLAIMS-BASED: tokens carry permissions[] and branch in the JWT payload.
+ * No DB user lookup happens in the middleware.
  */
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import request from "supertest";
 import { makeTestApp, type TestHarness } from "../testutil.js";
 import { signToken } from "@zordms/auth";
 
+const SECRET = "t";
+
 let h: TestHarness;
 
 beforeAll(async () => { h = await makeTestApp(); });
 afterAll(async () => { await h.cleanup(); });
 
-// ------------------------------------------------------------------
-// Helper: create a user with a specific role + branch and return a token
-async function createUserWithRole(
-  username: string,
-  roleName: string,
-  branch: string,
-): Promise<string> {
-  const role = await h.knex("roles").where({ name: roleName }).first();
-  const existing = await h.knex("users").where({ username }).first();
-  let userId: number;
-  if (existing) {
-    userId = existing.id;
-  } else {
-    const inserted = await h.knex("users").insert({
-      username,
-      password_hash: "x",
-      status: "Active",
-      branch,
-    }).returning("id");
-    userId = typeof inserted[0] === "object" ? (inserted[0] as any).id : inserted[0];
-    await h.knex("user_roles").insert({ user_id: userId, role_id: role.id });
-  }
-  const u = await h.knex("users").where({ id: userId }).first();
-  return signToken({ sub: u.id, username: u.username }, "t");
+// Known role permission sets (mirrors seeds/0001_core_rbac.ts)
+const ROLE_PERMS: Record<string, string[]> = {
+  CDO: [
+    "user:create", "user:update", "user:read", "role:assign",
+    "document:capture", "document:index", "document:read",
+    "document:approve", "document:reject", "document:delete",
+    "workflow:act", "legal_hold:place", "compliance:read",
+    "admin:access", "crossbranch:read", "folder:create", "folder:read",
+    "document:catalog", "document:map", "annotation:write",
+  ],
+  Maker: ["document:capture", "document:index", "document:read", "workflow:act", "folder:read", "annotation:write"],
+  Viewer: ["document:read", "folder:read"],
+  Auditor: ["document:read", "compliance:read", "crossbranch:read", "folder:read"],
+};
+
+/** Mint a claims-bearing token for a role+branch combination. */
+function mintToken(opts: { sub: number; username: string; role: string; branch?: string }): string {
+  return signToken({
+    sub: opts.sub,
+    username: opts.username,
+    permissions: ROLE_PERMS[opts.role] ?? [],
+    roles: [opts.role],
+    branch: opts.branch,
+  }, SECRET);
 }
 
 // Upload a document as a specific user to a specific branch
@@ -53,14 +58,11 @@ async function uploadDoc(token: string, branch: string, filename = "test.png"): 
 // C1: IDOR — single-document endpoints bypass branch scoping
 describe("C1: branch-scoped single-document IDOR prevention", () => {
   it("user from branch Paro cannot GET a document owned by branch Thimphu", async () => {
-    const thimphuToken = await createUserWithRole("c1_thimphu_maker", "Maker", "Thimphu");
-    const paroToken = await createUserWithRole("c1_paro_viewer", "Viewer", "Paro");
-
-    // Upload as Thimphu user — branch is derived from JWT (not req.body) for non-crossbranch
     const adminToken = await h.tokenFor("admin");
-    const id = await uploadDoc(adminToken, "Thimphu");
+    const paroToken = mintToken({ sub: 900, username: "c1_paro_viewer", role: "Viewer", branch: "Paro" });
 
-    // Update document to be owned by Thimphu branch explicitly
+    const id = await uploadDoc(adminToken, "Thimphu");
+    // Ensure the document is tagged to Thimphu
     await h.knex("documents").where({ id }).update({ branch: "Thimphu" });
 
     // Paro user should not see it
@@ -71,7 +73,7 @@ describe("C1: branch-scoped single-document IDOR prevention", () => {
 
   it("user from branch Paro cannot download a document owned by branch Thimphu", async () => {
     const adminToken = await h.tokenFor("admin");
-    const paroToken = await createUserWithRole("c1_paro_viewer2", "Viewer", "Paro");
+    const paroToken = mintToken({ sub: 901, username: "c1_paro_viewer2", role: "Viewer", branch: "Paro" });
 
     const id = await uploadDoc(adminToken, "Thimphu");
     await h.knex("documents").where({ id }).update({ branch: "Thimphu" });
@@ -83,32 +85,34 @@ describe("C1: branch-scoped single-document IDOR prevention", () => {
 
   it("user from branch Paro without crossbranch:read cannot DELETE a document owned by branch Thimphu", async () => {
     const adminToken = await h.tokenFor("admin");
-    // Maker role has document:read but NOT crossbranch:read
-    const paroMakerToken = await createUserWithRole("c1_paro_maker_del", "Maker", "Paro");
+    // Maker has document:read + document:delete (we add delete for this test), but NOT crossbranch:read
+    const paroMakerToken = mintToken({
+      sub: 902,
+      username: "c1_paro_maker_del",
+      role: "Maker",
+      branch: "Paro",
+    });
+    // Augment with document:delete inline — Maker role doesn't have it by default; use custom perms
+    const paroMakerWithDeleteToken = signToken({
+      sub: 902,
+      username: "c1_paro_maker_del",
+      permissions: [...ROLE_PERMS.Maker, "document:delete"],
+      roles: ["Maker"],
+      branch: "Paro",
+    }, SECRET);
 
     const id = await uploadDoc(adminToken, "Thimphu");
     await h.knex("documents").where({ id }).update({ branch: "Thimphu" });
 
-    // Grant document:delete to the Maker role for this test
-    const makerRole = await h.knex("roles").where({ name: "Maker" }).first();
-    const delPerm = await h.knex("permissions").where({ key: "document:delete" }).first();
-    const existing = await h.knex("role_permissions").where({ role_id: makerRole.id, permission_id: delPerm.id }).first();
-    if (!existing) await h.knex("role_permissions").insert({ role_id: makerRole.id, permission_id: delPerm.id });
-
-    // Must re-mint token so permissions are resolved fresh
-    const u = await h.knex("users").where({ username: "c1_paro_maker_del" }).first();
-    const { signToken } = await import("@zordms/auth");
-    const freshToken = signToken({ sub: u.id, username: u.username }, "t");
-
     const res = await request(h.app).delete(`/documents/${id}`)
-      .set("Authorization", `Bearer ${freshToken}`);
+      .set("Authorization", `Bearer ${paroMakerWithDeleteToken}`);
     // Paro user without crossbranch:read cannot see/delete Thimphu document
     expect(res.status).toBe(404);
   });
 
   it("crossbranch:read user CAN see any branch's document", async () => {
     const adminToken = await h.tokenFor("admin");
-    const auditorToken = await createUserWithRole("c1_auditor", "Auditor", "Paro");
+    const auditorToken = mintToken({ sub: 903, username: "c1_auditor", role: "Auditor", branch: "Paro" });
 
     const id = await uploadDoc(adminToken, "Thimphu");
     await h.knex("documents").where({ id }).update({ branch: "Thimphu" });
@@ -123,7 +127,8 @@ describe("C1: branch-scoped single-document IDOR prevention", () => {
 // C2: Branch spoofing — non-crossbranch user cannot set branch via body
 describe("C2: branch spoofing prevention on document capture", () => {
   it("a Maker user cannot set a different branch via req.body", async () => {
-    const makerToken = await createUserWithRole("c2_maker", "Maker", "Thimphu");
+    // Maker has document:capture but NOT crossbranch:read; branch=Thimphu in token
+    const makerToken = mintToken({ sub: 910, username: "c2_maker", role: "Maker", branch: "Thimphu" });
 
     const res = await request(h.app).post("/documents")
       .set("Authorization", `Bearer ${makerToken}`)
@@ -132,22 +137,21 @@ describe("C2: branch spoofing prevention on document capture", () => {
       .attach("file", Buffer.from("data"), "spoof.png");
 
     expect(res.status).toBe(201);
-    // Branch should be Thimphu (from JWT), not Paro (from body)
+    // Branch should be Thimphu (from JWT claims), not Paro (from body)
     expect(res.body.document.branch).toBe("Thimphu");
   });
 
-  it("a user with crossbranch:read CAN override branch", async () => {
-    const auditorToken = await createUserWithRole("c2_auditor", "Auditor", "Thimphu");
+  it("a user with crossbranch:read but no document:capture gets 403", async () => {
+    // Auditor has crossbranch:read but NOT document:capture
+    const auditorToken = mintToken({ sub: 911, username: "c2_auditor", role: "Auditor", branch: "Thimphu" });
 
-    // Auditors have crossbranch:read
     const res = await request(h.app).post("/documents")
       .set("Authorization", `Bearer ${auditorToken}`)
       .field("title", "Cross-branch doc")
       .field("branch", "Paro")
       .attach("file", Buffer.from("data"), "cross.png");
 
-    // Auditor doesn't have document:capture; expect 403 - this proves the perm check still applies
-    // Use admin instead who has crossbranch:read via CDO
+    // Auditor doesn't have document:capture; expect 403
     expect(res.status).toBe(403);
   });
 
@@ -212,7 +216,7 @@ describe("C4: annotation delete IDOR prevention", () => {
 
   it("user from branch Paro cannot list annotations on a Thimphu document", async () => {
     const adminToken = await h.tokenFor("admin");
-    const paroToken = await createUserWithRole("c4_paro_viewer", "Viewer", "Paro");
+    const paroToken = mintToken({ sub: 920, username: "c4_paro_viewer", role: "Viewer", branch: "Paro" });
 
     const docId = await uploadDoc(adminToken, "Thimphu");
     await h.knex("documents").where({ id: docId }).update({ branch: "Thimphu" });
@@ -254,17 +258,14 @@ describe("C5: Content-Disposition header injection prevention", () => {
 // I1: listDocuments fail-closed when branch is null
 describe("I1: listDocuments fail-closed for branchless user without crossbranch:read", () => {
   it("user with no branch and no crossbranch:read sees zero documents", async () => {
-    // Insert a branchless Viewer user
-    const role = await h.knex("roles").where({ name: "Viewer" }).first();
-    const inserted = await h.knex("users").insert({
+    // Mint a token with Viewer permissions but no branch claim
+    const token = signToken({
+      sub: 930,
       username: "i1_branchless",
-      password_hash: "x",
-      status: "Active",
-      branch: null,
-    }).returning("id");
-    const uid = typeof inserted[0] === "object" ? (inserted[0] as any).id : inserted[0];
-    await h.knex("user_roles").insert({ user_id: uid, role_id: role.id });
-    const token = signToken({ sub: uid, username: "i1_branchless" }, "t");
+      permissions: ROLE_PERMS.Viewer,
+      roles: ["Viewer"],
+      // branch intentionally omitted
+    }, SECRET);
 
     const res = await request(h.app).get("/documents")
       .set("Authorization", `Bearer ${token}`);

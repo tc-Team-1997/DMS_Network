@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requirePermission } from "../middleware.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
 import { listBranches, addBranch, listAccessPolicies, setAccessPolicy } from "../modules/branches.js";
 import type { CoreDeps } from "../deps.js";
 

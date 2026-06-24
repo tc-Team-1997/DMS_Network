@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requirePermission } from "../middleware.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
 import { buildLifecycleTrace } from "../modules/lifecycle.js";
 import type { CoreDeps } from "../deps.js";
 

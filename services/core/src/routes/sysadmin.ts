@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requirePermission } from "../middleware.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
 import { serviceHealth, drPosture, schedules } from "../modules/sysadmin.js";
 import type { CoreDeps } from "../deps.js";
 

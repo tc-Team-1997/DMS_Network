@@ -1,17 +1,11 @@
-import { Router, type Request } from "express";
+import { Router } from "express";
 import multer from "multer";
-import { requireAuth, requirePermission } from "../middleware.js";
-import { can } from "@zordms/auth";
+import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { captureDocument, listDocuments, getDocument, softDeleteDocument, currentVersion } from "../repo/documents.js";
 import { addVersion, listVersions, rollback } from "../repo/versions.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
-
-function makeViewer(req: Request) {
-  const canCrossBranch = can({ permissions: req.authUser!.permissions }, "crossbranch:read");
-  return { branch: req.authUser!.branch, canCrossBranch };
-}
 
 export function documentsRouter(): Router {
   const r = Router();
@@ -23,8 +17,8 @@ export function documentsRouter(): Router {
       const deps = req.app.locals.deps as CoreDeps;
       if (!req.file) { res.status(400).json({ error: "file_required" }); return; }
       // C2: only allow branch override if caller has crossbranch:read
-      const canCrossBranch = can({ permissions: req.authUser!.permissions }, "crossbranch:read");
-      const branch = (canCrossBranch && req.body.branch) ? req.body.branch : req.authUser!.branch;
+      const viewer = makeViewer(req);
+      const branch = (viewer.canCrossBranch && req.body.branch) ? req.body.branch : req.authUser!.branch;
       const document = await captureDocument(deps, {
         title: req.body.title ?? req.file.originalname,
         filename: req.file.originalname,

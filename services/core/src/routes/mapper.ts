@@ -1,7 +1,6 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-import { requireAuth, requirePermission } from "../middleware.js";
-import { can } from "@zordms/auth";
+import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { resolvePath, defaultAcls, domainForPath } from "../mapper/directory.js";
 import { ROOT_PATH } from "../repo/folders.js";
@@ -46,10 +45,8 @@ export function mapperRouter(): Router {
   r.post("/:documentId", requirePermission("document:map"), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
-      const canCrossBranch = can({ permissions: req.authUser!.permissions }, "crossbranch:read");
-      const viewer = { branch: req.authUser!.branch, canCrossBranch };
       // C1: pass viewer so branch-isolation is enforced
-      const document = await getDocument(deps.knex, Number(req.params.documentId), viewer);
+      const document = await getDocument(deps.knex, Number(req.params.documentId), makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
 
       const path = resolvePath(req.body.docType, req.body.fields ?? {});

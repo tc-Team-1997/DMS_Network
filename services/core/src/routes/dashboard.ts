@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { requireAuth, requirePermission } from "../middleware.js";
-import { can } from "@zordms/auth";
+import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 
 export function dashboardRouter(): Router {
@@ -10,13 +9,13 @@ export function dashboardRouter(): Router {
   r.get("/summary", requirePermission("document:read"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
-      const canCrossBranch = can({ permissions: req.authUser!.permissions }, "crossbranch:read");
+      const viewer = makeViewer(req);
       const base = () => {
         const q = knex("documents").where({ status: "Active" });
         // I1: fail-closed — users without crossbranch:read AND without a branch see nothing
-        if (!canCrossBranch) {
-          if (!req.authUser!.branch) q.andWhere({ id: -1 }); // matches nothing
-          else q.andWhere({ branch: req.authUser!.branch });
+        if (!viewer.canCrossBranch) {
+          if (!viewer.branch) q.andWhere({ id: -1 }); // matches nothing
+          else q.andWhere({ branch: viewer.branch });
         }
         return q;
       };
