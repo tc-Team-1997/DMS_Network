@@ -44,6 +44,7 @@ export default defineConfig({
       "/svc/notify": {
         target: "http://localhost:4003",
         changeOrigin: true,
+        ws: true,
         rewrite: (path) => path.replace(/^\/svc\/notify/, ""),
       },
       "/svc/search": {

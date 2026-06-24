@@ -6,7 +6,7 @@ import {
   type Column,
 } from "../components/ui/index.js";
 import {
-  fetchBranches, fetchAccessPolicies, createBranch,
+  fetchBranches, fetchAccessPolicies, createBranch, setAccessPolicy,
   type Branch, type BranchAccess,
 } from "../api/branchNetwork.js";
 
@@ -122,10 +122,14 @@ export default function BranchNetwork() {
   async function handleAddBranch(e: FormEvent) {
     e.preventDefault();
     if (!newBranch.code || !newBranch.name) return;
-    await createBranch(newBranch);
-    setNewBranch({ code: "", name: "", region: "", replication_mode: "async" });
-    setAddOpen(false);
-    await load();
+    try {
+      await createBranch(newBranch);
+      setNewBranch({ code: "", name: "", region: "", replication_mode: "async" });
+      setAddOpen(false);
+      await load();
+    } catch {
+      setError("Failed to create branch. Please check your input and try again.");
+    }
   }
 
   return (
@@ -465,11 +469,14 @@ export default function BranchNetwork() {
           onSubmit={async (e) => {
             e.preventDefault();
             if (!newPolicy.source_branch || !newPolicy.target_branch) return;
-            const { setAccessPolicy } = await import("../api/branchNetwork.js");
-            await setAccessPolicy(newPolicy);
-            setNewPolicy({ source_branch: "", target_branch: "", policy: "read" });
-            setPolicyOpen(false);
-            await load();
+            try {
+              await setAccessPolicy(newPolicy);
+              setNewPolicy({ source_branch: "", target_branch: "", policy: "read" });
+              setPolicyOpen(false);
+              await load();
+            } catch {
+              setError("Failed to set access policy. Please try again.");
+            }
           }}
           style={{ display: "flex", flexDirection: "column", gap: 12, padding: "8px 0" }}
         >

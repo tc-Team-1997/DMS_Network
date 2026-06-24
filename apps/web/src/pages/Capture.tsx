@@ -178,16 +178,9 @@ export default function Capture() {
     setQueue((q) => q.filter((i) => i.id !== id));
   }
 
-  if (!canCapture) {
-    return (
-      <div className="fade-up" style={{ padding: 40 }}>
-        <div style={{ background: "rgba(224,82,82,.13)", border: "1px solid rgba(224,82,82,.3)", borderRadius: 10, padding: 24, maxWidth: 480 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--R)", marginBottom: 6 }}>Access Denied</div>
-          <div style={{ fontSize: 12, color: "var(--sil)" }}>You do not have the <code>document:capture</code> permission required to access this screen.</div>
-        </div>
-      </div>
-    );
-  }
+  // Access control is enforced by ProtectedRoute (permission="document:capture") in router.tsx.
+  // The canCapture variable is kept for any conditional rendering of permission-dependent UI.
+  void canCapture;
 
   return (
     <div className="fade-up">
@@ -252,7 +245,7 @@ export default function Capture() {
                 {dragging ? "Release to upload" : "Drop files or click to upload"}
               </div>
               <div style={{ fontSize: 11, color: "var(--sil)" }}>
-                PDF, TIFF, JPEG, PNG, DOCX · Max 100 MB · Batch supported
+                PDF, TIFF, JPEG, PNG, DOCX · Max 50 MB · Batch supported
               </div>
               <input
                 ref={fileInputRef}
@@ -325,7 +318,7 @@ export default function Capture() {
                       )}
                       {item.status === "done" && item.docId && (
                         <button
-                          onClick={() => navigate(`/indexing/${item.docId}`)}
+                          onClick={() => navigate(`/indexing?id=${item.docId}`)}
                           style={{ padding: "4px 8px", background: "rgba(58,159,208,.15)", border: "1px solid rgba(58,159,208,.3)", borderRadius: 5, fontSize: 10, color: "var(--B)", cursor: "pointer" }}
                         >
                           Index

@@ -304,7 +304,8 @@ function CaseDetailPanel({
           </div>
         )}
 
-        {/* Action buttons */}
+        {/* Action buttons — C2: Escalate button removed (no backend route, was silently resolving);
+            C3: Hold button removed (no backend route, was a no-op with no feedback) */}
         {canManage && isOpen && (
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <button
@@ -320,13 +321,6 @@ function CaseDetailPanel({
             >
               ✗ Reject
             </button>
-            <button
-              className="btn bw"
-              onClick={() => setResolveOpen(true)}
-            >
-              ⇧ Escalate
-            </button>
-            <button className="btn bs">Hold</button>
           </div>
         )}
         {c.resolution && (
@@ -396,8 +390,8 @@ function CaseDetailPanel({
         )}
       </Card>
 
-      {/* Resolve modal */}
-      <Modal open={resolveOpen} onClose={() => setResolveOpen(false)} title="Resolve Case" width={420}>
+      {/* Resolve modal — M2 fix: dynamic title reflects actual action */}
+      <Modal open={resolveOpen} onClose={() => setResolveOpen(false)} title={resolveStatus === "Resolved" ? "Resolve Case" : "Reject Case"} width={420}>
         <form onSubmit={submitResolve} style={{ padding: "0 0 4px" }}>
           <FormField
             as="select"
@@ -436,6 +430,8 @@ function CaseDetailPanel({
 
 export default function CaseManagement() {
   const { user } = useAuth();
+  // I1: enforce case:read permission on list/detail views (as stated in JSDoc RBAC contract)
+  const canRead   = !!user?.permissions?.includes("case:read");
   const canCreate = !!user?.permissions?.includes("case:create");
   const canManage = !!user?.permissions?.includes("case:manage");
 
@@ -551,6 +547,21 @@ export default function CaseManagement() {
     },
   ];
 
+  // I1: enforce case:read permission — show access-denied if missing
+  if (!canRead) {
+    return (
+      <div className="fade-up" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ fontSize: 32, opacity: 0.3, marginBottom: 12 }}>🔒</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--mist)", marginBottom: 6 }}>
+          Access Denied
+        </div>
+        <div style={{ fontSize: 12, color: "var(--sil)" }}>
+          You do not have permission to view cases. The <code>case:read</code> permission is required.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-up">
       {/* Page header */}
@@ -579,10 +590,11 @@ export default function CaseManagement() {
           sub={`${totalCases} total`}
           variant="blue"
         />
+        {/* I2 fix: renamed to "Total Closed" (all-time count) and corrected sub-text (Resolved only) */}
         <KpiCard
-          label="Closed This Month"
+          label="Total Closed"
           value={resolvedCases.toLocaleString()}
-          sub="Resolved + Rejected"
+          sub="Resolved only"
           variant="green"
         />
         <KpiCard

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { DocumentLifecycle } from "./DocumentLifecycle.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -23,7 +23,8 @@ vi.mock("../auth/AuthContext.js", () => ({
       id: 1,
       username: "admin",
       roles: ["CDO"],
-      permissions: ["document:read", "lifecycle:read"],
+      // "lifecycle:read" does not exist in RBAC — only "document:read" is the real gate
+      permissions: ["document:read"],
     },
     logout: () => {},
   }),
@@ -92,9 +93,9 @@ describe("DocumentLifecycle screen", () => {
       const matches = screen.getAllByText(/LETTER/);
       expect(matches.length).toBeGreaterThan(0);
     });
-    // Click the Version Control tab
+    // Use fireEvent.click to stay within React's event system (avoids act() warnings)
     const versionTab = screen.getByRole("button", { name: /version control/i });
-    versionTab.click();
+    fireEvent.click(versionTab);
     await waitFor(() => {
       const v1 = screen.getAllByText(/v1/i);
       expect(v1.length).toBeGreaterThan(0);
@@ -120,5 +121,74 @@ describe("DocumentLifecycle screen", () => {
       (c: unknown[]) => String(c[0])
     );
     expect(calls.some((u) => u.includes("/lifecycle/9"))).toBe(true);
+  });
+});
+
+/* ─── Client-side document search filtering (C-2 workaround) ─── */
+// The main describe block mocks useParams to return docId: "9", so no browse-list
+// auto-load happens. To test client-side filtering we use the existing render,
+// switch to the Browse tab, trigger a search, and verify the filter narrows results.
+describe("DocumentLifecycle — client-side search filtering", () => {
+  const MOCK_DOCS = [
+    { id: 1, doc_no: "D001", doc_type: "LETTER", status: "Indexed", branch: "HQ", created_at: "2026-06-01T00:00:00Z" },
+    { id: 2, doc_no: "D002", doc_type: "REPORT", status: "Captured", branch: "Branch-A", created_at: "2026-06-02T00:00:00Z" },
+    { id: 3, doc_no: "D003", doc_type: "MEMO", status: "Archived", branch: "HQ", created_at: "2026-06-03T00:00:00Z" },
+  ];
+
+  beforeAll(() => {
+    if (typeof globalThis.ResizeObserver === "undefined") {
+      globalThis.ResizeObserver = class ResizeObserver {
+        observe()    { /* noop */ }
+        unobserve()  { /* noop */ }
+        disconnect() { /* noop */ }
+      } as unknown as typeof ResizeObserver;
+    }
+  });
+
+  beforeEach(() => {
+    // Backend returns unfiltered list regardless of query params (C-2 known issue).
+    // On the first call the lifecycle trace is fetched (docId=9 from the mock),
+    // on subsequent /documents calls the full list is returned.
+    globalThis.fetch = vi.fn((url: string) => {
+      if (String(url).includes("/lifecycle/9")) {
+        return Promise.resolve({ ok: true, json: async () => ({ trace: MOCK_TRACE }) });
+      }
+      // /documents returns unfiltered list — client must filter
+      return Promise.resolve({ ok: true, json: async () => ({ documents: MOCK_DOCS }) });
+    }) as any;
+  });
+
+  it("client-side filter by doc_type hides non-matching documents", async () => {
+    render(<DocumentLifecycle />);
+
+    // Wait for trace to load so initial fetch completes
+    await waitFor(() => expect(screen.getAllByText(/LETTER/).length).toBeGreaterThan(0));
+
+    // Switch to Browse tab and load the full document list
+    const browseTab = screen.getByRole("button", { name: /browse documents/i });
+    fireEvent.click(browseTab);
+
+    // The Browse tab shows a Search button; click it to load all docs (no filter)
+    const searchBtn = screen.getByRole("button", { name: /^Search$/i });
+    fireEvent.click(searchBtn);
+
+    // All three docs should appear
+    await waitFor(() => {
+      expect(screen.getByText("D001")).toBeInTheDocument();
+      expect(screen.getByText("D002")).toBeInTheDocument();
+      expect(screen.getByText("D003")).toBeInTheDocument();
+    });
+
+    // Type "REPORT" into the search box and click Search again
+    const searchInput = screen.getByPlaceholderText(/doc number, type, branch/i);
+    fireEvent.change(searchInput, { target: { value: "REPORT" } });
+    fireEvent.click(searchBtn);
+
+    // Only D002 (REPORT) should be visible; D001 and D003 should disappear
+    await waitFor(() => {
+      expect(screen.getByText("D002")).toBeInTheDocument();
+      expect(screen.queryByText("D001")).not.toBeInTheDocument();
+      expect(screen.queryByText("D003")).not.toBeInTheDocument();
+    });
   });
 });

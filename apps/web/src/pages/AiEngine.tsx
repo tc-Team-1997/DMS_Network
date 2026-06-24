@@ -17,10 +17,12 @@ import {
   processDoc,
   ocrDoc,
   getAiHealth,
+  getAiStats,
   bandFor,
   type ClassifyResult,
   type ProcessResult,
   type AiHealthStatus,
+  type AiStats,
 } from "../api/aiEngine.js";
 import { ConfidenceBadge } from "../components/ai/ConfidenceBadge.js";
 import {
@@ -33,8 +35,8 @@ import {
   LineChartCard,
 } from "../components/ui/index.js";
 
-/* ── Static demo throughput data (chart uses fetched data later) ── */
-const THROUGHPUT_STUB: Record<string, unknown>[] = [
+/* ── Static demo throughput data (placeholder until live analytics endpoint available) ── */
+const THROUGHPUT_STUB: Array<{ time: string; pages: number }> = [
   { time: "08:00", pages: 1200 },
   { time: "09:00", pages: 2800 },
   { time: "10:00", pages: 4200 },
@@ -91,13 +93,18 @@ function fieldConfColor(c: number) {
 
 function flattenMetadata(meta: Record<string, unknown> | null): FieldRow[] {
   if (!meta) return [];
+  // "confidence" and "doc_type" are document-level; "review_flag" is routing metadata.
+  // Per-field confidence is not available from the backend extraction schema, so we
+  // do not surface a per-field confidence bar (all fields would show the identical
+  // document-level value, which would be misleading — see I-4).
   const SKIP = new Set(["doc_type", "review_flag", "confidence"]);
   return Object.entries(meta)
     .filter(([k, v]) => !SKIP.has(k) && v !== null && v !== undefined)
     .map(([k, v]) => ({
       label: k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
       value: typeof v === "object" ? JSON.stringify(v) : String(v),
-      confidence: typeof meta["confidence"] === "number" ? (meta["confidence"] as number) : 0.9,
+      // confidence placeholder — not used for per-field bars; kept for FieldRow interface compatibility.
+      confidence: 0,
     }));
 }
 
@@ -114,14 +121,20 @@ export default function AiEngine() {
   const [processResult, setProcessResult] = useState<ProcessResult | null>(null);
   const [ocrText, setOcrText] = useState<string>("");
   const [health, setHealth] = useState<AiHealthStatus | null>(null);
+  const [healthError, setHealthError] = useState(false);
+  const [stats, setStats] = useState<AiStats | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
 
-  /* ── Fetch health on mount ── */
+  /* ── Fetch health and stats on mount ── */
   useEffect(() => {
     getAiHealth()
-      .then(setHealth)
-      .catch(() => setHealth({ status: "unknown", service: "ai-idp", mode: "gpu" }));
+      .then((h) => { setHealth(h); setHealthError(false); })
+      .catch(() => { setHealth({ status: "unknown", service: "ai-idp", mode: "unknown" }); setHealthError(true); });
+    getAiStats()
+      .then(setStats)
+      .catch(() => { /* stats unavailable — UI shows fallback placeholders */ });
   }, []);
 
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,7 +167,7 @@ export default function AiEngine() {
     setError(null);
     try {
       const docId = `DOC-${Date.now()}`;
-      const result = await processDoc(file, docId);
+      const result = await processDoc(file, docId, ocrText);
       setProcessResult(result);
       setClassifyResult({
         doc_type: result.handoff.doc_type,
@@ -167,7 +180,7 @@ export default function AiEngine() {
     } finally {
       setBusy(false);
     }
-  }, [file]);
+  }, [file, ocrText]);
 
   const handleOcr = useCallback(async () => {
     if (!file) return;
@@ -202,7 +215,9 @@ export default function AiEngine() {
     : "";
   const bandInfo = classifyResult ? bandFor(classifyResult.confidence) : null;
 
-  const modeTag = health?.mode === "cpu_degraded"
+  const modeTag = healthError
+    ? <Tag variant="amber"><span data-testid="health-unreachable">Service Unreachable</span></Tag>
+    : health?.mode === "cpu_degraded"
     ? <Tag variant="amber">CPU Degraded Mode</Tag>
     : <Tag variant="green">GPU Mode · Healthy</Tag>;
 
@@ -221,30 +236,30 @@ export default function AiEngine() {
         </div>
       </div>
 
-      {/* ── KPI row ── */}
+      {/* ── KPI row (live stats when available, dashes while loading) ── */}
       <div className="g4" style={{ marginBottom: 16 }}>
         <KpiCard
           label="AI Queue Size"
-          value="342"
+          value={stats ? stats.queue_size.toLocaleString() : "—"}
           sub="Est. 4 min to clear"
           variant="blue"
         />
         <KpiCard
           label="Processed Today"
-          value="42,871"
-          sub="Avg 3.8 s / page · P95 ≤ 5s"
+          value={stats ? stats.processed_today.toLocaleString() : "—"}
+          sub={stats ? `Avg ${(stats.avg_processing_ms / 1000).toFixed(1)} s / page · P95 ≤ 5s` : "Avg — s / page"}
           variant="green"
         />
         <KpiCard
           label="Avg Confidence"
-          value="97.4%"
+          value={stats ? `${(stats.avg_confidence * 100).toFixed(1)}%` : "—"}
           sub="Threshold: 85% (§6.4)"
           variant="gold"
         />
         <KpiCard
           label="Manual Review"
-          value="7"
-          sub="Conf &lt; 85% or invalid extract"
+          value={stats ? stats.manual_review_count : "—"}
+          sub="Conf < 85% or invalid extract"
           variant="red"
         />
       </div>
@@ -645,17 +660,49 @@ export default function AiEngine() {
                       </div>
                     )}
 
+                    {actionNotice && (
+                      <div
+                        data-testid="action-notice"
+                        style={{
+                          marginBottom: 8,
+                          padding: "8px 12px",
+                          background: "rgba(58,159,208,.1)",
+                          border: "1px solid rgba(58,159,208,.25)",
+                          borderRadius: 7,
+                          fontSize: 11,
+                          color: "var(--B)",
+                        }}
+                      >
+                        {actionNotice}
+                      </div>
+                    )}
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button className="btn bok" style={{ flex: 1 }} disabled={!canWrite}>
+                      <button
+                        className="btn bok"
+                        style={{ flex: 1 }}
+                        disabled={!canWrite}
+                        onClick={() => setActionNotice("Accept & Index: indexing pipeline not yet connected — contact your administrator.")}
+                        aria-label="accept and index"
+                      >
                         Accept &amp; Index
                       </button>
-                      <button className="btn bs" disabled={!canWrite}>
+                      <button
+                        className="btn bs"
+                        disabled={!canWrite}
+                        onClick={() => setActionNotice("Edit Fields: field-edit UI not yet implemented in this release.")}
+                        aria-label="edit fields"
+                      >
                         Edit Fields
                       </button>
-                      <button className="btn bx" onClick={handleReset}>
+                      <button className="btn bx" onClick={handleReset} aria-label="reprocess">
                         Reprocess
                       </button>
-                      <button className="btn bw" disabled={!canWrite}>
+                      <button
+                        className="btn bw"
+                        disabled={!canWrite}
+                        onClick={() => setActionNotice("Flag: flagging API not yet connected — item will be routed to review queue automatically.")}
+                        aria-label="flag"
+                      >
                         Flag
                       </button>
                     </div>
@@ -672,7 +719,7 @@ export default function AiEngine() {
                       Extracted Fields{" "}
                       {classifyResult && (
                         <Tag variant="gold">
-                          {(classifyResult.confidence * 100).toFixed(1)}% Avg Confidence
+                          {(classifyResult.confidence * 100).toFixed(1)}% Classification Confidence
                         </Tag>
                       )}
                     </span>
@@ -697,38 +744,6 @@ export default function AiEngine() {
                           </div>
                           <div style={{ flex: 1, fontSize: 12, color: "var(--mist)", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {f.value}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: fieldConfColor(f.confidence),
-                              width: 34,
-                              textAlign: "right",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {(f.confidence * 100).toFixed(0)}%
-                          </div>
-                          <div
-                            style={{
-                              width: 50,
-                              height: 4,
-                              background: "rgba(255,255,255,.08)",
-                              borderRadius: 2,
-                              overflow: "hidden",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${f.confidence * 100}%`,
-                                height: "100%",
-                                background: fieldConfColor(f.confidence),
-                                borderRadius: 2,
-                                transition: "width .4s ease",
-                              }}
-                            />
                           </div>
                         </div>
                       ))}

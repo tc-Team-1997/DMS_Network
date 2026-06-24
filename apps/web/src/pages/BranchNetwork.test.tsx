@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import BranchNetwork from "./BranchNetwork.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -104,6 +104,65 @@ describe("BranchNetwork screen", () => {
     render(<BranchNetwork />);
     await waitFor(() =>
       expect(screen.getByText("Network Report")).toBeInTheDocument()
+    );
+  });
+
+  // I-1: setAccessPolicy is now statically imported — verify it exists in the mock module at import time
+  it("I-1: setAccessPolicy is resolvable from the static import (no dynamic import)", async () => {
+    const mod = await import("../api/branchNetwork.js");
+    expect(typeof mod.setAccessPolicy).toBe("function");
+  });
+
+  // I-2: handleAddBranch — createBranch rejection shows error banner
+  it("I-2: shows error banner when createBranch rejects", async () => {
+    const { createBranch } = await import("../api/branchNetwork.js");
+    (createBranch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Duplicate branch code"));
+
+    render(<BranchNetwork />);
+    await waitFor(() => expect(screen.getByText("+ Add Branch")).toBeInTheDocument());
+
+    // Open the add branch modal
+    fireEvent.click(screen.getByText("+ Add Branch"));
+    await waitFor(() => expect(screen.getByText("Create Branch")).toBeInTheDocument());
+
+    // Fill in required fields
+    const [codeInput, nameInput] = screen.getAllByRole("textbox");
+    fireEvent.change(codeInput, { target: { value: "DUP001" } });
+    fireEvent.change(nameInput, { target: { value: "Duplicate Branch" } });
+
+    // Submit form
+    fireEvent.click(screen.getByRole("button", { name: "Create Branch" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to create branch/i)).toBeInTheDocument()
+    );
+  });
+
+  // I-2: setAccessPolicy rejection shows error banner
+  it("I-2: shows error banner when setAccessPolicy rejects", async () => {
+    const { setAccessPolicy } = await import("../api/branchNetwork.js");
+    (setAccessPolicy as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Policy conflict"));
+
+    render(<BranchNetwork />);
+    // Wait for page to load (branches appear)
+    await waitFor(() => expect(screen.getByText("Thimphu Main")).toBeInTheDocument());
+
+    // Switch to Replication tab
+    fireEvent.click(screen.getByText("Replication & Access Policy"));
+    await waitFor(() => expect(screen.getByText("+ Set Policy")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("+ Set Policy"));
+    await waitFor(() => expect(screen.getByText("Apply Policy")).toBeInTheDocument());
+
+    // Select source and target branches
+    const selects = screen.getAllByRole("combobox");
+    fireEvent.change(selects[0], { target: { value: "THI001" } });
+    fireEvent.change(selects[1], { target: { value: "PAR002" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply Policy" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to set access policy/i)).toBeInTheDocument()
     );
   });
 });

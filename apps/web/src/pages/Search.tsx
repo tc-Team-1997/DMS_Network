@@ -154,9 +154,11 @@ function FacetPanel({
 function HitPanel({
   hit,
   onClose,
+  onDownload,
 }: {
   hit: SearchHit;
   onClose: () => void;
+  onDownload?: (hit: SearchHit) => void;
 }) {
   return (
     <div
@@ -212,10 +214,20 @@ function HitPanel({
       </div>
 
       <div style={{ marginTop: "auto", display: "flex", gap: 8 }}>
-        <button className="btn-primary" style={{ flex: 1 }}>
+        <button
+          className="btn-primary"
+          style={{ flex: 1 }}
+          onClick={() => window.open(`/svc/core/documents/${encodeURIComponent(hit.doc_id)}/view`, "_blank")}
+          aria-label="Open document"
+        >
           Open Document
         </button>
-        <button className="btn">
+        <button
+          className="btn"
+          onClick={() => onDownload?.(hit)}
+          aria-label="Download document"
+          title="Download"
+        >
           <Download size={13} />
         </button>
       </div>
@@ -227,7 +239,10 @@ function HitPanel({
 
 export default function Search() {
   const { user } = useAuth();
-  const canSearch  = user?.permissions.includes("search:read") ?? true;
+  // "search:read" does not exist in RBAC; the server gates all search endpoints
+  // on "document:read". Default to false (not true) when user is null so that
+  // the Save-search button stays hidden for unauthenticated visitors.
+  const canSearch  = user?.permissions.includes("document:read") ?? false;
   const canExport  = user?.permissions.includes("document:read") ?? false;
 
   // Query state
@@ -301,6 +316,32 @@ export default function Search() {
     setFilters(q.filters ?? {});
     setSort(q.sort ?? "relevance");
     setShowSavedPanel(false);
+  }
+
+  async function handleExportCsv() {
+    try {
+      const blob = await searchApi.exportCsv({ text, mode, filters, sort, page, pageSize });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `search-export-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently ignore — user will see nothing downloaded
+    }
+  }
+
+  function handleDownload(hit: SearchHit) {
+    const url = `/svc/core/documents/${encodeURIComponent(hit.doc_id)}/download`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = hit.doc_id;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   async function handleSave() {
@@ -422,7 +463,7 @@ export default function Search() {
             )}
           </button>
           {canExport && hasSearched && (
-            <button className="btn" title="Export CSV">
+            <button className="btn" title="Export CSV" onClick={handleExportCsv}>
               <Download size={14} />
               <span style={{ marginLeft: 6 }}>Export</span>
             </button>
@@ -461,7 +502,7 @@ export default function Search() {
               <button
                 key={m}
                 className={`tab${mode === m ? " on" : ""}`}
-                onClick={() => setMode(m)}
+                onClick={() => { setMode(m); setPage(1); }}
                 style={{ fontSize: 11, padding: "4px 10px" }}
                 title={modeLabel(m)}
               >
@@ -497,7 +538,7 @@ export default function Search() {
             className="field"
             style={{ width: 130 }}
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortMode)}
+            onChange={(e) => { setSort(e.target.value as SortMode); setPage(1); }}
           >
             <option value="relevance">Relevance</option>
             <option value="recent">Most Recent</option>
@@ -673,7 +714,7 @@ export default function Search() {
 
       {/* Hit detail side panel */}
       {selectedHit && (
-        <HitPanel hit={selectedHit} onClose={() => setSelectedHit(null)} />
+        <HitPanel hit={selectedHit} onClose={() => setSelectedHit(null)} onDownload={handleDownload} />
       )}
 
       {/* Saved searches panel */}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   KpiCard, Card, DataTable, Tag, StatusDot, Tabs, Modal, FormField,
   LineChartCard, BarChartCard, DonutChartCard,
@@ -91,6 +91,14 @@ export default function IntegrationHub() {
       if (sysRes.status === "fulfilled") setSystems(sysRes.value.systems);
       if (logRes.status === "fulfilled") setLogs(logRes.value.logs);
       if (whRes.status === "fulfilled") setWebhooks(whRes.value.webhooks);
+
+      // If every call failed, surface an error banner so users know data is stale
+      const allFailed = [sysRes, logRes, whRes].every((r) => r.status === "rejected");
+      if (allFailed) {
+        setError(
+          (sysRes as PromiseRejectedResult).reason?.message ?? "Failed to load integration data",
+        );
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -177,8 +185,10 @@ export default function IntegrationHub() {
     }
   }
 
-  const callsData = buildCallsChart(logs);
-  const latencyData = buildLatencyChart(logs);
+  // Memoize chart data to prevent Math.random() flicker on every render (I3)
+  const callsData   = useMemo(() => buildCallsChart(logs),   [logs]);
+  const latencyData = useMemo(() => buildLatencyChart(logs), [logs]);
+
   const systemDonut = [
     { name: "Online", value: activeSystems, color: "var(--G)" },
     { name: "Mock",   value: Math.max(0, totalSystems - activeSystems - (systems.filter(s => s.status === "down").length)), color: "var(--gold2)" },
@@ -198,7 +208,9 @@ export default function IntegrationHub() {
           {canManage && (
             <button className="btn bg sm" onClick={() => setAddOpen(true)}>+ Add Integration</button>
           )}
-          <button className="btn bs sm" onClick={() => setTestOpen(true)}>Test Webhook</button>
+          {canManage && (
+            <button className="btn bs sm" onClick={() => setTestOpen(true)}>Test Webhook</button>
+          )}
           <button className="btn bs sm" onClick={() => void load()}>↻ Refresh</button>
         </div>
       </div>
@@ -404,13 +416,31 @@ export default function IntegrationHub() {
               />
               <DonutChartCard
                 title="Calls by System"
-                data={[
-                  { name: "CBS",   value: 38, color: "var(--gold2)" },
-                  { name: "LOS",   value: 27, color: "var(--B)" },
-                  { name: "KYC",   value: 18, color: "var(--G)" },
-                  { name: "SWIFT", value: 11, color: "var(--P)" },
-                  { name: "Other", value: 6,  color: "var(--W)" },
-                ]}
+                data={(() => {
+                  const SYSTEM_COLORS: Record<string, string> = {
+                    cbs: "var(--gold2)", los: "var(--B)", kyc: "var(--G)",
+                    swift: "var(--P)", erp: "var(--W)",
+                  };
+                  const TOP = ["cbs", "los", "kyc", "swift", "erp"];
+                  const computed = TOP.map((id) => ({
+                    name: id.toUpperCase(),
+                    value: logs.filter((l) => l.system === id).length || 1,
+                    color: SYSTEM_COLORS[id] ?? "var(--sil)",
+                  }));
+                  // Fall back to static proportions when no live log data is present
+                  const total = computed.reduce((s, d) => s + d.value, 0);
+                  const isAllOne = computed.every((d) => d.value === 1);
+                  if (isAllOne) {
+                    return [
+                      { name: "CBS",   value: 38, color: "var(--gold2)" },
+                      { name: "LOS",   value: 27, color: "var(--B)" },
+                      { name: "KYC",   value: 18, color: "var(--G)" },
+                      { name: "SWIFT", value: 11, color: "var(--P)" },
+                      { name: "ERP",   value: 6,  color: "var(--W)" },
+                    ];
+                  }
+                  return computed.filter((d) => d.value > 0);
+                })()}
                 height={200}
               />
             </div>

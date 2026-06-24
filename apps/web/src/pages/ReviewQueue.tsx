@@ -8,11 +8,14 @@
  *  - Side panel: detail view of selected review item
  *  - Modal for confirming resolution
  *  - RBAC: claim/resolve gated on "review:write" permission
+ *
+ * Note: The SLA Breached tab shows items where sla_deadline has already passed
+ * (status PENDING or CLAIMED items that have breached their SLA window).
  */
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext.js";
 import {
-  listPendingReviews,
+  listAllReviews,
   claimReview,
   resolveReview,
   type ReviewRow,
@@ -31,7 +34,7 @@ import {
 
 /* ─── Types ─── */
 
-type StatusFilter = "PENDING" | "CLAIMED" | "RESOLVED";
+type StatusFilter = "PENDING" | "CLAIMED" | "RESOLVED" | "SLA_BREACHED";
 
 interface ReviewDetail extends ReviewRow {
   claimed_by?: string | null;
@@ -93,7 +96,7 @@ export default function ReviewQueue() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listPendingReviews();
+      const data = await listAllReviews();
       setRows(data as ReviewDetail[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load review queue");
@@ -104,8 +107,13 @@ export default function ReviewQueue() {
 
   useEffect(() => {
     void reload();
-    // Refresh every 30 s
-    const t = setInterval(reload, 30_000);
+    // Refresh every 30 s — skip when the browser tab is hidden to avoid
+    // unnecessary network traffic and token refreshes (M-4).
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void reload();
+      }
+    }, 30_000);
     return () => clearInterval(t);
   }, [reload]);
 
@@ -152,7 +160,9 @@ export default function ReviewQueue() {
   const breached = rows.filter((r) => r.sla_deadline && new Date(r.sla_deadline) < new Date()).length;
 
   /* ── Filtered rows ── */
-  const filtered = rows.filter((r) => r.status === tab);
+  const filtered = tab === "SLA_BREACHED"
+    ? rows.filter((r) => slaDue(r.sla_deadline).urgent)
+    : rows.filter((r) => r.status === tab);
 
   /* ── Table columns ── */
   const columns: Column<ReviewDetail>[] = [
@@ -306,7 +316,7 @@ export default function ReviewQueue() {
         <KpiCard
           label="Resolved (queue)"
           value={resolved}
-          sub="In current page"
+          sub="From last fetch"
           variant="green"
         />
       </div>
@@ -367,9 +377,10 @@ export default function ReviewQueue() {
       {/* ── Tabs ── */}
       <Tabs
         items={[
-          { key: "PENDING",  label: `Pending (${pending})` },
-          { key: "CLAIMED",  label: `Claimed (${claimed})` },
-          { key: "RESOLVED", label: `Resolved (${resolved})` },
+          { key: "PENDING",     label: `Pending (${pending})` },
+          { key: "CLAIMED",     label: `Claimed (${claimed})` },
+          { key: "RESOLVED",    label: `Resolved (${resolved})` },
+          { key: "SLA_BREACHED", label: `SLA Breached (${breached})` },
         ]}
         active={tab}
         onChange={(k) => { setTab(k as StatusFilter); setSelected(null); }}
@@ -387,12 +398,14 @@ export default function ReviewQueue() {
             emptyMessage={
               loading
                 ? "Loading review queue…"
-                : `No ${tab.toLowerCase()} items.`
+                : tab === "SLA_BREACHED"
+                  ? "No SLA-breached items."
+                  : `No ${tab.toLowerCase()} items.`
             }
           />
           <div style={{ fontSize: 11, color: "var(--sil)", marginTop: 8, paddingLeft: 4 }}>
-            Showing {filtered.length} {tab.toLowerCase()} item{filtered.length !== 1 ? "s" : ""}.
-            Auto-refreshes every 30 s.
+            Showing {filtered.length} {tab === "SLA_BREACHED" ? "SLA-breached" : tab.toLowerCase()} item{filtered.length !== 1 ? "s" : ""}.
+            Auto-refreshes every 30 s (when tab is visible).
           </div>
         </div>
 

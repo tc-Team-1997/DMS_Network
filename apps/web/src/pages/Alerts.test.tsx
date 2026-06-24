@@ -1,18 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 
-// Mock the auth context
+// ── Shared auth state (mutated per-test for I-2, I-3) ────────────────────────
+const authState = {
+  user: {
+    id: 1,
+    username: "admin",
+    roles: ["CDO"],
+    permissions: ["alerts:read", "alert:read", "alert:manage", "alert_rule:manage"],
+    branch: "Thimphu",
+  },
+  logout: () => {},
+};
+
+// Mock the auth context — user has alert:read, alert:manage, alert_rule:manage
 vi.mock("../auth/AuthContext.js", () => ({
-  useAuth: () => ({
-    user: {
-      id: 1,
-      username: "admin",
-      roles: ["CDO"],
-      permissions: ["alerts:read", "alert:read", "alert:manage", "alert_rule:manage"],
-      branch: "Thimphu",
-    },
-    logout: () => {},
-  }),
+  useAuth: () => authState,
 }));
 
 // Mock the notifyApi module
@@ -27,13 +30,26 @@ vi.mock("../api/notifyApi.js", () => ({
   },
 }));
 
-// Mock WebSocket to avoid real connections in tests
+// Mock client.ts — getToken used by the WebSocket URL builder
+vi.mock("../api/client.js", () => ({
+  getToken: () => "test-jwt-token",
+  setToken: vi.fn(),
+  clearToken: vi.fn(),
+}));
+
+// Mock WebSocket to avoid real connections in tests (captures constructor args for C-1 test)
+const wsInstances: Array<{ url: string; instance: MockWebSocket }> = [];
 class MockWebSocket {
+  url: string;
   onopen: (() => void) | null = null;
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onmessage: ((ev: { data: string }) => void) | null = null;
   readyState = 0;
+  constructor(url: string) {
+    this.url = url;
+    wsInstances.push({ url, instance: this });
+  }
   close() {}
 }
 (globalThis as unknown as Record<string, unknown>).WebSocket = MockWebSocket;
@@ -109,6 +125,15 @@ const mockRules = [
 describe("Alerts screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    wsInstances.length = 0;
+    // Restore default (admin) user before each test
+    authState.user = {
+      id: 1,
+      username: "admin",
+      roles: ["CDO"],
+      permissions: ["alerts:read", "alert:read", "alert:manage", "alert_rule:manage"],
+      branch: "Thimphu",
+    };
     (notifyApi.listAlerts as ReturnType<typeof vi.fn>).mockResolvedValue({ alerts: mockAlerts });
     (notifyApi.listRules as ReturnType<typeof vi.fn>).mockResolvedValue({ rules: mockRules });
     (notifyApi.markRead as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
@@ -173,7 +198,9 @@ describe("Alerts screen", () => {
 
     // Find and click the mark-read icon button for the first unread alert
     const readButtons = screen.getAllByTitle("Mark as read");
-    fireEvent.click(readButtons[0]);
+    await act(async () => {
+      fireEvent.click(readButtons[0]);
+    });
 
     await waitFor(() => {
       expect(notifyApi.markRead).toHaveBeenCalledWith(1);
@@ -182,7 +209,9 @@ describe("Alerts screen", () => {
 
   it("navigates to Alert Rules tab and loads rules", async () => {
     render(<Alerts />);
-    fireEvent.click(screen.getByText("Alert Rules"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("Alert Rules"));
+    });
 
     await waitFor(() => {
       expect(notifyApi.listRules).toHaveBeenCalled();
@@ -202,7 +231,9 @@ describe("Alerts screen", () => {
   it("opens the alert rule creation modal when New Rule is clicked", async () => {
     render(<Alerts />);
     const newRuleBtn = screen.getAllByText(/New Rule/i)[0];
-    fireEvent.click(newRuleBtn);
+    await act(async () => {
+      fireEvent.click(newRuleBtn);
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Configure Alert Rule")).toBeInTheDocument();
@@ -218,7 +249,9 @@ describe("Alerts screen", () => {
     // requires ResizeObserver which may not be available in all CI envs
     const analyticsTab = screen.getByRole("button", { name: "Analytics" });
     expect(analyticsTab).toBeInTheDocument();
-    fireEvent.click(analyticsTab);
+    await act(async () => {
+      fireEvent.click(analyticsTab);
+    });
     // After clicking, the tab should be active
     expect(analyticsTab).toHaveClass("on");
   });
@@ -230,8 +263,10 @@ describe("Alerts screen", () => {
     });
 
     // Toggle "Unread only" checkbox
-    const checkbox = screen.getByRole("checkbox");
-    fireEvent.click(checkbox);
+    await act(async () => {
+      const checkbox = screen.getByRole("checkbox");
+      fireEvent.click(checkbox);
+    });
 
     await waitFor(() => {
       expect(notifyApi.listAlerts).toHaveBeenCalledWith(
@@ -251,5 +286,75 @@ describe("Alerts screen", () => {
     render(<Alerts />);
     // Should show either "Live" or "Offline"
     expect(screen.getByText(/Live|Offline/)).toBeInTheDocument();
+  });
+
+  // ── Fix verifications ─────────────────────────────────────────────────────
+
+  // C-1: WebSocket now uses proxy path with JWT token query parameter
+  it("C-1: WebSocket connects via proxy path with JWT token query param", async () => {
+    render(<Alerts />);
+    // Allow the useEffect to fire
+    await waitFor(() => expect(wsInstances.length).toBeGreaterThan(0));
+    const wsUrl = wsInstances[0].url;
+    // Should route through the proxy, not direct to port 4003
+    expect(wsUrl).toContain("/svc/notify/ws/alerts");
+    expect(wsUrl).not.toContain(":4003");
+    // Token should be included
+    expect(wsUrl).toContain("token=");
+    expect(wsUrl).toContain("test-jwt-token");
+  });
+
+  // I-2: Users without alert:read get access-denied message instead of error banner
+  it("I-2: users without alert:read see access-denied message, not an error banner", async () => {
+    // Override auth to return user without alert:read
+    authState.user = {
+      id: 2,
+      username: "maker",
+      roles: ["Maker"],
+      permissions: [],
+      branch: "Paro",
+    };
+
+    render(<Alerts />);
+    await waitFor(() => {
+      expect(screen.getByRole("alert", { name: /Access denied/i })).toBeInTheDocument();
+    });
+    // API should NOT have been called since we short-circuit before loading
+    expect(notifyApi.listAlerts).not.toHaveBeenCalled();
+  });
+
+  // I-3: "Mark all read" visible for users with alert:read (not just alert:manage)
+  it("I-3: Mark all read is visible for users with only alert:read permission", async () => {
+    // Has alert:read but NOT alert:manage
+    authState.user = {
+      id: 3,
+      username: "viewer",
+      roles: ["Viewer"],
+      permissions: ["alert:read"],
+      branch: "Thimphu",
+    };
+
+    render(<Alerts />);
+    await waitFor(() => {
+      expect(screen.getByText(/Mark all read/i)).toBeInTheDocument();
+    });
+  });
+
+  // I-6: Active Rules KPI card shows actual count on initial load (not "—")
+  it("I-6: Active Rules KPI shows count immediately on mount without switching to Rules tab", async () => {
+    render(<Alerts />);
+    // loadRules() is now called on mount — wait for it to resolve
+    await waitFor(() => {
+      expect(notifyApi.listRules).toHaveBeenCalled();
+    });
+    // Both mock rules are enabled, so the KPI should show "2" (not "—")
+    await waitFor(() => {
+      // The value "2" should appear near "Active Rules"
+      // Avoid "—" which was the old broken behavior
+      const activeRulesLabel = screen.getByText("Active Rules");
+      expect(activeRulesLabel).toBeInTheDocument();
+      // Look for the numeric value "2" in the document — the KPI renders it as a sibling
+      expect(screen.getAllByText("2").length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

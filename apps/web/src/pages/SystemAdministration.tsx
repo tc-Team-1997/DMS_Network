@@ -125,7 +125,7 @@ export function SystemAdministration() {
       ),
     },
     {
-      key: "_bar", header: "Load", width: 140,
+      key: "_bar", header: "Latency (relative)", width: 160,
       render: (r) => {
         const pct = Math.min(100, r.latency_ms > 0 ? Math.min(r.latency_ms / 10, 100) : 0);
         const barColor = pct > 80 ? "var(--R)" : pct > 50 ? "var(--W)" : "var(--G)";

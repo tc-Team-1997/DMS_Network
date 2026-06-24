@@ -2,9 +2,10 @@
  * AiEngine screen tests — mock fetch, assert key elements render and correct endpoints hit.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import AiEngine from "./AiEngine.js";
-import { bandFor } from "../components/ai/ConfidenceBadge.js";
+// Import bandFor directly from source module — not via ConfidenceBadge re-export chain (I-6).
+import { bandFor } from "../api/aiEngine.js";
 import * as aiApi from "../api/aiEngine.js";
 
 /* ── Polyfill ResizeObserver (recharts uses it in jsdom) ── */
@@ -24,12 +25,22 @@ vi.mock("../auth/AuthContext.js", () => ({
   }),
 }));
 
-/* ── Stub health endpoint ── */
+/* ── Stub health and stats endpoints ── */
 beforeEach(() => {
   vi.spyOn(aiApi, "getAiHealth").mockResolvedValue({
     status: "ok",
     service: "ai-idp",
     mode: "gpu",
+  });
+  vi.spyOn(aiApi, "getAiStats").mockResolvedValue({
+    queue_size: 342,
+    processed_today: 42871,
+    avg_confidence: 0.974,
+    manual_review_count: 7,
+    throughput_per_hour: 840,
+    avg_processing_ms: 3800,
+    classifier_p95_ms: 620,
+    extractor_p95_ms: 4100,
   });
 });
 
@@ -110,7 +121,9 @@ describe("AiEngine screen", () => {
 
     const input = screen.getByLabelText("document") as HTMLInputElement;
     const file = new File(["fake pdf content"], "test-cid.pdf", { type: "application/pdf" });
-    fireEvent.change(input, { target: { files: [file] } });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
 
     const processBtn = screen.getByRole("button", { name: "process document" });
     expect(processBtn).not.toBeDisabled();
@@ -150,10 +163,14 @@ describe("AiEngine screen", () => {
 
     const input = screen.getByLabelText("document") as HTMLInputElement;
     const file = new File(["x"], "cid.png", { type: "image/png" });
-    fireEvent.change(input, { target: { files: [file] } });
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [file] } });
+    });
 
     // Click the process button (aria-label="process document")
-    fireEvent.click(screen.getByRole("button", { name: "process document" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "process document" }));
+    });
 
     // Should call processDoc with the file
     await waitFor(() => expect(aiApi.processDoc).toHaveBeenCalled());
@@ -197,8 +214,12 @@ describe("AiEngine screen", () => {
     await waitFor(() => expect(screen.getByLabelText("document")).toBeInTheDocument());
 
     const input = screen.getByLabelText("document") as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [new File(["x"], "p.png", { type: "image/png" })] } });
-    fireEvent.click(screen.getByRole("button", { name: "process document" }));
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(["x"], "p.png", { type: "image/png" })] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "process document" }));
+    });
 
     await waitFor(() => expect(aiApi.processDoc).toHaveBeenCalled());
     await waitFor(() => {
@@ -212,11 +233,171 @@ describe("AiEngine screen", () => {
 
     // Click status tab
     const statusTab = screen.getByRole("button", { name: /engine status/i });
-    fireEvent.click(statusTab);
+    await act(async () => {
+      fireEvent.click(statusTab);
+    });
 
     await waitFor(() => {
       expect(screen.getByText("AI Engine Status")).toBeInTheDocument();
     });
     expect(screen.getByText("Performance SLOs (IDP §7.3)")).toBeInTheDocument();
+  });
+
+  it("shows live KPI values from getAiStats on mount", async () => {
+    render(<AiEngine />);
+    // Stats are fetched on mount — wait for them to display
+    await waitFor(() => {
+      expect(aiApi.getAiStats).toHaveBeenCalled();
+    });
+    // The mock returns queue_size=342, processed_today=42871, avg_confidence=0.974, manual_review_count=7
+    await waitFor(() => {
+      expect(screen.getByText("342")).toBeInTheDocument();
+    });
+    expect(screen.getByText("42,871")).toBeInTheDocument();
+    expect(screen.getByText("97.4%")).toBeInTheDocument();
+  });
+
+  it("shows Service Unreachable tag when health fetch fails", async () => {
+    vi.spyOn(aiApi, "getAiHealth").mockRejectedValue(new Error("Service down"));
+    render(<AiEngine />);
+    await waitFor(() => {
+      expect(screen.getByTestId("health-unreachable")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Service Unreachable")).toBeInTheDocument();
+  });
+
+  it("shows notice when Accept & Index button is clicked", async () => {
+    const mockResult = {
+      handoff: {
+        doc_id: "d1",
+        doc_type: "BT_CID_4G",
+        confidence: 0.95,
+        catalog_assignment: "full",
+        review_required: false,
+        metadata: null,
+      },
+      decision: {
+        band: ">=0.92",
+        action: "AUTO_APPROVE",
+        proceed_to_extract: true,
+        review_required: false,
+        sla_hours: null,
+        catalog_assignment: "full",
+      },
+      review_item_id: null,
+    };
+    vi.spyOn(aiApi, "processDoc").mockResolvedValue(mockResult);
+
+    render(<AiEngine />);
+    await waitFor(() => expect(screen.getByLabelText("document")).toBeInTheDocument());
+
+    const input = screen.getByLabelText("document") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(["x"], "cid.png", { type: "image/png" })] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "process document" }));
+    });
+    await waitFor(() => expect(aiApi.processDoc).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "accept and index" })).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "accept and index" }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("action-notice")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("action-notice").textContent).toMatch(/Accept & Index/i);
+  });
+
+  it("labels extracted fields card as Classification Confidence, not Avg Confidence", async () => {
+    const mockResult = {
+      handoff: {
+        doc_id: "d1",
+        doc_type: "BT_CID_4G",
+        confidence: 0.95,
+        catalog_assignment: "full",
+        review_required: false,
+        metadata: null,
+      },
+      decision: {
+        band: ">=0.92",
+        action: "AUTO_APPROVE",
+        proceed_to_extract: true,
+        review_required: false,
+        sla_hours: null,
+        catalog_assignment: "full",
+      },
+      review_item_id: null,
+    };
+    vi.spyOn(aiApi, "processDoc").mockResolvedValue(mockResult);
+
+    render(<AiEngine />);
+    await waitFor(() => expect(screen.getByLabelText("document")).toBeInTheDocument());
+
+    const input = screen.getByLabelText("document") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(["x"], "cid.png", { type: "image/png" })] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "process document" }));
+    });
+    await waitFor(() => expect(aiApi.processDoc).toHaveBeenCalled());
+
+    await waitFor(() => {
+      expect(screen.getByText(/Classification Confidence/i)).toBeInTheDocument();
+    });
+    // Must NOT appear as "Avg Confidence" in the extracted fields card header
+    const allText = document.body.textContent ?? "";
+    expect(allText).not.toMatch(/\d+\.\d+% Avg Confidence/);
+  });
+
+  it("forwards ocrText to processDoc when processing", async () => {
+    vi.spyOn(aiApi, "processDoc").mockResolvedValue({
+      handoff: {
+        doc_id: "d1",
+        doc_type: "BT_CID_4G",
+        confidence: 0.95,
+        catalog_assignment: "full",
+        review_required: false,
+        metadata: null,
+      },
+      decision: {
+        band: ">=0.92",
+        action: "AUTO_APPROVE",
+        proceed_to_extract: true,
+        review_required: false,
+        sla_hours: null,
+        catalog_assignment: "full",
+      },
+      review_item_id: null,
+    });
+
+    render(<AiEngine />);
+    await waitFor(() => expect(screen.getByLabelText("document")).toBeInTheDocument());
+
+    const input = screen.getByLabelText("document") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(["x"], "cid.png", { type: "image/png" })] } });
+    });
+
+    // Type OCR text
+    const textarea = screen.getByPlaceholderText(/Paste any known text/i);
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: "P<BWAD0E2810896<<<<<<<<<<<<<<<<<<<5011095M3312272BWA<<<<<<<<<0" } });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "process document" }));
+    });
+
+    await waitFor(() => {
+      expect(aiApi.processDoc).toHaveBeenCalledWith(
+        expect.any(File),
+        expect.any(String),
+        "P<BWAD0E2810896<<<<<<<<<<<<<<<<<<<5011095M3312272BWA<<<<<<<<<0",
+      );
+    });
   });
 });

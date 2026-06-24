@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import RecordsManagement from "./RecordsManagement.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -18,7 +18,7 @@ vi.mock("../auth/AuthContext.js", () => ({
       id: 1,
       username: "admin",
       roles: ["CDO"],
-      permissions: ["compliance:read", "legal_hold:place", "document:delete"],
+      permissions: ["compliance:read", "legal_hold:place", "document:delete", "admin:access"],
     },
     logout: () => {},
   }),
@@ -109,5 +109,88 @@ describe("RecordsManagement screen", () => {
     );
     expect(fetchLegalHolds).toHaveBeenCalledTimes(1);
     expect(fetchDisposalCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  // I-2: handlePlaceHold — placeLegalHold rejection shows error banner
+  it("I-2: shows error banner when placeLegalHold rejects", async () => {
+    const { placeLegalHold } = await import("../api/recordsManagement.js");
+    (placeLegalHold as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Duplicate hold ref"));
+
+    render(<RecordsManagement />);
+    await waitFor(() => expect(screen.getByText("Place Legal Hold")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Place Legal Hold"));
+    await waitFor(() => expect(screen.getByText("Place Hold")).toBeInTheDocument());
+
+    // Fill in required fields
+    const inputs = screen.getAllByRole("textbox");
+    fireEvent.change(inputs[0], { target: { value: "LH-ERR-01" } });
+    fireEvent.change(inputs[1], { target: { value: "branch:THI001" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Place Hold" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to place legal hold/i)).toBeInTheDocument()
+    );
+  });
+
+  // I-2: handleReleaseHold — releaseLegalHold rejection shows error banner
+  it("I-2: shows error banner when releaseLegalHold rejects", async () => {
+    const { releaseLegalHold } = await import("../api/recordsManagement.js");
+    (releaseLegalHold as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Network error"));
+
+    render(<RecordsManagement />);
+    await waitFor(() => expect(screen.getByText("GENERAL_LETTER")).toBeInTheDocument());
+
+    // Switch to Legal Holds tab (use tab button specifically)
+    const tabButtons = screen.getAllByText(/Legal Holds/);
+    // Click the tab button (the one that contains "active" in the label)
+    const holdTab = tabButtons.find(el => el.tagName === "BUTTON" && el.textContent?.includes("active"));
+    fireEvent.click(holdTab!);
+    await waitFor(() => expect(screen.getAllByText(/Release/).length).toBeGreaterThanOrEqual(1));
+
+    // Click Release on the first active hold
+    const releaseButtons = screen.getAllByText("Release");
+    fireEvent.click(releaseButtons[0]);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to release legal hold/i)).toBeInTheDocument()
+    );
+  });
+
+  // I-3: "Run Hold Check & Dispose All" and "Schedule 03:00" buttons are disabled
+  it("I-3: disposal bulk action buttons are disabled (not yet implemented)", async () => {
+    render(<RecordsManagement />);
+    await waitFor(() => expect(screen.getByText("GENERAL_LETTER")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText(/Disposal Queue/));
+    await waitFor(() =>
+      expect(screen.getByText(/Run Hold Check/i)).toBeInTheDocument()
+    );
+
+    const disposeAllBtn = screen.getByRole("button", { name: /Run Hold Check/i });
+    expect(disposeAllBtn).toBeDisabled();
+
+    const scheduleBtn = screen.getByRole("button", { name: /Schedule 03:00/i });
+    expect(scheduleBtn).toBeDisabled();
+  });
+
+  // I-4: "New Retention Rule" is gated on admin:access and is disabled (not yet implemented)
+  it("I-4: New Retention Rule button is visible to admin users but disabled", async () => {
+    render(<RecordsManagement />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /New Retention Rule/i })).toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: /New Retention Rule/i })).toBeDisabled();
+  });
+
+  // M-2: "Managed Records" KPI shows "—" not a fabricated value
+  it("M-2: Managed Records KPI shows — not a fabricated computed value", async () => {
+    render(<RecordsManagement />);
+    await waitFor(() => expect(screen.getByText("Managed Records")).toBeInTheDocument());
+    // The value should be "—" not "6M" (plan.length=5, 5*1.2=6)
+    const kpiValues = screen.getAllByText("—");
+    expect(kpiValues.length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("6M")).not.toBeInTheDocument();
   });
 });

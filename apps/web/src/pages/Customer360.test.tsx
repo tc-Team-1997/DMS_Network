@@ -134,4 +134,39 @@ describe("Customer360 screen", () => {
       expect(fetchCustomerProfile).toHaveBeenCalledWith("20098765432")
     );
   });
+
+  // M-1: timeline items use stable keys (ts_action), not array index
+  it("M-1: timeline events render correctly (stable-key pattern)", async () => {
+    render(<Customer360 />);
+    await waitFor(() =>
+      expect(screen.getByText("INDEXED")).toBeInTheDocument()
+    );
+    // Both timeline events visible — if keys were unstable and caused re-render
+    // ordering issues these would fail or duplicate. Both should be present once.
+    expect(screen.getByText("INDEXED")).toBeInTheDocument();
+    expect(screen.getByText("CAPTURED")).toBeInTheDocument();
+  });
+
+  // M-1: duplicate timestamps with different actions do not collide
+  it("M-1: two timeline events at same timestamp but different actions both render", async () => {
+    const { fetchCustomerProfile } = await import("../api/customer360.js");
+    (fetchCustomerProfile as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      cid: "20098765432",
+      documents: [],
+      kyc: {
+        requirements: [],
+        completeness: 1,
+        status: "Complete",
+        escalated: false,
+      },
+      portfolio: [],
+      timeline: [
+        { ts: "2026-06-01T09:00:00Z", action: "INDEXED",   entity_id: "1", details: "Doc A" },
+        { ts: "2026-06-01T09:00:00Z", action: "CAPTURED",  entity_id: "2", details: "Doc B" },
+      ],
+    });
+    render(<Customer360 />);
+    await waitFor(() => expect(screen.getByText("INDEXED")).toBeInTheDocument());
+    expect(screen.getByText("CAPTURED")).toBeInTheDocument();
+  });
 });

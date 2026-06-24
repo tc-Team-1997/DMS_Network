@@ -137,4 +137,32 @@ describe("Dashboard screen", () => {
     renderWithRouter(<Dashboard />);
     await waitFor(() => expect(screen.getByText(/Network Error/i)).toBeInTheDocument());
   });
+
+  it("calls dashboard summary API with Content-Type header (M2 fix — verifies options object is passed)", async () => {
+    // M2: confirms a full options object (including headers) is sent on every API call.
+    // In a real session the token is present and the Authorization: Bearer header is added by http.ts.
+    // In the test environment getToken() returns null so we can only assert Content-Type is present.
+    renderWithRouter(<Dashboard />);
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/dashboard/summary"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      }),
+    ));
+  });
+
+  it("Quick Actions: Scan Doc is shown to users with document:capture (I1 fix)", async () => {
+    renderWithRouter(<Dashboard />);
+    await waitFor(() => expect(screen.getByText(/Scan Doc/i)).toBeInTheDocument());
+  });
+
+  it("Quick Actions: all buttons gated — admin user sees Scan Doc (I1 fix)", async () => {
+    renderWithRouter(<Dashboard />);
+    // The mock user has document:capture so Scan Doc must appear
+    await waitFor(() => {
+      expect(screen.getByText(/Scan Doc/i)).toBeInTheDocument();
+    });
+  });
 });

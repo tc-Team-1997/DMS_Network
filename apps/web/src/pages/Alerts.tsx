@@ -24,6 +24,7 @@ import {
   type AlertRule,
   type CreateRuleRequest,
 } from "../api/notifyApi.js";
+import { getToken } from "../api/client.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -329,6 +330,7 @@ function AlertDetailPanel({
 
 export default function Alerts() {
   const { user } = useAuth();
+  const canView       = user?.permissions.includes("alert:read") ?? false;
   const canManage     = user?.permissions.includes("alert:manage") ?? false;
   const canManageRule = user?.permissions.includes("alert_rule:manage") ?? false;
 
@@ -382,12 +384,22 @@ export default function Alerts() {
     }
   }, []);
 
-  useEffect(() => { loadAlerts(); }, [loadAlerts]);
-  useEffect(() => { if (tab === "rules") loadRules(); }, [tab, loadRules]);
+  // Load alerts only when the user has the required view permission (I-2).
+  useEffect(() => { if (canView) loadAlerts(); }, [canView, loadAlerts]);
+  // Eagerly load rules on mount so the "Active Rules" KPI card is populated
+  // immediately without requiring the user to click the Rules tab (I-6).
+  useEffect(() => { if (canView) loadRules(); }, [canView, loadRules]);
+  // Reload rules when the user switches to the Rules tab (keeps data fresh)
+  useEffect(() => { if (tab === "rules" && canView) loadRules(); }, [tab, canView, loadRules]);
 
-  // WebSocket real-time feed for new alerts
+  // WebSocket real-time feed for new alerts.
+  // Route through the Vite dev proxy (/svc/notify -> :4003) so that:
+  //   1. The browser never attempts to connect to a private-network port directly.
+  //   2. The JWT token is appended as a query param (C-1 fix).
   useEffect(() => {
-    const wsUrl = `ws://${window.location.hostname}:4003/ws/alerts`;
+    const token = getToken();
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${proto}//${window.location.host}/svc/notify/ws/alerts?token=${encodeURIComponent(token ?? "")}`;
     try {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -675,6 +687,39 @@ export default function Alerts() {
 
   const ruleRows = rules.map((r) => r as unknown as Record<string, unknown>);
 
+  // I-2: Guard — users without alert:read get a graceful access-denied message
+  // instead of hitting the API and seeing a red error banner.
+  if (!canView) {
+    return (
+      <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="page-header">
+          <div>
+            <h2 className="serif">Alerts &amp; Event Management</h2>
+            <p>Real-time compliance alerts, expiry notifications and AI-driven system events</p>
+          </div>
+        </div>
+        <div
+          style={{
+            background: "rgba(220,38,38,.08)",
+            border: "1px solid var(--R)",
+            borderRadius: 8,
+            padding: 24,
+            textAlign: "center",
+            color: "var(--R)",
+          }}
+          role="alert"
+          aria-label="Access denied"
+        >
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Access Denied</div>
+          <div style={{ fontSize: 12, color: "var(--fg)" }}>
+            You do not have permission to view alerts. Contact your administrator to request{" "}
+            <code>alert:read</code> access.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Page header */}
@@ -694,7 +739,7 @@ export default function Alerts() {
             <RefreshCw size={13} />
           </button>
 
-          {unread > 0 && canManage && (
+          {unread > 0 && (canView || canManage) && (
             <button className="btn" onClick={handleMarkAllRead} title="Mark all read">
               <CheckCheck size={13} />
               <span style={{ marginLeft: 5 }}>Mark all read</span>

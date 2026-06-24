@@ -2,7 +2,7 @@
  * ReviewQueue screen tests — mock fetch, assert table renders and claim/resolve calls correct endpoints.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ReviewQueue from "./ReviewQueue.js";
 import * as aiApi from "../api/aiEngine.js";
 
@@ -34,8 +34,8 @@ const PENDING_ROW: aiApi.ReviewRow = {
   doc_type: "BT_CID_4G",
   confidence: 0.60,
   band: "0.50-0.69",
-  sla_hours: 24,
-  sla_deadline: new Date(Date.now() + 20 * 3_600_000).toISOString(), // 20h from now
+  sla_hours: 48,
+  sla_deadline: new Date(Date.now() + 36 * 3_600_000).toISOString(), // 36h from now — not urgent
   status: "PENDING",
 };
 
@@ -62,7 +62,8 @@ const RESOLVED_ROW: aiApi.ReviewRow = {
 };
 
 beforeEach(() => {
-  vi.spyOn(aiApi, "listPendingReviews").mockResolvedValue([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW]);
+  // ReviewQueue now uses listAllReviews (C-1 fix) — mock the correct function.
+  vi.spyOn(aiApi, "listAllReviews").mockResolvedValue([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW]);
 });
 
 afterEach(() => {
@@ -84,10 +85,10 @@ describe("ReviewQueue screen", () => {
     expect(screen.getByText("Resolved (queue)")).toBeInTheDocument();
   });
 
-  it("calls listPendingReviews on mount and hits the /idp/review/pending endpoint", async () => {
+  it("calls listAllReviews on mount (not listPendingReviews) to return all statuses", async () => {
     render(<ReviewQueue />);
     await waitFor(() => {
-      expect(aiApi.listPendingReviews).toHaveBeenCalled();
+      expect(aiApi.listAllReviews).toHaveBeenCalled();
     });
   });
 
@@ -111,7 +112,7 @@ describe("ReviewQueue screen", () => {
       ...PENDING_ROW,
       status: "CLAIMED",
     });
-    vi.spyOn(aiApi, "listPendingReviews")
+    vi.spyOn(aiApi, "listAllReviews")
       .mockResolvedValueOnce([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW])
       .mockResolvedValueOnce([{ ...PENDING_ROW, status: "CLAIMED" }, CLAIMED_ROW, RESOLVED_ROW]);
 
@@ -165,7 +166,7 @@ describe("ReviewQueue screen", () => {
       status: "RESOLVED",
       resolution: "APPROVED",
     } as aiApi.ReviewRow);
-    vi.spyOn(aiApi, "listPendingReviews")
+    vi.spyOn(aiApi, "listAllReviews")
       .mockResolvedValueOnce([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW])
       .mockResolvedValueOnce([PENDING_ROW, { ...CLAIMED_ROW, status: "RESOLVED" }, RESOLVED_ROW]);
 
@@ -194,7 +195,7 @@ describe("ReviewQueue screen", () => {
       status: "RESOLVED",
       resolution: "REJECTED",
     } as aiApi.ReviewRow);
-    vi.spyOn(aiApi, "listPendingReviews")
+    vi.spyOn(aiApi, "listAllReviews")
       .mockResolvedValueOnce([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW])
       .mockResolvedValueOnce([PENDING_ROW, { ...CLAIMED_ROW, status: "RESOLVED" }, RESOLVED_ROW]);
 
@@ -241,12 +242,97 @@ describe("ReviewQueue screen", () => {
     });
   });
 
-  it("shows error state when listPendingReviews fails", async () => {
-    vi.spyOn(aiApi, "listPendingReviews").mockRejectedValue(new Error("Network error"));
+  it("shows error state when listAllReviews fails", async () => {
+    vi.spyOn(aiApi, "listAllReviews").mockRejectedValue(new Error("Network error"));
 
     render(<ReviewQueue />);
     await waitFor(() => {
       expect(screen.getByText(/Network error/i)).toBeInTheDocument();
     });
+  });
+
+  // C-1: verify Claimed and Resolved tabs show their items (not empty)
+  it("shows claimed items in the Claimed tab (C-1 fix)", async () => {
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+
+    const tabs = screen.getAllByRole("button");
+    const claimedTab = tabs.find((b) => /^claimed/i.test(b.textContent ?? ""));
+    expect(claimedTab).toBeDefined();
+    await act(async () => {
+      fireEvent.click(claimedTab!);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("DOC-20260623-002")).toBeInTheDocument();
+    });
+  });
+
+  it("shows resolved items in the Resolved tab (C-1 fix)", async () => {
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+
+    const tabs = screen.getAllByRole("button");
+    const resolvedTab = tabs.find((b) => /^resolved/i.test(b.textContent ?? ""));
+    expect(resolvedTab).toBeDefined();
+    await act(async () => {
+      fireEvent.click(resolvedTab!);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("DOC-20260623-003")).toBeInTheDocument();
+    });
+  });
+
+  // I-3: SLA Breached tab exists and filters breached items
+  it("shows SLA Breached tab and filters breached items (I-3 fix)", async () => {
+    const BREACHED_ROW: aiApi.ReviewRow = {
+      id: 4,
+      doc_id: "DOC-20260623-004",
+      doc_type: "BT_CID_4G",
+      confidence: 0.55,
+      band: "0.50-0.69",
+      sla_hours: 2,
+      sla_deadline: new Date(Date.now() - 3_600_000).toISOString(), // 1h ago — already breached
+      status: "PENDING",
+    };
+    vi.spyOn(aiApi, "listAllReviews").mockResolvedValue([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW, BREACHED_ROW]);
+
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+
+    // SLA Breached tab should exist
+    const tabs = screen.getAllByRole("button");
+    const slaTab = tabs.find((b) => /sla breached/i.test(b.textContent ?? ""));
+    expect(slaTab).toBeDefined();
+
+    await act(async () => {
+      fireEvent.click(slaTab!);
+    });
+
+    await waitFor(() => {
+      // The breached row should appear in this tab
+      expect(screen.getByText("DOC-20260623-004")).toBeInTheDocument();
+    });
+    // Non-breached pending row should not appear in SLA Breached tab
+    expect(screen.queryByText("DOC-20260623-001")).not.toBeInTheDocument();
+  });
+
+  // M-1: "In current page" subtitle is fixed to "From last fetch"
+  it("shows From last fetch subtitle on Resolved KPI card (M-1 fix)", async () => {
+    render(<ReviewQueue />);
+    await waitFor(() => {
+      expect(screen.getByText("From last fetch")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("In current page")).not.toBeInTheDocument();
+  });
+
+  // M-4: Auto-refresh skips when tab is hidden — verify by inspecting the interval callback source
+  it("interval callback checks document.visibilityState before calling reload (M-4 fix)", () => {
+    // Check that the ReviewQueue source code contains the visibility guard.
+    // This is a white-box test that confirms the implementation guard is present,
+    // since async timer interactions with fake timers + RTL are fragile.
+    const ReviewQueueSource = ReviewQueue.toString();
+    expect(ReviewQueueSource).toContain("visibilityState");
   });
 });

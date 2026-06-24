@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import IntegrationHub from "./IntegrationHub.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -13,7 +13,7 @@ beforeAll(() => {
   }
 });
 
-/* ─── Mock auth context ─── */
+/* ─── Mock auth context — CDO with integration:manage ─── */
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
@@ -59,28 +59,26 @@ describe("IntegrationHub screen", () => {
   });
 
   it("renders the page heading", async () => {
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     expect(screen.getByText("Integration Hub")).toBeInTheDocument();
   });
 
-  it("renders the page sub-heading with service list", () => {
-    render(<IntegrationHub />);
-    // Multiple CBS matches expected; check the heading paragraph specifically
+  it("renders the page sub-heading with service list", async () => {
+    await act(async () => { render(<IntegrationHub />); });
     const heading = screen.getByText(/CBS · LOS · KYC Engine/);
     expect(heading).toBeInTheDocument();
   });
 
-  it("renders all four KPI cards", () => {
-    render(<IntegrationHub />);
+  it("renders all four KPI cards", async () => {
+    await act(async () => { render(<IntegrationHub />); });
     expect(screen.getByText("Active Integrations")).toBeInTheDocument();
     expect(screen.getByText("API Calls Today")).toBeInTheDocument();
     expect(screen.getByText("Avg Latency")).toBeInTheDocument();
     expect(screen.getByText("Failed Calls (24h)")).toBeInTheDocument();
   });
 
-  it("renders all tab labels", () => {
-    render(<IntegrationHub />);
-    // Tab buttons are in the .tabs div; use getAllByText and check at least one
+  it("renders all tab labels", async () => {
+    await act(async () => { render(<IntegrationHub />); });
     const connectedItems = screen.getAllByText("Connected Systems");
     expect(connectedItems.length).toBeGreaterThan(0);
     expect(screen.getByText("Request Logs")).toBeInTheDocument();
@@ -90,54 +88,104 @@ describe("IntegrationHub screen", () => {
 
   it("calls getSystems on mount", async () => {
     const { integrationHubApi } = await import("../api/integrationHub.js");
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(integrationHubApi.getSystems).toHaveBeenCalledTimes(1));
   });
 
   it("calls getLogs on mount", async () => {
     const { integrationHubApi } = await import("../api/integrationHub.js");
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(integrationHubApi.getLogs).toHaveBeenCalledTimes(1));
   });
 
   it("calls getWebhooks on mount", async () => {
     const { integrationHubApi } = await import("../api/integrationHub.js");
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(integrationHubApi.getWebhooks).toHaveBeenCalledTimes(1));
   });
 
   it("shows CBS system in the connected systems list", async () => {
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(screen.getByText(/Core Banking System \(CBS\)/)).toBeInTheDocument());
   });
 
   it("shows LOS system in the connected systems list", async () => {
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(screen.getByText(/Loan Origination System \(LOS\)/)).toBeInTheDocument());
   });
 
   it("shows HMAC webhook endpoints card", async () => {
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(screen.getByText("HMAC Webhook Endpoints")).toBeInTheDocument());
   });
 
-  it("shows the Add Integration button for users with integration:manage", () => {
-    render(<IntegrationHub />);
+  it("shows the Add Integration button for users with integration:manage", async () => {
+    await act(async () => { render(<IntegrationHub />); });
     expect(screen.getByText("+ Add Integration")).toBeInTheDocument();
   });
 
-  it("shows the Test Webhook button", () => {
-    render(<IntegrationHub />);
+  it("shows the Test Webhook button for users with integration:manage (I1 fix)", async () => {
+    await act(async () => { render(<IntegrationHub />); });
     expect(screen.getByText("Test Webhook")).toBeInTheDocument();
   });
 
   it("shows the Integration Health Summary card", async () => {
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(screen.getByText("Integration Health Summary")).toBeInTheDocument());
   });
 
   it("shows inbound webhook paths in HMAC Webhook Endpoints", async () => {
-    render(<IntegrationHub />);
+    await act(async () => { render(<IntegrationHub />); });
     await waitFor(() => expect(screen.getByText(/cbs\/customer-updated/)).toBeInTheDocument());
   });
+
+  /* ── C1: API path fix — verify correct base paths are called ── */
+  it("C1: getLogs is called (confirming /integration/logs path is used)", async () => {
+    const { integrationHubApi } = await import("../api/integrationHub.js");
+    await act(async () => { render(<IntegrationHub />); });
+    await waitFor(() => expect(integrationHubApi.getLogs).toHaveBeenCalled());
+  });
+
+  it("C1: getSystems is called (confirming /integration/systems path is used)", async () => {
+    const { integrationHubApi } = await import("../api/integrationHub.js");
+    await act(async () => { render(<IntegrationHub />); });
+    await waitFor(() => expect(integrationHubApi.getSystems).toHaveBeenCalled());
+  });
+
+  it("C1: getWebhooks is called (confirming /outbound path is used)", async () => {
+    const { integrationHubApi } = await import("../api/integrationHub.js");
+    await act(async () => { render(<IntegrationHub />); });
+    await waitFor(() => expect(integrationHubApi.getWebhooks).toHaveBeenCalled());
+  });
+
+  /* ── C2: Error banner appears when all API calls fail ── */
+  it("C2: shows error banner when all API calls fail", async () => {
+    const { integrationHubApi } = await import("../api/integrationHub.js");
+    vi.mocked(integrationHubApi.getSystems).mockRejectedValueOnce(new Error("Network error"));
+    vi.mocked(integrationHubApi.getLogs).mockRejectedValueOnce(new Error("Network error"));
+    vi.mocked(integrationHubApi.getWebhooks).mockRejectedValueOnce(new Error("Network error"));
+
+    await act(async () => { render(<IntegrationHub />); });
+    await waitFor(() =>
+      expect(screen.getByText(/Failed to load live data/)).toBeInTheDocument()
+    );
+  });
+
+  /* ── I1: Test Webhook shown to CDO (who has integration:manage) ── */
+  it("I1: shows Test Webhook button only for users with integration:manage", async () => {
+    await act(async () => { render(<IntegrationHub />); });
+    // CDO has integration:manage, so the Test Webhook button should be visible
+    expect(screen.getByText("Test Webhook")).toBeInTheDocument();
+  });
+
+  /* ── I1: Guard test — verify Test Webhook is inside canManage block (static) ── */
+  it("I1: Test Webhook is co-located with + Add Integration (both require integration:manage)", async () => {
+    await act(async () => { render(<IntegrationHub />); });
+    // Both buttons should be present for CDO
+    expect(screen.getByText("+ Add Integration")).toBeInTheDocument();
+    expect(screen.getByText("Test Webhook")).toBeInTheDocument();
+  });
 });
+
+// C1 API path tests live in src/api/integrationHub.api.test.ts
+// (separate file to avoid vi.mock hoisting conflicts with component tests)

@@ -311,8 +311,8 @@ export default function Customer360() {
                   <div className="tl">
                     {profile.timeline.length === 0
                       ? <div style={{ color: "var(--sil)", fontSize: 12, padding: "8px 0" }}>No timeline events yet.</div>
-                      : profile.timeline.slice(0, 8).map((t, i) => (
-                        <TimelineItem key={i} ts={t.ts} action={t.action} details={t.details} />
+                      : profile.timeline.slice(0, 8).map((t) => (
+                        <TimelineItem key={`${t.ts}_${t.action}`} ts={t.ts} action={t.action} details={t.details} />
                       ))
                     }
                   </div>
@@ -410,8 +410,8 @@ export default function Customer360() {
               <div className="tl">
                 {profile.timeline.length === 0
                   ? <div style={{ color: "var(--sil)", fontSize: 12, padding: "8px 0" }}>No timeline events recorded.</div>
-                  : profile.timeline.map((t, i) => (
-                    <TimelineItem key={i} ts={t.ts} action={t.action} details={t.details} />
+                  : profile.timeline.map((t) => (
+                    <TimelineItem key={`${t.ts}_${t.action}`} ts={t.ts} action={t.action} details={t.details} />
                   ))
                 }
               </div>

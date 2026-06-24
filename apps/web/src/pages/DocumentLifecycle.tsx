@@ -89,7 +89,20 @@ export function DocumentLifecycle() {
     if (!canRead) return;
     try {
       const res = await documentLifecycleApi.searchDocuments(q);
-      setDocList(res.documents.map((d) => ({ ...d, _key: String(d.id) })));
+      // Apply client-side filtering as a reliable fallback: the backend GET /documents
+      // does not currently read query params, so we filter the returned list here to
+      // ensure the search term is honoured even when server-side filtering is absent.
+      const term = q ? q.toLowerCase().trim() : "";
+      const filtered = term
+        ? res.documents.filter(
+            (d) =>
+              (d.doc_no ?? "").toLowerCase().includes(term) ||
+              d.doc_type.toLowerCase().includes(term) ||
+              (d.branch ?? "").toLowerCase().includes(term) ||
+              d.status.toLowerCase().includes(term),
+          )
+        : res.documents;
+      setDocList(filtered.map((d) => ({ ...d, _key: String(d.id) })));
     } catch { /* ignore */ }
   }, [canRead]);
 

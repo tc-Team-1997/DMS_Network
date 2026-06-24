@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { ComplianceAudit } from "./ComplianceAudit.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -13,16 +13,19 @@ beforeAll(() => {
   }
 });
 
+const mockUseAuth = vi.fn(() => ({
+  user: {
+    id: 1,
+    username: "aud",
+    roles: ["Auditor"],
+    permissions: ["compliance:read"],
+  } as any,
+  login: async () => {},
+  logout: () => {},
+}));
+
 vi.mock("../auth/AuthContext.js", () => ({
-  useAuth: () => ({
-    user: {
-      id: 1,
-      username: "aud",
-      roles: ["Auditor"],
-      permissions: ["compliance:read"],
-    },
-    logout: () => {},
-  }),
+  useAuth: () => mockUseAuth(),
 }));
 
 const MOCK_SCORECARD = {
@@ -80,18 +83,19 @@ describe("ComplianceAudit screen", () => {
     });
   });
 
-  it("shows chain integrity as Verified when ok=true", async () => {
+  it("shows sequence integrity as Intact when ok=true", async () => {
     render(<ComplianceAudit />);
-    await waitFor(() => expect(screen.getByText("Verified")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Intact")).toBeInTheDocument());
   });
 
   it("displays Regulatory Matrix tab content including framework names", async () => {
     render(<ComplianceAudit />);
     await waitFor(() => expect(screen.getAllByText(/Regulatory Matrix/).length).toBeGreaterThan(0));
-    // switch to the matrix tab
+    // switch to the matrix tab using fireEvent to stay within React's event system
     const matrixTab = screen.getByRole("button", { name: /regulatory matrix/i });
-    matrixTab.click();
-    await waitFor(() => expect(screen.getByText(/Tamper-evident audit trail/)).toBeInTheDocument());
+    fireEvent.click(matrixTab);
+    // Multiple elements may contain this text (page subtitle + table cell); use getAllByText
+    await waitFor(() => expect(screen.getAllByText(/Tamper-evident audit trail/).length).toBeGreaterThan(0));
   });
 
   it("calls the scorecard, matrix, verify, and audit endpoints", async () => {
@@ -106,16 +110,44 @@ describe("ComplianceAudit screen", () => {
     expect(calls.some((u) => u.includes("/compliance/audit"))).toBe(true);
   });
 
-  it("shows 'Not authorised' when user lacks compliance:read", async () => {
-    vi.doMock("../auth/AuthContext.js", () => ({
-      useAuth: () => ({
-        user: { id: 2, username: "maker", roles: ["Maker"], permissions: [] },
-        logout: () => {},
-      }),
-    }));
-    // Re-import doesn't work in this env; test the condition directly
-    // via the auth mock being set correctly in the describe block
-    // This is a placeholder assertion that always passes (auth mock is module-level)
-    expect(true).toBe(true);
+  it("shows loading placeholder on Scorecard tab while fetching", () => {
+    // fetch never resolves — simulates an in-flight request
+    globalThis.fetch = vi.fn(() => new Promise(() => {})) as any;
+    render(<ComplianceAudit />);
+    // The scorecard tab is active by default; loading state should be shown
+    expect(screen.getByText(/Loading scorecard…/)).toBeInTheDocument();
+  });
+
+  it("propagates filter error to error banner when loadAuditFiltered fails", async () => {
+    render(<ComplianceAudit />);
+    // Wait for initial load
+    await waitFor(() => expect(screen.getByText("78%")).toBeInTheDocument());
+
+    // Switch to Audit Trail tab
+    const auditTab = screen.getByRole("button", { name: /audit trail/i });
+    fireEvent.click(auditTab);
+
+    // Now make the next fetch fail
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error("Network error"))) as any;
+
+    const applyBtn = screen.getByRole("button", { name: /apply filter/i });
+    fireEvent.click(applyBtn);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Network error/)).toBeInTheDocument()
+    );
+  });
+
+  it("shows 'not have permission' when user lacks compliance:read", async () => {
+    // Override the mockUseAuth factory to return no permissions for this test.
+    mockUseAuth.mockReturnValueOnce({
+      user: { id: 2, username: "maker", roles: ["Maker"], permissions: [] } as any,
+      login: async () => {},
+      logout: () => {},
+    });
+    render(<ComplianceAudit />);
+    expect(screen.getByText(/You do not have permission/)).toBeInTheDocument();
+    // No fetch calls should be made when the user is not authorised
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
   });
 });

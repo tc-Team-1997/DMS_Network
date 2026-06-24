@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 
-// Mock the auth context
+// Mock the auth context.
+// I-1 fix verification: permissions now use "document:read" (not the phantom "search:read").
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
       id: 1,
       username: "admin",
       roles: ["CDO"],
-      permissions: ["search:read", "document:read", "crossbranch:read"],
+      permissions: ["document:read", "crossbranch:read"],
       branch: "Thimphu",
     },
     logout: () => {},
@@ -23,7 +24,15 @@ vi.mock("../api/searchApi.js", () => ({
     saveSearch: vi.fn(),
     listSaved: vi.fn(),
     runSaved: vi.fn(),
+    exportCsv: vi.fn(),
   },
+}));
+
+// Mock client.ts so getToken is available in exportCsv tests
+vi.mock("../api/client.js", () => ({
+  getToken: () => "test-jwt-token",
+  setToken: vi.fn(),
+  clearToken: vi.fn(),
 }));
 
 import { searchApi } from "../api/searchApi.js";
@@ -77,6 +86,7 @@ describe("Search screen", () => {
     (searchApi.listSaved as ReturnType<typeof vi.fn>).mockResolvedValue({ saved: [] });
     (searchApi.query as ReturnType<typeof vi.fn>).mockResolvedValue(mockResults);
     (searchApi.facets as ReturnType<typeof vi.fn>).mockResolvedValue({ facets: {} });
+    (searchApi.exportCsv as ReturnType<typeof vi.fn>).mockResolvedValue(new Blob(["col1,col2\nval1,val2"], { type: "text/csv" }));
   });
 
   it("renders the page heading and search input", () => {
@@ -100,7 +110,9 @@ describe("Search screen", () => {
   it("calls searchApi.query when user types in the search box", async () => {
     render(<Search />);
     const input = screen.getByRole("textbox", { name: /Search query/i });
-    fireEvent.change(input, { target: { value: "dorji loan" } });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "dorji loan" } });
+    });
 
     await waitFor(() => {
       expect(searchApi.query).toHaveBeenCalledWith(
@@ -112,7 +124,9 @@ describe("Search screen", () => {
   it("displays results from the API after a search", async () => {
     render(<Search />);
     const input = screen.getByRole("textbox", { name: /Search query/i });
-    fireEvent.change(input, { target: { value: "dorji" } });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "dorji" } });
+    });
 
     await waitFor(() => {
       expect(screen.getByText("DOC-001")).toBeInTheDocument();
@@ -123,7 +137,9 @@ describe("Search screen", () => {
   it("shows KPI cards after results load", async () => {
     render(<Search />);
     const input = screen.getByRole("textbox", { name: /Search query/i });
-    fireEvent.change(input, { target: { value: "dorji" } });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "dorji" } });
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Total Results")).toBeInTheDocument();
@@ -139,7 +155,9 @@ describe("Search screen", () => {
   it("calls /svc/search via searchApi.query with the correct endpoint", async () => {
     render(<Search />);
     const input = screen.getByRole("textbox", { name: /Search query/i });
-    fireEvent.change(input, { target: { value: "test query" } });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "test query" } });
+    });
 
     await waitFor(() => {
       expect(searchApi.query).toHaveBeenCalled();
@@ -160,7 +178,9 @@ describe("Search screen", () => {
     (searchApi.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Network error"));
     render(<Search />);
     const input = screen.getByRole("textbox", { name: /Search query/i });
-    fireEvent.change(input, { target: { value: "fail query" } });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "fail query" } });
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Network error")).toBeInTheDocument();
@@ -174,10 +194,126 @@ describe("Search screen", () => {
     expect(screen.getByText("Analytics")).toBeInTheDocument();
   });
 
-  it("changes mode when user clicks Boolean button", () => {
+  it("changes mode when user clicks Boolean button", async () => {
     render(<Search />);
     // Click the Boolean mode selector button (title matches the button role)
-    fireEvent.click(screen.getByRole("button", { name: "Boolean" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Boolean" }));
+    });
     expect(screen.getByText(/Syntax:/i)).toBeInTheDocument();
+  });
+
+  // ── Fix verifications ─────────────────────────────────────────────────────
+
+  // I-1: canSearch now uses "document:read" (not the nonexistent "search:read")
+  // so the Save button appears for users with document:read permission.
+  it("I-1: shows Save search button when user has document:read permission", async () => {
+    render(<Search />);
+    const input = screen.getByRole("textbox", { name: /Search query/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "dorji" } });
+    });
+    // The bookmark/save button should now be visible (was permanently hidden before fix)
+    await waitFor(() => {
+      // BookmarkCheck button has no text, find by its parent button
+      const saveBtn = document.querySelector('button[title="Save this search"]');
+      expect(saveBtn).not.toBeNull();
+    }, { timeout: 1000 });
+  });
+
+  // I-4: Changing mode resets page to 1
+  it("I-4: clicking a different mode resets pagination to page 1", async () => {
+    render(<Search />);
+    const input = screen.getByRole("textbox", { name: /Search query/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "loan" } });
+    });
+    await waitFor(() => expect(searchApi.query).toHaveBeenCalled(), { timeout: 1000 });
+
+    const callCountBefore = (searchApi.query as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    // Switch mode — should re-issue query with page=1
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Boolean" }));
+    });
+
+    await waitFor(() => {
+      const calls = (searchApi.query as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.length).toBeGreaterThan(callCountBefore);
+      const lastCall = calls[calls.length - 1][0];
+      expect(lastCall.page).toBe(1);
+    }, { timeout: 1000 });
+  });
+
+  // I-4: Changing sort resets page to 1
+  it("I-4: changing sort order resets pagination to page 1", async () => {
+    render(<Search />);
+    const input = screen.getByRole("textbox", { name: /Search query/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "loan" } });
+    });
+    await waitFor(() => expect(searchApi.query).toHaveBeenCalled(), { timeout: 1000 });
+
+    const callCountBefore = (searchApi.query as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    await act(async () => {
+      const sortSelect = screen.getByRole("combobox");
+      fireEvent.change(sortSelect, { target: { value: "recent" } });
+    });
+
+    await waitFor(() => {
+      const calls = (searchApi.query as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.length).toBeGreaterThan(callCountBefore);
+      const lastCall = calls[calls.length - 1][0];
+      expect(lastCall.page).toBe(1);
+    }, { timeout: 1000 });
+  });
+
+  // C-2: Export CSV button wired to searchApi.exportCsv
+  it("C-2: Export button calls searchApi.exportCsv when clicked", async () => {
+    // Set up URL.createObjectURL so the anchor click doesn't throw
+    const createObjectURL = vi.fn().mockReturnValue("blob:mock-url");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+
+    render(<Search />);
+    const input = screen.getByRole("textbox", { name: /Search query/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "loan" } });
+    });
+    await waitFor(() => expect(screen.getByText("DOC-001")).toBeInTheDocument(), { timeout: 1000 });
+
+    const exportBtn = screen.getByTitle("Export CSV");
+    expect(exportBtn).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(exportBtn);
+    });
+
+    await waitFor(() => {
+      expect(searchApi.exportCsv).toHaveBeenCalledWith(
+        expect.objectContaining({ text: "loan" })
+      );
+    }, { timeout: 1000 });
+  });
+
+  // I-5: HitPanel Open Document and Download buttons have onClick handlers
+  it("I-5: HitPanel Open Document button is wired (has onClick / aria-label)", async () => {
+    render(<Search />);
+    const input = screen.getByRole("textbox", { name: /Search query/i });
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "dorji" } });
+    });
+    await waitFor(() => expect(screen.getByText("DOC-001")).toBeInTheDocument(), { timeout: 1000 });
+
+    // Click the first result row to open the detail panel
+    await act(async () => {
+      fireEvent.click(screen.getByText("DOC-001"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Open document/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Download document/i })).toBeInTheDocument();
+    });
   });
 });

@@ -141,6 +141,7 @@ export default function RecordsManagement() {
   const canRead    = user?.permissions.includes("compliance:read") ?? false;
   const canHold    = user?.permissions.includes("legal_hold:place") ?? false;
   const canDispose = user?.permissions.includes("document:delete") ?? false;
+  const canAdmin   = user?.permissions.includes("admin:access") ?? false;
 
   const [plan,       setPlan]       = useState<RetentionPolicy[]>([]);
   const [holds,      setHolds]      = useState<LegalHold[]>([]);
@@ -185,15 +186,23 @@ export default function RecordsManagement() {
   async function handlePlaceHold(e: FormEvent) {
     e.preventDefault();
     if (!holdForm.ref || !holdForm.scope) return;
-    await placeLegalHold(holdForm);
-    setHoldForm({ ref: "", scope: "branch:" });
-    setHoldOpen(false);
-    await load();
+    try {
+      await placeLegalHold(holdForm);
+      setHoldForm({ ref: "", scope: "branch:" });
+      setHoldOpen(false);
+      await load();
+    } catch {
+      setError("Failed to place legal hold. Please check your input and try again.");
+    }
   }
 
   async function handleReleaseHold(ref: string) {
-    await releaseLegalHold(ref);
-    await load();
+    try {
+      await releaseLegalHold(ref);
+      await load();
+    } catch {
+      setError("Failed to release legal hold. Please try again.");
+    }
   }
 
   async function handleCertifyDisposal(docId: number) {
@@ -220,7 +229,9 @@ export default function RecordsManagement() {
           {canHold && (
             <button className="btn bw sm" onClick={() => setHoldOpen(true)}>Place Legal Hold</button>
           )}
-          <button className="btn bg sm">New Retention Rule</button>
+          {canAdmin && (
+            <button className="btn bg sm" disabled title="Retention rule creation coming soon">New Retention Rule</button>
+          )}
         </div>
       </div>
 
@@ -232,7 +243,7 @@ export default function RecordsManagement() {
 
       {/* ─── KPI Row ──────────────────────────── */}
       <div className="g4" style={{ marginBottom: 16 }}>
-        <KpiCard label="Managed Records"    value={loading ? "—" : `${(plan.length * 1.2).toFixed(0)}M`}    sub="Under retention schedule" variant="green" />
+        <KpiCard label="Managed Records"    value="—"    sub="Under retention schedule" variant="green" />
         <KpiCard label="Legal Holds Active" value={loading ? "—" : activeHolds.length} sub={`${holds.length} total holds`}           variant="amber" />
         <KpiCard label="Eligible for Disposal" value={loading ? "—" : candidates.length} sub={`${eligibleFree.length} free to dispose`} variant="red" />
         <KpiCard label="Retention Policies" value={loading ? "—" : plan.length}         sub="Document classes"                        variant="blue" />
@@ -365,10 +376,22 @@ export default function RecordsManagement() {
               </div>
               {canDispose && eligibleFree.length > 0 && (
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                  <button className="btn bx" style={{ flex: 1, fontSize: 11 }}>
+                  <button
+                    className="btn bx"
+                    style={{ flex: 1, fontSize: 11 }}
+                    disabled
+                    title="Bulk disposal not yet implemented — certify documents individually"
+                  >
                     Run Hold Check &amp; Dispose All
                   </button>
-                  <button className="btn bs" style={{ fontSize: 11 }}>Schedule 03:00</button>
+                  <button
+                    className="btn bs"
+                    style={{ fontSize: 11 }}
+                    disabled
+                    title="Scheduled disposal not yet implemented"
+                  >
+                    Schedule 03:00
+                  </button>
                 </div>
               )}
             </Card>

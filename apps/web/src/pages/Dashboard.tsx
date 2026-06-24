@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   KpiCard,
@@ -186,8 +186,9 @@ export default function Dashboard() {
   const byCategory = summary?.byCategory ?? {};
 
   const donutData = buildDonutData(byCategory);
-  const inflowData = buildInflowData(total, indexedToday);
-  const heatCells = Array.from({ length: 84 }, () => Math.random());
+  // useMemo prevents chart data from re-randomising on every re-render (fixes I6)
+  const inflowData = useMemo(() => buildInflowData(total, indexedToday), [total, indexedToday]);
+  const heatCells = useMemo(() => Array.from({ length: 84 }, (_, i) => ((i * 7 + total) % 100) / 100), [total]);
 
   return (
     <div className="fade-up">
@@ -375,10 +376,18 @@ export default function Dashboard() {
 
           <Card title="Quick Actions">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-              <QuickAction icon="📷" label="Scan Doc" onClick={() => navigate("/capture")} />
-              <QuickAction icon="🗂️" label="New Case" onClick={() => navigate("/case-management")} />
-              <QuickAction icon="🔍" label="Search" onClick={() => navigate("/search")} />
-              <QuickAction icon="🛡️" label="Compliance" onClick={() => navigate("/compliance-audit")} />
+              {user?.permissions?.includes("document:capture") && (
+                <QuickAction icon="📷" label="Scan Doc" onClick={() => navigate("/capture")} />
+              )}
+              {user?.permissions?.includes("case:read") && (
+                <QuickAction icon="🗂️" label="New Case" onClick={() => navigate("/case-management")} />
+              )}
+              {user?.permissions?.includes("search:read") && (
+                <QuickAction icon="🔍" label="Search" onClick={() => navigate("/search")} />
+              )}
+              {user?.permissions?.includes("compliance:read") && (
+                <QuickAction icon="🛡️" label="Compliance" onClick={() => navigate("/compliance-audit")} />
+              )}
             </div>
           </Card>
         </div>

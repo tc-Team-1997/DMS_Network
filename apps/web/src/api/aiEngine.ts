@@ -1,7 +1,12 @@
 /**
  * Typed API client for the ZorDMS AI / IDP service.
  * All requests go to /svc/ai (proxied to http://localhost:8000).
- * Multipart upload endpoints use raw fetch (not the json-only http helper).
+ *
+ * Transport conventions:
+ *  - JSON endpoints  (GET, and POST with JSON body): use the `http` helper.
+ *  - Multipart upload endpoints (file uploads, claim, resolve): use `postFormData`.
+ *    These hit FastAPI Form() parameters and MUST be sent as multipart/form-data.
+ *    Do NOT accidentally call http.post() for any endpoint listed under postFormData.
  */
 import { http, SVC } from "./http.js";
 import { getToken } from "./client.js";
@@ -107,10 +112,11 @@ export async function extractDoc(file: File, docType: string): Promise<{
   return postFormData(`${AI}/idp/extract`, fd);
 }
 
-export async function processDoc(file: File, docId: string): Promise<ProcessResult> {
+export async function processDoc(file: File, docId: string, ocrText = ""): Promise<ProcessResult> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("doc_id", docId);
+  if (ocrText) fd.append("ocr_text", ocrText);
   return postFormData<ProcessResult>(`${AI}/idp/process`, fd);
 }
 
@@ -122,8 +128,22 @@ export async function ocrDoc(file: File): Promise<{ engine: string; text: string
 
 /* ─── Review queue endpoints ─── */
 
+/** @deprecated Use listAllReviews() — this only returns PENDING items from the backend. */
 export async function listPendingReviews(): Promise<ReviewRow[]> {
   return http.get<ReviewRow[]>(`${AI}/idp/review/pending`);
+}
+
+/**
+ * Fetch review items across all statuses (PENDING, CLAIMED, RESOLVED).
+ * Calls GET /idp/review/items?status=ALL when available; falls back to
+ * /idp/review/pending for backward compatibility with older API deployments.
+ */
+export async function listAllReviews(): Promise<ReviewRow[]> {
+  return http.get<ReviewRow[]>(`${AI}/idp/review/items?status=ALL`);
+}
+
+export async function getAiStats(): Promise<AiStats> {
+  return http.get<AiStats>(`${AI}/stats`);
 }
 
 export async function claimReview(id: number, userId: string): Promise<ReviewRow> {
@@ -138,7 +158,7 @@ export async function resolveReview(id: number, resolution: string): Promise<Rev
   return postFormData<ReviewRow>(`${AI}/idp/review/${id}/resolve`, fd);
 }
 
-/* ─── Health / stats (derived from health endpoint + review queue) ─── */
+/* ─── Health / stats ─── */
 
 export async function getAiHealth(): Promise<AiHealthStatus> {
   return http.get<AiHealthStatus>(`${AI}/health`);

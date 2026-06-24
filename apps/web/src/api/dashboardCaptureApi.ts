@@ -95,4 +95,7 @@ export const dashboardCaptureApi = {
     body: { docType: string; confidence: number; fields: Record<string, unknown> }
   ): Promise<unknown> =>
     http.post(`${SVC.core}/catalog/${id}`, body),
+
+  rejectDocument: (id: number, reason: string): Promise<unknown> =>
+    http.post(`${SVC.workflow}/documents/${id}/reject`, { reason }),
 };

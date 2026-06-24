@@ -81,4 +81,22 @@ export const searchApi = {
   /** POST /saved/:id/run */
   runSaved: (id: number) =>
     http.post<SearchResults>(`${BASE}/saved/${id}/run`),
+
+  /**
+   * POST /search/export.csv — export search results as a CSV blob.
+   * Returns a Blob that the caller should trigger as a file download.
+   */
+  exportCsv: async (q: SearchQuery): Promise<Blob> => {
+    const { getToken } = await import("./client.js");
+    const token = getToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${BASE}/search/export.csv`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(q),
+    });
+    if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+    return res.blob();
+  },
 };

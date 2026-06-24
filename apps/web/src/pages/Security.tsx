@@ -273,7 +273,7 @@ export default function Security() {
       <div className="g4" style={{ marginBottom: 14 }}>
         <KpiCard label="Active Users"        value={loading ? "…" : activeUsers}          sub="across all branches"         variant="green" />
         <KpiCard label="MFA Enrolled"        value={loading ? "…" : `${mfaPct}%`}         sub={`${100 - mfaPct}% pending`} variant="blue" />
-        <KpiCard label="Failed Logins (24h)" value={7}                                     sub="3 IPs auto-blocked"          variant="red" />
+        <KpiCard label="Failed Logins (24h)" value="—"                                    sub="audit log endpoint pending"  variant="red" />
         <KpiCard label="Locked Accounts"     value={loading ? "…" : lockedCount}           sub="pending review"              variant="amber" />
       </div>
 
@@ -479,8 +479,8 @@ export default function Security() {
                     { time: "08:07", event: "LOGIN_FAILED", actor: "unknown",entity: "auth",             severity: "danger"  },
                     { time: "07:44", event: "LOGIN_FAILED", actor: "unknown",entity: "auth",             severity: "danger"  },
                     { time: "07:20", event: "LOGIN",        actor: "maker_01",entity: "auth",            severity: "info"    },
-                  ].map((ev, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "var(--gr)", border: "1px solid var(--bd)", borderRadius: 6 }}>
+                  ].map((ev) => (
+                    <div key={`${ev.time}-${ev.event}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "var(--gr)", border: "1px solid var(--bd)", borderRadius: 6 }}>
                       <StatusDot color={ev.severity === "danger" ? "red" : ev.severity === "warning" ? "amber" : "green"} />
                       <span style={{ fontSize: 10, color: "var(--sil)", width: 36, flexShrink: 0 }}>{ev.time}</span>
                       <Tag variant={ev.severity === "danger" ? "red" : ev.severity === "warning" ? "amber" : "blue"} style={{ fontSize: 10 }}>{ev.event}</Tag>
@@ -526,6 +526,7 @@ export default function Security() {
             />
             <FormField
               label="Password"
+              type="password"
               placeholder="Min 8 characters"
               value={form.password ?? ""}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}

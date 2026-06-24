@@ -49,7 +49,4 @@ export const securityApi = {
 
   toggleLock: (userId: number) =>
     http.post<{ ok: boolean; status: string }>(`${BASE}/users/${userId}/lock`, {}),
-
-  getAuditLog: () =>
-    http.get<{ logs: AuditLogRow[] }>(`${BASE}/audit-log`),
 };

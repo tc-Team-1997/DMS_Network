@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   KpiCard,
   Card,
@@ -257,12 +258,14 @@ function VersionHistory({ versions, currentVersion, canRollback, onRollback }: V
 
 export default function Repository() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Permissions
   const canRead = user?.permissions.includes("document:read") ?? false;
   const canDelete = user?.permissions.includes("document:delete") ?? false;
   const canCapture = user?.permissions.includes("document:capture") ?? false;
   const canCreateFolder = user?.permissions.includes("folder:create") ?? false;
+  const canFolderRead = user?.permissions.includes("folder:read") ?? false;
 
   // State
   const [tab, setTab] = useState("browse");
@@ -281,6 +284,7 @@ export default function Repository() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadBranch, setUploadBranch] = useState(user?.branch ?? "");
+  const [uploadSourceChannel, setUploadSourceChannel] = useState<string>("UPLOAD");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadMsg, setUploadMsg] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -299,18 +303,25 @@ export default function Repository() {
     setLoading(true);
     setError(null);
     try {
-      const [foldersRes, docsRes] = await Promise.all([
-        repositoryViewerApi.listFolders(),
+      // Use allSettled so a folder:read 403 does not abort the document load
+      const [foldersResult, docsResult] = await Promise.allSettled([
+        canFolderRead ? repositoryViewerApi.listFolders() : Promise.resolve(null),
         repositoryViewerApi.listDocuments(),
       ]);
-      setTree(foldersRes.tree);
-      setDocs(docsRes.documents);
+      if (foldersResult.status === "fulfilled" && foldersResult.value) {
+        setTree(foldersResult.value.tree);
+      }
+      if (docsResult.status === "fulfilled") {
+        setDocs(docsResult.value.documents);
+      } else {
+        throw docsResult.reason;
+      }
     } catch (e: any) {
       setError(e?.body?.error ?? e?.message ?? "Failed to load repository data");
     } finally {
       setLoading(false);
     }
-  }, [canRead]);
+  }, [canRead, canFolderRead]);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -363,6 +374,7 @@ export default function Repository() {
       const form = new FormData();
       form.append("title", uploadTitle || uploadFile.name);
       form.append("branch", uploadBranch);
+      form.append("sourceChannel", uploadSourceChannel);
       if (selectedFolder) form.append("folderId", String(selectedFolder.id));
       form.append("file", uploadFile);
       await repositoryViewerApi.uploadDocument(form);
@@ -422,10 +434,9 @@ export default function Repository() {
     }
   }
 
-  // Open viewer
+  // Open viewer — C3 fix: use React Router navigate instead of direct window.location mutations
   function openViewer(doc: DocumentRecord) {
-    window.location.hash = `#/viewer?doc=${doc.id}`;
-    window.location.href = `/viewer?doc=${doc.id}`;
+    navigate(`/viewer?doc=${doc.id}`);
   }
 
   // Table columns
@@ -580,7 +591,11 @@ export default function Repository() {
         <div className="g3c">
           {/* Folder Tree Panel */}
           <Card title="Folder Structure" style={{ padding: 12 }}>
-            {loading ? (
+            {!canFolderRead ? (
+              <div style={{ color: "var(--sil)", fontSize: 11, padding: "8px 0" }}>
+                You do not have permission to view folders.
+              </div>
+            ) : loading ? (
               <div style={{ color: "var(--sil)", fontSize: 11, padding: "8px 0" }}>Loading folders…</div>
             ) : tree.length === 0 ? (
               <div style={{ color: "var(--sil)", fontSize: 11, padding: "8px 0" }}>No folders yet.</div>
@@ -643,7 +658,8 @@ export default function Repository() {
                   <option value="all">All Status</option>
                   <option value="Active">Active</option>
                   <option value="review">Review Flag</option>
-                  <option value="Deleted">Deleted</option>
+                  {/* "Deleted" option removed: server only returns Active documents;
+                      deleted docs are archived and not browseable here */}
                 </select>
                 {categories.length > 0 && (
                   <select
@@ -776,6 +792,17 @@ export default function Repository() {
             value={uploadBranch}
             onChange={(e) => setUploadBranch((e.target as HTMLInputElement).value)}
           />
+          <FormField
+            as="select"
+            label="Source Channel"
+            value={uploadSourceChannel}
+            onChange={(e) => setUploadSourceChannel((e.target as HTMLSelectElement).value)}
+          >
+            <option value="UPLOAD">Upload (Web)</option>
+            <option value="SCAN">Scan</option>
+            <option value="EMAIL">Email</option>
+            <option value="API">API</option>
+          </FormField>
           {selectedFolder && (
             <div style={{ fontSize: 11, color: "var(--sil)", marginBottom: 10 }}>
               Uploading to: <span style={{ color: "var(--gold3)" }}>{selectedFolder.path}</span>

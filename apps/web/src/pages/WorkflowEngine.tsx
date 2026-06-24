@@ -3,8 +3,12 @@
  *
  * Maker-Checker approval workflows: active workflow table, BPMN-style
  * visual builder, SLA countdown, and approve/reject/escalate/hold actions.
- * RBAC-gated: action buttons require workflow:act permission (enforced also
- * on the backend by the authority client calling the Gateway /authz/check).
+ * RBAC-gated: each action button requires its own specific permission:
+ *   approve  → document:approve
+ *   reject   → document:reject
+ *   escalate → workflow:escalate
+ *   hold     → workflow:hold
+ * (enforced also on the backend by the authority client calling the Gateway /authz/check).
  */
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext.js";
@@ -189,13 +193,21 @@ function NewWorkflowModal({
 }
 
 /* ── Workflow detail side panel ── */
+interface WorkflowDetailPanelPermissions {
+  canApprove: boolean;
+  canReject: boolean;
+  canEscalate: boolean;
+  canHold: boolean;
+}
+
 function WorkflowDetailPanel({
-  workflowId, onAct, canAct,
+  workflowId, onAct, permissions,
 }: {
   workflowId: number;
   onAct: (id: number, action: WorkflowAction, comment?: string) => Promise<void>;
-  canAct: boolean;
+  permissions: WorkflowDetailPanelPermissions;
 }) {
+  const { canApprove, canReject, canEscalate, canHold } = permissions;
   const [detail, setDetail] = useState<{ workflow: WorkflowRow; steps: WorkflowStepRow[] } | null>(null);
   const [busy, setBusy] = useState<WorkflowAction | null>(null);
   const [comment, setComment] = useState("");
@@ -267,8 +279,8 @@ function WorkflowDetailPanel({
         {/* Visual step chain */}
         <WorkflowBuilder steps={steps} compact />
 
-        {/* Action row */}
-        {canAct && !isTerminal && !isInactive && activeStep && (
+        {/* Action row — each button is gated on its own permission (C1 fix) */}
+        {!isTerminal && !isInactive && activeStep && (canApprove || canReject || canEscalate || canHold) && (
           <div style={{ marginTop: 12, borderTop: "1px solid var(--bd)", paddingTop: 12 }}>
             <div style={{ marginBottom: 8 }}>
               <input
@@ -280,35 +292,43 @@ function WorkflowDetailPanel({
               />
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <button
-                className="btn bok"
-                style={{ flex: 1, fontSize: 12 }}
-                disabled={busy !== null}
-                onClick={() => act("approve")}
-              >
-                {busy === "approve" ? "…" : "✓ Approve & Forward"}
-              </button>
-              <button
-                className="btn bx"
-                disabled={busy !== null}
-                onClick={() => act("reject")}
-              >
-                {busy === "reject" ? "…" : "✗ Reject"}
-              </button>
-              <button
-                className="btn bw"
-                disabled={busy !== null}
-                onClick={() => act("escalate")}
-              >
-                {busy === "escalate" ? "…" : "⇧ Escalate"}
-              </button>
-              <button
-                className="btn bs"
-                disabled={busy !== null}
-                onClick={() => act("hold")}
-              >
-                {busy === "hold" ? "…" : "Hold"}
-              </button>
+              {canApprove && (
+                <button
+                  className="btn bok"
+                  style={{ flex: 1, fontSize: 12 }}
+                  disabled={busy !== null}
+                  onClick={() => act("approve")}
+                >
+                  {busy === "approve" ? "…" : "✓ Approve & Forward"}
+                </button>
+              )}
+              {canReject && (
+                <button
+                  className="btn bx"
+                  disabled={busy !== null}
+                  onClick={() => act("reject")}
+                >
+                  {busy === "reject" ? "…" : "✗ Reject"}
+                </button>
+              )}
+              {canEscalate && (
+                <button
+                  className="btn bw"
+                  disabled={busy !== null}
+                  onClick={() => act("escalate")}
+                >
+                  {busy === "escalate" ? "…" : "⇧ Escalate"}
+                </button>
+              )}
+              {canHold && (
+                <button
+                  className="btn bs"
+                  disabled={busy !== null}
+                  onClick={() => act("hold")}
+                >
+                  {busy === "hold" ? "…" : "Hold"}
+                </button>
+              )}
             </div>
             {err && <div style={{ fontSize: 11, color: "var(--R)", marginTop: 6 }}>{err}</div>}
           </div>
@@ -369,8 +389,12 @@ const TABS = [
 
 export default function WorkflowEngine() {
   const { user } = useAuth();
-  const canAct    = !!user?.permissions?.includes("workflow:act");
-  const canCreate = canAct;
+  // C1: per-action permissions aligned with backend ACTION_PERMISSION map
+  const canApprove  = !!user?.permissions?.includes("document:approve");
+  const canReject   = !!user?.permissions?.includes("document:reject");
+  const canEscalate = !!user?.permissions?.includes("workflow:escalate");
+  const canHold     = !!user?.permissions?.includes("workflow:hold");
+  const canCreate   = canApprove || canReject || canEscalate || canHold;
 
   const [rows,      setRows]      = useState<WorkflowRow[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
@@ -379,7 +403,7 @@ export default function WorkflowEngine() {
   const [tab,       setTab]       = useState("all");
   const [selected,  setSelected]  = useState<WorkflowRow | null>(null);
   const [newWfOpen, setNewWfOpen] = useState(false);
-  const [actErr,    setActErr]    = useState<string | null>(null);
+  // I4: actErr removed — errors from actOnWorkflow are surfaced in WorkflowDetailPanel.err
 
   /* data load */
   async function refresh() {
@@ -416,9 +440,8 @@ export default function WorkflowEngine() {
   const kpis = computeKpis(rows);
   const stageChart = buildStageChart(rows);
 
-  /* act handler */
+  /* act handler — errors propagate to WorkflowDetailPanel.err (I4: actErr removed) */
   async function handleAct(id: number, action: WorkflowAction, comment?: string) {
-    setActErr(null);
     await actOnWorkflow(id, { action, comment });
     await refresh();
   }
@@ -522,9 +545,9 @@ export default function WorkflowEngine() {
           variant="blue"
         />
         <KpiCard
-          label="Approved This Session"
+          label="Total Approved"
           value={kpis.approved.toLocaleString()}
-          sub="SLA met"
+          sub="All-time approved"
           variant="green"
         />
         <KpiCard
@@ -586,7 +609,7 @@ export default function WorkflowEngine() {
             key={selected.id}
             workflowId={selected.id}
             onAct={handleAct}
-            canAct={canAct}
+            permissions={{ canApprove, canReject, canEscalate, canHold }}
           />
         ) : (
           <Card>
@@ -635,10 +658,6 @@ export default function WorkflowEngine() {
         />
       )}
 
-      {actErr && (
-        <div style={{ marginTop: 8, color: "var(--R)", fontSize: 12 }}>{actErr}</div>
-      )}
-
       {/* New Workflow modal */}
       <NewWorkflowModal
         open={newWfOpen}
@@ -650,11 +669,38 @@ export default function WorkflowEngine() {
   );
 }
 
-/* Fetches and renders the full builder for the selected workflow */
+/* Fetches and renders the full builder for the selected workflow.
+ * I3 fix: surfaces fetch errors and shows a loading indicator instead of
+ * silently falling back to an empty step list. */
 function SelectedWorkflowBuilder({ workflowId }: { workflowId: number }) {
-  const [steps, setSteps] = useState<WorkflowStepRow[]>([]);
+  const [steps, setSteps]     = useState<WorkflowStepRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
   useEffect(() => {
-    getWorkflow(workflowId).then((d) => setSteps(d.steps)).catch(() => {});
+    setLoading(true); setError(null);
+    getWorkflow(workflowId)
+      .then((d) => { setSteps(d.steps); })
+      .catch((e) => { setError((e as Error).message ?? "Failed to load workflow steps"); })
+      .finally(() => { setLoading(false); });
   }, [workflowId]);
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0" }}>
+        <StatusDot color="amber" pulse />
+        <span style={{ fontSize: 11, color: "var(--sil)" }}>Loading workflow steps…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ fontSize: 12, color: "var(--R)", padding: "12px 0" }}>
+        Failed to load workflow steps: {error}
+      </div>
+    );
+  }
+
   return <WorkflowBuilder steps={steps} />;
 }

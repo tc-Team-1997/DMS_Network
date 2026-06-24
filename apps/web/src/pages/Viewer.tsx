@@ -324,6 +324,17 @@ export default function Viewer() {
 
   const totalPages = doc?.page_count ?? 1;
 
+  // ── Render: Access denied — I4 fix: guard is first so no partial render leaks through ─────────
+
+  if (!canRead) {
+    return (
+      <div className="fade-up" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ color: "var(--R)", fontSize: 14, marginBottom: 8 }}>Access Denied</div>
+        <div style={{ color: "var(--sil)", fontSize: 12 }}>You do not have permission to view documents.</div>
+      </div>
+    );
+  }
+
   // ── Render: No document selected ─────────────────────────────────────────
 
   if (!docId && !loading) {
@@ -365,15 +376,6 @@ export default function Viewer() {
     );
   }
 
-  if (!canRead) {
-    return (
-      <div className="fade-up" style={{ padding: 40, textAlign: "center" }}>
-        <div style={{ color: "var(--R)", fontSize: 14, marginBottom: 8 }}>Access Denied</div>
-        <div style={{ color: "var(--sil)", fontSize: 12 }}>You do not have permission to view documents.</div>
-      </div>
-    );
-  }
-
   return (
     <div className="fade-up">
       {/* Page Header */}
@@ -398,7 +400,7 @@ export default function Viewer() {
             </a>
           )}
           <button className="btn bs sm" onClick={() => window.print()}>Print</button>
-          <button className="btn bg sm">Share</button>
+          <button className="btn bg sm" disabled title="Share — coming soon" aria-label="Share (not yet available)">Share</button>
         </div>
       </div>
 
@@ -448,8 +450,8 @@ export default function Viewer() {
             </>
           )}
 
-          <button className="btn bs xs">Compare Versions</button>
-          <button className="btn bs xs">Share View</button>
+          <button className="btn bs xs" disabled title="Compare Versions — coming soon" aria-label="Compare Versions (not yet available)">Compare Versions</button>
+          <button className="btn bs xs" disabled title="Share View — coming soon" aria-label="Share View (not yet available)">Share View</button>
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{ fontSize: 11, color: "var(--sil)" }}>Page</span>
@@ -721,14 +723,19 @@ export default function Viewer() {
                         </div>
                       </div>
                       {doc && (
+                        // C4 fix: label clarifies this downloads the *current* version,
+                        // not the specific historical version (version-specific download
+                        // endpoint not yet exposed by the backend).
                         <a
                           href={`/svc/core/documents/${doc.id}/download`}
                           className="btn bs xs"
                           style={{ fontSize: 9, textDecoration: "none" }}
                           target="_blank"
                           rel="noreferrer"
+                          title={isCurrent ? "Download current version" : "Version-specific download not yet available — downloads current version"}
+                          aria-label={isCurrent ? `Download current version v${v.version_no}` : `Download (current version, not v${v.version_no})`}
                         >
-                          View
+                          {isCurrent ? "Download" : "Download (current)"}
                         </a>
                       )}
                     </div>
@@ -738,32 +745,15 @@ export default function Viewer() {
             </Card>
           )}
 
-          {/* Collaborators */}
+          {/* Collaborators — M3 fix: hardcoded initials removed;
+              real collaborators API not yet available */}
           {doc && (
             <Card title="Collaborators">
               <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {["AM", "OK", "SM"].map((initials, i) => (
-                  <div
-                    key={initials}
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: "50%",
-                      background: i === 0 ? "linear-gradient(135deg,var(--ink4),var(--gold))" : i === 1 ? "linear-gradient(135deg,var(--B),var(--G))" : "linear-gradient(135deg,var(--P),var(--R))",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: "var(--wh)",
-                    }}
-                    title={initials}
-                  >
-                    {initials}
-                  </div>
-                ))}
-                <span style={{ fontSize: 11, color: "var(--sil)", marginLeft: 4 }}>+ 2 more</span>
-                <button className="btn bs xs" style={{ marginLeft: "auto" }}>Invite</button>
+                <span style={{ fontSize: 11, color: "var(--sil)" }}>
+                  Collaborator data not yet available.
+                </span>
+                <button className="btn bs xs" style={{ marginLeft: "auto" }} disabled title="Invite collaborator — coming soon" aria-label="Invite collaborator (not yet available)">Invite</button>
               </div>
             </Card>
           )}

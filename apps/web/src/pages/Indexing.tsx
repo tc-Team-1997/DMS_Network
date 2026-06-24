@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   KpiCard,
   Card,
@@ -22,6 +22,7 @@ interface FieldDef {
   label: string;
   type?: "text" | "date" | "number" | "select";
   options?: string[];
+  optionLabels?: Record<string, string>;
   required?: boolean;
   hint?: string;
 }
@@ -61,8 +62,11 @@ const DOC_TYPES: Record<DocTypeKey, { label: string; fields: FieldDef[] }> = {
       { key: "applicant_cid", label: "Applicant CID *", required: true },
       { key: "applicant_name", label: "Applicant Name *", required: true },
       { key: "loan_type", label: "Loan Type *", type: "select", required: true, options: [
-        "Home Loan", "Vehicle Loan", "Personal Loan", "Education Loan", "Business Loan", "Agricultural Loan",
-      ]},
+        "HOME", "AUTO", "AGRI", "BUSINESS", "PERSONAL",
+      ], optionLabels: {
+        HOME: "Home Loan", AUTO: "Vehicle Loan", AGRI: "Agricultural Loan",
+        BUSINESS: "Business Loan", PERSONAL: "Personal Loan",
+      }},
       { key: "loan_amount", label: "Loan Amount (BTN) *", type: "number", required: true },
       { key: "branch_code", label: "Branch Code *", required: true },
       { key: "submission_date", label: "Submission Date *", type: "date", required: true },
@@ -130,9 +134,16 @@ const QUEUE_COLS: Column<QueueRow>[] = [
 export default function Indexing() {
   const { user } = useAuth();
   const params = useParams<{ id?: string }>();
-  const preSelectedId = params.id ? Number(params.id) : null;
+  const [searchParams] = useSearchParams();
+  // Support both /indexing/:id (router param) and /indexing?id=X (query param)
+  const preSelectedId = params.id
+    ? Number(params.id)
+    : searchParams.get("id")
+    ? Number(searchParams.get("id"))
+    : null;
 
   const canIndex = user?.permissions?.includes("document:index") ?? false;
+  const canRead = user?.permissions?.includes("document:read") ?? false;
   const [tab, setTab] = useState("form");
 
   /* Queue list */
@@ -171,12 +182,17 @@ export default function Indexing() {
   const [rejectReason, setRejectReason] = useState("");
 
   const loadQueue = useCallback(async () => {
+    if (!canRead) {
+      setQueueError("You need document:read permission to load the indexing queue.");
+      setQueueLoading(false);
+      return;
+    }
     try {
       setQueueLoading(true);
       setQueueError(null);
       const res = await dashboardCaptureApi.listDocuments();
       setQueue(res.documents);
-      // If a preSelectedId was passed via route param, pick that doc
+      // If a preSelectedId was passed via route param or query param, pick that doc
       if (preSelectedId) {
         const found = res.documents.find((d) => d.id === preSelectedId) ?? null;
         if (found) setSelectedDoc(found);
@@ -186,7 +202,7 @@ export default function Indexing() {
     } finally {
       setQueueLoading(false);
     }
-  }, [preSelectedId]);
+  }, [preSelectedId, canRead]);
 
   useEffect(() => {
     loadQueue();
@@ -241,10 +257,23 @@ export default function Indexing() {
   }
 
   async function doReject() {
-    setRejectOpen(false);
-    setRejectReason("");
-    // In production: call a workflow reject endpoint
-    setErrors(["Rejected. Document returned to capture queue."]);
+    if (!rejectReason.trim()) return;
+    if (!selectedDoc) {
+      setErrors(["Select a document to reject."]);
+      return;
+    }
+    try {
+      await dashboardCaptureApi.rejectDocument(selectedDoc.id, rejectReason.trim());
+      setRejectOpen(false);
+      setRejectReason("");
+      setErrors(["Document rejected and returned to capture queue."]);
+      // Refresh queue to reflect new status
+      await loadQueue();
+    } catch (err: unknown) {
+      setRejectOpen(false);
+      setRejectReason("");
+      setErrors([(err as Error).message ?? "Failed to reject document."]);
+    }
   }
 
   const pendingCount = queue.filter((d) => !d.doc_type).length;
@@ -279,7 +308,10 @@ export default function Indexing() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Tag variant="red">{pendingCount} pending</Tag>
           <button
-            style={{ padding: "7px 14px", background: "linear-gradient(135deg,#b8912a,#f0c84a)", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", color: "#050d1a" }}
+            disabled
+            title="AI bulk indexing is not yet available — contact your system administrator."
+            style={{ padding: "7px 14px", background: "rgba(184,145,42,.3)", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "not-allowed", color: "#050d1a", opacity: 0.6 }}
+            aria-label="Auto-Index All (AI) — coming soon"
           >
             Auto-Index All (AI)
           </button>
@@ -303,13 +335,28 @@ export default function Indexing() {
           {/* Left: Document preview + QA quick-check */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <Card title={<span>Document Viewer <span style={{ color: "var(--sil)", fontWeight: 400, fontSize: 11 }}>{selectedDoc ? `#${selectedDoc.id}` : "— select from queue"}</span></span>}
-              action={
-                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                  <button style={{ padding: "4px 10px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 5, fontSize: 10, color: "var(--sil)", cursor: "pointer" }}>◀ Prev</button>
-                  <span style={{ fontSize: 11, color: "var(--sil)" }}>{selectedDoc ? `${queue.findIndex((d) => d.id === selectedDoc.id) + 1}/${queue.length}` : "0/0"}</span>
-                  <button style={{ padding: "4px 10px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 5, fontSize: 10, color: "var(--sil)", cursor: "pointer" }}>Next ▶</button>
-                </div>
-              }
+              action={(() => {
+                const currentIdx = selectedDoc ? queue.findIndex((d) => d.id === selectedDoc.id) : -1;
+                const hasPrev = currentIdx > 0;
+                const hasNext = currentIdx >= 0 && currentIdx < queue.length - 1;
+                return (
+                  <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                    <button
+                      disabled={!hasPrev}
+                      onClick={() => hasPrev && setSelectedDoc(queue[currentIdx - 1])}
+                      style={{ padding: "4px 10px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 5, fontSize: 10, color: hasPrev ? "var(--mist)" : "var(--sil)", cursor: hasPrev ? "pointer" : "not-allowed", opacity: hasPrev ? 1 : 0.5 }}
+                      aria-label="Previous document"
+                    >◀ Prev</button>
+                    <span style={{ fontSize: 11, color: "var(--sil)" }}>{selectedDoc ? `${currentIdx + 1}/${queue.length}` : "0/0"}</span>
+                    <button
+                      disabled={!hasNext}
+                      onClick={() => hasNext && setSelectedDoc(queue[currentIdx + 1])}
+                      style={{ padding: "4px 10px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 5, fontSize: 10, color: hasNext ? "var(--mist)" : "var(--sil)", cursor: hasNext ? "pointer" : "not-allowed", opacity: hasNext ? 1 : 0.5 }}
+                      aria-label="Next document"
+                    >Next ▶</button>
+                  </div>
+                );
+              })()}
             >
               <div style={{ background: "rgba(255,255,255,.03)", border: "1px dashed rgba(255,255,255,.1)", borderRadius: 8, padding: 24, minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {selectedDoc ? (
@@ -376,6 +423,15 @@ export default function Indexing() {
               <Tag variant="gold">AI-assisted · 97.4% filled</Tag>
             </span>
           }>
+            {/* Queue load error — visible on form tab so user knows why the picker is empty (I5) */}
+            {queueError && (
+              <div style={{ background: "rgba(224,82,82,.13)", border: "1px solid rgba(224,82,82,.3)", borderRadius: 7, padding: "8px 12px", fontSize: 11, color: "var(--R)", marginBottom: 12 }}>
+                Could not load indexing queue: {queueError} —{" "}
+                <button onClick={loadQueue} style={{ color: "var(--R)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                  Retry
+                </button>
+              </div>
+            )}
             {/* Queue picker */}
             {!selectedDoc && queue.length > 0 && (
               <div style={{ marginBottom: 14 }}>
@@ -434,7 +490,11 @@ export default function Indexing() {
                       onChange={(e) => setField(fd.key, (e.target as HTMLSelectElement).value)}
                     >
                       <option value="">— Select —</option>
-                      {fd.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+                      {fd.options?.map((o) => (
+                        <option key={o} value={o}>
+                          {fd.optionLabels?.[o] ?? o}
+                        </option>
+                      ))}
                     </FormField>
                   );
                 }
@@ -543,7 +603,10 @@ export default function Indexing() {
                 Reject
               </button>
               <button
-                style={{ padding: "9px 14px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}
+                disabled
+                title="Legal hold placement is not yet available — contact your compliance officer."
+                style={{ padding: "9px 14px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--sil)", cursor: "not-allowed", opacity: 0.6 }}
+                aria-label="Hold — coming soon"
               >
                 Hold
               </button>
@@ -652,7 +715,9 @@ export default function Indexing() {
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <button
             onClick={doReject}
-            style={{ flex: 1, padding: "9px 14px", background: "rgba(224,82,82,.2)", border: "1px solid rgba(224,82,82,.3)", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", color: "var(--R)" }}
+            disabled={!rejectReason.trim()}
+            style={{ flex: 1, padding: "9px 14px", background: rejectReason.trim() ? "rgba(224,82,82,.2)" : "rgba(224,82,82,.08)", border: "1px solid rgba(224,82,82,.3)", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: rejectReason.trim() ? "pointer" : "not-allowed", color: "var(--R)", opacity: rejectReason.trim() ? 1 : 0.5 }}
+            aria-disabled={!rejectReason.trim()}
           >
             Confirm Reject
           </button>

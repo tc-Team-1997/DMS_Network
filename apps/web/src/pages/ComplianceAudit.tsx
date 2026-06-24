@@ -81,6 +81,7 @@ export function ComplianceAudit() {
 
   const loadAuditFiltered = useCallback(async () => {
     if (!canRead) return;
+    setError(null);
     try {
       const at = await complianceAuditApi.getAuditTrail({
         action: auditFilter.action || undefined,
@@ -89,7 +90,9 @@ export function ComplianceAudit() {
         limit: 100,
       });
       setAuditRows(at.rows.map((r) => ({ ...r, _key: String(r.id ?? Math.random()) })));
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      setError(String(e?.message ?? "Failed to apply audit filter"));
+    }
   }, [canRead, auditFilter]);
 
   if (!canRead) {
@@ -198,16 +201,16 @@ export function ComplianceAudit() {
         <KpiCard
           label="Audit Entries"
           value={verification ? verification.checked.toLocaleString() : "—"}
-          sub="Tamper-proof · SHA-256"
+          sub="Sequence-verified · SHA-256"
           variant="gold"
         />
         <KpiCard
-          label="Chain Integrity"
-          value={verification ? (verification.ok ? "Verified" : "Broken") : "—"}
+          label="Sequence Integrity"
+          value={verification ? (verification.ok ? "Intact" : "Gap Detected") : "—"}
           sub={verification?.ok
-            ? <Tag variant="green">Hash chain intact</Tag>
+            ? <Tag variant="green">No sequence gaps</Tag>
             : verification
-              ? <Tag variant="red">Broken at #{verification.brokenAt}</Tag>
+              ? <Tag variant="red">Gap at entry #{verification.brokenAt}</Tag>
               : "Checking…"}
           variant={verification?.ok ? "green" : "red"}
         />
@@ -218,22 +221,32 @@ export function ComplianceAudit() {
 
       {/* ═══ SCORECARD TAB ═══ */}
       {tab === "scorecard" && (
-        <div className="g2" style={{ marginTop: 14 }}>
-          <DonutChartCard
-            title="Overall Compliance Score"
-            data={donutData}
-            height={240}
-          />
-          <BarChartCard
-            title="Framework Breakdown"
-            data={frameworkBarData}
-            xKey="framework"
-            bars={[
-              { key: "Met", color: "var(--G)", name: "Controls Met" },
-              { key: "Gap", color: "var(--R)", name: "Gap" },
-            ]}
-            height={240}
-          />
+        <div style={{ marginTop: 14 }}>
+          {loading && (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>Loading scorecard…</div>
+          )}
+          {!loading && !scorecard && (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>No scorecard data available</div>
+          )}
+          {!loading && scorecard && (
+            <div className="g2">
+              <DonutChartCard
+                title="Overall Compliance Score"
+                data={donutData}
+                height={240}
+              />
+              <BarChartCard
+                title="Framework Breakdown"
+                data={frameworkBarData}
+                xKey="framework"
+                bars={[
+                  { key: "Met", color: "var(--G)", name: "Controls Met" },
+                  { key: "Gap", color: "var(--R)", name: "Gap" },
+                ]}
+                height={240}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -314,7 +327,7 @@ export function ComplianceAudit() {
       {/* ═══ HASH-CHAIN TAB ═══ */}
       {tab === "chain" && (
         <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
-          <Card title="Tamper-Evident Audit Chain Verification">
+          <Card title="Audit Log Sequence Verification">
             {verification ? (
               <div>
                 <div style={{
@@ -329,14 +342,14 @@ export function ComplianceAudit() {
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: verification.ok ? "var(--G)" : "var(--R)" }}>
                       {verification.ok
-                        ? "Chain Integrity Verified"
-                        : `Chain Broken at Entry #${verification.brokenAt}`}
+                        ? "Sequence Integrity Verified"
+                        : `Sequence Gap Detected at Entry #${verification.brokenAt}`}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--sil)", marginTop: 4 }}>
-                      {verification.checked.toLocaleString()} audit log entries verified via SHA-256 hash-chain recomputation.
+                      {verification.checked.toLocaleString()} audit log entries checked via SHA-256 rolling digest.
                       {verification.ok
-                        ? " No tamper evidence detected."
-                        : " Immediate investigation required — possible log tampering."}
+                        ? " No sequence gaps detected. Note: in-place row edits are not detected by the current check."
+                        : " Immediate investigation required — one or more entries may be missing."}
                     </div>
                   </div>
                 </div>
@@ -345,8 +358,8 @@ export function ComplianceAudit() {
                   {[
                     { label: "Entries Checked", value: verification.checked.toLocaleString() },
                     { label: "Algorithm", value: "SHA-256" },
-                    { label: "Status", value: verification.ok ? "Intact" : "Compromised" },
-                    { label: "Broken At", value: verification.brokenAt != null ? `#${verification.brokenAt}` : "—" },
+                    { label: "Status", value: verification.ok ? "Sequence Intact" : "Gap Found" },
+                    { label: "Gap At", value: verification.brokenAt != null ? `#${verification.brokenAt}` : "—" },
                   ].map((kv) => (
                     <div key={kv.label} style={{ background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 9, padding: "10px 14px" }}>
                       <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>{kv.label}</div>
@@ -357,23 +370,29 @@ export function ComplianceAudit() {
               </div>
             ) : (
               <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>
-                {loading ? "Verifying hash chain…" : "No verification data available"}
+                {loading ? "Checking audit log sequence…" : "No verification data available"}
               </div>
             )}
           </Card>
 
-          <Card title="How Hash-Chain Verification Works">
+          <Card title="About Audit Log Verification">
             <div style={{ fontSize: 12, color: "var(--sil)", lineHeight: 1.7 }}>
               <p>
-                Each audit log entry is chained to the previous one using a SHA-256 hash:
+                The verifier replays the audit log in ascending entry order and computes a rolling SHA-256 digest
+                across all rows to confirm the sequence is complete and uninterrupted:
               </p>
               <pre style={{ background: "var(--ink3)", padding: "10px 14px", borderRadius: 8, fontSize: 11, color: "var(--gold3)", overflow: "auto", margin: "8px 0" }}>
-{`hash[n] = SHA-256(hash[n-1] + "|" + actor|action|entity|entity_id|details)`}
+{`digest[n] = SHA-256(digest[n-1] + "|" + actor|action|entity|entity_id|details)`}
               </pre>
               <p>
-                The verifier replays the sequence from row 0, recomputing each digest. If any row has been silently
-                altered, the digest mismatch is detected — making the audit trail tamper-evident. The chain covers all
-                privileged actions: logins, approvals, legal holds, and document disposals.
+                <strong style={{ color: "var(--W)" }}>Current guarantee:</strong>{" "}
+                The check confirms that no entry IDs are missing (i.e. rows have not been deleted) and that the
+                sequence is intact. It does <em>not</em> detect silent in-place edits to existing rows, because
+                each row&apos;s recomputed digest is not compared against a stored <code>prev_hash</code> value.
+                A full tamper-evident chain requires a <code>prev_hash</code> column populated on every write.
+              </p>
+              <p>
+                The check covers all privileged actions: logins, approvals, legal holds, and document disposals.
               </p>
             </div>
           </Card>
