@@ -10,9 +10,7 @@
 import { describe, it, expect } from "vitest";
 import express from "express";
 import request from "supertest";
-import { signToken } from "@zordms/auth";
-import { requireAuth } from "./requireAuth.js";
-import { requirePermission } from "./requirePermission.js";
+import { signToken, requireAuth, requirePermission } from "@zordms/auth";
 
 const SECRET = "test-secret";
 

@@ -5,9 +5,7 @@ import { nextStateForAction, ACTION_PERMISSION, type WorkflowAction } from "../e
 import { writeAudit } from "../audit.js";
 import type { EventBus } from "../events.js";
 import type { AuthorityClient } from "../authority.js";
-import { requireAuth } from "../middleware/requireAuth.js";
-import { requirePermission } from "../middleware/requirePermission.js";
-import { asyncHandler } from "../app.js";
+import { requireAuth, requirePermission, asyncHandler } from "@zordms/auth";
 
 // F7: Insert-then-refetch pattern for Oracle compatibility.
 // Returns the inserted row by querying on the unique column after insert.

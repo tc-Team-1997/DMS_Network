@@ -3,9 +3,7 @@ import type { Knex } from "knex";
 import { compileTemplate } from "../engine/compileTemplate.js";
 import { writeAudit } from "../audit.js";
 import type { EventBus } from "../events.js";
-import { requireAuth } from "../middleware/requireAuth.js";
-import { requirePermission } from "../middleware/requirePermission.js";
-import { asyncHandler } from "../app.js";
+import { requireAuth, requirePermission, asyncHandler } from "@zordms/auth";
 
 const CASE_TYPES = ["KYC", "Loan", "Account", "AML"];
 
