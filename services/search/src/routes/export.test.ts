@@ -6,7 +6,7 @@ import { signToken } from "@zordms/auth";
 import { createApp } from "../app.js";
 import { SqlSearchBackend } from "../backend/SqlSearchBackend.js";
 import { toCsv } from "./export.js";
-import type { SearchHit } from "../types.js";
+import type { SearchHit } from "@zordms/types";
 
 const migrationsDir = new URL("../migrations", import.meta.url).pathname;
 const seedsDir = new URL("../seeds", import.meta.url).pathname;
@@ -16,11 +16,20 @@ const backend = new SqlSearchBackend(knex);
 const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv), backend });
 let adminToken = "";
 
+// CDO has all permissions including crossbranch:read
+const ALL_PERMISSIONS = [
+  "user:create", "user:update", "user:read", "role:assign",
+  "document:capture", "document:index", "document:read", "document:approve",
+  "document:reject", "document:delete", "workflow:act", "legal_hold:place",
+  "compliance:read", "admin:access", "crossbranch:read",
+];
+
 beforeAll(async () => {
   await knex.migrate.latest();
   await knex.seed.run();
   const admin = await knex("users").where({ username: "admin" }).first();
-  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+  // Admin (CDO) token carries all permissions in claims including crossbranch:read
+  adminToken = signToken({ sub: admin.id, username: "admin", permissions: ALL_PERMISSIONS, roles: ["CDO"] }, "t");
   await backend.index({ doc_id: "D1", ocr_text: 'Loan, Dorji "VIP"', metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Thimphu", status: "indexed", risk_band: "low", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });
 });
 afterAll(async () => { await knex.destroy(); });

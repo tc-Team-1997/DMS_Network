@@ -1,5 +1,5 @@
 import type { Knex } from "knex";
-import type { SearchFilters, SearchMode, SearchScope } from "../types.js";
+import type { SearchFilters, SearchMode, SearchScope } from "@zordms/types";
 
 export function applyScope(qb: Knex.QueryBuilder, scope: SearchScope): Knex.QueryBuilder {
   if (scope.crossBranch) return qb;

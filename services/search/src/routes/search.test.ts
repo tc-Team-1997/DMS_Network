@@ -16,24 +16,26 @@ let adminToken = "";
 let viewerThimphuToken = "";
 let nullBranchViewerToken = "";
 
+// CDO has all permissions including crossbranch:read
+const ALL_PERMISSIONS = [
+  "user:create", "user:update", "user:read", "role:assign",
+  "document:capture", "document:index", "document:read", "document:approve",
+  "document:reject", "document:delete", "workflow:act", "legal_hold:place",
+  "compliance:read", "admin:access", "crossbranch:read",
+];
+
 beforeAll(async () => {
   await knex.migrate.latest();
   await knex.seed.run();
   const admin = await knex("users").where({ username: "admin" }).first();
-  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+  // Admin (CDO) gets all permissions + crossbranch:read embedded in JWT claims
+  adminToken = signToken({ sub: admin.id, username: "admin", permissions: ALL_PERMISSIONS, roles: ["CDO"] }, "t");
 
-  // a Viewer scoped to Thimphu (no crossbranch:read)
-  const [vid] = await knex("users").insert({ username: "viewerT", password_hash: "x", status: "Active", branch: "Thimphu" }).returning("id");
-  const userId = typeof vid === "object" ? (vid as any).id : vid;
-  const viewerRole = await knex("roles").where({ name: "Viewer" }).first();
-  await knex("user_roles").insert({ user_id: userId, role_id: viewerRole.id });
-  viewerThimphuToken = signToken({ sub: userId, username: "viewerT" }, "t");
+  // a Viewer scoped to Thimphu (no crossbranch:read) — claims-based, no DB user lookup needed
+  viewerThimphuToken = signToken({ sub: 100, username: "viewerT", permissions: ["document:read"], roles: ["Viewer"], branch: "Thimphu" }, "t");
 
-  // IMPORTANT-2 / CRITICAL-1: a Viewer with NO branch assigned (branch = null)
-  const [nbvid] = await knex("users").insert({ username: "viewerNoBranch", password_hash: "x", status: "Active", branch: null }).returning("id");
-  const nullBranchUserId = typeof nbvid === "object" ? (nbvid as any).id : nbvid;
-  await knex("user_roles").insert({ user_id: nullBranchUserId, role_id: viewerRole.id });
-  nullBranchViewerToken = signToken({ sub: nullBranchUserId, username: "viewerNoBranch" }, "t");
+  // IMPORTANT-2 / CRITICAL-1: a Viewer with NO branch assigned (branch = null/undefined)
+  nullBranchViewerToken = signToken({ sub: 101, username: "viewerNoBranch", permissions: ["document:read"], roles: ["Viewer"] }, "t");
 
   await backend.index({ doc_id: "D1", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Thimphu", status: "indexed", risk_band: "low", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });
   await backend.index({ doc_id: "D2", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Paro", status: "indexed", risk_band: "high", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });

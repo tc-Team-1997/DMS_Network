@@ -1,4 +1,4 @@
-import type { SearchDoc } from "../types.js";
+import type { SearchDoc } from "@zordms/types";
 
 export function tokenize(parts: Array<string | undefined | null>): string {
   return parts

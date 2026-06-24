@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { tokenize, buildTokensForDoc } from "./tokenize.js";
-import type { SearchDoc } from "../types.js";
+import type { SearchDoc } from "@zordms/types";
 
 describe("tokenize", () => {
   it("lowercases, strips punctuation, collapses whitespace", () => {

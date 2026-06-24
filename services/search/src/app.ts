@@ -1,7 +1,8 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, { type Express } from "express";
 import cors from "cors";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
+import { errorHandler } from "@zordms/auth";
 import type { SearchBackend } from "./backend/SearchBackend.js";
 import { reindexRouter } from "./routes/reindex.js";
 import { searchRouter } from "./routes/search.js";
@@ -26,12 +27,9 @@ export function createApp(deps: AppDeps): Express {
   app.use("/saved", savedRouter());
   app.use("/", exportRouter());
 
-  // Global error handler — catches any error passed via next(err) from async handlers.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("[search] unhandled error:", err);
-    res.status(500).json({ error: "internal_error" });
-  });
+  // Global error handler from @zordms/auth — catches any error passed via next(err).
+  // Must be registered LAST. Returns 500 {error:"internal_error"} with no stack leak.
+  app.use(errorHandler);
 
   return app;
 }

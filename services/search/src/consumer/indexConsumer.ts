@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 import type { SearchBackend } from "../backend/SearchBackend.js";
-import type { SearchDoc } from "../types.js";
+import type { SearchDoc } from "@zordms/types";
 
 type EventName = "document.indexed" | "document.cataloged" | "document.deleted";
 

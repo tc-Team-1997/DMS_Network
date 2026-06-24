@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 import type { SearchBackend } from "./SearchBackend.js";
-import type { SearchDoc, SearchQuery, SearchResults, SearchScope, SearchHit } from "../types.js";
+import type { SearchDoc, SearchQuery, SearchResults, SearchScope, SearchHit } from "@zordms/types";
 import { buildTokensForDoc } from "../query/tokenize.js";
 import { applyScope, applyFilters, applyTextMatch, scoreHit, paginate } from "../query/buildQuery.js";
 import { aggregateFacets } from "../query/facets.js";

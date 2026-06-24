@@ -4,7 +4,7 @@ import { buildServiceKnex } from "@zordms/db";
 import { SqlSearchBackend } from "./SqlSearchBackend.js";
 import { selectBackend } from "./index.js";
 import { loadConfig } from "@zordms/config";
-import type { SearchDoc } from "../types.js";
+import type { SearchDoc } from "@zordms/types";
 
 const migrationsDir = new URL("../migrations", import.meta.url).pathname;
 const db = { client: "sqlite3" as const, host: "", port: 0, user: "", password: "", name: "", oracleConnectString: "" };

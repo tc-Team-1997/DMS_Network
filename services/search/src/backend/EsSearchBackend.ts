@@ -1,6 +1,6 @@
 import { Client } from "@elastic/elasticsearch";
 import type { SearchBackend } from "./SearchBackend.js";
-import type { SearchDoc, SearchQuery, SearchResults, SearchScope, SearchHit } from "../types.js";
+import type { SearchDoc, SearchQuery, SearchResults, SearchScope, SearchHit } from "@zordms/types";
 
 export interface EsClient {
   index(args: { index: string; id: string; document: Record<string, unknown>; refresh?: boolean | "true" | "false" | "wait_for" }): Promise<unknown>;

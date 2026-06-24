@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 import type { SearchBackend } from "./backend/SearchBackend.js";
-import type { SearchDoc } from "./types.js";
+import type { SearchDoc } from "@zordms/types";
 
 /**
  * Phase-2 cutover job: clears the target backend and re-streams every document from

@@ -15,18 +15,23 @@ const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.P
 let adminToken = "";
 let viewerToken = "";
 
+// CDO has all permissions including admin:access and crossbranch:read
+const ALL_PERMISSIONS = [
+  "user:create", "user:update", "user:read", "role:assign",
+  "document:capture", "document:index", "document:read", "document:approve",
+  "document:reject", "document:delete", "workflow:act", "legal_hold:place",
+  "compliance:read", "admin:access", "crossbranch:read",
+];
+
 beforeAll(async () => {
   await knex.migrate.latest();
   await knex.seed.run();
   const admin = await knex("users").where({ username: "admin" }).first();
-  adminToken = signToken({ sub: admin.id, username: "admin" }, "t");
+  // Admin (CDO) token carries all permissions in claims
+  adminToken = signToken({ sub: admin.id, username: "admin", permissions: ALL_PERMISSIONS, roles: ["CDO"] }, "t");
 
-  // IMPORTANT-4: a non-admin Viewer — has document:read but NOT admin:access
-  const [vid] = await knex("users").insert({ username: "viewerReindex", password_hash: "x", status: "Active", branch: "Thimphu" }).returning("id");
-  const viewerUserId = typeof vid === "object" ? (vid as any).id : vid;
-  const viewerRole = await knex("roles").where({ name: "Viewer" }).first();
-  await knex("user_roles").insert({ user_id: viewerUserId, role_id: viewerRole.id });
-  viewerToken = signToken({ sub: viewerUserId, username: "viewerReindex" }, "t");
+  // IMPORTANT-4: a non-admin Viewer — has document:read but NOT admin:access (claims-based)
+  viewerToken = signToken({ sub: 200, username: "viewerReindex", permissions: ["document:read"], roles: ["Viewer"], branch: "Thimphu" }, "t");
 });
 afterAll(async () => { await knex.destroy(); });
 

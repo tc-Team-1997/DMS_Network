@@ -1,11 +1,10 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-import { requireAuth } from "../middleware/requireAuth.js";
-import { requirePermission } from "../middleware/requirePermission.js";
-import type { SaveSearchRequest, SearchQuery } from "../types.js";
-import { isSearchQuery } from "../types.js";
+import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
+import type { SaveSearchRequest, SearchQuery } from "@zordms/types";
+import { isSearchQuery } from "@zordms/types";
 import type { SearchBackend } from "../backend/SearchBackend.js";
-import { scopeFromUser } from "./search.js";
+import { viewerToScope } from "./search.js";
 
 export function savedRouter(): Router {
   const r = Router();
@@ -53,7 +52,7 @@ export function savedRouter(): Router {
       }
       // IMPORTANT-3: validate the stored query before passing it to the backend.
       if (!isSearchQuery(query)) { res.status(500).json({ error: "corrupted_saved_search" }); return; }
-      const results = await backend.search(query, scopeFromUser(req.authUser!));
+      const results = await backend.search(query, viewerToScope(makeViewer(req)));
       res.json(results);
     } catch (err) { next(err); }
   });

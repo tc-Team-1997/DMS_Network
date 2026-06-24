@@ -1,9 +1,8 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/requireAuth.js";
-import { requirePermission } from "../middleware/requirePermission.js";
-import { isSearchQuery, type SearchHit, type SearchQuery } from "../types.js";
+import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
+import { isSearchQuery, type SearchHit, type SearchQuery } from "@zordms/types";
 import type { SearchBackend } from "../backend/SearchBackend.js";
-import { scopeFromUser } from "./search.js";
+import { viewerToScope } from "./search.js";
 
 const COLUMNS: Array<keyof SearchHit> = ["doc_id", "doc_type", "branch", "status", "score", "indexed_at"];
 const EXPORT_CAP = 5000;
@@ -27,7 +26,7 @@ export function exportRouter(): Router {
       const { backend } = req.app.locals.deps as { backend: SearchBackend };
       const body = req.body as SearchQuery;
       if (!isSearchQuery(body)) { res.status(400).json({ error: "invalid_query" }); return; }
-      const results = await backend.search({ ...body, page: 1, pageSize: EXPORT_CAP }, scopeFromUser(req.authUser!));
+      const results = await backend.search({ ...body, page: 1, pageSize: EXPORT_CAP }, viewerToScope(makeViewer(req)));
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", 'attachment; filename="zordms-search.csv"');
       res.send(toCsv(results.hits));

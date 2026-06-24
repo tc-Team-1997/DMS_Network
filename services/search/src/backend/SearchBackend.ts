@@ -1,4 +1,4 @@
-import type { SearchDoc, SearchQuery, SearchResults, SearchScope } from "../types.js";
+import type { SearchDoc, SearchQuery, SearchResults, SearchScope } from "@zordms/types";
 
 export interface SearchBackend {
   readonly name: "sql" | "es";
