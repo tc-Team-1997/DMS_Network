@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "../auth/AuthContext.js";
 import {
   KpiCard, Card, DataTable, Tag, Tabs, DonutChartCard, BarChartCard,
@@ -11,6 +11,7 @@ import type {
   ChainVerification,
   AuditRow,
 } from "../api/complianceAudit.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 
 /* ─── helpers ─── */
 function statusTagVariant(s: string): "green" | "amber" | "red" | "blue" | "purple" | "gold" {
@@ -44,14 +45,34 @@ export function ComplianceAudit() {
   const { user } = useAuth();
   const canRead = Boolean(user?.permissions.includes("compliance:read"));
 
-  const [tab, setTab] = useState("scorecard");
+  /* ─── Pattern 2: URL-driven state (tab + audit filters) ─── */
+  const [urlState, setUrlState] = useUrlState({
+    tab: "scorecard",
+    action: "",
+    entity: "",
+    actor: "",
+  });
+
+  const tab = urlState.tab;
+  const setTab = (t: string) => setUrlState({ tab: t });
+
+  /* Debounced local inputs for audit filter text fields */
+  const [localAction, setLocalAction] = useState(urlState.action);
+  const [localEntity, setLocalEntity] = useState(urlState.entity);
+  const [localActor, setLocalActor]   = useState(urlState.actor);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Current committed filter (read from URL) used for API calls */
+  const auditFilter = {
+    action: urlState.action,
+    entity: urlState.entity,
+    actor:  urlState.actor,
+  };
+
   const [scorecard, setScorecard] = useState<ComplianceScorecard | null>(null);
   const [matrix, setMatrix] = useState<MatrixRow[]>([]);
   const [verification, setVerification] = useState<ChainVerification | null>(null);
   const [auditRows, setAuditRows] = useState<AuditTableRow[]>([]);
-  const [auditFilter, setAuditFilter] = useState<{
-    action: string; entity: string; actor: string;
-  }>({ action: "", entity: "", actor: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -256,11 +277,13 @@ export function ComplianceAudit() {
           {loading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>Loading matrix…</div>
           ) : (
+            /* Pattern 3: pagination via DataTable pageSize prop */
             <DataTable<MatrixRow>
               columns={matrixCols}
               rows={matrix}
               rowKey={(r) => r.id}
               emptyMessage="No regulatory controls found"
+              pageSize={10}
             />
           )}
         </Card>
@@ -269,41 +292,57 @@ export function ComplianceAudit() {
       {/* ═══ AUDIT TRAIL TAB ═══ */}
       {tab === "audit" && (
         <div style={{ marginTop: 14 }}>
-          {/* filter bar */}
+          {/* filter bar — Pattern 2: inputs bound to URL state via debounce */}
           <Card title="Audit Trail Filters" style={{ marginBottom: 14 }}>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
               <div className="field" style={{ minWidth: 160, margin: 0 }}>
                 <label>Action</label>
                 <input
                   type="text"
-                  value={auditFilter.action}
+                  value={localAction}
                   placeholder="e.g. LOGIN"
-                  onChange={(e) => setAuditFilter((f) => ({ ...f, action: e.target.value }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setLocalAction(v);
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => setUrlState({ action: v }), 300);
+                  }}
                 />
               </div>
               <div className="field" style={{ minWidth: 140, margin: 0 }}>
                 <label>Entity</label>
                 <input
                   type="text"
-                  value={auditFilter.entity}
+                  value={localEntity}
                   placeholder="e.g. document"
-                  onChange={(e) => setAuditFilter((f) => ({ ...f, entity: e.target.value }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setLocalEntity(v);
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => setUrlState({ entity: v }), 300);
+                  }}
                 />
               </div>
               <div className="field" style={{ minWidth: 140, margin: 0 }}>
                 <label>Actor</label>
                 <input
                   type="text"
-                  value={auditFilter.actor}
+                  value={localActor}
                   placeholder="e.g. admin"
-                  onChange={(e) => setAuditFilter((f) => ({ ...f, actor: e.target.value }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setLocalActor(v);
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
+                    debounceRef.current = setTimeout(() => setUrlState({ actor: v }), 300);
+                  }}
                 />
               </div>
               <button className="btn bg sm" onClick={loadAuditFiltered}>
                 Apply Filter
               </button>
               <button className="btn bs sm" onClick={() => {
-                setAuditFilter({ action: "", entity: "", actor: "" });
+                setLocalAction(""); setLocalEntity(""); setLocalActor("");
+                setUrlState({ action: "", entity: "", actor: "" });
                 loadAll();
               }}>
                 Clear
@@ -314,11 +353,13 @@ export function ComplianceAudit() {
           <Card
             title={<span>Audit Trail — Recent Events <span style={{ fontSize: 11, color: "var(--sil)", fontWeight: 400 }}>({auditRows.length} entries)</span></span>}
           >
+            {/* Pattern 3: pagination via DataTable pageSize prop */}
             <DataTable<AuditTableRow>
               columns={auditCols}
               rows={auditRows}
               rowKey={(r) => r._key}
               emptyMessage="No audit events found"
+              pageSize={10}
             />
           </Card>
         </div>

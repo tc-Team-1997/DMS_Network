@@ -10,6 +10,7 @@ import type {
   DrPosture,
   ScheduleEntry,
 } from "../api/systemAdministration.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 
 /* ─── helpers ─── */
 function healthVariant(s: ServiceHealth["status"]): "green" | "amber" | "red" {
@@ -41,7 +42,14 @@ export function SystemAdministration() {
   const { user } = useAuth();
   const canAdmin = Boolean(user?.permissions.includes("admin:access"));
 
-  const [tab, setTab] = useState("health");
+  /* ─── Pattern 2: URL-driven tab selection ─── */
+  const [urlState, setUrlState] = useUrlState({
+    tab: "health",
+  });
+
+  const tab = urlState.tab;
+  const setTab = (t: string) => setUrlState({ tab: t });
+
   const [health, setHealth] = useState<HealthRow[]>([]);
   const [dr, setDr] = useState<DrPosture | null>(null);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
@@ -241,11 +249,13 @@ export function SystemAdministration() {
             {loading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>Probing services…</div>
             ) : (
+              /* Pattern 3: pagination via DataTable pageSize prop */
               <DataTable<HealthRow>
                 columns={healthCols}
                 rows={health}
                 rowKey={(r) => r._key}
                 emptyMessage="No service health data"
+                pageSize={10}
               />
             )}
           </Card>
@@ -390,11 +400,13 @@ export function SystemAdministration() {
             {loading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>Loading schedules…</div>
             ) : (
+              /* Pattern 3: pagination via DataTable pageSize prop */
               <DataTable<ScheduleRow>
                 columns={scheduleCols}
                 rows={schedules}
                 rowKey={(r) => r._key}
                 emptyMessage="No scheduled tasks configured"
+                pageSize={10}
               />
             )}
           </Card>

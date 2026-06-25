@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { SVC } from "../config.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 import {
   Card,
   Tag,
@@ -212,8 +214,12 @@ function MetadataPanel({ doc, parsedMeta }: MetadataPanelProps) {
 
 // ── Main Viewer Screen ────────────────────────────────────────────────────────
 
+// Pagination constant for annotations list (pattern 3)
+const ANN_PAGE_SIZE = 5;
+
 export default function Viewer() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const docIdParam = searchParams.get("doc");
 
@@ -221,13 +227,22 @@ export default function Viewer() {
   const canAnnotate = user?.permissions.includes("annotation:write") ?? false;
   const canRead = user?.permissions.includes("document:read") ?? false;
 
+  // Pattern 2: URL-driven page state — bookmarkable and refresh-safe
+  const [viewerUrl, setViewerUrl] = useUrlState({ page: "1", annp: "1" });
+  const currentPage = Math.max(1, Number(viewerUrl.page) || 1);
+  const setCurrentPage = (p: number | ((prev: number) => number)) => {
+    const next = typeof p === "function" ? p(currentPage) : p;
+    setViewerUrl({ page: String(next) });
+  };
+  const annListPage = Math.max(1, Number(viewerUrl.annp) || 1);
+  const setAnnListPage = (p: number) => setViewerUrl({ annp: String(p) });
+
   // State
   const [doc, setDoc] = useState<DocumentRecord | null>(null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(100);
 
   // Annotation add modal
@@ -268,8 +283,9 @@ export default function Viewer() {
       setDoc(docRes.document);
       setAnnotations(annRes.annotations);
       setVersions(verRes.versions);
-    } catch (e: any) {
-      setError(e?.body?.error ?? e?.message ?? "Failed to load document");
+    } catch (e: unknown) {
+      const err = e as { body?: { error?: string }; message?: string };
+      setError(err?.body?.error ?? err?.message ?? "Failed to load document");
     } finally {
       setLoading(false);
     }
@@ -306,8 +322,9 @@ export default function Viewer() {
       setAnnotations(res.annotations);
       setAnnModalOpen(false);
       setAnnContent("");
-    } catch (e: any) {
-      setAnnError(e?.body?.error ?? e?.message ?? "Failed to add annotation");
+    } catch (e: unknown) {
+      const err2 = e as { body?: { error?: string }; message?: string };
+      setAnnError(err2?.body?.error ?? err2?.message ?? "Failed to add annotation");
     }
   }
 
@@ -317,8 +334,9 @@ export default function Viewer() {
     try {
       await repositoryViewerApi.deleteAnnotation(doc.id, annId);
       setAnnotations((prev) => prev.filter((a) => a.id !== annId));
-    } catch (e: any) {
-      alert(e?.body?.error ?? "Delete annotation failed.");
+    } catch (e: unknown) {
+      const err3 = e as { body?: { error?: string } };
+      alert(err3?.body?.error ?? "Delete annotation failed.");
     }
   }
 
@@ -367,7 +385,7 @@ export default function Viewer() {
           <button
             className="btn bs"
             style={{ marginTop: 16 }}
-            onClick={() => (window.location.href = "/repository")}
+            onClick={() => navigate("/repository")}
           >
             Go to Repository
           </button>
@@ -392,7 +410,7 @@ export default function Viewer() {
         <div style={{ display: "flex", gap: 8 }}>
           {doc && (
             <a
-              href={`/svc/core/documents/${doc.id}/download`}
+              href={`${SVC.core}/documents/${doc.id}/download`}
               className="btn bs sm"
               download={doc.original_filename ?? doc.title}
             >
@@ -618,81 +636,113 @@ export default function Viewer() {
             </Card>
           )}
 
-          {/* Annotations List */}
-          <Card
-            title={
-              <span>
-                Annotations{" "}
-                <Tag variant={annotations.length > 0 ? "blue" : "amber"}>
-                  {annotations.length}
-                </Tag>
-              </span>
-            }
-            action={
-              canAnnotate && doc ? (
-                <button
-                  className="btn bs xs"
-                  onClick={() => setAnnModalOpen(true)}
-                  aria-label="add annotation"
-                >
-                  + Add
-                </button>
-              ) : undefined
-            }
-          >
-            {annotations.length === 0 ? (
-              <div style={{ fontSize: 11, color: "var(--sil)", padding: "8px 0" }}>
-                No annotations yet.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {annotations.map((a) => {
-                  const c = annotationColor(a.kind);
-                  return (
-                    <div
-                      key={a.id}
-                      style={{
-                        padding: 8,
-                        background: c.bg,
-                        borderRadius: 6,
-                        borderLeft: `2px solid ${c.border}`,
-                        cursor: "pointer",
-                        position: "relative",
-                      }}
-                      onClick={() => setCurrentPage(a.page)}
+          {/* Annotations List — with simple pager (pattern 3) */}
+          {(() => {
+            const annTotalPages = Math.max(1, Math.ceil(annotations.length / ANN_PAGE_SIZE));
+            const safeAnnPage = Math.min(Math.max(1, annListPage), annTotalPages);
+            const pagedAnnotations = annotations.slice((safeAnnPage - 1) * ANN_PAGE_SIZE, safeAnnPage * ANN_PAGE_SIZE);
+            return (
+              <Card
+                title={
+                  <span>
+                    Annotations{" "}
+                    <Tag variant={annotations.length > 0 ? "blue" : "amber"}>
+                      {annotations.length}
+                    </Tag>
+                  </span>
+                }
+                action={
+                  canAnnotate && doc ? (
+                    <button
+                      className="btn bs xs"
+                      onClick={() => setAnnModalOpen(true)}
+                      aria-label="add annotation"
                     >
-                      <div style={{ fontSize: 10, color: c.text }}>{kindLabel(a.kind)} · Page {a.page}</div>
-                      <div style={{ fontSize: 11, color: "var(--mist)", marginTop: 2 }}>
-                        {a.content ?? `${kindLabel(a.kind)} applied`}
-                      </div>
-                      <div style={{ fontSize: 9, color: "var(--sil)", marginTop: 2 }}>
-                        {a.created_by ?? "System"} · {a.created_at ? new Date(a.created_at).toLocaleDateString() : ""}
-                      </div>
-                      {canAnnotate && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeleteAnnotation(a.id); }}
-                          style={{
-                            position: "absolute",
-                            top: 6,
-                            right: 6,
-                            background: "none",
-                            border: "none",
-                            color: "var(--sil)",
-                            cursor: "pointer",
-                            fontSize: 11,
-                            padding: 2,
-                          }}
-                          title="Delete annotation"
-                        >
-                          ×
-                        </button>
-                      )}
+                      + Add
+                    </button>
+                  ) : undefined
+                }
+              >
+                {annotations.length === 0 ? (
+                  <div style={{ fontSize: 11, color: "var(--sil)", padding: "8px 0" }}>
+                    No annotations yet.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                      {pagedAnnotations.map((a) => {
+                        const c = annotationColor(a.kind);
+                        return (
+                          <div
+                            key={a.id}
+                            style={{
+                              padding: 8,
+                              background: c.bg,
+                              borderRadius: 6,
+                              borderLeft: `2px solid ${c.border}`,
+                              cursor: "pointer",
+                              position: "relative",
+                            }}
+                            onClick={() => setCurrentPage(a.page)}
+                          >
+                            <div style={{ fontSize: 10, color: c.text }}>{kindLabel(a.kind)} · Page {a.page}</div>
+                            <div style={{ fontSize: 11, color: "var(--mist)", marginTop: 2 }}>
+                              {a.content ?? `${kindLabel(a.kind)} applied`}
+                            </div>
+                            <div style={{ fontSize: 9, color: "var(--sil)", marginTop: 2 }}>
+                              {a.created_by ?? "System"} · {a.created_at ? new Date(a.created_at).toLocaleDateString() : ""}
+                            </div>
+                            {canAnnotate && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteAnnotation(a.id); }}
+                                style={{
+                                  position: "absolute",
+                                  top: 6,
+                                  right: 6,
+                                  background: "none",
+                                  border: "none",
+                                  color: "var(--sil)",
+                                  cursor: "pointer",
+                                  fontSize: 11,
+                                  padding: 2,
+                                }}
+                                title="Delete annotation"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+                    {annTotalPages > 1 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, fontSize: 11 }}>
+                        <button
+                          className="btn bs xs"
+                          disabled={safeAnnPage <= 1}
+                          onClick={() => setAnnListPage(safeAnnPage - 1)}
+                          aria-label="Previous annotation page"
+                        >
+                          Prev
+                        </button>
+                        <span style={{ color: "var(--sil)", flex: 1, textAlign: "center" }}>
+                          {safeAnnPage} / {annTotalPages}
+                        </span>
+                        <button
+                          className="btn bs xs"
+                          disabled={safeAnnPage >= annTotalPages}
+                          onClick={() => setAnnListPage(safeAnnPage + 1)}
+                          aria-label="Next annotation page"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Card>
+            );
+          })()}
 
           {/* Version History */}
           {versions.length > 0 && (
@@ -727,7 +777,7 @@ export default function Viewer() {
                         // not the specific historical version (version-specific download
                         // endpoint not yet exposed by the backend).
                         <a
-                          href={`/svc/core/documents/${doc.id}/download`}
+                          href={`${SVC.core}/documents/${doc.id}/download`}
                           className="btn bs xs"
                           style={{ fontSize: 9, textDecoration: "none" }}
                           target="_blank"

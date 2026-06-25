@@ -5,6 +5,7 @@ import {
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 import {
   securityApi,
   type UserRow,
@@ -101,7 +102,9 @@ export default function Security() {
   const canUpdate = user?.permissions.includes("user:update") ?? false;
   const canRead   = user?.permissions.includes("user:read")   ?? false;
 
-  const [tab, setTab]         = useState("users");
+  const [urlState, setUrlState] = useUrlState({ tab: "users" });
+  const tab = urlState.tab;
+  const setTab = (t: string) => setUrlState({ tab: t });
   const [users, setUsers]     = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -297,6 +300,7 @@ export default function Security() {
                 <div style={{ color: "var(--sil)", padding: 24, textAlign: "center" }}>Insufficient permissions to view users.</div>
               ) : (
                 <DataTable<UserTableRow>
+                  pageSize={10}
                   columns={userColumns}
                   rows={users as UserTableRow[]}
                   rowKey={(r) => r.id}
@@ -377,6 +381,7 @@ export default function Security() {
             }
           >
             <DataTable<MatrixRow>
+              pageSize={10}
               columns={matrixColumns}
               rows={PERMISSION_MATRIX as unknown as MatrixRow[]}
               rowKey={(r) => String(r.module)}

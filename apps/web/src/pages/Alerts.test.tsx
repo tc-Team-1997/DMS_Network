@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 // ── Shared auth state (mutated per-test for I-2, I-3) ────────────────────────
 const authState = {
@@ -63,6 +64,10 @@ class MockWebSocket {
 
 import { notifyApi } from "../api/notifyApi.js";
 import Alerts from "./Alerts.js";
+
+function renderAlerts() {
+  return render(<MemoryRouter><Alerts /></MemoryRouter>);
+}
 
 const mockAlerts = [
   {
@@ -143,19 +148,19 @@ describe("Alerts screen", () => {
   });
 
   it("renders the page heading", () => {
-    render(<Alerts />);
+    renderAlerts();
     expect(screen.getByRole("heading", { name: /Alerts & Event Management/i })).toBeInTheDocument();
   });
 
   it("calls notifyApi.listAlerts on mount with correct endpoint", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(notifyApi.listAlerts).toHaveBeenCalled();
     });
   });
 
   it("displays alerts fetched from the API", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByText(/KYC document expiring in 7 days/i)).toBeInTheDocument();
       expect(screen.getByText(/Workflow SLA breach/i)).toBeInTheDocument();
@@ -163,7 +168,7 @@ describe("Alerts screen", () => {
   });
 
   it("shows KPI cards with correct counts", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByText("Total Alerts")).toBeInTheDocument();
       // "Critical" appears multiple times (KPI label, filter btn, tag) — use getAllByText
@@ -174,7 +179,7 @@ describe("Alerts screen", () => {
   });
 
   it("renders Alerts, Alert Rules, and Analytics tabs", () => {
-    render(<Alerts />);
+    renderAlerts();
     // "Alerts" text appears in the heading AND the tab — use role to target the tab button
     expect(screen.getByRole("button", { name: /^Alerts/ })).toBeInTheDocument();
     expect(screen.getByText("Alert Rules")).toBeInTheDocument();
@@ -182,7 +187,7 @@ describe("Alerts screen", () => {
   });
 
   it("shows severity filter buttons", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByText("All")).toBeInTheDocument();
     });
@@ -191,7 +196,7 @@ describe("Alerts screen", () => {
   });
 
   it("marks alert as read when mark-read button is clicked", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByText(/KYC document expiring/i)).toBeInTheDocument();
     });
@@ -208,7 +213,7 @@ describe("Alerts screen", () => {
   });
 
   it("navigates to Alert Rules tab and loads rules", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await act(async () => {
       fireEvent.click(screen.getByText("Alert Rules"));
     });
@@ -224,12 +229,12 @@ describe("Alerts screen", () => {
   });
 
   it("shows the New Rule button for users with alert_rule:manage permission", () => {
-    render(<Alerts />);
+    renderAlerts();
     expect(screen.getAllByText(/New Rule/i).length).toBeGreaterThan(0);
   });
 
   it("opens the alert rule creation modal when New Rule is clicked", async () => {
-    render(<Alerts />);
+    renderAlerts();
     const newRuleBtn = screen.getAllByText(/New Rule/i)[0];
     await act(async () => {
       fireEvent.click(newRuleBtn);
@@ -241,7 +246,7 @@ describe("Alerts screen", () => {
   });
 
   it("Analytics tab button exists and is clickable", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByText(/KYC document expiring/i)).toBeInTheDocument();
     });
@@ -257,7 +262,7 @@ describe("Alerts screen", () => {
   });
 
   it("calls notifyApi.listAlerts (via /svc/notify/alerts) with unread filter", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(notifyApi.listAlerts).toHaveBeenCalled();
     });
@@ -276,14 +281,14 @@ describe("Alerts screen", () => {
   });
 
   it("shows the Mark all read button when there are unread alerts", async () => {
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByText(/Mark all read/i)).toBeInTheDocument();
     });
   });
 
   it("shows the real-time connection indicator", () => {
-    render(<Alerts />);
+    renderAlerts();
     // Should show either "Live" or "Offline"
     expect(screen.getByText(/Live|Offline/)).toBeInTheDocument();
   });
@@ -292,7 +297,7 @@ describe("Alerts screen", () => {
 
   // C-1: WebSocket now uses proxy path with JWT token query parameter
   it("C-1: WebSocket connects via proxy path with JWT token query param", async () => {
-    render(<Alerts />);
+    renderAlerts();
     // Allow the useEffect to fire
     await waitFor(() => expect(wsInstances.length).toBeGreaterThan(0));
     const wsUrl = wsInstances[0].url;
@@ -315,7 +320,7 @@ describe("Alerts screen", () => {
       branch: "Paro",
     };
 
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByRole("alert", { name: /Access denied/i })).toBeInTheDocument();
     });
@@ -334,7 +339,7 @@ describe("Alerts screen", () => {
       branch: "Thimphu",
     };
 
-    render(<Alerts />);
+    renderAlerts();
     await waitFor(() => {
       expect(screen.getByText(/Mark all read/i)).toBeInTheDocument();
     });
@@ -342,7 +347,7 @@ describe("Alerts screen", () => {
 
   // I-6: Active Rules KPI card shows actual count on initial load (not "—")
   it("I-6: Active Rules KPI shows count immediately on mount without switching to Rules tab", async () => {
-    render(<Alerts />);
+    renderAlerts();
     // loadRules() is now called on mount — wait for it to resolve
     await waitFor(() => {
       expect(notifyApi.listRules).toHaveBeenCalled();
@@ -356,5 +361,27 @@ describe("Alerts screen", () => {
       // Look for the numeric value "2" in the document — the KPI renders it as a sibling
       expect(screen.getAllByText("2").length).toBeGreaterThanOrEqual(1);
     });
+  });
+
+  // P3: DataTable renders with pagination (pageSize={10})
+  it("P3: Alerts DataTable renders with pagination support", async () => {
+    renderAlerts();
+    await waitFor(() => {
+      expect(screen.getByText(/KYC document expiring/i)).toBeInTheDocument();
+    });
+    // 3 alerts, pageSize=10: no pager buttons needed, but table renders
+    expect(screen.getByText(/KYC document expiring/i)).toBeInTheDocument();
+    expect(screen.getByText(/Workflow SLA breach/i)).toBeInTheDocument();
+  });
+
+  // P2: URL state reflects tab selection
+  it("P2: URL state driven tab navigation (useUrlState integration)", async () => {
+    renderAlerts();
+    // Click Analytics tab — URL state drives the active tab
+    const analyticsTab = screen.getByRole("button", { name: "Analytics" });
+    await act(async () => {
+      fireEvent.click(analyticsTab);
+    });
+    expect(analyticsTab).toHaveClass("on");
   });
 });

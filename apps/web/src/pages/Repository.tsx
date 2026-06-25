@@ -1,5 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { SVC } from "../config.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 import {
   KpiCard,
   Card,
@@ -146,7 +148,7 @@ function PreviewPanel({ doc, versions, onViewInViewer, canDelete, onDelete }: Pr
       >
         {doc.mime_type?.startsWith("image/") ? (
           <img
-            src={`/svc/core/documents/${doc.id}/download`}
+            src={`${SVC.core}/documents/${doc.id}/download`}
             alt={doc.title}
             style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
           />
@@ -267,18 +269,37 @@ export default function Repository() {
   const canCreateFolder = user?.permissions.includes("folder:create") ?? false;
   const canFolderRead = user?.permissions.includes("folder:read") ?? false;
 
+  // Pattern 2: URL-driven state for filters, folder selection.
+  // Tab uses dual state (local + URL sync) so React re-renders instantly
+  // on tab click while still updating the URL for bookmarkability.
+  const [urlFilters, setUrlFilters] = useUrlState({ tab: "browse", q: "", status: "all", category: "all", folder: "" });
+  const [tab, setTabLocal] = useState(urlFilters.tab);
+  const setTab = (t: string) => { setTabLocal(t); setUrlFilters({ tab: t }); };
+  const filterStatus = urlFilters.status;
+  const filterCategory = urlFilters.category;
+  const setFilterStatus = (s: string) => setUrlFilters({ status: s });
+  const setFilterCategory = (c: string) => setUrlFilters({ category: c });
+  const [filterText, _setFilterTextLocal] = useState(urlFilters.q);
+  const _debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setFilterText = (v: string) => {
+    _setFilterTextLocal(v);
+    if (_debounceRef.current) clearTimeout(_debounceRef.current);
+    _debounceRef.current = setTimeout(() => setUrlFilters({ q: v }), 300);
+  };
+  const [_selFolder, _setSelFolder] = useState<FolderNode | null>(null);
+  const selectedFolder = _selFolder;
+  const setSelectedFolder = (node: FolderNode | null) => {
+    _setSelFolder(node);
+    setUrlFilters({ folder: node ? String(node.id) : "" });
+  };
+
   // State
-  const [tab, setTab] = useState("browse");
   const [tree, setTree] = useState<FolderNode[]>([]);
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
-  const [selectedFolder, setSelectedFolder] = useState<FolderNode | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DocumentRecord | null>(null);
   const [versions, setVersions] = useState<Array<{ id: number; version_no: number; mime_type?: string; created_by?: string; comment?: string; created_at?: string; file_size_bytes: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterText, setFilterText] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterCategory, setFilterCategory] = useState("all");
 
   // Upload modal
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -309,15 +330,32 @@ export default function Repository() {
         repositoryViewerApi.listDocuments(),
       ]);
       if (foldersResult.status === "fulfilled" && foldersResult.value) {
-        setTree(foldersResult.value.tree);
+        const loadedTree = foldersResult.value.tree;
+        setTree(loadedTree);
+        // Pattern 2: Restore selected folder from URL
+        const folderParam = urlFilters.folder;
+        if (folderParam) {
+          const targetId = Number(folderParam);
+          const findNode = (nodes: FolderNode[]): FolderNode | null => {
+            for (const n of nodes) {
+              if (n.id === targetId) return n;
+              const found = findNode(n.children);
+              if (found) return found;
+            }
+            return null;
+          };
+          const restored = findNode(loadedTree);
+          if (restored) _setSelFolder(restored);
+        }
       }
       if (docsResult.status === "fulfilled") {
         setDocs(docsResult.value.documents);
       } else {
         throw docsResult.reason;
       }
-    } catch (e: any) {
-      setError(e?.body?.error ?? e?.message ?? "Failed to load repository data");
+    } catch (e: unknown) {
+      const _err = e as { body?: { error?: string }; message?: string };
+      setError(_err?.body?.error ?? _err?.message ?? "Failed to load repository data");
     } finally {
       setLoading(false);
     }
@@ -382,8 +420,9 @@ export default function Repository() {
       setUploadTitle("");
       setUploadFile(null);
       await loadData();
-    } catch (e: any) {
-      setUploadMsg(e?.body?.error ?? e?.message ?? "Upload failed.");
+    } catch (e: unknown) {
+      const _err2 = e as { body?: { error?: string }; message?: string };
+      setUploadMsg(_err2?.body?.error ?? _err2?.message ?? "Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -396,8 +435,9 @@ export default function Repository() {
       await repositoryViewerApi.deleteDocument(doc.id);
       setSelectedDoc(null);
       await loadData();
-    } catch (e: any) {
-      alert(e?.body?.error ?? "Delete failed.");
+    } catch (e: unknown) {
+      const _err3 = e as { body?: { error?: string } };
+      alert(_err3?.body?.error ?? "Delete failed.");
     }
   }
 
@@ -415,8 +455,9 @@ export default function Repository() {
       setNewFolderName("");
       setFolderModalOpen(false);
       await loadData();
-    } catch (e: any) {
-      setFolderMsg(e?.body?.error ?? "Create folder failed.");
+    } catch (e: unknown) {
+      const _err4 = e as { body?: { error?: string }; message?: string };
+      setFolderMsg(_err4?.body?.error ?? _err4?.message ?? "Create folder failed.");
     }
   }
 
@@ -429,8 +470,9 @@ export default function Repository() {
       const updated = await repositoryViewerApi.getDocument(selectedDoc.id);
       setSelectedDoc(updated.document);
       await loadData();
-    } catch (e: any) {
-      alert(e?.body?.error ?? "Rollback failed.");
+    } catch (e: unknown) {
+      const _err5 = e as { body?: { error?: string } };
+      alert(_err5?.body?.error ?? "Rollback failed.");
     }
   }
 
@@ -678,18 +720,14 @@ export default function Repository() {
             {loading ? (
               <div style={{ color: "var(--sil)", fontSize: 11, padding: "12px 0" }}>Loading documents…</div>
             ) : (
-              <>
-                <DataTable
+              <DataTable
                   columns={docColumns}
                   rows={filteredDocs as unknown as Record<string, unknown>[]}
                   rowKey={(r) => String(r.id)}
                   onRowClick={(r) => setSelectedDoc(r as unknown as DocumentRecord)}
                   emptyMessage={selectedFolder ? `No documents in ${selectedFolder.name}` : "No documents found"}
+                  pageSize={10}
                 />
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, fontSize: 11, color: "var(--sil)" }}>
-                  <span>Showing {filteredDocs.length} of {docs.length} documents</span>
-                </div>
-              </>
             )}
           </Card>
 

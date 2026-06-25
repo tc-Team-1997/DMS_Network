@@ -1,8 +1,17 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import Security from "./Security.js";
 
-/* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
+function renderSecurity(search = "") {
+  return render(
+    <MemoryRouter initialEntries={[`/${search}`]}>
+      <Security />
+    </MemoryRouter>,
+  );
+}
+
+/* ResizeObserver polyfill (recharts needs it in jsdom) */
 beforeAll(() => {
   if (typeof globalThis.ResizeObserver === "undefined") {
     globalThis.ResizeObserver = class ResizeObserver {
@@ -13,7 +22,7 @@ beforeAll(() => {
   }
 });
 
-/* ─── Mock auth context ─── */
+/* Mock auth context */
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
@@ -26,7 +35,7 @@ vi.mock("../auth/AuthContext.js", () => ({
   }),
 }));
 
-/* ─── Mock the security API module ─── */
+/* Mock the security API module */
 vi.mock("../api/securityScreen.js", () => ({
   securityApi: {
     getUsers: vi.fn().mockResolvedValue({
@@ -49,19 +58,17 @@ describe("Security screen", () => {
   });
 
   it("renders the page heading", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     expect(screen.getByText("Security & Access Control")).toBeInTheDocument();
   });
 
   it("renders the security sub-heading", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     expect(screen.getByText(/RBAC/)).toBeInTheDocument();
   });
 
   it("renders all four KPI cards", async () => {
-    await act(async () => { render(<Security />); });
-    // "Active Users" appears as a KPI card label — use getAllByText since
-    // the "Active Sessions" card uses "Active Accounts" now (not "Active Users")
+    await act(async () => { renderSecurity(); });
     expect(screen.getByText("Active Users")).toBeInTheDocument();
     expect(screen.getByText("MFA Enrolled")).toBeInTheDocument();
     expect(screen.getByText("Failed Logins (24h)")).toBeInTheDocument();
@@ -69,8 +76,7 @@ describe("Security screen", () => {
   });
 
   it("renders all tab labels", async () => {
-    await act(async () => { render(<Security />); });
-    // "User Management" appears in both tab and card header — use getAllByText
+    await act(async () => { renderSecurity(); });
     const umItems = screen.getAllByText("User Management");
     expect(umItems.length).toBeGreaterThan(0);
     expect(screen.getByText("Permission Matrix")).toBeInTheDocument();
@@ -80,17 +86,17 @@ describe("Security screen", () => {
 
   it("calls getUsers on mount", async () => {
     const { securityApi } = await import("../api/securityScreen.js");
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => expect(securityApi.getUsers).toHaveBeenCalledTimes(1));
   });
 
   it("renders users from the API in the table", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => expect(screen.getByText("Dorji Wangchuk")).toBeInTheDocument());
   });
 
   it("renders a locked user status badge", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => {
       const lockedBadges = screen.getAllByText("Locked");
       expect(lockedBadges.length).toBeGreaterThan(0);
@@ -98,13 +104,13 @@ describe("Security screen", () => {
   });
 
   it("shows the Add User button for users with user:create permission", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     const addButtons = screen.getAllByText("+ Add User");
     expect(addButtons.length).toBeGreaterThan(0);
   });
 
   it("shows Lock/Unlock action buttons for users with user:update permission", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => {
       const lockButtons = screen.getAllByText(/Lock|Unlock/);
       expect(lockButtons.length).toBeGreaterThan(0);
@@ -112,7 +118,7 @@ describe("Security screen", () => {
   });
 
   it("shows MFA status for users", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => {
       const mfaIndicators = screen.getAllByText(/TOTP|Pending/);
       expect(mfaIndicators.length).toBeGreaterThan(0);
@@ -120,65 +126,86 @@ describe("Security screen", () => {
   });
 
   it("renders the Role Distribution card", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => expect(screen.getByText("Role Distribution")).toBeInTheDocument());
   });
 
   it("renders the Active Sessions card", async () => {
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => expect(screen.getByText("Active Sessions")).toBeInTheDocument());
   });
 
-  /* ── I2: Password field type fix ── */
+  /* I2: Password field type fix */
   it("I2: Add User modal password field renders as type=password (not plaintext)", async () => {
-    await act(async () => { render(<Security />); });
-
-    // Open the Add User modal
+    await act(async () => { renderSecurity(); });
     const addButtons = screen.getAllByText("+ Add User");
     await act(async () => { fireEvent.click(addButtons[0]); });
-
-    // Find the password input — must be type="password"
     const passwordInput = screen.getByPlaceholderText("Min 8 characters");
     expect(passwordInput).toHaveAttribute("type", "password");
   });
 
-  /* ── I4: Failed Logins KPI is clearly marked as a placeholder ── */
+  /* I4: Failed Logins KPI placeholder */
   it("I4: Failed Logins (24h) KPI is clearly marked as a placeholder (not hardcoded 7)", async () => {
-    await act(async () => { render(<Security />); });
-    // The KPI card should show "—" or the audit-log-pending sub label, NOT the hardcoded 7
+    await act(async () => { renderSecurity(); });
     expect(screen.queryByText("7")).not.toBeInTheDocument();
     expect(screen.getByText("audit log endpoint pending")).toBeInTheDocument();
   });
 
-  /* ── M1: Recent Security Events shows correct empty state (audit log endpoint pending) ── */
+  /* M1: Recent Security Events empty state */
   it("M1: Recent Security Events shows empty state when audit log endpoint is not yet exposed", async () => {
-    await act(async () => { render(<Security />); });
-
-    // Navigate to Analytics tab to see security events section
+    await act(async () => { renderSecurity(); });
     const analyticsTab = screen.getByText("Access Analytics");
     await act(async () => { fireEvent.click(analyticsTab); });
-
-    // Should show the empty state message (no hardcoded events)
     await waitFor(() => {
       expect(screen.getByText("Recent Security Events")).toBeInTheDocument();
       expect(screen.getByText("Audit log endpoint not yet exposed.")).toBeInTheDocument();
     });
   });
 
-  /* ── M2: securityApi mock must not contain getAuditLog (removed from real module) ── */
+  /* M2: getAuditLog removed */
   it("M2: securityApi mock does not expose getAuditLog (dead code removed from real module)", async () => {
-    // The mocked securityApi in this file does not include getAuditLog,
-    // matching the real module where it was removed (M2 fix).
     const { securityApi } = await import("../api/securityScreen.js");
     expect((securityApi as Record<string, unknown>)["getAuditLog"]).toBeUndefined();
   });
 
-  /* ── M4 replacement: verify getUsers is called exactly once on mount ── */
+  /* M4 replacement */
   it("M4 replacement: getUsers is called exactly once on mount (not a duplicate of call test)", async () => {
     const { securityApi } = await import("../api/securityScreen.js");
-    await act(async () => { render(<Security />); });
+    await act(async () => { renderSecurity(); });
     await waitFor(() => expect(securityApi.getUsers).toHaveBeenCalledTimes(1));
-    // Ensure it was called with no arguments (simple mount call)
     expect(securityApi.getUsers).toHaveBeenCalledWith();
+  });
+
+  /* URL-driven state */
+  it("URL: default tab is 'users' — User Management card visible without query param", async () => {
+    await act(async () => { renderSecurity(); });
+    await waitFor(() => {
+      const umItems = screen.getAllByText("User Management");
+      expect(umItems.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("URL: ?tab=matrix renders Permission Matrix tab content", async () => {
+    await act(async () => { renderSecurity("?tab=matrix"); });
+    await waitFor(() => expect(screen.getByText("Capture & Scan")).toBeInTheDocument());
+  });
+
+  /* Pagination */
+  it("PAGER: users table renders pager when more than 10 users are returned", async () => {
+    const { securityApi } = await import("../api/securityScreen.js");
+    vi.mocked(securityApi.getUsers).mockResolvedValueOnce({
+      users: Array.from({ length: 12 }, (_, i) => ({
+        id: i + 1,
+        username: `user_${i + 1}`,
+        full_name: `User ${i + 1}`,
+        branch: "Thimphu HQ",
+        mfa_enabled: true,
+        status: "Active" as const,
+        email: `user${i + 1}@bank.bt`,
+        roles: ["Viewer"],
+      })),
+    });
+    await act(async () => { renderSecurity(); });
+    await waitFor(() => expect(screen.getByText(/Page 1 of 2/)).toBeInTheDocument());
   });
 });

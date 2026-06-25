@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { ComplianceAudit } from "./ComplianceAudit.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -65,18 +66,27 @@ function mockFetch(url: string) {
   return Promise.resolve({ ok: true, json: async () => ({}) });
 }
 
+/* Wrap in MemoryRouter so useUrlState (useSearchParams) works in tests */
+function renderPage(initialSearch = "") {
+  return render(
+    <MemoryRouter initialEntries={[`/${initialSearch}`]}>
+      <ComplianceAudit />
+    </MemoryRouter>,
+  );
+}
+
 describe("ComplianceAudit screen", () => {
   beforeEach(() => {
     globalThis.fetch = vi.fn(mockFetch) as any;
   });
 
   it("renders the compliance score KPI card with the fetched score", async () => {
-    render(<ComplianceAudit />);
+    renderPage();
     await waitFor(() => expect(screen.getByText("78%")).toBeInTheDocument());
   });
 
   it("renders KPI cards for frameworks monitored and audit entries", async () => {
-    render(<ComplianceAudit />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText("4")).toBeInTheDocument(); // frameworks
       expect(screen.getByText("148")).toBeInTheDocument(); // audit entries
@@ -84,12 +94,12 @@ describe("ComplianceAudit screen", () => {
   });
 
   it("shows sequence integrity as Intact when ok=true", async () => {
-    render(<ComplianceAudit />);
+    renderPage();
     await waitFor(() => expect(screen.getByText("Intact")).toBeInTheDocument());
   });
 
   it("displays Regulatory Matrix tab content including framework names", async () => {
-    render(<ComplianceAudit />);
+    renderPage();
     await waitFor(() => expect(screen.getAllByText(/Regulatory Matrix/).length).toBeGreaterThan(0));
     // switch to the matrix tab using fireEvent to stay within React's event system
     const matrixTab = screen.getByRole("button", { name: /regulatory matrix/i });
@@ -99,7 +109,7 @@ describe("ComplianceAudit screen", () => {
   });
 
   it("calls the scorecard, matrix, verify, and audit endpoints", async () => {
-    render(<ComplianceAudit />);
+    renderPage();
     await waitFor(() => screen.getByText("78%"));
     const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map(
       (c: unknown[]) => String(c[0])
@@ -113,13 +123,13 @@ describe("ComplianceAudit screen", () => {
   it("shows loading placeholder on Scorecard tab while fetching", () => {
     // fetch never resolves — simulates an in-flight request
     globalThis.fetch = vi.fn(() => new Promise(() => {})) as any;
-    render(<ComplianceAudit />);
+    renderPage();
     // The scorecard tab is active by default; loading state should be shown
     expect(screen.getByText(/Loading scorecard…/)).toBeInTheDocument();
   });
 
   it("propagates filter error to error banner when loadAuditFiltered fails", async () => {
-    render(<ComplianceAudit />);
+    renderPage();
     // Wait for initial load
     await waitFor(() => expect(screen.getByText("78%")).toBeInTheDocument());
 
@@ -145,7 +155,7 @@ describe("ComplianceAudit screen", () => {
       login: async () => {},
       logout: () => {},
     });
-    render(<ComplianceAudit />);
+    renderPage();
     expect(screen.getByText(/You do not have permission/)).toBeInTheDocument();
     // No fetch calls should be made when the user is not authorised
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);

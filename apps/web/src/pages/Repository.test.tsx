@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import Repository from "./Repository.js";
 
-// Mock react-router-dom — Repository now uses useNavigate (C3 fix)
+// Mock react-router-dom — Repository now uses useNavigate (C3 fix) and
+// useUrlState (which calls useSearchParams internally), so both must be mocked.
+// Tab state uses dual local+URL state so tab clicks trigger React re-renders
+// even though useSearchParams setter is a vi.fn() no-op in tests.
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [new URLSearchParams(""), vi.fn()],
 }));
 
 // Polyfill ResizeObserver for jsdom (recharts ResponsiveContainer requires it)

@@ -12,6 +12,7 @@ import type {
   LifecycleVersion,
   DocumentSummary,
 } from "../api/documentLifecycle.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 
 /* ─── helpers ─── */
 const STAGE_COLORS: Record<string, string> = {
@@ -61,10 +62,26 @@ export function DocumentLifecycle() {
   const { user } = useAuth();
   const canRead = Boolean(user?.permissions.includes("document:read"));
 
-  const [tab, setTab] = useState("trace");
+  /* ─── Pattern 2: URL-driven state (tab + search query) ─── */
+  const [urlState, setUrlState] = useUrlState({
+    tab: "trace",
+    q: "",
+  });
+
+  const tab = urlState.tab;
+  const setTab = (t: string) => setUrlState({ tab: t });
+
+  /* Debounced text input for browse search */
+  const [searchQ, setSearchQLocal] = useState(urlState.q);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setSearchQ = (v: string) => {
+    setSearchQLocal(v);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => setUrlState({ q: v }), 300);
+  };
+
   const [trace, setTrace] = useState<LifecycleTrace | null>(null);
   const [docList, setDocList] = useState<DocRow[]>([]);
-  const [searchQ, setSearchQ] = useState("");
   const [trackInput, setTrackInput] = useState(params.docId ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -409,11 +426,13 @@ export function DocumentLifecycle() {
       {tab === "versions" && (
         <Card title="Version History" style={{ marginTop: 14 }}>
           {trace ? (
+            /* Pattern 3: pagination via DataTable pageSize prop */
             <DataTable<VersionRow>
               columns={versionCols}
               rows={versionRows}
               rowKey={(r) => r._key}
               emptyMessage="No version history available"
+              pageSize={10}
             />
           ) : (
             <div style={{ padding: 40, textAlign: "center", color: "var(--sil)" }}>
@@ -439,16 +458,18 @@ export function DocumentLifecycle() {
                 />
               </div>
               <button className="btn bg sm" onClick={() => loadDocList(searchQ)}>Search</button>
-              <button className="btn bs sm" onClick={() => { setSearchQ(""); loadDocList(); }}>Clear</button>
+              <button className="btn bs sm" onClick={() => { setSearchQLocal(""); setUrlState({ q: "" }); loadDocList(); }}>Clear</button>
             </div>
           </Card>
           <Card title={`Documents (${docList.length})`}>
+            {/* Pattern 3: pagination via DataTable pageSize prop */}
             <DataTable<DocRow>
               columns={docCols}
               rows={docList}
               rowKey={(r) => r._key}
               onRowClick={(r) => loadTrace(r.id)}
               emptyMessage="No documents found — try a search"
+              pageSize={10}
             />
           </Card>
         </div>

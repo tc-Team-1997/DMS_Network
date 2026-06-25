@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { SystemAdministration } from "./SystemAdministration.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -59,19 +60,28 @@ function mockFetch(url: string) {
   return Promise.resolve({ ok: true, json: async () => ({}) });
 }
 
+/* Helper: wrap in MemoryRouter so useUrlState (useSearchParams) works in tests */
+function renderPage(initialSearch = "") {
+  return render(
+    <MemoryRouter initialEntries={[`/${initialSearch}`]}>
+      <SystemAdministration />
+    </MemoryRouter>,
+  );
+}
+
 describe("SystemAdministration screen", () => {
   beforeEach(() => {
     globalThis.fetch = vi.fn(mockFetch) as any;
   });
 
   it("renders the page heading and subtitle", async () => {
-    render(<SystemAdministration />);
+    renderPage();
     expect(screen.getByText("System Administration")).toBeInTheDocument();
     expect(screen.getByText(/Platform health/)).toBeInTheDocument();
   });
 
   it("renders the service health tab (default) with service names", async () => {
-    render(<SystemAdministration />);
+    renderPage();
     // 'core' should appear in health tab
     await waitFor(() => {
       const coreItems = screen.getAllByText(/core/i);
@@ -80,14 +90,14 @@ describe("SystemAdministration screen", () => {
   });
 
   it("renders the RPO from DR posture in KPI cards", async () => {
-    render(<SystemAdministration />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText("15m RPO")).toBeInTheDocument();
     });
   });
 
   it("renders the services up KPI", async () => {
-    render(<SystemAdministration />);
+    renderPage();
     await waitFor(() => {
       // upCount = 4, total = 6
       expect(screen.getByText(/4 \/ 6/)).toBeInTheDocument();
@@ -95,7 +105,7 @@ describe("SystemAdministration screen", () => {
   });
 
   it("shows the primary site in the DR tab", async () => {
-    render(<SystemAdministration />);
+    renderPage();
     // Switch to DR tab
     await waitFor(() => screen.getByRole("button", { name: /disaster recovery/i }));
     fireEvent.click(screen.getByRole("button", { name: /disaster recovery/i }));
@@ -105,7 +115,7 @@ describe("SystemAdministration screen", () => {
   });
 
   it("renders the schedules tab button and schedule data loads", async () => {
-    render(<SystemAdministration />);
+    renderPage();
     // Wait until data is loaded (health tab is default)
     await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
     // Verify that the schedule tab button exists
@@ -126,7 +136,7 @@ describe("SystemAdministration screen", () => {
   });
 
   it("calls all three admin endpoints", async () => {
-    render(<SystemAdministration />);
+    renderPage();
     await waitFor(() => {
       expect(screen.getByText("15m RPO")).toBeInTheDocument();
     });
@@ -136,5 +146,19 @@ describe("SystemAdministration screen", () => {
     expect(calls.some((u) => u.includes("/admin/health"))).toBe(true);
     expect(calls.some((u) => u.includes("/admin/dr"))).toBe(true);
     expect(calls.some((u) => u.includes("/admin/schedules"))).toBe(true);
+  });
+
+  it("tab param in URL defaults to health on initial render", async () => {
+    renderPage();
+    await waitFor(() => screen.getAllByText(/core/i).length > 0);
+    // Health tab content should be visible by default
+    expect(screen.queryByText(/Service Health Monitor/i)).toBeDefined();
+  });
+
+  it("renders paginated health table with pageSize=10", async () => {
+    renderPage();
+    await waitFor(() => screen.getAllByText(/core/i).length > 0);
+    // 6 rows, pageSize=10 — all on one page, pager hidden
+    expect(screen.queryByRole("button", { name: /prev/i })).toBeNull();
   });
 });

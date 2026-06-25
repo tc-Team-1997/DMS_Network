@@ -12,7 +12,10 @@ if (typeof ResizeObserver === "undefined") {
 }
 
 // Mock react-router-dom — must not reference outer variables (hoisted)
+// Viewer.tsx uses useNavigate, useSearchParams (directly), and useUrlState
+// (which calls useSearchParams internally), so all three must be in the mock.
 vi.mock("react-router-dom", () => ({
+  useNavigate: () => vi.fn(),
   useSearchParams: () => [new URLSearchParams("doc=7"), vi.fn()],
 }));
 

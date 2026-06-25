@@ -5,6 +5,7 @@ import {
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 import {
   integrationHubApi,
   type IntegrationLog,
@@ -54,11 +55,14 @@ export default function IntegrationHub() {
   const { user } = useAuth();
   const canManage = user?.permissions.includes("integration:manage") ?? false;
 
-  const [tab, setTab]             = useState("systems");
+  const [urlState, setUrlState]   = useUrlState({ tab: "systems", sys: "" });
+  const tab = urlState.tab;
+  const setTab = (t: string) => setUrlState({ tab: t });
   const [systems, setSystems]     = useState<ConnectedSystem[]>([]);
   const [logs, setLogs]           = useState<IntegrationLog[]>([]);
   const [webhooks, setWebhooks]   = useState<OutboundWebhook[]>([]);
-  const [filterSys, setFilterSys] = useState("");
+  const filterSys = urlState.sys;
+  const setFilterSys = (s: string) => setUrlState({ sys: s });
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
 
@@ -357,6 +361,7 @@ export default function IntegrationHub() {
               <div style={{ color: "var(--sil)", padding: 24, textAlign: "center" }}>Loading logs…</div>
             ) : (
               <DataTable<LogRow>
+                pageSize={10}
                 columns={logColumns}
                 rows={logs as LogRow[]}
                 rowKey={(r) => r.id}
@@ -376,6 +381,7 @@ export default function IntegrationHub() {
               <div style={{ color: "var(--sil)", padding: 24, textAlign: "center" }}>Loading webhooks…</div>
             ) : (
               <DataTable<HookRow>
+                pageSize={10}
                 columns={webhookColumns}
                 rows={webhooks as HookRow[]}
                 rowKey={(r) => r.id}

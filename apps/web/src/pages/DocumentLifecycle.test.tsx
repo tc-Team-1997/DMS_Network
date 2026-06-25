@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { DocumentLifecycle } from "./DocumentLifecycle.js";
 
 /* ─── ResizeObserver polyfill (recharts needs it in jsdom) ─── */
@@ -13,9 +14,17 @@ beforeAll(() => {
   }
 });
 
-vi.mock("react-router-dom", () => ({
-  useParams: () => ({ docId: "9" }),
-}));
+/*
+ * Mock react-router-dom — keep useParams returning docId: "9" while
+ * preserving useSearchParams from the real library so useUrlState works.
+ */
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router-dom")>();
+  return {
+    ...actual,
+    useParams: () => ({ docId: "9" }),
+  };
+});
 
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
@@ -52,6 +61,15 @@ const MOCK_TRACE = {
   funnel: { capture: 5, index: 4, workflow: 2, archive: 1, disposal: 0 },
 };
 
+/* Wrap in MemoryRouter so useUrlState (useSearchParams) works in tests */
+function renderPage(initialSearch = "") {
+  return render(
+    <MemoryRouter initialEntries={[`/${initialSearch}`]}>
+      <DocumentLifecycle />
+    </MemoryRouter>,
+  );
+}
+
 describe("DocumentLifecycle screen", () => {
   beforeEach(() => {
     globalThis.fetch = vi.fn((url: string) => {
@@ -63,7 +81,7 @@ describe("DocumentLifecycle screen", () => {
   });
 
   it("renders the document type after loading", async () => {
-    render(<DocumentLifecycle />);
+    renderPage();
     await waitFor(() => {
       const matches = screen.getAllByText(/LETTER/);
       expect(matches.length).toBeGreaterThan(0);
@@ -71,7 +89,7 @@ describe("DocumentLifecycle screen", () => {
   });
 
   it("renders the document number", async () => {
-    render(<DocumentLifecycle />);
+    renderPage();
     await waitFor(() => {
       const matches = screen.getAllByText("L9");
       expect(matches.length).toBeGreaterThan(0);
@@ -79,7 +97,7 @@ describe("DocumentLifecycle screen", () => {
   });
 
   it("renders stage names in the trace", async () => {
-    render(<DocumentLifecycle />);
+    renderPage();
     await waitFor(() => {
       const captures = screen.getAllByText(/Capture/i);
       expect(captures.length).toBeGreaterThan(0);
@@ -87,7 +105,7 @@ describe("DocumentLifecycle screen", () => {
   });
 
   it("shows version v1 label after switching to Versions tab", async () => {
-    render(<DocumentLifecycle />);
+    renderPage();
     // Wait for trace to load
     await waitFor(() => {
       const matches = screen.getAllByText(/LETTER/);
@@ -103,7 +121,7 @@ describe("DocumentLifecycle screen", () => {
   });
 
   it("renders the pipeline funnel numbers", async () => {
-    render(<DocumentLifecycle />);
+    renderPage();
     await waitFor(() => {
       // funnel capture=5 should appear in the pipeline bar area
       const fives = screen.getAllByText("5");
@@ -112,7 +130,7 @@ describe("DocumentLifecycle screen", () => {
   });
 
   it("calls the lifecycle endpoint with the docId from route params", async () => {
-    render(<DocumentLifecycle />);
+    renderPage();
     await waitFor(() => {
       const matches = screen.getAllByText(/LETTER/);
       expect(matches.length).toBeGreaterThan(0);
@@ -159,7 +177,7 @@ describe("DocumentLifecycle — client-side search filtering", () => {
   });
 
   it("client-side filter by doc_type hides non-matching documents", async () => {
-    render(<DocumentLifecycle />);
+    renderPage();
 
     // Wait for trace to load so initial fetch completes
     await waitFor(() => expect(screen.getAllByText(/LETTER/).length).toBeGreaterThan(0));
