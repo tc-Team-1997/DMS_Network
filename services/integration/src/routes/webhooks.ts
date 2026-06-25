@@ -5,6 +5,7 @@ import type { EventSink } from "../events/sink.js";
 import type { CoreIngestClient } from "../core/ingest.js";
 import { pathForEvent } from "../core/ingest.js";
 import { verifySignature } from "../webhooks/hmac.js";
+import { InboundSchemaForEvent, parseOr400 } from "../validation.js";
 
 const SIGNATURE_HEADER = "x-zordms-signature";
 
@@ -35,8 +36,25 @@ async function handle(req: Request, res: Response, hook: Hook): Promise<void> {
     return;
   }
 
+  // P10: validate the inbound payload AFTER the signature is trusted (so a bad
+  // signature still returns 401, not 400). The parsed/typed value is used
+  // downstream for emit + core forwarding.
+  const schema = InboundSchemaForEvent[hook.event];
+  let payload: unknown = req.body;
+  if (schema) {
+    const parsed = parseOr400(schema, req.body, res);
+    if (parsed === undefined) {
+      await knex("integration_logs").insert({
+        id: newId(), system: hook.system, endpoint: hook.event, method: "POST",
+        status: 400, latency_ms: 0, direction: "inbound", success: false, error: "validation_error",
+      });
+      return;
+    }
+    payload = parsed;
+  }
+
   // emit the internal event for Workflow/Notify consumers
-  await events?.emit(hook.event, req.body);
+  await events?.emit(hook.event, payload);
 
   // P7: forward verified inbound events to CORE's internal ingest endpoint so the
   // data is actually persisted (CBS customer-updated -> customer upsert,
@@ -46,7 +64,7 @@ async function handle(req: Request, res: Response, hook: Hook): Promise<void> {
   let consumed: boolean | null = pathForEvent(hook.event) ? false : null;
   let consumeError: string | null = null;
   if (coreIngest && consumed === false) {
-    const result = await coreIngest.forward(hook.event, req.body);
+    const result = await coreIngest.forward(hook.event, payload);
     consumed = result.ok;
     consumeError = result.ok ? null : (result.error ?? `http_${result.status}`);
   }

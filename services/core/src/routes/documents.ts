@@ -3,6 +3,7 @@ import multer from "multer";
 import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { captureDocument, listDocuments, getDocument, softDeleteDocument, currentVersion } from "../repo/documents.js";
+import { holdsFor } from "../modules/records.js";
 import { addVersion, listVersions, rollback } from "../repo/versions.js";
 import { catalog, categoryFor } from "../catalog/engine.js";
 import { computeQuality } from "../catalog/quality.js";
@@ -10,6 +11,8 @@ import { burnStamp, burnRedaction, type RedactRegion } from "../repo/burnin.js";
 import { EVENTS } from "../events/index.js";
 import { enqueue } from "../queue/index.js";
 import { extractIdempotencyKey } from "../worker/handlers.js";
+import { validateBody } from "../openapi/validate.js";
+import { RollbackSchema, StampSchema, RedactSchema, PatchDocumentSchema } from "../openapi/schemas.js";
 
 function bearerFrom(authHeader: string | undefined): string {
   if (!authHeader) return "";
@@ -127,6 +130,9 @@ export function documentsRouter(): Router {
       const { knex } = req.app.locals.deps as CoreDeps;
       const document = await getDocument(knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
+      // P9: a document under an active legal hold MUST NOT be deletable.
+      const hold = await holdsFor(knex, document.id);
+      if (hold) { res.status(409).json({ error: "under_legal_hold", hold }); return; }
       await softDeleteDocument(knex, document.id);
       res.status(204).end();
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
@@ -161,7 +167,7 @@ export function documentsRouter(): Router {
   });
 
   // POST /:id/rollback — rollback (document:index) — C1: branch-scoped
-  r.post("/:id/rollback", requirePermission("document:index"), async (req, res) => {
+  r.post("/:id/rollback", requirePermission("document:index"), validateBody(RollbackSchema), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
@@ -174,7 +180,7 @@ export function documentsRouter(): Router {
   // POST /:id/stamp — burn a visible APPROVED stamp into a NEW version (document:approve)
   // Body: { label?: "APPROVED", by: string, date?: string, page?: number, ref?: string }
   // Returns: { version, download } where download is the path to fetch the new bytes.
-  r.post("/:id/stamp", requirePermission("document:approve"), async (req, res) => {
+  r.post("/:id/stamp", requirePermission("document:approve"), validateBody(StampSchema), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
@@ -209,7 +215,7 @@ export function documentsRouter(): Router {
   // Body: { regions: [{ page:number, x:number, y:number, w:number, h:number }] }
   //   coords normalized 0..1 of page/image size, TOP-LEFT origin.
   // Returns: { version, download, redaction: { rasterized, guarantee } }
-  r.post("/:id/redact", requirePermission("document:write"), async (req, res) => {
+  r.post("/:id/redact", requirePermission("document:write"), validateBody(RedactSchema), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
@@ -255,7 +261,7 @@ export function documentsRouter(): Router {
 
   // PATCH /:id — metadata correction (document:index) — C1: branch-scoped
   // Body: { doc_type?, catalog_category?, cid?, doc_no?, folder_id?, metadata? }
-  r.patch("/:id", requirePermission("document:index"), async (req, res) => {
+  r.patch("/:id", requirePermission("document:index"), validateBody(PatchDocumentSchema), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       const document = await getDocument(deps.knex, req.params.id, makeViewer(req));

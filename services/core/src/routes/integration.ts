@@ -1,6 +1,8 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { timingSafeEqual } from "crypto";
 import type { CoreDeps } from "../deps.js";
+import { validateBody } from "../openapi/validate.js";
+import { CustomerUpsertSchema, LoanIntakeSchema } from "../openapi/schemas.js";
 
 /**
  * P7: Internal ingest endpoints called by the INTEGRATION hub (service-to-service)
@@ -36,7 +38,7 @@ export function integrationRouter(): Router {
   });
 
   // CBS customer-updated -> upsert Customer 360 master record (idempotent by cid).
-  r.post("/customer-upsert", async (req: Request, res: Response, next: NextFunction) => {
+  r.post("/customer-upsert", validateBody(CustomerUpsertSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const body = req.body as {
@@ -65,7 +67,7 @@ export function integrationRouter(): Router {
   });
 
   // LOS loan-application -> upsert a loan intake case stub + customer link (idempotent by applicationId).
-  r.post("/loan-intake", async (req: Request, res: Response, next: NextFunction) => {
+  r.post("/loan-intake", validateBody(LoanIntakeSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const body = req.body as {

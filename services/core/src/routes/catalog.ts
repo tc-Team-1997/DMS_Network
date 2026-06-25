@@ -4,6 +4,8 @@ import { EVENTS } from "../events/index.js";
 import type { CoreDeps } from "../deps.js";
 import { catalog } from "../catalog/engine.js";
 import { getDocument } from "../repo/documents.js";
+import { validateBody } from "../openapi/validate.js";
+import { CatalogSchema } from "../openapi/schemas.js";
 
 function addYears(iso: string, years: number): string {
   if (years >= 9999) return "9999-12-31";
@@ -16,7 +18,7 @@ export function catalogRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
-  r.post("/:documentId", requirePermission("document:catalog"), async (req, res) => {
+  r.post("/:documentId", requirePermission("document:catalog"), validateBody(CatalogSchema), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       // C1: pass viewer so branch-isolation is enforced

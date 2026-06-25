@@ -10,6 +10,7 @@ import { healthRouter } from "./routes/health.js";
 import { alertsRouter } from "./routes/alerts.js";
 import { rulesRouter } from "./routes/rules.js";
 import { streamRouter } from "./routes/stream.js";
+import { openapiRouter } from "./routes/openapi.js";
 
 export interface NotifyDeps {
   knex: Knex;
@@ -26,6 +27,7 @@ export function createApp(deps: NotifyDeps): Express {
   app.locals.deps = deps;
 
   app.use("/health", healthRouter());
+  app.use("/", openapiRouter());              // GET /openapi.json (+ /openapi)
   app.use("/alerts", streamRouter(deps.hub)); // SSE: GET /alerts/stream (auth-gated)
   app.use("/alerts", alertsRouter());         // REST: GET /alerts, POST /alerts/:id/read, etc.
   app.use("/rules", rulesRouter());

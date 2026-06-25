@@ -2,17 +2,18 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
 import { verifyPassword, verifyTotp, signToken, resolveUserAuthz } from "@zordms/auth";
-import type { LoginRequest } from "@zordms/types";
 import { writeAudit } from "../middleware/audit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { validate } from "../middleware/validate.js";
+import { LoginBodySchema, type LoginBody } from "../schemas.js";
 
 export function authRouter(): Router {
   const r = Router();
 
-  r.post("/login", async (req, res) => {
+  r.post("/login", validate(LoginBodySchema), async (req, res) => {
     try {
       const { knex, config } = req.app.locals.deps as { knex: Knex; config: AppConfig };
-      const { username, password, totp } = req.body as LoginRequest;
+      const { username, password, totp } = req.body as LoginBody;
       const user = await knex("users").where({ username }).first();
 
       // Fix 1: check Locked BEFORE verifyPassword to prevent password oracle

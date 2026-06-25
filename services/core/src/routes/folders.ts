@@ -2,12 +2,14 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import { createFolder, listTree, moveFolder } from "../repo/folders.js";
+import { validateBody } from "../openapi/validate.js";
+import { CreateFolderSchema, MoveFolderSchema } from "../openapi/schemas.js";
 
 export function foldersRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
-  r.post("/", requirePermission("folder:create"), async (req, res) => {
+  r.post("/", requirePermission("folder:create"), validateBody(CreateFolderSchema), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     try {
       const folder = await createFolder(knex, {
@@ -29,7 +31,7 @@ export function foldersRouter(): Router {
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
-  r.post("/:id/move", requirePermission("folder:create"), async (req, res) => {
+  r.post("/:id/move", requirePermission("folder:create"), validateBody(MoveFolderSchema), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     try {
       const folder = await moveFolder(knex, req.params.id, String(req.body.parentId));

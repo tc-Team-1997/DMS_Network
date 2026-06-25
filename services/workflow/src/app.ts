@@ -6,6 +6,7 @@ import type { AuthorityClient } from "./authority.js";
 import type { EventBus } from "./events.js";
 import { workflowRouter, workflowsRouter } from "./routes/workflows.js";
 import { casesRouter } from "./routes/cases.js";
+import { buildOpenApiDocument } from "./openapi.js";
 import { errorHandler } from "@zordms/auth";
 
 export interface AppDeps {
@@ -26,6 +27,13 @@ export function createApp(deps: AppDeps): Express {
   app.get("/health", (_req, res) =>
     res.json({ status: "ok", service: "workflow" }),
   );
+
+  // P10: serve the OpenAPI 3.1 spec (public — no auth required for discovery).
+  // Both /openapi.json and /openapi (raw) return the same JSON document.
+  const openapiHandler = (_req: express.Request, res: express.Response) =>
+    res.json(buildOpenApiDocument());
+  app.get("/openapi.json", openapiHandler);
+  app.get("/openapi", openapiHandler);
 
   app.use("/", workflowRouter());
   app.use("/workflows", workflowsRouter());

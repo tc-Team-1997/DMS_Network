@@ -66,19 +66,21 @@ describe("supervisor user provisioning", () => {
     expect(after.status).toBe("Locked");
   });
 
-  // Fix 3: input validation — missing username → 400
-  it("returns 400 when username is missing in POST /users", async () => {
+  // Boundary validation (zod) — missing username → 400 validation_error
+  it("returns 400 validation_error when username is missing in POST /users", async () => {
     const res = await request(app).post("/users").set("Authorization", `Bearer ${adminToken}`)
       .send({ password: "pw123456", roles: ["Viewer"] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/username/);
+    expect(res.body.error).toBe("validation_error");
+    expect(res.body.issues.some((i: any) => i.path.includes("username"))).toBe(true);
   });
 
-  // Fix 3: input validation — roles not an array → 400
-  it("returns 400 when roles is not an array in POST /users", async () => {
+  // Boundary validation (zod) — roles not an array → 400 validation_error
+  it("returns 400 validation_error when roles is not an array in POST /users", async () => {
     const res = await request(app).post("/users").set("Authorization", `Bearer ${adminToken}`)
       .send({ username: "newuser", password: "pw123456", roles: "Viewer" });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/roles/);
+    expect(res.body.error).toBe("validation_error");
+    expect(res.body.issues.some((i: any) => i.path.includes("roles")).valueOf()).toBe(true);
   });
 });

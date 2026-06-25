@@ -10,6 +10,7 @@ import type { CoreIngestClient } from "./core/ingest.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { outboundRouter } from "./routes/outbound.js";
 import { managementRouter } from "./routes/management.js";
+import { buildOpenApiDocument } from "./openapi.js";
 
 export interface AppDeps {
   knex: Knex;
@@ -30,6 +31,11 @@ export function createApp(deps: AppDeps): Express {
   app.locals.deps = deps;
 
   app.get("/health", (_req, res) => res.json({ status: "ok", service: "integration" }));
+
+  // P10: serve the OpenAPI 3.1 spec (built once at startup) and the raw spec.
+  const openApiDoc = buildOpenApiDocument();
+  app.get("/openapi.json", (_req, res) => res.json(openApiDoc));
+  app.get("/openapi", (_req, res) => res.json(openApiDoc));
 
   app.use("/webhooks", webhooksRouter());
   app.use("/outbound", outboundRouter());

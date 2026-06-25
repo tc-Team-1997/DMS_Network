@@ -3,37 +3,29 @@ import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import { newId } from "@zordms/db";
 import { dispatchEvent } from "../webhooks/dispatch.js";
+import { CreateOutboundWebhookSchema, TestOutboundSchema, parseOr400 } from "../validation.js";
 
 export function outboundRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
   // F2: Every async handler has try/catch and passes errors to next(err).
-  // F4: Validate required fields before touching the DB; return 400 on bad input.
-  // F8 (minor): Treat empty or missing events array as 400 so callers are warned early.
+  // P10: Body parsed at the boundary with zod; 400 validation_error on bad input,
+  // and the parsed/typed value is used downstream.
   r.post("/", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const { url, events, auth_method, secret } = req.body as
-        { url?: unknown; events?: unknown; auth_method?: string; secret?: string };
-
-      // Validate required fields
-      if (!url || typeof url !== "string") {
-        res.status(400).json({ error: "url is required and must be a string" });
-        return;
-      }
-      if (!Array.isArray(events) || events.length === 0) {
-        res.status(400).json({ error: "events is required and must be a non-empty array" });
-        return;
-      }
+      const body = parseOr400(CreateOutboundWebhookSchema, req.body, res);
+      if (!body) return;
+      const { url, events, auth_method, secret } = body;
 
       // Generate a UUIDv7 primary key and insert the webhook row explicitly.
       const id = newId();
       await knex("outbound_webhooks").insert({
-        id, url, events: events.join(","), auth_method: auth_method ?? "hmac",
+        id, url, events: events.join(","), auth_method,
         secret: secret ?? null, enabled: true,
       });
-      res.status(201).json({ webhook: { id, url, events, auth_method: auth_method ?? "hmac" } });
+      res.status(201).json({ webhook: { id, url, events, auth_method } });
     } catch (err) { next(err); }
   });
 
@@ -45,16 +37,13 @@ export function outboundRouter(): Router {
     } catch (err) { next(err); }
   });
 
-  // F9 (minor): Validate that event field is present; return 400 otherwise.
+  // P10: Body parsed at the boundary with zod; 400 validation_error on bad input.
   r.post("/test", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const { event, payload } = req.body as { event?: unknown; payload?: unknown };
-      if (!event || typeof event !== "string") {
-        res.status(400).json({ error: "event is required and must be a string" });
-        return;
-      }
-      const report = await dispatchEvent({ knex }, event, payload ?? {});
+      const body = parseOr400(TestOutboundSchema, req.body, res);
+      if (!body) return;
+      const report = await dispatchEvent({ knex }, body.event, body.payload ?? {});
       res.json({ report });
     } catch (err) { next(err); }
   });

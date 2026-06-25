@@ -7,6 +7,8 @@ import { ROOT_PATH } from "../repo/folders.js";
 import { setFolderAcls, effectiveAcls } from "../repo/acls.js";
 import { getDocument } from "../repo/documents.js";
 import { newId } from "@zordms/db";
+import { validateBody } from "../openapi/validate.js";
+import { MapperSchema } from "../openapi/schemas.js";
 
 // Ensures every segment of `path` (relative to /BoB) exists; returns the leaf folder id.
 async function ensureFolderChain(knex: Knex, path: string, createdBy: string): Promise<string> {
@@ -40,7 +42,7 @@ export function mapperRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
-  r.post("/:documentId", requirePermission("document:map"), async (req, res) => {
+  r.post("/:documentId", requirePermission("document:map"), validateBody(MapperSchema), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       // C1: pass viewer so branch-isolation is enforced

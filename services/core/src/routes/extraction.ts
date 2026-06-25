@@ -21,6 +21,8 @@ import type { CoreDeps } from "../deps.js";
 import { runExtraction } from "../extraction/run.js";
 import { enqueue } from "../queue/index.js";
 import { extractIdempotencyKey } from "../worker/handlers.js";
+import { validateBody } from "../openapi/validate.js";
+import { ExtractSchema } from "../openapi/schemas.js";
 
 function extractBearerToken(authHeader: string | undefined): string {
   if (!authHeader) return "";
@@ -61,7 +63,7 @@ export function extractionRouter(): Router {
    * Sync: 200 on success, 404 not found, 500 on internal error.
    * Async (body.async===true): 202 { jobId, status:"queued" }.
    */
-  r.post("/:id/extract", requirePermission("document:index"), async (req, res) => {
+  r.post("/:id/extract", requirePermission("document:index"), validateBody(ExtractSchema), async (req, res) => {
     if (req.body && req.body.async === true) { await enqueueExtract(req, res); return; }
 
     const deps = req.app.locals.deps as CoreDeps;

@@ -2,8 +2,11 @@ import { Router } from "express";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import {
   listFilePlan, listLegalHolds, placeLegalHold, releaseLegalHold, disposalEligibility, certifiedDisposal,
+  LegalHoldError,
 } from "../modules/records.js";
 import type { CoreDeps } from "../deps.js";
+import { validateBody } from "../openapi/validate.js";
+import { PlaceHoldSchema } from "../openapi/schemas.js";
 
 export function recordsRouter(): Router {
   const r = Router();
@@ -23,7 +26,7 @@ export function recordsRouter(): Router {
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
-  r.post("/holds", requirePermission("legal_hold:place"), async (req, res) => {
+  r.post("/holds", requirePermission("legal_hold:place"), validateBody(PlaceHoldSchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const { ref, scope } = req.body ?? {};
@@ -52,6 +55,10 @@ export function recordsRouter(): Router {
       const result = await certifiedDisposal(knex, req.params.documentId, req.authUser!.username);
       res.status(201).json(result);
     } catch (err: any) {
+      if (err instanceof LegalHoldError) {
+        res.status(409).json({ error: "under_legal_hold", hold: err.hold });
+        return;
+      }
       res.status(409).json({ error: String(err.message ?? err) });
     }
   });

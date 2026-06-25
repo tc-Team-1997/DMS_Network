@@ -3,6 +3,8 @@ import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { createAnnotation, listAnnotations, deleteAnnotation } from "../repo/annotations.js";
 import { getDocument } from "../repo/documents.js";
+import { validateBody } from "../openapi/validate.js";
+import { CreateAnnotationSchema } from "../openapi/schemas.js";
 
 export function annotationsRouter(): Router {
   const r = Router({ mergeParams: true });
@@ -20,7 +22,7 @@ export function annotationsRouter(): Router {
   });
 
   // POST / — create annotation; first verify caller can access the document
-  r.post("/", requirePermission("annotation:write"), async (req, res) => {
+  r.post("/", requirePermission("annotation:write"), validateBody(CreateAnnotationSchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       // C4: branch-check the document before allowing annotation creation

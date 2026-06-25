@@ -8,6 +8,7 @@ import { reindexRouter } from "./routes/reindex.js";
 import { searchRouter } from "./routes/search.js";
 import { savedRouter } from "./routes/saved.js";
 import { exportRouter } from "./routes/export.js";
+import { openapiRouter } from "./routes/openapi.js";
 
 export interface AppDeps {
   knex: Knex;
@@ -22,6 +23,7 @@ export function createApp(deps: AppDeps): Express {
   app.locals.deps = deps;
 
   app.get("/health", (_req, res) => res.json({ status: "ok", backend: deps.backend.name }));
+  app.use("/", openapiRouter());
   app.use("/admin", reindexRouter());
   app.use("/", searchRouter());
   app.use("/saved", savedRouter());

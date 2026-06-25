@@ -2,17 +2,20 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import type { ConnectedSystem } from "@zordms/types";
+import { LogsQuerySchema, parseOr400 } from "../validation.js";
 
 export function managementRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
   // F2: Wrap async handlers in try/catch and pass errors to next(err).
+  // P10: validate the key query params (system, limit) at the boundary.
   r.get("/logs", requirePermission("integration:read"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const system = req.query.system as string | undefined;
-      const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
+      const query = parseOr400(LogsQuerySchema, req.query, res);
+      if (!query) return;
+      const { system, limit } = query;
       let q = knex("integration_logs").orderBy("id", "desc").limit(limit);
       if (system) q = q.where({ system });
       // Normalize SQLite boolean 0/1 to true/false for JSON serialization.

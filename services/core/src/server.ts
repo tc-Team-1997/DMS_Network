@@ -4,6 +4,7 @@ import { loadConfig } from "@zordms/config";
 import { LocalStorage } from "./storage/local.js";
 import { RedisStreamsEventBus } from "./events/index.js";
 import { createWorker } from "./worker/index.js";
+import { startDisposalScan } from "./jobs/disposalScan.js";
 
 const config = loadConfig();
 const knex = getServiceKnex();
@@ -24,4 +25,9 @@ if (process.env.START_WORKER !== "0" && process.env.NODE_ENV !== "test") {
   const worker = createWorker(deps);
   worker.start();
   console.log("ZorDMS queue worker started");
+
+  // P9: start the scheduled disposal-eligibility scan. Guarded by the same env
+  // checks so tests/CI never spawn the background timer (START_WORKER=0 disables).
+  startDisposalScan(deps);
+  console.log("ZorDMS disposal scan started");
 }

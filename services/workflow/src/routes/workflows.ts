@@ -1,12 +1,23 @@
 import { Router } from "express";
 import type { Knex } from "knex";
 import { compileTemplate, passesConfidenceGate } from "../engine/compileTemplate.js";
-import { nextStateForAction, ACTION_PERMISSION, type WorkflowAction } from "../engine/transitions.js";
+import { nextStateForAction, ACTION_PERMISSION } from "../engine/transitions.js";
 import { writeAudit } from "../audit.js";
 import type { EventBus } from "../events.js";
 import type { AuthorityClient } from "../authority.js";
 import { requireAuth, requirePermission, asyncHandler } from "@zordms/auth";
 import { newId } from "@zordms/db";
+import {
+  validate,
+  CreateTemplateBody,
+  CreateWorkflowBody,
+  ActBody,
+  WorkflowIdParam,
+  ListWorkflowsQuery,
+  type CreateTemplateBody as CreateTemplateBodyT,
+  type CreateWorkflowBody as CreateWorkflowBodyT,
+  type ActBody as ActBodyT,
+} from "../schemas.js";
 
 // F7: Insert-then-refetch pattern for Oracle compatibility.
 // Returns the inserted row by querying on the unique column after insert.
@@ -36,17 +47,10 @@ export function workflowRouter(): Router {
     "/templates",
     requireAuth,
     requirePermission("workflow:act"),
+    validate(CreateTemplateBody, "body"),
     asyncHandler(async (req, res) => {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const { name, doc_type, steps_json } = req.body as {
-        name: string;
-        doc_type?: string;
-        steps_json: string;
-      };
-      if (!name || !steps_json) {
-        res.status(400).json({ error: "name_and_steps_required" });
-        return;
-      }
+      const { name, doc_type, steps_json } = req.body as CreateTemplateBodyT;
       try {
         compileTemplate(steps_json);
       } catch (e) {
@@ -91,22 +95,10 @@ export function workflowsRouter(): Router {
     "/",
     requireAuth,
     requirePermission("workflow:act"),
+    validate(CreateWorkflowBody, "body"),
     asyncHandler(async (req, res) => {
       const { knex, events } = req.app.locals.deps as { knex: Knex; events?: EventBus };
-      const body = req.body as {
-        title: string;
-        doc_id?: string;
-        template_id: string;
-        priority?: string;
-        assigned_to?: string;
-        doc_confidence?: number;
-        created_by?: string;
-        branch?: string;
-      };
-      if (!body.title || !body.template_id) {
-        res.status(400).json({ error: "title_and_template_required" });
-        return;
-      }
+      const body = req.body as CreateWorkflowBodyT;
 
       const tpl = await knex("workflow_templates").where({ id: body.template_id }).first();
       if (!tpl) {
@@ -225,21 +217,19 @@ export function workflowsRouter(): Router {
   //   Rejected  → status=Rejected
   //   Escalated → status=Escalated
   //   OnHold    → status=OnHold
-  const VALID_QUEUE_STATUS = new Set([
-    "Pending",
-    "Claimed",
-    "Approved",
-    "Rejected",
-    "Escalated",
-    "OnHold",
-  ]);
-
   r.get(
     "/",
     requireAuth,
+    validate(ListWorkflowsQuery, "query"),
     asyncHandler(async (req, res) => {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const statusFilter = typeof req.query.status === "string" ? req.query.status : undefined;
+      // Query validated by zod (ListWorkflowsQuery). express 5 makes req.query
+      // read-only, so validate() may stash the parsed value under validated_query.
+      const parsedQuery =
+        ((req as unknown as Record<string, unknown>).validated_query as
+          | { status?: string }
+          | undefined) ?? (req.query as { status?: string });
+      const statusFilter = parsedQuery.status;
 
       // Branch scoping: fail-closed unless the caller can read cross-branch.
       const canCrossBranch = req.authUser?.permissions.includes("crossbranch:read") ?? false;
@@ -257,10 +247,7 @@ export function workflowsRouter(): Router {
       // Pending/Claimed are derived from the current step; everything else maps
       // directly to the workflow status column.
       if (statusFilter && statusFilter !== "Pending" && statusFilter !== "Claimed") {
-        if (!VALID_QUEUE_STATUS.has(statusFilter)) {
-          res.status(400).json({ error: "invalid_status" });
-          return;
-        }
+        // statusFilter is one of the QueueStatusEnum values (validated by zod).
         q = q.where("status", statusFilter);
       } else if (statusFilter === "Pending" || statusFilter === "Claimed") {
         q = q.where("status", "Active");
@@ -338,6 +325,7 @@ export function workflowsRouter(): Router {
   r.post(
     "/:id/claim",
     requireAuth,
+    validate(WorkflowIdParam, "params"),
     asyncHandler(async (req, res) => {
       const { knex } = req.app.locals.deps as { knex: Knex };
       const actorUsername = req.authUser!.username;
@@ -400,6 +388,8 @@ export function workflowsRouter(): Router {
   r.post(
     "/:id/act",
     requireAuth,
+    validate(WorkflowIdParam, "params"),
+    validate(ActBody, "body"),
     asyncHandler(async (req, res) => {
       const { knex, events, authority } = req.app.locals.deps as {
         knex: Knex;
@@ -414,14 +404,8 @@ export function workflowsRouter(): Router {
       // F2: actor from verified JWT — NEVER from request body
       const userId = req.authUser!.id;
 
-      const { action, comment } = req.body as {
-        action: WorkflowAction;
-        comment?: string;
-      };
-      if (!action || !ACTION_PERMISSION[action]) {
-        res.status(400).json({ error: "valid_action_required" });
-        return;
-      }
+      // Body validated by zod (ActBody): action is a known WorkflowAction.
+      const { action, comment } = req.body as ActBodyT;
 
       const workflow = await knex("workflows").where({ id: req.params.id }).first();
       if (!workflow) {

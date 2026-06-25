@@ -150,7 +150,9 @@ describe("F4 — input validation on POST /outbound", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ events: ["cbs.customer.updated"] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/url/i);
+    // P10: structured boundary validation — url field is flagged in issues[].
+    expect(res.body.error).toBe("validation_error");
+    expect(res.body.issues.some((i: { path: string }) => /url/i.test(i.path))).toBe(true);
   });
 
   it("returns 400 when events is not an array", async () => {
@@ -159,7 +161,8 @@ describe("F4 — input validation on POST /outbound", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ url: "http://target/hook", events: "cbs.customer.updated" });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/events/i);
+    expect(res.body.error).toBe("validation_error");
+    expect(res.body.issues.some((i: { path: string }) => /events/i.test(i.path))).toBe(true);
   });
 
   it("returns 400 when events is an empty array (F8 minor)", async () => {
@@ -168,7 +171,8 @@ describe("F4 — input validation on POST /outbound", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ url: "http://target/hook", events: [] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/events/i);
+    expect(res.body.error).toBe("validation_error");
+    expect(res.body.issues.some((i: { path: string }) => /events/i.test(i.path))).toBe(true);
   });
 
   it("returns 201 with a valid body and correct id in response", async () => {
@@ -201,7 +205,8 @@ describe("F5 — POST /outbound/test coverage", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ payload: { foo: "bar" } });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/event/i);
+    expect(res.body.error).toBe("validation_error");
+    expect(res.body.issues.some((i: { path: string }) => /event/i.test(i.path))).toBe(true);
   });
 
   it("dispatches and returns a report when no webhooks are subscribed", async () => {

@@ -4,12 +4,14 @@ import { EVENTS } from "../events/index.js";
 import type { CoreDeps } from "../deps.js";
 import { validateMetadata } from "../schemas/index.js";
 import { getDocument } from "../repo/documents.js";
+import { validateBody } from "../openapi/validate.js";
+import { IndexSchema } from "../openapi/schemas.js";
 
 export function indexRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
-  r.post("/:documentId", requirePermission("document:index"), async (req, res) => {
+  r.post("/:documentId", requirePermission("document:index"), validateBody(IndexSchema), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       const viewer = makeViewer(req);

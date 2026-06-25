@@ -22,6 +22,13 @@ import {
   inferFieldType,
   type FieldObject,
 } from "../catalog/quality.js";
+import { validateBody } from "../openapi/validate.js";
+import {
+  CreateDocTypeSchema,
+  UpdateDocTypeSchema,
+  ApplyFieldsSchema,
+  FromSuggestionSchema,
+} from "../openapi/schemas.js";
 
 const DOCTYPE_WRITE = "doctype:write";
 
@@ -165,7 +172,7 @@ export function docTypesRouter(): Router {
   });
 
   // ── POST /doc-types — create a new (custom) type ─────────────────────────────
-  r.post("/", requirePermission(DOCTYPE_WRITE), async (req, res) => {
+  r.post("/", requirePermission(DOCTYPE_WRITE), validateBody(CreateDocTypeSchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const body = req.body ?? {};
@@ -208,7 +215,7 @@ export function docTypesRouter(): Router {
   });
 
   // ── PUT /doc-types/:code — edit an existing type ─────────────────────────────
-  r.put("/:code", requirePermission(DOCTYPE_WRITE), async (req, res) => {
+  r.put("/:code", requirePermission(DOCTYPE_WRITE), validateBody(UpdateDocTypeSchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const code = req.params.code;
@@ -275,7 +282,7 @@ export function docTypesRouter(): Router {
   });
 
   // ── POST /doc-types/from-suggestion — persist an AI suggested-new-type ────────
-  r.post("/from-suggestion", requirePermission(DOCTYPE_WRITE), async (req, res) => {
+  r.post("/from-suggestion", requirePermission(DOCTYPE_WRITE), validateBody(FromSuggestionSchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const body = req.body ?? {};
@@ -319,7 +326,7 @@ export function docTypesRouter(): Router {
   });
 
   // ── POST /doc-types/:code/apply-fields — replace the field schema ────────────
-  r.post("/:code/apply-fields", requirePermission(DOCTYPE_WRITE), async (req, res) => {
+  r.post("/:code/apply-fields", requirePermission(DOCTYPE_WRITE), validateBody(ApplyFieldsSchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const code = req.params.code;

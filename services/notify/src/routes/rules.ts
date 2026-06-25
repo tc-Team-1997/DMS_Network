@@ -3,6 +3,14 @@ import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import { newId } from "@zordms/db";
 import { parseRule } from "../engine/ruleEngine.js";
+import { validateBody, validateParams } from "../validate.js";
+import {
+  CreateRuleBodySchema,
+  UpdateRuleBodySchema,
+  IdParamSchema,
+  type CreateRuleBody,
+  type UpdateRuleBody,
+} from "../schemas.js";
 
 export function rulesRouter(): Router {
   const r = Router();
@@ -14,10 +22,9 @@ export function rulesRouter(): Router {
     res.json({ rules: rows.map(parseRule) });
   });
 
-  r.post("/", requirePermission("alert_rule:manage"), async (req, res) => {
+  r.post("/", requirePermission("alert_rule:manage"), validateBody(CreateRuleBodySchema), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
-    const b = req.body as { name: string; trigger: string; params?: object; channels?: string[]; escalationTarget?: string; scope?: string };
-    if (!b.name || !b.trigger) { res.status(400).json({ error: "name_and_trigger_required" }); return; }
+    const b = req.body as CreateRuleBody;
     const id = newId();
     await knex("alert_rules").insert({
       id,
@@ -30,10 +37,10 @@ export function rulesRouter(): Router {
     res.status(201).json({ id });
   });
 
-  r.patch("/:id", requirePermission("alert_rule:manage"), async (req, res) => {
+  r.patch("/:id", requirePermission("alert_rule:manage"), validateParams(IdParamSchema), validateBody(UpdateRuleBodySchema), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     const patch: Record<string, unknown> = {};
-    const b = req.body as Record<string, unknown>;
+    const b = req.body as UpdateRuleBody;
     if (b.name !== undefined) patch.name = b.name;
     if (b.trigger !== undefined) patch.trigger = b.trigger;
     if (b.params !== undefined) patch.params_json = JSON.stringify(b.params);

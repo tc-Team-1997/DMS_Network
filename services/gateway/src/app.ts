@@ -5,6 +5,7 @@ import type { AppConfig } from "@zordms/config";
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
 import { authzRouter } from "./routes/authz.js";
+import { buildOpenApiDocument } from "./openapi.js";
 
 export interface AppDeps { knex: Knex; config: AppConfig; }
 
@@ -19,5 +20,12 @@ export function createApp(deps: AppDeps): Express {
   app.use("/users", usersRouter());
   app.use("/authz", authzRouter());
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+  // OpenAPI 3.1 contract, derived from the same zod schemas used for runtime
+  // boundary validation. Built once at startup.
+  const openApiDoc = buildOpenApiDocument();
+  app.get("/openapi.json", (_req, res) => res.json(openApiDoc));
+  // Raw spec alias.
+  app.get("/openapi", (_req, res) => res.json(openApiDoc));
   return app;
 }

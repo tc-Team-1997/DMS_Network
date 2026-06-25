@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import type { SearchBackend } from "../backend/SearchBackend.js";
-import type { SearchDoc } from "@zordms/types";
+import { ReindexRequestSchema, parseOrFail } from "../schemas.js";
 
 export function reindexRouter(): Router {
   const r = Router();
@@ -9,10 +9,13 @@ export function reindexRouter(): Router {
   r.post("/reindex", requirePermission("admin:access"), async (req, res, next) => {
     try {
       const { backend } = req.app.locals.deps as { backend: SearchBackend };
-      const docs = (req.body?.docs ?? []) as SearchDoc[];
-      // Validate required fields per document to avoid DB errors on missing doc_id.
+      // Boundary validation of the envelope shape (docs array + field types).
+      const parsed = parseOrFail(ReindexRequestSchema, req.body ?? {}, res);
+      if (!parsed) return;
+      const docs = parsed.docs;
+      // Business rule: doc_id must be present & non-empty — returns a specific error.
       for (const doc of docs) {
-        if (!doc.doc_id || typeof doc.doc_id !== "string" || doc.doc_id.trim() === "") {
+        if (doc.doc_id.trim() === "") {
           res.status(400).json({ error: "invalid_doc", detail: "Each doc must have a non-empty doc_id" });
           return;
         }

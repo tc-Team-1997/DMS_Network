@@ -39,58 +39,161 @@ export async function releaseLegalHold(knex: Knex, ref: string): Promise<LegalHo
   return knex<LegalHold>("legal_holds").where({ ref }).first() as Promise<LegalHold>;
 }
 
-/** Returns true if any Active hold covers this document. */
-async function documentOnHold(knex: Knex, documentId: string): Promise<boolean> {
-  const holds = await knex("legal_holds").where({ status: "Active" }).select("scope");
-  if (holds.length === 0) return false;
+function scopeCoversDoc(scope: string, doc: { branch?: string; doc_type?: string; cid?: string }): boolean {
+  const colonIdx = String(scope).indexOf(":");
+  if (colonIdx < 0) return false;
+  const field = String(scope).slice(0, colonIdx);
+  const value = String(scope).slice(colonIdx + 1);
+  if (field === "branch") return doc.branch === value;
+  if (field === "doc_type") return doc.doc_type === value;
+  if (field === "cid") return doc.cid === value;
+  return false;
+}
+
+/**
+ * Returns the `ref` of the first Active legal hold that covers this document,
+ * or null if none. Used to enforce records lifecycle: a held document must not
+ * be deletable or disposable.
+ */
+export async function holdsFor(knex: Knex, documentId: string): Promise<string | null> {
+  const holds = await knex("legal_holds").where({ status: "Active" }).select("ref", "scope");
+  if (holds.length === 0) return null;
   const doc = await knex("documents").where({ id: documentId }).first();
-  if (!doc) return false;
-  return holds.some((h) => {
-    const colonIdx = String(h.scope).indexOf(":");
-    if (colonIdx < 0) return false;
-    const field = String(h.scope).slice(0, colonIdx);
-    const value = String(h.scope).slice(colonIdx + 1);
-    if (field === "branch") return doc.branch === value;
-    if (field === "doc_type") return doc.doc_type === value;
-    if (field === "cid") return doc.cid === value;
-    return false;
-  });
+  if (!doc) return null;
+  const hit = holds.find((h) => scopeCoversDoc(String(h.scope), doc));
+  return hit ? String(hit.ref) : null;
+}
+
+/** Returns true if any Active hold covers this document. */
+export async function isUnderHold(knex: Knex, documentId: string): Promise<boolean> {
+  return (await holdsFor(knex, documentId)) != null;
+}
+
+/** Internal alias kept for existing callers. */
+async function documentOnHold(knex: Knex, documentId: string): Promise<boolean> {
+  return isUnderHold(knex, documentId);
+}
+
+/**
+ * Thrown when an operation is refused because the document is covered by an
+ * active legal hold. Carries the offending hold ref so the route layer can
+ * return 409 { error: "under_legal_hold", hold: <ref> }.
+ */
+export class LegalHoldError extends Error {
+  readonly hold: string;
+  constructor(documentId: string, hold: string) {
+    super(`refused: document ${documentId} is covered by an active legal_hold ${hold}`);
+    this.name = "LegalHoldError";
+    this.hold = hold;
+  }
+}
+
+/** Compute the destruction date for a document given its retention policy. */
+function computeDestruction(createdAt: string | null, retentionYears: number | null, now: number): Date {
+  const years = retentionYears == null ? 7 : Number(retentionYears);
+  const ingested = createdAt ? new Date(createdAt).getTime() : now;
+  const destruction = new Date(ingested);
+  destruction.setFullYear(destruction.getFullYear() + years);
+  return destruction;
 }
 
 export async function disposalEligibility(knex: Knex): Promise<DisposalCandidate[]> {
   const docs = await knex("documents as d")
     .leftJoin("retention_policies as rp", "rp.doc_class", "d.doc_type")
-    .select("d.id", "d.doc_no", "d.doc_type", "d.ingest_timestamp as created_at", "rp.retention_years");
+    .whereNot("d.status", "Disposed")
+    .select(
+      "d.id", "d.doc_no", "d.doc_type", "d.ingest_timestamp as created_at",
+      "rp.retention_years", "d.disposal_status",
+    );
 
   const now = Date.now();
   const out: DisposalCandidate[] = [];
   for (const d of docs) {
-    const years = d.retention_years == null ? 7 : Number(d.retention_years);
-    const ingested = d.created_at ? new Date(d.created_at).getTime() : now;
-    const destruction = new Date(ingested);
-    destruction.setFullYear(destruction.getFullYear() + years);
+    const destruction = computeDestruction(d.created_at ?? null, d.retention_years ?? null, now);
     if (destruction.getTime() <= now) {
-      out.push({
+      const candidate: DisposalCandidate & { disposal_status?: string | null } = {
         document_id: d.id, doc_no: d.doc_no ?? undefined, doc_type: d.doc_type,
         destruction_date: destruction.toISOString().slice(0, 10),
         on_hold: await documentOnHold(knex, d.id),
-      });
+      };
+      // P9: reflect the scheduled scan's eligibility marking when present.
+      candidate.disposal_status = d.disposal_status ?? null;
+      out.push(candidate);
     }
   }
   return out;
 }
 
+/**
+ * P9 SCHEDULED DISPOSAL SCAN.
+ *
+ * Scans for documents whose destruction_date <= now AND that are NOT under an
+ * active legal hold AND are not already disposed, and marks them
+ * disposal-eligible (disposal_status = "Eligible") + emits an event for a human
+ * to certify. This NEVER hard-deletes — it only produces eligibility + an audit
+ * trail. Documents that become held again (or whose retention has not lapsed)
+ * are un-marked so eligibility stays accurate.
+ *
+ * Returns the number of documents newly marked eligible this pass.
+ */
+export async function scanDisposalEligibility(
+  knex: Knex,
+  emit?: (type: string, payload: Record<string, unknown>) => Promise<void>,
+  now: number = Date.now(),
+): Promise<{ eligible: number; skipped: number }> {
+  const docs = await knex("documents as d")
+    .leftJoin("retention_policies as rp", "rp.doc_class", "d.doc_type")
+    .whereNot("d.status", "Disposed")
+    .select(
+      "d.id", "d.doc_type", "d.disposal_status",
+      "d.ingest_timestamp as created_at", "rp.retention_years",
+    );
+
+  let eligible = 0;
+  let skipped = 0;
+  for (const d of docs) {
+    const destruction = computeDestruction(d.created_at ?? null, d.retention_years ?? null, now);
+    const overRetention = destruction.getTime() <= now;
+    const held = await documentOnHold(knex, d.id);
+
+    if (overRetention && !held) {
+      if (d.disposal_status !== "Eligible") {
+        await knex("documents").where({ id: d.id })
+          .update({ disposal_status: "Eligible", disposal_eligible_at: knex.fn.now() });
+        await knex("audit_log").insert({
+          id: newId(), actor_username: "system", action: "DISPOSAL_ELIGIBLE", entity: "document",
+          entity_id: String(d.id),
+          details: `destruction_date=${destruction.toISOString().slice(0, 10)}`,
+        });
+        await emit?.("document.disposal_eligible", {
+          docId: d.id, destruction_date: destruction.toISOString().slice(0, 10),
+        });
+      }
+      eligible += 1;
+    } else {
+      // Held (or no longer over-retention) → ensure it is NOT marked eligible.
+      if (d.disposal_status === "Eligible") {
+        await knex("documents").where({ id: d.id }).update({ disposal_status: null, disposal_eligible_at: null });
+      }
+      if (overRetention && held) skipped += 1;
+    }
+  }
+  return { eligible, skipped };
+}
+
 export async function certifiedDisposal(
   knex: Knex, documentId: string, actor: string,
 ): Promise<{ certificate: string }> {
-  if (await documentOnHold(knex, documentId)) {
-    throw new Error(`refused: document ${documentId} is covered by an active legal_hold`);
+  // Re-check holds at certify time even if the scan previously marked eligible.
+  const hold = await holdsFor(knex, documentId);
+  if (hold) {
+    throw new LegalHoldError(documentId, hold);
   }
   const certificate = `DISPOSAL-${randomUUID()}`;
   await knex("disposal_queue").insert({
     id: newId(), document_id: documentId, disposed: true, disposed_at: knex.fn.now(), certificate,
   });
-  await knex("documents").where({ id: documentId }).update({ status: "Disposed" });
+  await knex("documents").where({ id: documentId }).update({ status: "Disposed", disposal_status: "Disposed" });
   await knex("audit_log").insert({
     id: newId(), actor_username: actor, action: "DISPOSAL_CERTIFIED", entity: "document",
     entity_id: String(documentId), details: certificate,

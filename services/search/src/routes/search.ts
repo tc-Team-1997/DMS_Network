@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
-import { isSearchQuery, type SearchQuery, type SearchScope } from "@zordms/types";
+import type { SearchScope } from "@zordms/types";
 import type { SearchBackend } from "../backend/SearchBackend.js";
+import { SearchQuerySchema, parseOrFail } from "../schemas.js";
 
 export function viewerToScope(viewer: { branch?: string; canCrossBranch: boolean }): SearchScope {
   return {
@@ -17,8 +18,8 @@ export function searchRouter(): Router {
   r.post("/search", requirePermission("document:read"), async (req, res, next) => {
     try {
       const { backend } = req.app.locals.deps as { backend: SearchBackend };
-      const body = req.body as SearchQuery;
-      if (!isSearchQuery(body)) { res.status(400).json({ error: "invalid_query" }); return; }
+      const body = parseOrFail(SearchQuerySchema, req.body, res);
+      if (!body) return;
       const results = await backend.search(body, viewerToScope(makeViewer(req)));
       res.json(results);
     } catch (err) { next(err); }

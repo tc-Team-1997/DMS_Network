@@ -2,10 +2,17 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import { hashPassword } from "@zordms/auth";
 import { newId } from "@zordms/db";
-import type { CreateUserRequest } from "@zordms/types";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { requirePermission } from "../middleware/requirePermission.js";
 import { writeAudit } from "../middleware/audit.js";
+import { validate } from "../middleware/validate.js";
+import {
+  CreateUserBodySchema,
+  type CreateUserBody,
+  SetUserRolesBodySchema,
+  type SetUserRolesBody,
+  UserIdParamsSchema,
+} from "../schemas.js";
 
 async function setUserRoles(knex: Knex, userId: string, roleNames: string[]): Promise<void> {
   await knex("user_roles").where({ user_id: userId }).del();
@@ -23,20 +30,9 @@ export function usersRouter(): Router {
     res.json({ users });
   });
 
-  r.post("/", requirePermission("user:create"), async (req, res) => {
+  r.post("/", requirePermission("user:create"), validate(CreateUserBodySchema), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
-    const body = req.body as CreateUserRequest;
-
-    // Fix 3: validate required fields
-    if (!body.username || typeof body.username !== "string" || body.username.trim() === "") {
-      res.status(400).json({ error: "username is required" }); return;
-    }
-    if (!body.password || typeof body.password !== "string" || body.password.trim() === "") {
-      res.status(400).json({ error: "password is required" }); return;
-    }
-    if (!Array.isArray(body.roles)) {
-      res.status(400).json({ error: "roles must be an array" }); return;
-    }
+    const body = req.body as CreateUserBody;
 
     const exists = await knex("users").where({ username: body.username }).first();
     if (exists) { res.status(409).json({ error: "username_taken" }); return; }
@@ -54,15 +50,22 @@ export function usersRouter(): Router {
     res.status(201).json({ user: { id: userId, username: body.username, roles: body.roles ?? [] } });
   });
 
-  r.post("/:id/roles", requirePermission("role:assign"), async (req, res) => {
-    const { knex } = req.app.locals.deps as { knex: Knex };
-    const userId = req.params.id;
-    await setUserRoles(knex, userId, (req.body.roles as string[]) ?? []);
-    await writeAudit(knex, { actor_id: req.authUser!.id, actor_username: req.authUser!.username, action: "USER_ROLES", entity: "user", entity_id: userId });
-    res.json({ ok: true });
-  });
+  r.post(
+    "/:id/roles",
+    requirePermission("role:assign"),
+    validate(UserIdParamsSchema, "params"),
+    validate(SetUserRolesBodySchema),
+    async (req, res) => {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const userId = req.params.id;
+      const body = req.body as SetUserRolesBody;
+      await setUserRoles(knex, userId, body.roles);
+      await writeAudit(knex, { actor_id: req.authUser!.id, actor_username: req.authUser!.username, action: "USER_ROLES", entity: "user", entity_id: userId });
+      res.json({ ok: true });
+    },
+  );
 
-  r.post("/:id/lock", requirePermission("user:update"), async (req, res) => {
+  r.post("/:id/lock", requirePermission("user:update"), validate(UserIdParamsSchema, "params"), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     const userId = req.params.id;
     const user = await knex("users").where({ id: userId }).first();

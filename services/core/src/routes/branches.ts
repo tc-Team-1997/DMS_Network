@@ -2,6 +2,8 @@ import { Router } from "express";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import { listBranches, addBranch, listAccessPolicies, setAccessPolicy } from "../modules/branches.js";
 import type { CoreDeps } from "../deps.js";
+import { validateBody } from "../openapi/validate.js";
+import { CreateBranchSchema, AccessPolicySchema } from "../openapi/schemas.js";
 
 export function branchesRouter(): Router {
   const r = Router();
@@ -14,7 +16,7 @@ export function branchesRouter(): Router {
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
-  r.post("/", requirePermission("admin:access"), async (req, res) => {
+  r.post("/", requirePermission("admin:access"), validateBody(CreateBranchSchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       if (!req.body?.code || !req.body?.name) { res.status(400).json({ error: "code_and_name_required" }); return; }
@@ -29,7 +31,7 @@ export function branchesRouter(): Router {
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
-  r.post("/access", requirePermission("admin:access"), async (req, res) => {
+  r.post("/access", requirePermission("admin:access"), validateBody(AccessPolicySchema), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const { source_branch, target_branch } = req.body ?? {};

@@ -2,10 +2,11 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import { newId } from "@zordms/db";
 import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
-import type { SaveSearchRequest, SearchQuery } from "@zordms/types";
+import type { SearchQuery } from "@zordms/types";
 import { isSearchQuery } from "@zordms/types";
 import type { SearchBackend } from "../backend/SearchBackend.js";
 import { viewerToScope } from "./search.js";
+import { SaveSearchRequestSchema, SavedSearchIdParamsSchema, parseOrFail } from "../schemas.js";
 
 export function savedRouter(): Router {
   const r = Router();
@@ -14,8 +15,8 @@ export function savedRouter(): Router {
   r.post("/", async (req, res, next) => {
     try {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const body = req.body as SaveSearchRequest;
-      if (!body?.name || !body?.query) { res.status(400).json({ error: "invalid_saved_search" }); return; }
+      const body = parseOrFail(SaveSearchRequestSchema, req.body, res);
+      if (!body) return;
       const visibility = body.visibility === "public" ? "public" : "private";
       const savedId = newId();
       await knex("saved_searches").insert({
@@ -44,7 +45,9 @@ export function savedRouter(): Router {
   r.post("/:id/run", async (req, res, next) => {
     try {
       const { knex, backend } = req.app.locals.deps as { knex: Knex; backend: SearchBackend };
-      const row = await knex("saved_searches").where({ id: req.params.id }).first();
+      const params = parseOrFail(SavedSearchIdParamsSchema, req.params, res);
+      if (!params) return;
+      const row = await knex("saved_searches").where({ id: params.id }).first();
       const visible = row && (row.user_id === req.authUser!.id || row.visibility === "public");
       if (!visible) { res.status(404).json({ error: "not_found" }); return; }
       let query: SearchQuery;

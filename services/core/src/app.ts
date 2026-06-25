@@ -19,6 +19,7 @@ import { docTypesRouter } from "./routes/doc_types.js";
 import { extractionRouter } from "./routes/extraction.js";
 import { integrationRouter } from "./routes/integration.js";
 import { jobsRouter } from "./routes/jobs.js";
+import { openapiRouter } from "./openapi/index.js";
 
 export function createApp(deps: CoreDeps): Express {
   const app = express();
@@ -29,6 +30,9 @@ export function createApp(deps: CoreDeps): Express {
   app.locals.deps = deps;
 
   app.get("/health", (_req, res) => res.json({ status: "ok", service: "core" }));
+
+  // P10: serve the OpenAPI 3.1 spec (GET /openapi.json + raw /openapi)
+  app.use(openapiRouter());
 
   app.use("/folders", foldersRouter());
   app.use("/documents", documentsRouter());
