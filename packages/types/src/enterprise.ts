@@ -2,7 +2,7 @@ export type ReplicationMode = "sync" | "async" | "none";
 export type BranchStatus = "Active" | "Degraded" | "Offline";
 
 export interface Branch {
-  id: number; code: string; name: string; region?: string;
+  id: string; code: string; name: string; region?: string;
   replication_mode: ReplicationMode; status: BranchStatus; created_at?: string;
 }
 export interface NewBranch {
@@ -10,7 +10,7 @@ export interface NewBranch {
   replication_mode?: ReplicationMode; status?: BranchStatus;
 }
 export interface BranchAccess {
-  id: number; source_branch: string; target_branch: string; policy: "read" | "write"; created_at?: string;
+  id: string; source_branch: string; target_branch: string; policy: "read" | "write"; created_at?: string;
 }
 export interface NewBranchAccess {
   source_branch: string; target_branch: string; policy?: "read" | "write";
@@ -20,7 +20,7 @@ export interface NewBranchAccess {
 export interface KycRequirement { key: string; label: string; satisfied: boolean; }
 export interface CustomerProfile {
   cid: string;
-  documents: { id: number; doc_no?: string; doc_type: string; status: string; created_at?: string }[];
+  documents: { id: string; doc_no?: string; doc_type: string; status: string; created_at?: string }[];
   kyc: { requirements: KycRequirement[]; completeness: number; status: "Complete" | "Partial" | "Missing"; escalated: boolean };
   portfolio: { doc_type: string; count: number }[];
   timeline: { ts: string; action: string; entity_id?: string; details?: string }[];
@@ -28,14 +28,14 @@ export interface CustomerProfile {
 
 // ---- Records Management (Task 3) ----
 export interface RetentionPolicy {
-  id: number; doc_class: string; retention_years: number; trigger: string; regulation?: string;
+  id: string; doc_class: string; retention_years: number; trigger: string; regulation?: string;
 }
 export interface LegalHold {
-  id: number; ref: string; scope: string; status: "Active" | "Released"; doc_count: number;
+  id: string; ref: string; scope: string; status: "Active" | "Released"; doc_count: number;
   placed_by?: string; placed_at?: string; released_at?: string;
 }
 export interface DisposalCandidate {
-  document_id: number; doc_no?: string; doc_type: string; destruction_date: string; on_hold: boolean;
+  document_id: string; doc_no?: string; doc_type: string; destruction_date: string; on_hold: boolean;
 }
 
 // ---- Compliance & Audit (Task 4) ----
@@ -48,7 +48,7 @@ export interface ChainVerification { ok: boolean; checked: number; brokenAt: num
 // ---- Document Lifecycle (Task 5) ----
 export interface LifecycleStage { stage: string; at: string | null; actor?: string; detail?: string; complete: boolean; }
 export interface LifecycleTrace {
-  document_id: number; doc_no?: string; doc_type: string;
+  document_id: string; doc_no?: string; doc_type: string;
   stages: LifecycleStage[];
   versions: { version_no: number; file_hash_sha256: string; created_at?: string; created_by?: string }[];
   funnel: { capture: number; index: number; workflow: number; archive: number; disposal: number };

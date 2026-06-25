@@ -23,7 +23,7 @@ vi.mock("react-router-dom", () => ({
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
-      id: 1,
+      id: "018f4e2a-0000-7000-8000-000000000001",
       username: "admin",
       roles: ["CDO"],
       permissions: ["document:read", "annotation:write"],
@@ -37,8 +37,8 @@ vi.mock("../auth/AuthContext.js", () => ({
 vi.mock("../api/repositoryViewerApi.js", () => {
   const annotations = [
     {
-      id: 1,
-      document_id: 7,
+      id: "018f4e2a-0001-7000-8000-000000000001",
+      document_id: "018f4e2a-0007-7000-8000-000000000007",
       page: 1,
       kind: "redaction",
       x: 10,
@@ -50,8 +50,8 @@ vi.mock("../api/repositoryViewerApi.js", () => {
       created_at: "2026-01-10T09:00:00.000Z",
     },
     {
-      id: 2,
-      document_id: 7,
+      id: "018f4e2a-0002-7000-8000-000000000002",
+      document_id: "018f4e2a-0007-7000-8000-000000000007",
       page: 1,
       kind: "highlight",
       x: 5,
@@ -68,7 +68,7 @@ vi.mock("../api/repositoryViewerApi.js", () => {
     repositoryViewerApi: {
       getDocument: vi.fn().mockResolvedValue({
         document: {
-          id: 7,
+          id: "018f4e2a-0007-7000-8000-000000000007",
           title: "Passport_AHI_2022.pdf",
           original_filename: "Passport_AHI_2022.pdf",
           mime_type: "application/pdf",
@@ -89,8 +89,8 @@ vi.mock("../api/repositoryViewerApi.js", () => {
       listVersions: vi.fn().mockResolvedValue({
         versions: [
           {
-            id: 1,
-            document_id: 7,
+            id: "018f4e2a-0011-7000-8000-000000000011",
+            document_id: "018f4e2a-0007-7000-8000-000000000007",
             version_no: 2,
             storage_key: "ab/cd/abcd1234",
             file_hash_sha256: "abcd1234",
@@ -101,8 +101,8 @@ vi.mock("../api/repositoryViewerApi.js", () => {
             created_at: "2026-01-12T00:00:00.000Z",
           },
           {
-            id: 2,
-            document_id: 7,
+            id: "018f4e2a-0012-7000-8000-000000000012",
+            document_id: "018f4e2a-0007-7000-8000-000000000007",
             version_no: 1,
             storage_key: "ab/cd/abcd5678",
             file_hash_sha256: "abcd5678",
@@ -115,7 +115,7 @@ vi.mock("../api/repositoryViewerApi.js", () => {
         ],
       }),
       createAnnotation: vi.fn().mockResolvedValue({
-        annotation: { id: 99, document_id: 7, page: 1, kind: "redaction", x: 10, y: 10, width: 20, height: 10 },
+        annotation: { id: "018f4e2a-0099-7000-8000-000000000099", document_id: "018f4e2a-0007-7000-8000-000000000007", page: 1, kind: "redaction", x: 10, y: 10, width: 20, height: 10 },
       }),
       deleteAnnotation: vi.fn().mockResolvedValue(undefined),
       dashboardSummary: vi.fn().mockResolvedValue({
@@ -190,7 +190,7 @@ describe("Viewer screen", () => {
 
     await waitFor(() => {
       expect(repositoryViewerApi.createAnnotation).toHaveBeenCalledWith(
-        7,
+        "018f4e2a-0007-7000-8000-000000000007",
         expect.objectContaining({ kind: "redaction" })
       );
     });
@@ -217,13 +217,13 @@ describe("Viewer screen", () => {
   it("calls getDocument with the docId from search params", async () => {
     const { repositoryViewerApi } = await import("../api/repositoryViewerApi.js");
     render(<Viewer />);
-    await waitFor(() => expect(repositoryViewerApi.getDocument).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(repositoryViewerApi.getDocument).toHaveBeenCalledWith("7"));
   });
 
   it("calls listAnnotations with the docId on load", async () => {
     const { repositoryViewerApi } = await import("../api/repositoryViewerApi.js");
     render(<Viewer />);
-    await waitFor(() => expect(repositoryViewerApi.listAnnotations).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(repositoryViewerApi.listAnnotations).toHaveBeenCalledWith("7"));
   });
 
   it("shows collaborators panel without hardcoded initials (M3 fix)", async () => {

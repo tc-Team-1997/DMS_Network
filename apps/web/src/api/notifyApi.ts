@@ -9,18 +9,18 @@ const BASE = SVC.notify;
 export type AlertLevel = "info" | "warning" | "critical";
 
 export interface Alert {
-  id: number;
+  id: string;
   level: AlertLevel;
   title: string;
   meta: Record<string, unknown> | string;
   is_read: boolean;
-  rule_id: number | null;
+  rule_id: string | null;
   branch: string | null;
   created_at: string;
 }
 
 export interface AlertRule {
-  id: number;
+  id: string;
   name: string;
   trigger: string;
   params: Record<string, unknown>;
@@ -52,12 +52,12 @@ export const notifyApi = {
   },
 
   /** POST /alerts/:id/read */
-  markRead: (id: number) =>
+  markRead: (id: string) =>
     http.post<{ ok: boolean }>(`${BASE}/alerts/${id}/read`),
 
   /** POST /alerts/:id/escalate */
-  escalate: (id: number, target: string) =>
-    http.post<{ escalatedTo: number }>(`${BASE}/alerts/${id}/escalate`, { target }),
+  escalate: (id: string, target: string) =>
+    http.post<{ escalatedTo: string }>(`${BASE}/alerts/${id}/escalate`, { target }),
 
   /** GET /rules */
   listRules: () =>
@@ -65,9 +65,9 @@ export const notifyApi = {
 
   /** POST /rules */
   createRule: (body: CreateRuleRequest) =>
-    http.post<{ id: number }>(`${BASE}/rules`, body),
+    http.post<{ id: string }>(`${BASE}/rules`, body),
 
   /** PATCH /rules/:id */
-  patchRule: (id: number, patch: Partial<CreateRuleRequest & { enabled: boolean }>) =>
+  patchRule: (id: string, patch: Partial<CreateRuleRequest & { enabled: boolean }>) =>
     http.patch<{ ok: boolean }>(`${BASE}/rules/${id}`, patch),
 };

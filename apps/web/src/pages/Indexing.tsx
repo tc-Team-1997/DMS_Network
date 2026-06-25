@@ -136,11 +136,7 @@ export default function Indexing() {
   const params = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   // Support both /indexing/:id (router param) and /indexing?id=X (query param)
-  const preSelectedId = params.id
-    ? Number(params.id)
-    : searchParams.get("id")
-    ? Number(searchParams.get("id"))
-    : null;
+  const preSelectedId = params.id ?? searchParams.get("id") ?? null;
 
   const canIndex = user?.permissions?.includes("document:index") ?? false;
   const canRead = user?.permissions?.includes("document:read") ?? false;
@@ -440,7 +436,7 @@ export default function Indexing() {
                   style={{ background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, padding: "8px 12px", fontSize: 12, color: "var(--wh)", width: "100%", fontFamily: "inherit" }}
                   value=""
                   onChange={(e) => {
-                    const id = Number(e.target.value);
+                    const id = e.target.value;
                     const doc = queue.find((d) => d.id === id) ?? null;
                     setSelectedDoc(doc);
                   }}

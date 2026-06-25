@@ -195,7 +195,7 @@ describe("Security screen", () => {
     const { securityApi } = await import("../api/securityScreen.js");
     vi.mocked(securityApi.getUsers).mockResolvedValueOnce({
       users: Array.from({ length: 12 }, (_, i) => ({
-        id: i + 1,
+        id: `018f4e2a-0000-7000-8000-${String(i + 1).padStart(12, "0")}`,
         username: `user_${i + 1}`,
         full_name: `User ${i + 1}`,
         branch: "Thimphu HQ",

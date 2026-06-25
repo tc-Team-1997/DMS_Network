@@ -4,7 +4,7 @@
 import { http, SVC } from "./http.js";
 
 export interface RetentionPolicy {
-  id: number;
+  id: string;
   doc_class: string;
   retention_years: number;
   trigger: string;
@@ -12,7 +12,7 @@ export interface RetentionPolicy {
 }
 
 export interface LegalHold {
-  id: number;
+  id: string;
   ref: string;
   scope: string;
   status: "Active" | "Released";
@@ -23,7 +23,7 @@ export interface LegalHold {
 }
 
 export interface DisposalCandidate {
-  document_id: number;
+  document_id: string;
   doc_no?: string;
   doc_type: string;
   destruction_date: string;
@@ -58,6 +58,6 @@ export async function releaseLegalHold(ref: string): Promise<LegalHold> {
   return data.hold;
 }
 
-export async function certifyDisposal(documentId: number): Promise<{ certificate: string }> {
+export async function certifyDisposal(documentId: string): Promise<{ certificate: string }> {
   return http.post<{ certificate: string }>(`${SVC.core}/records/disposal/${documentId}/certify`);
 }

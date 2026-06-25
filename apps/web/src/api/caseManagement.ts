@@ -9,14 +9,14 @@ const WF = SVC.workflow;
 /* ── Types ── */
 
 export interface CaseRow {
-  id: number;
+  id: string;
   case_ref: string;
   case_type: "KYC" | "Loan" | "Account" | "AML" | string;
   title: string;
   status: "Open" | "InReview" | "Resolved" | "Rejected" | string;
   assigned_to?: string | null;
   due_at?: string | null;
-  workflow_id?: number | null;
+  workflow_id?: string | null;
   resolution?: string | null;
   created_by?: string | null;
   created_at?: string;
@@ -32,8 +32,8 @@ export interface CaseMetrics {
 }
 
 export interface CaseDocument {
-  id: number;
-  case_id: number;
+  id: string;
+  case_id: string;
   doc_id: string;
   label?: string | null;
   attached_at?: string;
@@ -47,7 +47,7 @@ export const listCases = (): Promise<{ cases: CaseRow[] }> =>
 export const getCaseMetrics = (): Promise<CaseMetrics> =>
   http.get(`${WF}/cases/metrics`);
 
-export const getCase = (id: number): Promise<{ case: CaseRow; documents: CaseDocument[]; workflow?: unknown }> =>
+export const getCase = (id: string): Promise<{ case: CaseRow; documents: CaseDocument[]; workflow?: unknown }> =>
   http.get(`${WF}/cases/${id}`);
 
 export const createCase = (body: {
@@ -55,12 +55,12 @@ export const createCase = (body: {
   title: string;
   assigned_to?: string;
   due_at?: string;
-  template_id?: number;
+  template_id?: string;
   doc_confidence?: number;
 }) => http.post<{ case: CaseRow }>(`${WF}/cases`, body);
 
-export const attachDocument = (id: number, body: { doc_id: string; label?: string }) =>
+export const attachDocument = (id: string, body: { doc_id: string; label?: string }) =>
   http.post<{ document: CaseDocument }>(`${WF}/cases/${id}/documents`, body);
 
-export const resolveCase = (id: number, body: { status: "Resolved" | "Rejected"; resolution: string }) =>
+export const resolveCase = (id: string, body: { status: "Resolved" | "Rejected"; resolution: string }) =>
   http.post<{ case: CaseRow }>(`${WF}/cases/${id}/resolve`, body);

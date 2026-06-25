@@ -4,7 +4,7 @@
 import { http, SVC } from "./http.js";
 
 export interface Branch {
-  id: number;
+  id: string;
   code: string;
   name: string;
   region?: string;
@@ -14,7 +14,7 @@ export interface Branch {
 }
 
 export interface BranchAccess {
-  id: number;
+  id: string;
   source_branch: string;
   target_branch: string;
   policy: "read" | "write";

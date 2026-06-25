@@ -25,7 +25,7 @@ export interface ChainVerification {
 }
 
 export interface AuditRow {
-  id: number;
+  id: string;
   actor_username?: string;
   action: string;
   entity?: string;

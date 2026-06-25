@@ -69,7 +69,7 @@ export async function buildLifecycleTrace(knex: Knex, docId: string): Promise<Li
   }
 
   return {
-    document_id: docId as unknown as number, doc_no: doc.doc_no ?? undefined, doc_type: doc.doc_type ?? "",
+    document_id: docId, doc_no: doc.doc_no ?? undefined, doc_type: doc.doc_type ?? "",
     stages, versions, funnel: funnelCounts,
   };
 }

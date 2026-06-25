@@ -125,7 +125,7 @@ function NewWorkflowModal({
     try {
       await createWorkflow({
         title: form.title,
-        template_id: Number(form.template_id),
+        template_id: form.template_id,
         priority: form.priority,
         assigned_to: form.assigned_to || undefined,
         doc_id: form.doc_id || undefined,
@@ -203,8 +203,8 @@ interface WorkflowDetailPanelPermissions {
 function WorkflowDetailPanel({
   workflowId, onAct, permissions,
 }: {
-  workflowId: number;
-  onAct: (id: number, action: WorkflowAction, comment?: string) => Promise<void>;
+  workflowId: string;
+  onAct: (id: string, action: WorkflowAction, comment?: string) => Promise<void>;
   permissions: WorkflowDetailPanelPermissions;
 }) {
   const { canApprove, canReject, canEscalate, canHold } = permissions;
@@ -441,7 +441,7 @@ export default function WorkflowEngine() {
   const stageChart = buildStageChart(rows);
 
   /* act handler — errors propagate to WorkflowDetailPanel.err (I4: actErr removed) */
-  async function handleAct(id: number, action: WorkflowAction, comment?: string) {
+  async function handleAct(id: string, action: WorkflowAction, comment?: string) {
     await actOnWorkflow(id, { action, comment });
     await refresh();
   }
@@ -672,7 +672,7 @@ export default function WorkflowEngine() {
 /* Fetches and renders the full builder for the selected workflow.
  * I3 fix: surfaces fetch errors and shows a loading indicator instead of
  * silently falling back to an empty step list. */
-function SelectedWorkflowBuilder({ workflowId }: { workflowId: number }) {
+function SelectedWorkflowBuilder({ workflowId }: { workflowId: string }) {
   const [steps, setSteps]     = useState<WorkflowStepRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);

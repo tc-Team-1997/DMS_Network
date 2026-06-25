@@ -33,7 +33,7 @@ import { FullScreenPreview } from "./FullScreenPreview.js";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ExtractionResultDrawerProps {
-  docId: number;
+  docId: string;
   result: ExtractionResult;
   /** Called when drawer X is clicked */
   onClose: () => void;

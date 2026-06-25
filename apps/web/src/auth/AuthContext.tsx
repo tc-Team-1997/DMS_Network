@@ -19,7 +19,7 @@ function userFromToken(token: string | null): AuthUser | null {
     const claims = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
     if (claims.exp && claims.exp * 1000 < Date.now()) { clearToken(); return null; }
     return {
-      id: Number(claims.sub),
+      id: String(claims.sub),
       username: String(claims.username),
       roles: claims.roles ?? [],
       permissions: claims.permissions ?? [],

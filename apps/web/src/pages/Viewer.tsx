@@ -269,9 +269,9 @@ export default function Viewer() {
     return () => obs.disconnect();
   }, []);
 
-  const docId = docIdParam ? Number(docIdParam) : null;
+  const docId = docIdParam ?? null;
 
-  const load = useCallback(async (id: number) => {
+  const load = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -328,7 +328,7 @@ export default function Viewer() {
     }
   }
 
-  async function handleDeleteAnnotation(annId: number) {
+  async function handleDeleteAnnotation(annId: string) {
     if (!doc) return;
     if (!confirm("Delete this annotation?")) return;
     try {

@@ -40,7 +40,7 @@ const filePlanColumns: Column<RetentionPolicy & Record<string, unknown>>[] = [
 /* ─── Disposal table columns ────────────────────────────────────── */
 function buildDisposalColumns(
   canDispose: boolean,
-  onCertify: (id: number) => void,
+  onCertify: (id: string) => void,
 ): Column<DisposalCandidate & Record<string, unknown>>[] {
   return [
     {
@@ -72,7 +72,7 @@ function buildDisposalColumns(
           <button
             className="btn bx xs"
             style={{ fontSize: 11 }}
-            onClick={(e) => { e.stopPropagation(); onCertify(r.document_id as number); }}
+            onClick={(e) => { e.stopPropagation(); onCertify(r.document_id); }}
           >
             Certify Disposal
           </button>
@@ -152,7 +152,7 @@ export default function RecordsManagement() {
 
   /* Modals */
   const [holdOpen,    setHoldOpen]    = useState(false);
-  const [certConfirm, setCertConfirm] = useState<number | null>(null);
+  const [certConfirm, setCertConfirm] = useState<string | null>(null);
 
   /* Hold form */
   const [holdForm, setHoldForm] = useState({ ref: "", scope: "branch:", });
@@ -205,7 +205,7 @@ export default function RecordsManagement() {
     }
   }
 
-  async function handleCertifyDisposal(docId: number) {
+  async function handleCertifyDisposal(docId: string) {
     try {
       await certifyDisposal(docId);
       setCertConfirm(null);

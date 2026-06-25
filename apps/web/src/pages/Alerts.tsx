@@ -218,8 +218,8 @@ function AlertDetailPanel({
 }: {
   alert: Alert;
   onClose: () => void;
-  onMarkRead: (id: number) => void;
-  onEscalate: (id: number, target: string) => void;
+  onMarkRead: (id: string) => void;
+  onEscalate: (id: string, target: string) => void;
   canManage: boolean;
 }) {
   const [escTarget, setEscTarget] = useState("");
@@ -422,7 +422,7 @@ export default function Alerts() {
     }
   }, []);
 
-  async function handleMarkRead(id: number) {
+  async function handleMarkRead(id: string) {
     await notifyApi.markRead(id).catch(() => {});
     setAlerts((prev) => prev.map((a) => a.id === id ? { ...a, is_read: true } : a));
     if (selectedAlert?.id === id) setSelectedAlert((a) => a ? { ...a, is_read: true } : a);
@@ -434,7 +434,7 @@ export default function Alerts() {
     setAlerts((prev) => prev.map((a) => ({ ...a, is_read: true })));
   }
 
-  async function handleEscalate(id: number, target: string) {
+  async function handleEscalate(id: string, target: string) {
     await notifyApi.escalate(id, target);
     await loadAlerts();
   }
@@ -580,7 +580,7 @@ export default function Alerts() {
           <button
             className="ic"
             title="Mark as read"
-            onClick={(e) => { e.stopPropagation(); handleMarkRead(row.id as number); }}
+            onClick={(e) => { e.stopPropagation(); handleMarkRead(row.id as string); }}
           >
             <CheckCheck size={12} />
           </button>

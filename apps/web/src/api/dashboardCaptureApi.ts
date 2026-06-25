@@ -14,7 +14,7 @@ export interface DashboardSummary {
 }
 
 export interface DocumentRecord {
-  id: number;
+  id: string;
   title: string;
   original_filename?: string;
   mime_type?: string;
@@ -31,7 +31,7 @@ export interface DocumentRecord {
 }
 
 export interface FolderNode {
-  id: number;
+  id: string;
   name: string;
   path: string;
   domain?: string;
@@ -39,7 +39,7 @@ export interface FolderNode {
 }
 
 export interface CaptureQueueItem {
-  id: number;
+  id: string;
   title: string;
   original_filename?: string;
   mime_type?: string;
@@ -68,7 +68,7 @@ export const dashboardCaptureApi = {
   listFolders: (): Promise<{ tree: FolderNode[] }> =>
     http.get<{ tree: FolderNode[] }>(`${SVC.core}/folders`),
 
-  getDocument: (id: number): Promise<{ document: DocumentRecord }> =>
+  getDocument: (id: string): Promise<{ document: DocumentRecord }> =>
     http.get<{ document: DocumentRecord }>(`${SVC.core}/documents/${id}`),
 
   uploadDocument: async (form: FormData): Promise<{ document: DocumentRecord }> => {
@@ -83,22 +83,22 @@ export const dashboardCaptureApi = {
     return res.json();
   },
 
-  deleteDocument: (id: number): Promise<unknown> =>
+  deleteDocument: (id: string): Promise<unknown> =>
     http.delete(`${SVC.core}/documents/${id}`),
 
   // Indexing
   indexDocument: (
-    id: number,
+    id: string,
     body: { doc_type: string; fields: Record<string, unknown>; confidence?: number }
   ): Promise<{ document: DocumentRecord }> =>
     http.post<{ document: DocumentRecord }>(`${SVC.core}/index/${id}`, body),
 
   catalogDocument: (
-    id: number,
+    id: string,
     body: { docType: string; confidence: number; fields: Record<string, unknown> }
   ): Promise<unknown> =>
     http.post(`${SVC.core}/catalog/${id}`, body),
 
-  rejectDocument: (id: number, reason: string): Promise<unknown> =>
+  rejectDocument: (id: string, reason: string): Promise<unknown> =>
     http.post(`${SVC.workflow}/documents/${id}/reject`, { reason }),
 };

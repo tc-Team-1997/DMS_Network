@@ -12,7 +12,7 @@ export interface KycRequirement {
 export interface CustomerProfile {
   cid: string;
   documents: {
-    id: number;
+    id: string;
     doc_no?: string;
     doc_type: string;
     status: string;

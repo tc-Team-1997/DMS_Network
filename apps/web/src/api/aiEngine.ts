@@ -42,11 +42,11 @@ export interface CatalogHandoff {
 export interface ProcessResult {
   handoff: CatalogHandoff;
   decision: DecisionInfo;
-  review_item_id: number | null;
+  review_item_id: string | null;
 }
 
 export interface ReviewRow {
-  id: number;
+  id: string;
   doc_id: string;
   doc_type: string;
   confidence: number;
@@ -182,13 +182,13 @@ export async function getAiStats(): Promise<AiStats> {
   return http.get<AiStats>(`${AI}/stats`);
 }
 
-export async function claimReview(id: number, userId: string): Promise<ReviewRow> {
+export async function claimReview(id: string, userId: string): Promise<ReviewRow> {
   const fd = new FormData();
   fd.append("user_id", userId);
   return postFormData<ReviewRow>(`${AI}/idp/review/${id}/claim`, fd);
 }
 
-export async function resolveReview(id: number, resolution: string): Promise<ReviewRow> {
+export async function resolveReview(id: string, resolution: string): Promise<ReviewRow> {
   const fd = new FormData();
   fd.append("resolution", resolution);
   return postFormData<ReviewRow>(`${AI}/idp/review/${id}/resolve`, fd);

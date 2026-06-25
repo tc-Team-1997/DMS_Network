@@ -209,7 +209,7 @@ type ActivityRow = Pick<DocumentRecord, "id" | "title" | "branch" | "catalog_cat
 
 /* ─── Expiring Soon row type ─── */
 interface ExpiringDoc {
-  id: number;
+  id: string;
   title: string;
   branch?: string;
   doc_type?: string;

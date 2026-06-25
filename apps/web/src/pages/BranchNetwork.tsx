@@ -46,12 +46,18 @@ const policyColumns: Column<BranchAccess & Record<string, unknown>>[] = [
 ];
 
 /* ─── Volume heatmap seed (84 branches × relative activity) ────────── */
+function idToNumber(id: string): number {
+  // Simple stable hash for UUID strings
+  let h = 0;
+  for (let j = 0; j < id.length; j++) h = (h * 31 + id.charCodeAt(j)) >>> 0;
+  return h;
+}
 function buildHeatmapCells(branches: Branch[]): number[] {
   // Produce a stable pseudo-random set of 84 cells, seeded from branch ids
   const out: number[] = [];
   for (let i = 0; i < 84; i++) {
     const b = branches[i % branches.length];
-    const seed = b ? (b.id * 7 + i * 13) : i * 17;
+    const seed = b ? (idToNumber(b.id) * 7 + i * 13) : i * 17;
     out.push((seed % 100) / 100);
   }
   return out;
@@ -132,7 +138,7 @@ export default function BranchNetwork() {
 
   const stats = deriveStats(branches);
   const visible = regionFilter === "All" ? branches : branches.filter(b => b.region === regionFilter);
-  const heatCells = buildHeatmapCells(branches.length ? branches : Array.from({ length: 10 }, (_, i) => ({ id: i + 1 }) as Branch));
+  const heatCells = buildHeatmapCells(branches.length ? branches : Array.from({ length: 10 }, (_, i) => ({ id: String(i + 1) }) as Branch));
   const volumeChartData = buildVolumeChart(summary);
 
   async function handleAddBranch(e: FormEvent) {

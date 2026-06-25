@@ -8,8 +8,8 @@ import { getToken } from "./client.js";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface FolderNode {
-  id: number;
-  parent_id?: number | null;
+  id: string;
+  parent_id?: string | null;
   name: string;
   path: string;
   domain?: string;
@@ -19,8 +19,8 @@ export interface FolderNode {
 }
 
 export interface DocumentRecord {
-  id: number;
-  folder_id?: number | null;
+  id: string;
+  folder_id?: string | null;
   title: string;
   original_filename?: string;
   mime_type?: string;
@@ -43,8 +43,8 @@ export interface DocumentRecord {
 }
 
 export interface DocumentVersion {
-  id: number;
-  document_id: number;
+  id: string;
+  document_id: string;
   version_no: number;
   storage_key: string;
   file_hash_sha256: string;
@@ -56,8 +56,8 @@ export interface DocumentVersion {
 }
 
 export interface Annotation {
-  id: number;
-  document_id: number;
+  id: string;
+  document_id: string;
   page: number;
   kind: "note" | "highlight" | "redaction" | "stamp";
   x: number;
@@ -98,45 +98,45 @@ export const repositoryViewerApi = {
   listFolders: (): Promise<{ tree: FolderNode[] }> =>
     http.get(`${SVC.core}/folders`),
 
-  createFolder: (body: { name: string; parentId?: number | null; domain?: string }): Promise<{ folder: FolderNode }> =>
+  createFolder: (body: { name: string; parentId?: string | null; domain?: string }): Promise<{ folder: FolderNode }> =>
     http.post(`${SVC.core}/folders`, body),
 
   // Documents
-  listDocuments: (params?: { folderId?: number; branch?: string; status?: string }): Promise<{ documents: DocumentRecord[] }> => {
+  listDocuments: (params?: { folderId?: string; branch?: string; status?: string }): Promise<{ documents: DocumentRecord[] }> => {
     const qs = new URLSearchParams();
-    if (params?.folderId != null) qs.set("folder_id", String(params.folderId));
+    if (params?.folderId != null) qs.set("folder_id", params.folderId);
     if (params?.branch) qs.set("branch", params.branch);
     if (params?.status) qs.set("status", params.status);
     const query = qs.toString() ? `?${qs}` : "";
     return http.get(`${SVC.core}/documents${query}`);
   },
 
-  getDocument: (id: number): Promise<{ document: DocumentRecord }> =>
+  getDocument: (id: string): Promise<{ document: DocumentRecord }> =>
     http.get(`${SVC.core}/documents/${id}`),
 
-  deleteDocument: (id: number): Promise<void> =>
+  deleteDocument: (id: string): Promise<void> =>
     http.delete(`${SVC.core}/documents/${id}`),
 
   uploadDocument: (form: FormData) => uploadDoc(form),
 
   // Versions
-  listVersions: (docId: number): Promise<{ versions: DocumentVersion[] }> =>
+  listVersions: (docId: string): Promise<{ versions: DocumentVersion[] }> =>
     http.get(`${SVC.core}/documents/${docId}/versions`),
 
-  rollback: (docId: number, version: number): Promise<{ version: DocumentVersion }> =>
+  rollback: (docId: string, version: number): Promise<{ version: DocumentVersion }> =>
     http.post(`${SVC.core}/documents/${docId}/rollback`, { version }),
 
   // Annotations
-  listAnnotations: (docId: number): Promise<{ annotations: Annotation[] }> =>
+  listAnnotations: (docId: string): Promise<{ annotations: Annotation[] }> =>
     http.get(`${SVC.core}/documents/${docId}/annotations`),
 
   createAnnotation: (
-    docId: number,
+    docId: string,
     body: { kind: string; page: number; x: number; y: number; width: number; height: number; content?: string; color?: string }
   ): Promise<{ annotation: Annotation }> =>
     http.post(`${SVC.core}/documents/${docId}/annotations`, body),
 
-  deleteAnnotation: (docId: number, annId: number): Promise<void> =>
+  deleteAnnotation: (docId: string, annId: string): Promise<void> =>
     http.delete(`${SVC.core}/documents/${docId}/annotations/${annId}`),
 
   // Dashboard

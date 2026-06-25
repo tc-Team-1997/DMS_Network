@@ -16,7 +16,7 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
-      id: 1,
+      id: "018f4e2a-0000-7000-8000-000000000001",
       username: "indexer1",
       roles: ["Indexer"],
       permissions: ["document:index", "document:read", "document:catalog"],
@@ -39,9 +39,12 @@ function renderWithRouter(ui: React.ReactElement, initialPath = "/indexing") {
   );
 }
 
+const DOC_ID_5 = "018f4e2a-0005-7000-8000-000000000005";
+const DOC_ID_6 = "018f4e2a-0006-7000-8000-000000000006";
+
 const MOCK_DOCUMENTS = [
   {
-    id: 5,
+    id: DOC_ID_5,
     title: "Passport — Tenzin Wangchuk",
     branch: "Thimphu",
     status: "Active",
@@ -52,7 +55,7 @@ const MOCK_DOCUMENTS = [
     original_filename: "passport_001.pdf",
   },
   {
-    id: 6,
+    id: DOC_ID_6,
     title: "CID Card — Dema Lhamo",
     branch: "Phuentsholing",
     status: "Active",
@@ -177,7 +180,7 @@ describe("Indexing screen", () => {
     // Find the queue picker option select and select document #5
     const queuePicker = screen.getByText(/Choose document/i).closest("select");
     if (queuePicker) {
-      fireEvent.change(queuePicker, { target: { value: "5" } });
+      fireEvent.change(queuePicker, { target: { value: DOC_ID_5 } });
     }
 
     // Click Save Index button
@@ -256,7 +259,7 @@ describe("Indexing screen", () => {
     // Select document from queue picker
     const queuePicker = screen.getByText(/Choose document/i).closest("select");
     if (queuePicker) {
-      fireEvent.change(queuePicker, { target: { value: "5" } });
+      fireEvent.change(queuePicker, { target: { value: DOC_ID_5 } });
     }
 
     fireEvent.click(screen.getByRole("button", { name: /Save & Send to Workflow/i }));
@@ -342,7 +345,7 @@ describe("Indexing screen", () => {
     renderWithRouter(<Indexing />);
     await waitFor(() => expect(screen.queryByText(/Choose document/i)).toBeInTheDocument());
     const queuePicker = screen.getByText(/Choose document/i).closest("select");
-    if (queuePicker) fireEvent.change(queuePicker, { target: { value: "5" } });
+    if (queuePicker) fireEvent.change(queuePicker, { target: { value: DOC_ID_5 } });
     const prevBtn = screen.getByRole("button", { name: /Previous document/i });
     expect(prevBtn).toBeDisabled();
   });
@@ -364,7 +367,7 @@ describe("Indexing screen", () => {
 
     // Select a document first
     const queuePicker = screen.getByText(/Choose document/i).closest("select");
-    if (queuePicker) fireEvent.change(queuePicker, { target: { value: "5" } });
+    if (queuePicker) fireEvent.change(queuePicker, { target: { value: DOC_ID_5 } });
 
     // Open reject modal
     fireEvent.click(screen.getByRole("button", { name: /Reject/i }));
@@ -386,18 +389,18 @@ describe("Indexing screen", () => {
   });
 
   it("C2 fix: Indexing page picks pre-selected document when ?id= query param is provided", async () => {
-    renderWithRouter(<Indexing />, "/indexing?id=6");
-    // Document #6 is CID Card — Dema Lhamo which has doc_type set (BT_CID_4G)
+    renderWithRouter(<Indexing />, `/indexing?id=${DOC_ID_6}`);
+    // Document DOC_ID_6 is CID Card — Dema Lhamo which has doc_type set (BT_CID_4G)
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(
       expect.stringContaining("/documents"),
       expect.anything(),
     ));
     // The queue picker shouldn't appear because a doc is pre-selected
     // (the queue picker only shows when selectedDoc is null and queue.length > 0)
-    // After pre-selection, doc #6 should be highlighted — we verify by checking the viewer
+    // After pre-selection, the selected doc should appear in the viewer header
     await waitFor(() => {
       // The viewer shows the selected doc ID
-      expect(screen.queryByText(/#6/)).not.toBeNull();
+      expect(screen.queryByText(new RegExp(DOC_ID_6))).not.toBeNull();
     });
   });
 });

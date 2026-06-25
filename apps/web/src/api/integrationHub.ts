@@ -10,7 +10,7 @@ const MGMT_BASE = `${SVC.integrate}/integration`;
 const OUTBOUND_BASE = `${SVC.integrate}/outbound`;
 
 export interface IntegrationLog {
-  id: number;
+  id: string;
   system: string;
   endpoint: string;
   method: string;
@@ -32,7 +32,7 @@ export interface ConnectedSystem {
 }
 
 export interface OutboundWebhook {
-  id: number;
+  id: string;
   url: string;
   events: string[];
   auth_method: "hmac" | "none";

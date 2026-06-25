@@ -18,7 +18,7 @@ Object.defineProperty(globalThis, "ResizeObserver", { value: FakeResizeObserver,
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
-      id: 1,
+      id: "018f4e2a-0000-7000-8000-000000000001",
       username: "reviewer1",
       roles: ["Checker"],
       permissions: ["review:read", "review:write"],
@@ -29,7 +29,7 @@ vi.mock("../auth/AuthContext.js", () => ({
 }));
 
 const PENDING_ROW: aiApi.ReviewRow = {
-  id: 1,
+  id: "018f4e2a-0001-7000-8000-000000000001",
   doc_id: "DOC-20260623-001",
   doc_type: "BT_CID_4G",
   confidence: 0.60,
@@ -40,7 +40,7 @@ const PENDING_ROW: aiApi.ReviewRow = {
 };
 
 const CLAIMED_ROW: aiApi.ReviewRow = {
-  id: 2,
+  id: "018f4e2a-0002-7000-8000-000000000002",
   doc_id: "DOC-20260623-002",
   doc_type: "BT_PASSPORT",
   confidence: 0.75,
@@ -51,7 +51,7 @@ const CLAIMED_ROW: aiApi.ReviewRow = {
 };
 
 const RESOLVED_ROW: aiApi.ReviewRow = {
-  id: 3,
+  id: "018f4e2a-0003-7000-8000-000000000003",
   doc_id: "DOC-20260623-003",
   doc_type: "BOB_LOAN_APPLICATION",
   confidence: 0.80,
@@ -122,7 +122,7 @@ describe("ReviewQueue screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "claim" }));
 
     await waitFor(() => {
-      expect(claimSpy).toHaveBeenCalledWith(1, expect.any(String));
+      expect(claimSpy).toHaveBeenCalledWith(PENDING_ROW.id, expect.any(String));
     });
   });
 
@@ -185,7 +185,7 @@ describe("ReviewQueue screen", () => {
     fireEvent.click(confirmBtn);
 
     await waitFor(() => {
-      expect(resolveSpy).toHaveBeenCalledWith(2, "APPROVED");
+      expect(resolveSpy).toHaveBeenCalledWith(CLAIMED_ROW.id, "APPROVED");
     });
   });
 
@@ -214,7 +214,7 @@ describe("ReviewQueue screen", () => {
     fireEvent.click(confirmBtn);
 
     await waitFor(() => {
-      expect(resolveSpy).toHaveBeenCalledWith(2, "REJECTED");
+      expect(resolveSpy).toHaveBeenCalledWith(CLAIMED_ROW.id, "REJECTED");
     });
   });
 
@@ -287,7 +287,7 @@ describe("ReviewQueue screen", () => {
   // I-3: SLA Breached tab exists and filters breached items
   it("shows SLA Breached tab and filters breached items (I-3 fix)", async () => {
     const BREACHED_ROW: aiApi.ReviewRow = {
-      id: 4,
+      id: "018f4e2a-0004-7000-8000-000000000004",
       doc_id: "DOC-20260623-004",
       doc_type: "BT_CID_4G",
       confidence: 0.55,

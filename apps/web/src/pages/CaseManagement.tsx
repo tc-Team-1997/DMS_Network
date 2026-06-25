@@ -113,7 +113,7 @@ function NewCaseModal({
         title: form.title,
         assigned_to: form.assigned_to || undefined,
         due_at: form.due_at || undefined,
-        template_id: form.template_id ? Number(form.template_id) : undefined,
+        template_id: form.template_id || undefined,
       });
       setForm({ case_type: "KYC", title: "", assigned_to: "", due_at: "", template_id: "" });
       onCreated(); onClose();
@@ -189,7 +189,7 @@ interface CaseBundle {
 function CaseDetailPanel({
   caseId, onUpdated, canManage,
 }: {
-  caseId: number;
+  caseId: string;
   onUpdated: () => void;
   canManage: boolean;
 }) {

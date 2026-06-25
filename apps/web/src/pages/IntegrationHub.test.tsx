@@ -212,7 +212,7 @@ describe("IntegrationHub screen", () => {
     const { integrationHubApi } = await import("../api/integrationHub.js");
     vi.mocked(integrationHubApi.getLogs).mockResolvedValueOnce({
       logs: Array.from({ length: 15 }, (_, i) => ({
-        id: i + 1, system: "cbs", endpoint: "customer.lookup", method: "CALL",
+        id: `018f4e2a-0000-7000-8000-${String(i).padStart(12, "0")}`, system: "cbs", endpoint: "customer.lookup", method: "CALL",
         status: 200, latency_ms: 42, direction: "outbound" as const, success: true,
         created_at: `2026-06-23T10:${String(i).padStart(2, "0")}:00Z`,
       })),

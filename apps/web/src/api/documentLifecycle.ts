@@ -30,7 +30,7 @@ export interface LifecycleFunnel {
 }
 
 export interface LifecycleTrace {
-  document_id: number;
+  document_id: string;
   doc_no?: string;
   doc_type: string;
   stages: LifecycleStage[];
@@ -39,7 +39,7 @@ export interface LifecycleTrace {
 }
 
 export interface DocumentSummary {
-  id: number;
+  id: string;
   doc_no?: string;
   doc_type: string;
   status: string;

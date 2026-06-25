@@ -30,7 +30,7 @@ function FolderIcon() {
 
 interface FolderTreeProps {
   nodes: FolderNode[];
-  selectedId: number | null;
+  selectedId: string | null;
   onSelect: (node: FolderNode) => void;
   depth?: number;
 }
@@ -100,7 +100,7 @@ function formatBytes(bytes: number): string {
 
 interface PreviewPanelProps {
   doc: DocumentRecord | null;
-  versions: Array<{ id: number; version_no: number; mime_type?: string; created_by?: string; comment?: string; created_at?: string; file_size_bytes: number }>;
+  versions: Array<{ id: string; version_no: number; mime_type?: string; created_by?: string; comment?: string; created_at?: string; file_size_bytes: number }>;
   onViewInViewer: (doc: DocumentRecord) => void;
   canDelete: boolean;
   onDelete: (doc: DocumentRecord) => void;
@@ -203,9 +203,9 @@ function PreviewPanel({ doc, versions, onViewInViewer, canDelete, onDelete }: Pr
 // ── Version History Panel ─────────────────────────────────────────────────────
 
 interface VersionHistoryProps {
-  versions: Array<{ id: number; version_no: number; mime_type?: string; created_by?: string; comment?: string; created_at?: string; file_size_bytes: number }>;
+  versions: Array<{ id: string; version_no: number; mime_type?: string; created_by?: string; comment?: string; created_at?: string; file_size_bytes: number }>;
   currentVersion: number;
-  docId: number;
+  docId: string;
   canRollback: boolean;
   onRollback: (version: number) => void;
 }
@@ -297,7 +297,7 @@ export default function Repository() {
   const [tree, setTree] = useState<FolderNode[]>([]);
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<DocumentRecord | null>(null);
-  const [versions, setVersions] = useState<Array<{ id: number; version_no: number; mime_type?: string; created_by?: string; comment?: string; created_at?: string; file_size_bytes: number }>>([]);
+  const [versions, setVersions] = useState<Array<{ id: string; version_no: number; mime_type?: string; created_by?: string; comment?: string; created_at?: string; file_size_bytes: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -335,7 +335,7 @@ export default function Repository() {
         // Pattern 2: Restore selected folder from URL
         const folderParam = urlFilters.folder;
         if (folderParam) {
-          const targetId = Number(folderParam);
+          const targetId = folderParam;
           const findNode = (nodes: FolderNode[]): FolderNode | null => {
             for (const n of nodes) {
               if (n.id === targetId) return n;

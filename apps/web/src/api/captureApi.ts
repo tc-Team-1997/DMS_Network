@@ -12,7 +12,7 @@ import { getToken } from "./client.js";
 // ─── Response shapes from backend contract ───────────────────────────────────
 
 export interface UploadedDocument {
-  id: number;
+  id: string;
   title: string;
   doc_type?: string;
   confidence?: number;
@@ -20,7 +20,7 @@ export interface UploadedDocument {
   extracted_at?: string;
   catalog_category?: string;
   retention_years?: number;
-  folder_id?: number;
+  folder_id?: string;
   review_flag?: boolean;
   cid?: string;
   doc_no?: string;
@@ -58,7 +58,7 @@ export interface ExtractionCatalog {
 }
 
 export interface ExtractionFolder {
-  folderId: number;
+  folderId: string;
   path: string;
   acls: Array<{ role: string; access: string; inherited: boolean }>;
 }
@@ -83,7 +83,7 @@ export interface ExtractionQuality {
 
 /** Single duplicate entry returned by the extraction pipeline */
 export interface ExtractionDuplicate {
-  id: number;
+  id: string;
   title: string;
   doc_type: string;
   branch: string;
@@ -135,7 +135,7 @@ export interface PatchDocumentPayload {
   catalog_category?: string;
   cid?: string;
   doc_no?: string;
-  folder_id?: number;
+  folder_id?: string;
   metadata?: Record<string, string | number | null>;
 }
 
@@ -198,7 +198,7 @@ export async function bulkUploadDocuments(
  * Trigger AI extraction pipeline for an already-uploaded document.
  * POST /documents/:id/extract
  */
-export async function extractDocument(id: number): Promise<ExtractionResult> {
+export async function extractDocument(id: string): Promise<ExtractionResult> {
   const res = await fetch(`${SVC.core}/documents/${id}/extract`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -235,7 +235,7 @@ export async function getDocTypes(): Promise<DocTypesResponse> {
  * Returns updated document record with recomputed quality.
  */
 export async function patchDocument(
-  id: number,
+  id: string,
   payload: PatchDocumentPayload
 ): Promise<PatchDocumentResponse> {
   const res = await fetch(`${SVC.core}/documents/${id}`, {

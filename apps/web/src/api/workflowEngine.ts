@@ -9,11 +9,11 @@ const WF = SVC.workflow;
 /* ── Types ── */
 
 export interface WorkflowRow {
-  id: number;
+  id: string;
   ref_code: string;
   title: string;
   doc_id?: string | null;
-  template_id?: number | null;
+  template_id?: string | null;
   stage: string;
   priority: "Low" | "Normal" | "High" | "Urgent" | string;
   status: "Active" | "Approved" | "Rejected" | "OnHold" | "Escalated" | string;
@@ -24,21 +24,21 @@ export interface WorkflowRow {
 }
 
 export interface WorkflowStepRow {
-  id: number;
-  workflow_id: number;
+  id: string;
+  workflow_id: string;
   seq: number;
   name: string;
   required_permissions: string; // JSON string
   min_confidence: number;
   status: "Pending" | "Approved" | "Rejected" | "Skipped" | string;
-  actor_id?: number | null;
+  actor_id?: string | null;
   acted_at?: string | null;
   sla_minutes?: number | null;
   due_at?: string | null;
 }
 
 export interface TemplateRow {
-  id: number;
+  id: string;
   name: string;
   doc_type?: string | null;
   steps_json: string;
@@ -53,10 +53,10 @@ export type WorkflowAction = "approve" | "reject" | "escalate" | "hold";
 export const listWorkflows = (): Promise<{ workflows: WorkflowRow[] }> =>
   http.get(`${WF}/workflows`);
 
-export const getWorkflow = (id: number): Promise<{ workflow: WorkflowRow; steps: WorkflowStepRow[] }> =>
+export const getWorkflow = (id: string): Promise<{ workflow: WorkflowRow; steps: WorkflowStepRow[] }> =>
   http.get(`${WF}/workflows/${id}`);
 
-export const actOnWorkflow = (id: number, body: { action: WorkflowAction; comment?: string }) =>
+export const actOnWorkflow = (id: string, body: { action: WorkflowAction; comment?: string }) =>
   http.post<{ workflow: WorkflowRow; steps: WorkflowStepRow[] }>(`${WF}/workflows/${id}/act`, body);
 
 export const listTemplates = (): Promise<{ templates: TemplateRow[] }> =>
@@ -65,7 +65,7 @@ export const listTemplates = (): Promise<{ templates: TemplateRow[] }> =>
 export const createWorkflow = (body: {
   title: string;
   doc_id?: string;
-  template_id: number;
+  template_id: string;
   priority?: string;
   assigned_to?: string;
   doc_confidence?: number;

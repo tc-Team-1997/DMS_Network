@@ -54,8 +54,8 @@ export interface SearchResults {
 }
 
 export interface SavedSearch {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   name: string;
   query_json: SearchQuery;
   visibility: "private" | "public";
@@ -79,7 +79,7 @@ export const searchApi = {
     http.get<{ saved: SavedSearch[] }>(`${BASE}/saved`),
 
   /** POST /saved/:id/run */
-  runSaved: (id: number) =>
+  runSaved: (id: string) =>
     http.post<SearchResults>(`${BASE}/saved/${id}/run`),
 
   /**

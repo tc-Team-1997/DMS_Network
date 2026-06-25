@@ -31,7 +31,7 @@ export interface CaptureQueueEntry {
   status: "ready" | "uploading" | "extracting" | "done" | "error";
   frontFile: File | null;
   backFile: File | null;
-  docId?: number;
+  docId?: string;
   confidence?: number;
   extraction?: ExtractionResult;
   errorMsg?: string;

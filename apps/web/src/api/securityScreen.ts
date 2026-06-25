@@ -7,7 +7,7 @@ import { http, SVC } from "./http.js";
 const BASE = SVC.gateway;
 
 export interface UserRow {
-  id: number;
+  id: string;
   username: string;
   full_name?: string;
   email?: string;
@@ -28,7 +28,7 @@ export interface CreateUserPayload {
 }
 
 export interface AuditLogRow {
-  id: number;
+  id: string;
   actor_username?: string;
   action: string;
   entity?: string;
@@ -44,9 +44,9 @@ export const securityApi = {
   createUser: (payload: CreateUserPayload) =>
     http.post<{ user: UserRow }>(`${BASE}/users`, payload),
 
-  assignRoles: (userId: number, roles: string[]) =>
+  assignRoles: (userId: string, roles: string[]) =>
     http.post<{ ok: boolean }>(`${BASE}/users/${userId}/roles`, { roles }),
 
-  toggleLock: (userId: number) =>
+  toggleLock: (userId: string) =>
     http.post<{ ok: boolean; status: string }>(`${BASE}/users/${userId}/lock`, {}),
 };

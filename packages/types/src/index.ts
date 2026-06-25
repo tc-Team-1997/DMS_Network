@@ -1,14 +1,14 @@
 export type Permission = string; // "resource:action"
 
-export interface Role { id: number; name: string; description?: string; system?: boolean; }
+export interface Role { id: string; name: string; description?: string; system?: boolean; }
 
 export interface User {
-  id: number; username: string; full_name?: string; email?: string;
+  id: string; username: string; full_name?: string; email?: string;
   branch?: string; region?: string; mfa_enabled: boolean; status: "Active" | "Locked";
 }
 
 export interface AuthUser {
-  id: number; username: string; roles: string[]; permissions: Permission[];
+  id: string; username: string; roles: string[]; permissions: Permission[];
   branch?: string; region?: string;
 }
 
@@ -24,7 +24,7 @@ export * from "./enterprise.js";
 
 export function isAuthUser(x: unknown): x is AuthUser {
   const u = x as AuthUser;
-  return !!u && typeof u.id === "number" && typeof u.username === "string"
+  return !!u && typeof u.id === "string" && typeof u.username === "string"
     && Array.isArray(u.roles) && Array.isArray(u.permissions)
     && u.roles.every(r => typeof r === "string")
     && u.permissions.every(p => typeof p === "string");
@@ -99,8 +99,8 @@ export interface SearchResults {
 export type SavedSearchVisibility = "private" | "public";
 
 export interface SavedSearch {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   name: string;
   query_json: SearchQuery;
   visibility: SavedSearchVisibility;
@@ -126,7 +126,7 @@ export function isSearchQuery(x: unknown): x is SearchQuery {
 export type IntegrationDirection = "outbound" | "inbound";
 
 export interface IntegrationLog {
-  id: number;
+  id: string;
   system: string;
   endpoint: string;
   method: string;
@@ -139,7 +139,7 @@ export interface IntegrationLog {
 }
 
 export interface IntegrationConfigRow {
-  id: number;
+  id: string;
   system: string;
   base_url?: string | null;
   auth_type: "none" | "bearer" | "hmac" | "basic";
@@ -149,7 +149,7 @@ export interface IntegrationConfigRow {
 }
 
 export interface OutboundWebhook {
-  id: number;
+  id: string;
   url: string;
   events: string[];
   auth_method: "hmac" | "none";
