@@ -395,8 +395,16 @@ export function ExtractionResultDrawer({
 
   // ── Current doc-type schema (for field form) ──
   const currentDocTypeDef = docTypes.find((dt) => dt.code === editedDocType) ?? null;
-  const mandatoryFields: string[] = currentDocTypeDef?.mandatoryFields ?? [];
-  const optionalFields: string[] = currentDocTypeDef?.optionalFields ?? [];
+  // Field schemas may arrive as plain strings (legacy) or FieldObjects
+  // ({ name, type, mandatory }) since the P5 doc-type admin; normalize to names.
+  const toFieldName = (f: unknown): string =>
+    typeof f === "string" ? f : ((f as { name?: string } | null)?.name ?? "");
+  const mandatoryFields: string[] = (currentDocTypeDef?.mandatoryFields ?? [])
+    .map(toFieldName)
+    .filter(Boolean);
+  const optionalFields: string[] = (currentDocTypeDef?.optionalFields ?? [])
+    .map(toFieldName)
+    .filter(Boolean);
   const allFormFields = [
     ...mandatoryFields.map((f) => ({ field: f, required: true })),
     ...optionalFields.map((f) => ({ field: f, required: false })),
@@ -821,11 +829,14 @@ export function ExtractionResultDrawer({
                     flexWrap: "wrap",
                   }}
                 >
-                  {suggestedNewType.sampleFields.map((f) => (
-                    <Tag key={f} variant="blue">
-                      {f}
-                    </Tag>
-                  ))}
+                  {suggestedNewType.sampleFields.map((f) => {
+                    const name = toFieldName(f);
+                    return (
+                      <Tag key={name} variant="blue">
+                        {name}
+                      </Tag>
+                    );
+                  })}
                 </div>
               )}
             </div>
