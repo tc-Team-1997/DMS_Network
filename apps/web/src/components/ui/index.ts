@@ -1,4 +1,6 @@
 export { AppShell }        from "./AppShell.js";
+export { Tooltip }         from "./Tooltip.js";
+export type { TooltipProps } from "./Tooltip.js";
 export { KpiCard }         from "./KpiCard.js";
 export { Card }            from "./Card.js";
 export { DataTable }       from "./DataTable.js";

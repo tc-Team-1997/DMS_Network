@@ -106,8 +106,17 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 /* ══════════════════════════════════════════════
-   KPI CARD
+   KPI CARD  (new border-box style)
    ══════════════════════════════════════════════ */
+.kpi-card {
+  background:    var(--ink2);
+  border:        1px solid var(--bd);
+  border-radius: 10px;
+  padding:       16px 18px;
+  box-shadow:    0 2px 8px rgba(15,23,42,.08);
+}
+
+/* ── Legacy .kpi class (kept for backward compat — old pages may still use it) ── */
 .kpi {
   background:    var(--ink2);
   border:        1px solid var(--bd);

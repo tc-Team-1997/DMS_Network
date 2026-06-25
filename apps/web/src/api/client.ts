@@ -1,3 +1,16 @@
+/**
+ * client.ts — low-level token store + simple API helper.
+ *
+ * The base path for each service is defined in config.ts (SVC map) and
+ * driven by VITE_SVC_* env vars.  Call sites pass full paths like
+ * "/svc/gateway/auth/login" — no base is prepended here so that existing
+ * call sites remain unchanged.
+ */
+import { SVC } from "../config.js";
+
+// Re-export SVC so legacy imports from client.ts still compile.
+export { SVC };
+
 const TOKEN_KEY = "zordms_token";
 
 export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }

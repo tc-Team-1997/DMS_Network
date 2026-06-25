@@ -125,9 +125,11 @@ describe("Dashboard screen", () => {
     await waitFor(() => expect(screen.getByText(/Pending Review/i)).toBeInTheDocument());
   });
 
-  it("shows AI Active tag in the header area", async () => {
+  it("does NOT show AI Active tag in the header area", async () => {
     renderWithRouter(<Dashboard />);
-    await waitFor(() => expect(screen.getByText(/AI Active/i)).toBeInTheDocument());
+    // Wait for load to complete before asserting absence
+    await waitFor(() => expect(screen.getByText("12,847")).toBeInTheDocument());
+    expect(screen.queryByText(/AI Active/i)).not.toBeInTheDocument();
   });
 
   it("renders recent document activity rows after documents load", async () => {

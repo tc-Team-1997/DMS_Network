@@ -43,6 +43,11 @@ describe("AppShell", () => {
     expect(screen.getAllByText("ZorDMS").length).toBeGreaterThan(0);
   });
 
+  it("does NOT render the 'Enterprise Document Management' subtitle", () => {
+    renderShell();
+    expect(screen.queryByText(/Enterprise Document Management/i)).toBeNull();
+  });
+
   it("renders the content slot", () => {
     renderShell();
     expect(screen.getByTestId("content")).toBeInTheDocument();
@@ -61,5 +66,45 @@ describe("AppShell", () => {
   it("renders the sidebar footer version/build line", () => {
     renderShell();
     expect(screen.getByText(/Build/i)).toBeInTheDocument();
+  });
+
+  it("renders user name and role on the same line as plain text (no button/pill)", () => {
+    renderShell();
+    // usr-identity should be a div, not a button
+    const identity = document.querySelector(".usr-identity");
+    expect(identity).not.toBeNull();
+    expect(identity?.tagName.toLowerCase()).toBe("div");
+    // Both name and role visible in the document
+    expect(screen.getByText("Admin")).toBeInTheDocument();
+    expect(screen.getByText("CDO")).toBeInTheDocument();
+    // The separator dot span is present (text content is " · ")
+    const dotSpan = document.querySelector(".usr-dot");
+    expect(dotSpan).not.toBeNull();
+    expect(dotSpan?.textContent).toBe(" · ");
+  });
+
+  it("does NOT render usr-pill (old button/pill chrome removed)", () => {
+    renderShell();
+    expect(document.querySelector(".usr-pill")).toBeNull();
+  });
+
+  it("renders tooltip bubble spans for icon-only action buttons", () => {
+    renderShell();
+    // Tooltip bubbles are aria-hidden visual aids; query by CSS class
+    const bubbles = document.querySelectorAll(".zor-tooltip-bubble");
+    const labels = Array.from(bubbles).map((b) => b.textContent ?? "");
+    expect(labels.some((l) => /sign out/i.test(l))).toBe(true);
+    expect(labels.some((l) => /alerts/i.test(l))).toBe(true);
+    expect(labels.some((l) => /compliance/i.test(l))).toBe(true);
+  });
+
+  it("sign-out button has aria-label 'Sign out'", () => {
+    renderShell();
+    expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument();
+  });
+
+  it("alerts button has aria-label", () => {
+    renderShell();
+    expect(screen.getByRole("button", { name: /alerts/i })).toBeInTheDocument();
   });
 });

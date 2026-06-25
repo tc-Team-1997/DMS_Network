@@ -346,7 +346,6 @@ export default function Dashboard() {
   const [recentDocs, setRecentDocs] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastSync, setLastSync] = useState<string>("just now");
 
   // Time period control state
   const [periodState, setPeriodState] = useState<PeriodState>({
@@ -375,7 +374,6 @@ export default function Dashboard() {
       setSummary(s);
       setAllDocs(docsResp.documents);
       setRecentDocs(docsResp.documents.slice(0, 12));
-      setLastSync("just now");
     } catch (err: unknown) {
       setError((err as Error).message ?? "Failed to load dashboard");
     } finally {
@@ -385,8 +383,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(() => setLastSync("47s ago"), 47000);
-    return () => clearInterval(iv);
+    return () => {};
   }, [load]);
 
   const total = summary?.totalDocuments ?? 0;
@@ -428,31 +425,6 @@ export default function Dashboard() {
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <Tag variant="gold">AI Active</Tag>
-          {!loading && branchStats.length > 0 && (
-            <Tag variant="blue">{branchStats.length} Branches</Tag>
-          )}
-          <span style={{ fontSize: 11, color: "var(--sil)", marginLeft: 4 }}>
-            Last sync {lastSync}
-          </span>
-          <button
-            onClick={load}
-            style={{
-              padding: "6px 12px",
-              background: "var(--ink3)",
-              border: "1px solid var(--bd)",
-              borderRadius: 7,
-              fontSize: 11,
-              color: "var(--mist)",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            Refresh
-          </button>
-        </div>
-
         {/* Time period control */}
         <PeriodControl value={periodState} onChange={setPeriodState} />
       </div>

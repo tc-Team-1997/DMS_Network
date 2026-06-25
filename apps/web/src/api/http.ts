@@ -10,12 +10,19 @@
  *   /svc/integrate-> http://localhost:4005  (integrations, connectors)
  *   /svc/ai       -> http://localhost:8000  (AI engine, OCR, NLP)
  *
+ * Service base paths are now driven by VITE_SVC_* env vars (see config.ts).
+ * Call sites are unchanged — just keep using full paths like "/svc/core/documents".
+ *
  * Usage:
  *   import { http } from "../api/http.js";
  *   const docs = await http.get<Doc[]>("/svc/core/documents");
  *   await http.post("/svc/gateway/auth/login", { username, password });
  */
 import { getToken } from "./client.js";
+
+// Re-export SVC from the canonical config so existing imports from http.ts
+// continue to work without changing call sites.
+export { SVC } from "../config.js";
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -46,14 +53,3 @@ export const http = {
   patch:  <T>(url: string, body?: unknown)    => request<T>("PATCH",  url, body),
   delete: <T>(url: string)                    => request<T>("DELETE", url),
 };
-
-/* ─── Service base paths ─── */
-export const SVC = {
-  gateway:   "/svc/gateway",   // :4000
-  core:      "/svc/core",      // :4001
-  workflow:  "/svc/workflow",  // :4002
-  notify:    "/svc/notify",    // :4003
-  search:    "/svc/search",    // :4004
-  integrate: "/svc/integrate", // :4005
-  ai:        "/svc/ai",        // :8000
-} as const;

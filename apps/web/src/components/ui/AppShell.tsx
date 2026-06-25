@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext.js";
+import { Tooltip } from "./Tooltip.js";
 
 /* ─────────── nav schema ─────────── */
 interface NavItem {
@@ -117,7 +118,6 @@ export function AppShell({ children }: AppShellProps) {
           <div className="topbar-zbadge">Z</div>
           <div className="topbar-brand">
             <b>ZorDMS</b>
-            <small>Enterprise Document Management</small>
           </div>
         </div>
 
@@ -131,36 +131,45 @@ export function AppShell({ children }: AppShellProps) {
         )}
 
         {/* Branch scope — based on the logged-in user (left) */}
-        <button className="topbar-branch" type="button" title="Branch scope">
-          <MapPin size={12} />
-          <span>{branchLabel}</span>
-          <ChevronDown size={11} />
-        </button>
+        <Tooltip label="Branch scope">
+          <button className="topbar-branch" type="button" aria-label="Branch scope">
+            <MapPin size={12} />
+            <span>{branchLabel}</span>
+            <ChevronDown size={11} />
+          </button>
+        </Tooltip>
 
         {/* Right actions */}
         <div className="topbar-actions">
-          <button className="ic" type="button" title="Alerts" onClick={() => navigate("/alerts")}>
-            <Bell size={17} />
-            <span className="notdot" />
-          </button>
+          <Tooltip label="Alerts &amp; Events">
+            <button className="ic" type="button" aria-label="Alerts & Events" onClick={() => navigate("/alerts")}>
+              <Bell size={17} />
+              <span className="notdot" />
+            </button>
+          </Tooltip>
 
-          <button className="ic" type="button" title="Compliance" onClick={() => navigate("/compliance-audit")}>
-            <Shield size={17} />
-          </button>
+          <Tooltip label="Compliance &amp; Audit">
+            <button className="ic" type="button" aria-label="Compliance & Audit" onClick={() => navigate("/compliance-audit")}>
+              <Shield size={17} />
+            </button>
+          </Tooltip>
 
-          {/* User pill — display only */}
-          <div className="usr-pill" title={`${displayName} · ${role}`}>
+          {/* User identity — plain text, same line, no button/pill chrome */}
+          <div className="usr-identity" aria-label={`${displayName}, ${role}`}>
             <span className="usr-av">{initials}</span>
-            <span>
+            <span className="usr-name-role">
               <b>{displayName}</b>
-              <small>{role}</small>
+              <span className="usr-dot" aria-hidden="true"> · </span>
+              <span className="usr-role">{role}</span>
             </span>
           </div>
 
           {/* Logout — separate exit button */}
-          <button className="ic exit-ic" type="button" title="Sign out" onClick={logout}>
-            <LogOut size={17} />
-          </button>
+          <Tooltip label="Sign out">
+            <button className="ic exit-ic" type="button" aria-label="Sign out" onClick={logout}>
+              <LogOut size={17} />
+            </button>
+          </Tooltip>
         </div>
       </header>
 
