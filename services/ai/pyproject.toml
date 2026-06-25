@@ -13,13 +13,13 @@ dependencies = [
     "httpx>=0.27",
     "python-multipart>=0.0.9",
     "pyjwt>=2.8",
+    "pillow>=10.3",
+    "pdf2image>=1.17",
 ]
 
 [project.optional-dependencies]
 ocr = [
     "pytesseract>=0.3.10",
-    "pdf2image>=1.17",
-    "pillow>=10.3",
 ]
 db = [
     "psycopg[binary]>=3.1",
