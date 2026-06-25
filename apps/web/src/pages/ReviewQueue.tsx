@@ -177,7 +177,9 @@ export default function ReviewQueue() {
   const openInViewer = useCallback(
     (item: ReviewQueueItem) => {
       if (!item.doc_id) return;
-      navigate(`/viewer?doc=${encodeURIComponent(item.doc_id)}`);
+      // Pass the workflow id so the Viewer shows the Approve/Reject decision card
+      // and closes the review -> viewer -> approve -> back loop.
+      navigate(`/viewer?doc=${encodeURIComponent(item.doc_id)}&workflow=${encodeURIComponent(item.id)}`);
     },
     [navigate],
   );
