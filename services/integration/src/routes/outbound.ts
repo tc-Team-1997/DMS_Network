@@ -39,7 +39,7 @@ export function outboundRouter(): Router {
   r.get("/", requirePermission("integration:read"), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const rows = await knex("outbound_webhooks").select("id", "url", "events", "auth_method", "enabled");
+      const rows = await knex("outbound_webhooks").select("id", "url", "events", "auth_method", "enabled").orderBy("id", "desc");
       res.json({ webhooks: rows.map((w) => ({ ...w, events: String(w.events).split(",").filter(Boolean) })) });
     } catch (err) { next(err); }
   });

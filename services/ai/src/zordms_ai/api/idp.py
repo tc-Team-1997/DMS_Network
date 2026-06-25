@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from zordms_ai.auth import require_auth
 from zordms_ai.pipeline.preprocess import b64_png, to_page_images
+from zordms_ai.seeds import seed_review_queue
 
 # Every route under this router requires a valid Bearer JWT (F-01).
 idp_router = APIRouter(prefix="/idp", dependencies=[Depends(require_auth)])
@@ -40,6 +41,17 @@ async def extract_endpoint(
         "partial": res.partial,
         "errors": res.errors,
     }
+
+
+@idp_router.post("/seed")
+def seed_endpoint(request: Request) -> dict:
+    """(Dev) Re-run the review-queue seed; no-op if data already present.
+
+    Returns ``{"inserted": N}`` where N is the number of rows added (0 = already seeded).
+    Requires a valid Bearer JWT like all other /idp/* routes.
+    """
+    n = seed_review_queue(request.app.state.session_factory)
+    return {"inserted": n, "status": "ok"}
 
 
 @idp_router.post("/process")

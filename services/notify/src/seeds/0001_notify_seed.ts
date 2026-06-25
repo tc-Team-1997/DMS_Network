@@ -32,14 +32,25 @@ const ROLES: Record<string, string[]> = {
   Auditor: ["document:read", "compliance:read", "crossbranch:read", "alert:read"],
 };
 
-const SAMPLE_RULES = [
+// ── Alert rules ──────────────────────────────────────────────────────────────
+// Each rule has a unique `name` used as the idempotency key.
+const SAMPLE_RULES: Array<{
+  name: string;
+  trigger: string;
+  params_json: string;
+  channels: string;
+  escalation_target: string | null;
+  scope: string | null;
+  enabled: boolean;
+  created_by: string;
+}> = [
   {
     name: "KYC/ID expiry — 60/30/7/0 day campaign",
     trigger: "document.expiring",
     params_json: JSON.stringify({ tiers: ["T-60", "T-30", "T-07", "T-00"], catalog: "KYC/Identity" }),
     channels: JSON.stringify(["email", "sms", "whatsapp", "inapp"]),
-    escalation_target: null as string | null,
-    scope: null as string | null,
+    escalation_target: null,
+    scope: null,
     enabled: true,
     created_by: "system",
   },
@@ -49,9 +60,242 @@ const SAMPLE_RULES = [
     params_json: JSON.stringify({ sla_hours: 24 }),
     channels: JSON.stringify(["email", "teams", "inapp"]),
     escalation_target: "Supervisor",
-    scope: null as string | null,
+    scope: null,
     enabled: true,
     created_by: "system",
+  },
+  {
+    name: "OCR confidence below threshold",
+    trigger: "ocr.low_confidence",
+    params_json: JSON.stringify({ threshold: 0.72, requeue: true }),
+    channels: JSON.stringify(["inapp", "email"]),
+    escalation_target: "Indexer",
+    scope: "ocr_pipeline",
+    enabled: true,
+    created_by: "system",
+  },
+  {
+    name: "AML high-risk flag on new account",
+    trigger: "aml.high_risk",
+    params_json: JSON.stringify({ risk_score_min: 0.80, freeze_account: false }),
+    channels: JSON.stringify(["email", "sms", "teams", "inapp"]),
+    escalation_target: "Supervisor",
+    scope: "AML/Compliance",
+    enabled: true,
+    created_by: "system",
+  },
+  {
+    name: "Regulatory filing deadline — 3/1 day reminder",
+    trigger: "document.expiring",
+    params_json: JSON.stringify({ tiers: ["T-03", "T-01"], catalog: "Regulatory/Filing" }),
+    channels: JSON.stringify(["email", "inapp"]),
+    escalation_target: "CDO",
+    scope: "Regulatory/Filing",
+    enabled: true,
+    created_by: "system",
+  },
+  {
+    name: "Document approval overdue — Checker idle > 48 h",
+    trigger: "workflow.approval_overdue",
+    params_json: JSON.stringify({ idle_hours: 48, doc_types: ["Loan Agreement", "Mortgage Deed", "LC Application"] }),
+    channels: JSON.stringify(["email", "teams", "inapp"]),
+    escalation_target: "Supervisor",
+    scope: null,
+    enabled: true,
+    created_by: "system",
+  },
+];
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+// Realistic in-app alerts for a Bhutan bank (BNB — Bhutan National Bank).
+// `branch` values match real BNB branch codes.
+// `meta` is stored as a JSON string; the API serialises it as-is.
+// is_read mix: ~half read, ~half unread to make the Alerts screen interesting.
+const SAMPLE_ALERTS: Array<{
+  level: string;
+  title: string;
+  meta: string;
+  is_read: boolean;
+  branch: string;
+}> = [
+  // ── Critical ──
+  {
+    level: "critical",
+    title: "AML high-risk flag: account A/C-00437812 (Paro Branch)",
+    meta: JSON.stringify({
+      account: "A/C-00437812",
+      customer: "Tshering Wangchuk",
+      risk_score: 0.93,
+      triggered_rule: "AML high-risk flag on new account",
+      branch: "Paro",
+      action_required: "Freeze and escalate to Compliance Officer",
+    }),
+    is_read: false,
+    branch: "Paro",
+  },
+  {
+    level: "critical",
+    title: "KYC document expired: Citizenship ID — Dorji Namgyel (Thimphu HQ)",
+    meta: JSON.stringify({
+      doc_id: "KYC-2021-0884",
+      customer: "Dorji Namgyel",
+      doc_type: "Citizenship ID",
+      expiry_date: "2026-06-20",
+      days_overdue: 4,
+      branch: "Thimphu HQ",
+      triggered_rule: "KYC/ID expiry — 60/30/7/0 day campaign",
+    }),
+    is_read: false,
+    branch: "Thimphu HQ",
+  },
+  {
+    level: "critical",
+    title: "Workflow SLA breached: LC Application WF-2026-0912 stalled 31 h",
+    meta: JSON.stringify({
+      workflow_id: "WF-2026-0912",
+      doc_type: "LC Application",
+      submitted_by: "Kinley Dorji",
+      sla_hours: 24,
+      elapsed_hours: 31,
+      pending_with: "Checker — Phuntsho Gyeltshen",
+      branch: "Phuntsholing",
+    }),
+    is_read: false,
+    branch: "Phuntsholing",
+  },
+  // ── Warning ──
+  {
+    level: "warning",
+    title: "OCR confidence low (68 %): Mortgage Deed scan — batch OCR-2026-0623-14",
+    meta: JSON.stringify({
+      batch_id: "OCR-2026-0623-14",
+      doc_type: "Mortgage Deed",
+      pages_affected: 3,
+      avg_confidence: 0.68,
+      threshold: 0.72,
+      requeued: true,
+      branch: "Wangdue",
+    }),
+    is_read: false,
+    branch: "Wangdue",
+  },
+  {
+    level: "warning",
+    title: "KYC document expiring in 7 days: Passport — Sonam Peldon (Punakha)",
+    meta: JSON.stringify({
+      doc_id: "KYC-2023-0317",
+      customer: "Sonam Peldon",
+      doc_type: "Passport",
+      expiry_date: "2026-07-01",
+      days_remaining: 7,
+      branch: "Punakha",
+      triggered_rule: "KYC/ID expiry — 60/30/7/0 day campaign",
+    }),
+    is_read: true,
+    branch: "Punakha",
+  },
+  {
+    level: "warning",
+    title: "Regulatory filing deadline in 3 days: RMA Prudential Return Q2-2026",
+    meta: JSON.stringify({
+      filing_id: "REG-RMA-2026-Q2",
+      filing_type: "RMA Prudential Return",
+      deadline: "2026-06-27",
+      days_remaining: 3,
+      owner: "Compliance Team",
+      branch: "Thimphu HQ",
+      triggered_rule: "Regulatory filing deadline — 3/1 day reminder",
+    }),
+    is_read: false,
+    branch: "Thimphu HQ",
+  },
+  {
+    level: "warning",
+    title: "Document approval overdue 52 h: Loan Agreement LA-2026-4421 (Bumthang)",
+    meta: JSON.stringify({
+      workflow_id: "WF-2026-1104",
+      doc_id: "LA-2026-4421",
+      doc_type: "Loan Agreement",
+      submitted_by: "Ugyen Tshering",
+      idle_hours: 52,
+      pending_with: "Checker — Karma Wangmo",
+      branch: "Bumthang",
+    }),
+    is_read: true,
+    branch: "Bumthang",
+  },
+  // ── Info ──
+  {
+    level: "info",
+    title: "KYC expiry reminder (30 days): Trade Licence — Choki Enterprises (Gelephu)",
+    meta: JSON.stringify({
+      doc_id: "KYC-2024-1122",
+      customer: "Choki Enterprises",
+      doc_type: "Trade Licence",
+      expiry_date: "2026-07-24",
+      days_remaining: 30,
+      branch: "Gelephu",
+      triggered_rule: "KYC/ID expiry — 60/30/7/0 day campaign",
+    }),
+    is_read: true,
+    branch: "Gelephu",
+  },
+  {
+    level: "info",
+    title: "New user onboarded: Tenzin Norbu — Maker role, Samdrup Jongkhar Branch",
+    meta: JSON.stringify({
+      username: "tenzin.norbu",
+      full_name: "Tenzin Norbu",
+      role: "Maker",
+      branch: "Samdrup Jongkhar",
+      created_by: "admin",
+    }),
+    is_read: true,
+    branch: "Samdrup Jongkhar",
+  },
+  {
+    level: "info",
+    title: "Batch OCR completed: 47 documents processed, 45 passed (Thimphu HQ)",
+    meta: JSON.stringify({
+      batch_id: "OCR-2026-0622-09",
+      total: 47,
+      passed: 45,
+      failed: 2,
+      avg_confidence: 0.91,
+      branch: "Thimphu HQ",
+    }),
+    is_read: true,
+    branch: "Thimphu HQ",
+  },
+  // ── Success ──
+  {
+    level: "success",
+    title: "Workflow approved: Mortgage Deed MD-2026-0087 — customer Pema Lhamo (Haa)",
+    meta: JSON.stringify({
+      workflow_id: "WF-2026-0998",
+      doc_id: "MD-2026-0087",
+      doc_type: "Mortgage Deed",
+      customer: "Pema Lhamo",
+      approved_by: "Checker — Dechen Wangdi",
+      elapsed_hours: 6,
+      branch: "Haa",
+    }),
+    is_read: false,
+    branch: "Haa",
+  },
+  {
+    level: "success",
+    title: "AML screening cleared: A/C-00501633 — Tashi Dema (Mongar Branch)",
+    meta: JSON.stringify({
+      account: "A/C-00501633",
+      customer: "Tashi Dema",
+      risk_score: 0.12,
+      screened_by: "AML Engine v3.1",
+      branch: "Mongar",
+      cleared_at: "2026-06-23T08:14:00Z",
+    }),
+    is_read: true,
+    branch: "Mongar",
   },
 ];
 
@@ -96,9 +340,15 @@ export async function seed(knex: Knex): Promise<void> {
     }
   }
 
-  // sample rules only if empty
-  const count = Number((await knex("alert_rules").count<{ c: number }[]>("id as c"))[0].c);
-  if (count === 0) {
-    for (const rule of SAMPLE_RULES) await knex("alert_rules").insert(rule);
+  // alert rules — idempotent on `name` (natural key)
+  for (const rule of SAMPLE_RULES) {
+    const exists = await knex("alert_rules").where({ name: rule.name }).first();
+    if (!exists) await knex("alert_rules").insert(rule);
+  }
+
+  // alerts — seed only when table is empty (tests insert their own rows)
+  const alertCount = Number((await knex("alerts").count<{ c: number }[]>("id as c"))[0].c);
+  if (alertCount === 0) {
+    for (const alert of SAMPLE_ALERTS) await knex("alerts").insert(alert);
   }
 }

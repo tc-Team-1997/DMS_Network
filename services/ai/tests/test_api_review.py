@@ -71,8 +71,11 @@ def test_list_pending():
     res = client.get("/idp/review/pending", headers=_auth())
     assert res.status_code == 200
     rows = res.json()
-    assert rows[0]["doc_id"] == "d1"
-    assert rows[0]["sla_hours"] == 24
+    # Startup seeding adds sample data, so we look for our item anywhere in
+    # the list (not necessarily first) and verify its SLA hours.
+    d1_rows = [r for r in rows if r["doc_id"] == "d1"]
+    assert d1_rows, "d1 must appear in pending list"
+    assert d1_rows[0]["sla_hours"] == 24
 
 
 def test_claim_then_resolve():
