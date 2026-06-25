@@ -46,25 +46,25 @@ export function Login() {
 
       {/* RIGHT — white sign-in panel */}
       <div style={{ position: "relative", display: "grid", placeItems: "center", padding: 24, background: "#ffffff" }}>
-        <form onSubmit={onSubmit} style={{ width: 360 }}>
+        <form onSubmit={onSubmit} style={{ width: 360 }} autoComplete="off">
           <div style={{ width: 46, height: 46, background: "var(--navy)", borderRadius: 12, display: "grid", placeItems: "center", color: "#fff", fontSize: 20, marginBottom: 26 }}>🛡️</div>
           <h2 style={{ margin: "0 0 8px", fontSize: 26, color: "#0f172a" }}>Sign in</h2>
           <p style={{ color: "#64748b", margin: "0 0 32px", fontSize: 14 }}>Document operations for authorised staff only</p>
 
           <div style={{ marginBottom: 20 }}>
             <label style={labelStyle} htmlFor="username">Username</label>
-            <input id="username" style={inputStyle} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="your.username" />
+            <input id="username" name="zordms-username" style={inputStyle} value={username} onChange={(e) => setUsername(e.target.value)} placeholder="your.username" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} />
           </div>
 
           <div>
             <label style={labelStyle} htmlFor="password">Password</label>
-            <input id="password" style={inputStyle} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+            <input id="password" name="zordms-password" style={inputStyle} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password" />
           </div>
 
           {mfa && (
             <div style={{ marginTop: 20 }}>
               <label style={labelStyle} htmlFor="totp">Authenticator code</label>
-              <input id="totp" style={inputStyle} value={totp} onChange={(e) => setTotp(e.target.value)} placeholder="123456" />
+              <input id="totp" name="zordms-totp" style={inputStyle} value={totp} onChange={(e) => setTotp(e.target.value)} placeholder="123456" autoComplete="one-time-code" inputMode="numeric" />
             </div>
           )}
 
