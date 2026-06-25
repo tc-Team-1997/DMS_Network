@@ -222,7 +222,7 @@ describe("ReviewQueue (workflow-backed)", () => {
     await waitFor(() => expect(screen.getByText("KYC Pending")).toBeInTheDocument());
 
     fireEvent.click(screen.getAllByRole("button", { name: "open in viewer" })[0]);
-    expect(mockNavigate).toHaveBeenCalledWith("/viewer?doc=DOC-001");
+    expect(mockNavigate).toHaveBeenCalledWith("/viewer?doc=DOC-001&workflow=wf-1");
   });
 
   it("shows a detail side panel when a row is clicked", async () => {
