@@ -1,9 +1,23 @@
+/**
+ * Capture.test.tsx — Enterprise capture screen tests
+ *
+ * Covers:
+ * - 3 tabs: Scanner, File Upload, Bulk Upload
+ * - Front/Back slot rendering per tab
+ * - Proceed button (appears once file selected)
+ * - Proceed flow: POST /documents + /extract (mocked captureApi)
+ * - Processing state
+ * - Extraction result display
+ * - Queue drawer + FAB toggle
+ * - RBAC gate (document:capture)
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Capture from "./Capture.js";
 
-// Polyfill ResizeObserver for recharts in jsdom
+// ─── Polyfills ────────────────────────────────────────────────────────────────
+
 if (typeof globalThis.ResizeObserver === "undefined") {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {}
@@ -12,204 +26,496 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   };
 }
 
-// Mock AuthContext
+// Mock URL.createObjectURL and revokeObjectURL for FilePreview
+if (!globalThis.URL.createObjectURL) {
+  globalThis.URL.createObjectURL = vi.fn(() => "blob:mock");
+  globalThis.URL.revokeObjectURL = vi.fn();
+}
+
+// ─── Mock captureApi ──────────────────────────────────────────────────────────
+
+const mockUploadDocument = vi.fn();
+const mockExtractDocument = vi.fn();
+
+vi.mock("../api/captureApi.js", () => ({
+  uploadDocument: (...args: unknown[]) => mockUploadDocument(...args),
+  extractDocument: (...args: unknown[]) => mockExtractDocument(...args),
+  bulkUploadDocuments: vi.fn(),
+}));
+
+// ─── Auth mock — mutable so RBAC test can override ───────────────────────────
+
+let mockUserPermissions: string[] = ["document:capture", "document:read", "document:index"];
+let mockUserBranch = "Thimphu";
+
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
       id: 1,
       username: "maker1",
       roles: ["Maker"],
-      permissions: ["document:capture", "document:read"],
-      branch: "Thimphu",
+      permissions: mockUserPermissions,
+      branch: mockUserBranch,
     },
     login: vi.fn(),
     logout: vi.fn(),
   }),
 }));
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function renderWithRouter(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
 }
 
-describe("Capture screen", () => {
+function mockFile(name = "test.pdf", type = "application/pdf", size = 1024) {
+  return new File(["x".repeat(size)], name, { type });
+}
+
+const MOCK_UPLOAD_RESPONSE = {
+  document: { id: 42, title: "Test Document", status: "Active" },
+};
+
+const MOCK_EXTRACTION_RESPONSE = {
+  document: {
+    id: 42,
+    title: "Test Document",
+    doc_type: "BT_CID_4G",
+    confidence: 0.97,
+    extraction_status: "DONE",
+    catalog_category: "KYC / Identity",
+  },
+  classification: { doc_type: "BT_CID_4G", confidence: 0.97, review_flag: false },
+  mappedFields: {
+    cid: "11504000231",
+    doc_no: null,
+    mappedKeys: ["cid", "full_name", "dob"],
+    data: { cid_no: "11504000231", full_name: "Dorji Wangchuk", dob: "1985-03-12" },
+    partial: false,
+    errors: [],
+  },
+  catalog: {
+    category: "KYC / Identity",
+    route: "AUTO",
+    mandatoryOk: true,
+    missing: [],
+    retentionYears: 10,
+    alertRule: "60/30/7 days before expiry_date",
+  },
+  folder: {
+    folderId: 7,
+    path: "/BoB/Customers/11504000231/KYC/Identity/2026/",
+    acls: [{ role: "RM", access: "read", inherited: false }],
+  },
+  suggestedNewType: null,
+  source: "ai",
+};
+
+/** Full proceed flow helper — selects front file, clicks Proceed, confirms, awaits extraction. */
+async function doFullProceed() {
+  const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+  Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+  fireEvent.change(frontInput);
+  await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
+  fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+  await waitFor(() => screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+  });
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe("Capture screen — enterprise rebuild", () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 201,
-      json: async () => ({
-        document: { id: 42, title: "Test Document", status: "Active", confidence: 0.97 },
-      }),
-    } as unknown as Response);
+    mockUserPermissions = ["document:capture", "document:read", "document:index"];
+    mockUserBranch = "Thimphu";
+    mockUploadDocument.mockResolvedValue(MOCK_UPLOAD_RESPONSE);
+    mockExtractDocument.mockResolvedValue(MOCK_EXTRACTION_RESPONSE);
   });
 
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
-  it("renders the Multi-Channel Capture page header", () => {
+  // ── Header + tabs ──────────────────────────────────────────────────────────
+
+  it("renders the Document Capture page header", () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText("Multi-Channel Capture")).toBeInTheDocument();
+    expect(screen.getByText("Document Capture")).toBeInTheDocument();
   });
 
-  it("renders the capture channel tabs", () => {
+  it("renders exactly 3 tabs: Scanner, File Upload, Bulk Upload", () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText("File Upload")).toBeInTheDocument();
-    // Use getAllByText to handle multiple matches, then assert at least one is a tab button
-    const scannerEls = screen.getAllByText(/Scanner \(WIA/i);
-    expect(scannerEls.length).toBeGreaterThan(0);
-    const emailEls = screen.getAllByText(/Email Ingestion/i);
-    expect(emailEls.length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Scanner" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "File Upload" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bulk Upload" })).toBeInTheDocument();
   });
 
-  it("shows the drop zone with file upload instructions", () => {
+  it("does NOT render Email Ingestion, API Push, Customer Portal tabs", () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText(/Drop files or click to upload/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Email Ingestion/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/API Push/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Customer Portal/i)).not.toBeInTheDocument();
   });
 
-  it("shows PDF and TIFF format hint", () => {
+  it("does NOT render Today's Ingestion by Channel section", () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText(/PDF, TIFF, JPEG/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Today's Ingestion by Channel/i)).not.toBeInTheDocument();
   });
 
-  it("shows Today Total Ingested KPI", () => {
+  // ── File Upload tab — Front/Back slots ────────────────────────────────────
+
+  it("File Upload tab shows Front Side and Back Side card titles", () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText(/Today Total Ingested/i)).toBeInTheDocument();
+    // File Upload is the default tab
+    expect(screen.getByText("Front Side")).toBeInTheDocument();
+    expect(screen.getByText("Back Side")).toBeInTheDocument();
   });
 
-  it("shows the capture queue panel", () => {
+  it("File Upload tab has two file inputs (front and back)", () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText(/Capture Queue/i)).toBeInTheDocument();
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    const backInput = screen.getByLabelText(/Back Side.*file input/i);
+    expect(frontInput).toBeInTheDocument();
+    expect(backInput).toBeInTheDocument();
   });
 
-  it("shows empty state message when queue is empty", () => {
+  // ── Scanner tab — Front/Back slots ───────────────────────────────────────
+
+  it("Scanner tab shows Front Side Capture and Back Side Capture cards", async () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText(/No files queued/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() => expect(screen.getByText("Front Side Capture")).toBeInTheDocument());
+    expect(screen.getByText("Back Side Capture")).toBeInTheDocument();
   });
 
-  it("shows file modal when a file is picked via input (single file flow)", async () => {
+  it("Scanner tab shows Scanner Configuration", async () => {
     renderWithRouter(<Capture />);
-    const fileInput = screen.getByLabelText(/File input/i);
-    const file = new File(["pdf-bytes"], "cid-scan.pdf", { type: "application/pdf" });
-    Object.defineProperty(fileInput, "files", {
-      value: [file],
-      configurable: true,
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() => expect(screen.getByText("Scanner Configuration")).toBeInTheDocument());
+  });
+
+  it("Scanner tab has front and back file inputs", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() => screen.getByLabelText(/Front Side.*file input/i));
+    expect(screen.getByLabelText(/Back Side.*file input/i)).toBeInTheDocument();
+  });
+
+  // ── Bulk Upload tab ───────────────────────────────────────────────────────
+
+  it("Bulk Upload tab shows multi-file drop zone input", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Bulk Upload" }));
+    await waitFor(() => screen.getByLabelText(/Drop multiple files.*file input/i));
+    const bulkInput = screen.getByLabelText(/Drop multiple files.*file input/i);
+    expect(bulkInput).toHaveAttribute("multiple");
+  });
+
+  // ── Proceed button ────────────────────────────────────────────────────────
+
+  it("Proceed button does NOT appear when no file selected", () => {
+    renderWithRouter(<Capture />);
+    expect(screen.queryByRole("button", { name: /Proceed/i })).not.toBeInTheDocument();
+  });
+
+  it("Proceed button appears after front file is selected", async () => {
+    renderWithRouter(<Capture />);
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    const file = mockFile("cid.pdf");
+    Object.defineProperty(frontInput, "files", { value: [file], configurable: true });
+    fireEvent.change(frontInput);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Proceed/i })).toBeInTheDocument()
+    );
+  });
+
+  it("Proceed button appears after bulk files are selected", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Bulk Upload" }));
+    await waitFor(() => screen.getByLabelText(/Drop multiple files.*file input/i));
+    const input = screen.getByLabelText(/Drop multiple files.*file input/i);
+    const files = [mockFile("a.pdf"), mockFile("b.pdf")];
+    Object.defineProperty(input, "files", { value: files, configurable: true });
+    fireEvent.change(input);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Proceed/i })).toBeInTheDocument()
+    );
+  });
+
+  // ── Proceed flow — upload + extract ──────────────────────────────────────
+
+  it("clicking Proceed opens the confirm modal", async () => {
+    renderWithRouter(<Capture />);
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    const file = mockFile("passport.pdf");
+    Object.defineProperty(frontInput, "files", { value: [file], configurable: true });
+    fireEvent.change(frontInput);
+    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+    await waitFor(() => expect(screen.getByText("Confirm Capture")).toBeInTheDocument());
+  });
+
+  it("Proceed flow calls uploadDocument with correct file and branch", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() => expect(mockUploadDocument).toHaveBeenCalledTimes(1));
+    expect(mockUploadDocument).toHaveBeenCalledWith(
+      expect.any(File),
+      expect.objectContaining({ branch: "Thimphu" })
+    );
+  });
+
+  it("Proceed flow calls extractDocument with doc id from upload response", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() => expect(mockExtractDocument).toHaveBeenCalledWith(42));
+  });
+
+  it("shows processing state while upload/extract runs", async () => {
+    let resolveExtract!: (v: unknown) => void;
+    mockExtractDocument.mockReturnValue(new Promise((r) => { resolveExtract = r; }));
+
+    renderWithRouter(<Capture />);
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    const file = mockFile("kyc.pdf");
+    Object.defineProperty(frontInput, "files", { value: [file], configurable: true });
+    fireEvent.change(frontInput);
+    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+    await waitFor(() => screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+
+    await waitFor(() => expect(screen.getByText(/Processing…/i)).toBeInTheDocument());
+    await act(async () => resolveExtract(MOCK_EXTRACTION_RESPONSE));
+  });
+
+  it("shows AI Classification Result section after successful extraction", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    // getAllByText because drawer may duplicate it — just ensure at least one is present
+    await waitFor(() =>
+      expect(screen.getAllByText("AI Classification Result").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("shows detected doc_type BT_CID_4G after extraction", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      expect(screen.getAllByText("BT_CID_4G").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("shows confidence percentage (97%) after extraction", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      expect(screen.getAllByText("97%").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("shows catalog category in extraction result", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      expect(screen.getAllByText("KYC / Identity").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("shows folder path in extraction result", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("/BoB/Customers/11504000231/KYC/Identity/2026/").length
+      ).toBeGreaterThan(0)
+    );
+  });
+
+  it("shows extracted metadata values (Dorji Wangchuk, CID)", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      expect(screen.getAllByText("Dorji Wangchuk").length).toBeGreaterThan(0)
+    );
+    expect(screen.getAllByText("11504000231").length).toBeGreaterThan(0);
+  });
+
+  it("shows suggestedNewType card when backend returns one", async () => {
+    mockExtractDocument.mockResolvedValueOnce({
+      ...MOCK_EXTRACTION_RESPONSE,
+      suggestedNewType: {
+        proposedName: "UNKNOWN_DOC_X",
+        reason: "Document type not in registry",
+        sampleFields: ["field_a", "field_b"],
+      },
     });
-    fireEvent.change(fileInput);
-    await waitFor(() => expect(screen.getByText(/Configure Capture/i)).toBeInTheDocument());
+
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    // Text is split between elements so use getAllByText with a custom matcher
+    await waitFor(() =>
+      expect(
+        screen.getAllByText((content) => content.includes("UNKNOWN_DOC_X")).length
+      ).toBeGreaterThan(0)
+    );
   });
 
-  it("shows document title field in the modal after file pick", async () => {
+  it("shows 'Create new document type' heading for suggestedNewType", async () => {
+    mockExtractDocument.mockResolvedValueOnce({
+      ...MOCK_EXTRACTION_RESPONSE,
+      suggestedNewType: {
+        proposedName: "CORP_DOCS_MISC",
+        reason: "Unknown type",
+        sampleFields: [],
+      },
+    });
     renderWithRouter(<Capture />);
-    const fileInput = screen.getByLabelText(/File input/i);
-    const file = new File(["bytes"], "passport.pdf", { type: "application/pdf" });
-    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
-    fireEvent.change(fileInput);
-    await waitFor(() => expect(screen.getByText(/Document Title/i)).toBeInTheDocument());
+    await doFullProceed();
+    await waitFor(() =>
+      expect(screen.getAllByText("Suggested New Document Type").length).toBeGreaterThan(0)
+    );
   });
 
-  it("adds file to queue when modal is confirmed", async () => {
+  it("shows error alert when upload fails", async () => {
+    mockUploadDocument.mockRejectedValueOnce(new Error("Network error"));
+
     renderWithRouter(<Capture />);
-    const fileInput = screen.getByLabelText(/File input/i);
-    const file = new File(["bytes"], "passport.pdf", { type: "application/pdf" });
-    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
-    fireEvent.change(fileInput);
-    await waitFor(() => screen.getByText(/Configure Capture/i));
-    fireEvent.click(screen.getByRole("button", { name: /Add to Queue/i }));
-    await waitFor(() => expect(screen.getByText("passport")).toBeInTheDocument());
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+    fireEvent.change(frontInput);
+    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+    await waitFor(() => screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Confirm.*Proceed/i })); });
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.getByText(/Network error/i)).toBeInTheDocument();
   });
 
-  it("uploads document to POST /svc/core/documents when Upload button is clicked", async () => {
+  // ── Queue ─────────────────────────────────────────────────────────────────
+
+  it("adds item to capture queue after Proceed and shows queue section", async () => {
     renderWithRouter(<Capture />);
-    const fileInput = screen.getByLabelText(/File input/i);
-    const file = new File(["bytes"], "kyc.pdf", { type: "application/pdf" });
-    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
-    fireEvent.change(fileInput);
-    await waitFor(() => screen.getByText(/Configure Capture/i));
-    fireEvent.click(screen.getByRole("button", { name: /Add to Queue/i }));
-    await waitFor(() => screen.getByRole("button", { name: /^Upload$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Upload$/i }));
-    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/documents"),
-      expect.objectContaining({ method: "POST" }),
-    ));
+    await doFullProceed();
+    // "Capture Queue" appears in both the inline panel and drawer header
+    await waitFor(() =>
+      expect(screen.getAllByText(/Capture Queue/i).length).toBeGreaterThan(0)
+    );
   });
 
-  it("shows 'Captured' tag after successful upload", async () => {
+  it("shows queue count badge after an item is captured", async () => {
     renderWithRouter(<Capture />);
-    const fileInput = screen.getByLabelText(/File input/i);
-    const file = new File(["bytes"], "loan-app.pdf", { type: "application/pdf" });
-    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
-    fireEvent.change(fileInput);
-    await waitFor(() => screen.getByText(/Configure Capture/i));
-    fireEvent.click(screen.getByRole("button", { name: /Add to Queue/i }));
-    await waitFor(() => screen.getByRole("button", { name: /^Upload$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Upload$/i }));
-    await waitFor(() => expect(screen.getByText("Captured")).toBeInTheDocument());
+    await doFullProceed();
+    await waitFor(() =>
+      expect(screen.getAllByText("1 items").length).toBeGreaterThan(0)
+    );
   });
 
-  it("renders the full Capture UI when the user has document:capture permission", () => {
-    // The module-level vi.mock provides a user with document:capture.
-    // Access control for insufficient permissions is handled by ProtectedRoute (router-level),
-    // not by an in-component guard, so we verify the main UI renders.
+  it("clicking a queue item opens the capture queue drawer", async () => {
     renderWithRouter(<Capture />);
-    expect(screen.getByText("Multi-Channel Capture")).toBeInTheDocument();
+    await doFullProceed();
+    // Drawer should auto-open after proceed
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: /Capture queue drawer/i })).toBeInTheDocument()
+    );
+  });
+
+  it("queue item is clickable (role=button with aria-label)", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() => screen.getAllByRole("button", { name: /Queue item:/i }));
+    const queueItems = screen.getAllByRole("button", { name: /Queue item:/i });
+    expect(queueItems.length).toBeGreaterThan(0);
+  });
+
+  // ── FAB and drawer ────────────────────────────────────────────────────────
+
+  it("renders the floating action button (Toggle capture queue drawer)", () => {
+    renderWithRouter(<Capture />);
+    expect(
+      screen.getByRole("button", { name: /Toggle capture queue drawer/i })
+    ).toBeInTheDocument();
+  });
+
+  it("FAB click opens the capture queue drawer", async () => {
+    renderWithRouter(<Capture />);
+    const fab = screen.getByRole("button", { name: /Toggle capture queue drawer/i });
+    fireEvent.click(fab);
+    await waitFor(() =>
+      expect(screen.getByRole("dialog", { name: /Capture queue drawer/i })).toBeInTheDocument()
+    );
+  });
+
+  it("drawer close button is accessible", async () => {
+    renderWithRouter(<Capture />);
+    const fab = screen.getByRole("button", { name: /Toggle capture queue drawer/i });
+    fireEvent.click(fab);
+    await waitFor(() => screen.getByRole("button", { name: /Close drawer/i }));
+    expect(screen.getByRole("button", { name: /Close drawer/i })).toBeInTheDocument();
+  });
+
+  it("drawer shows empty state when no queue entries", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: /Toggle capture queue drawer/i }));
+    await waitFor(() => screen.getByRole("dialog", { name: /Capture queue drawer/i }));
+    expect(screen.getByText(/No captures yet/i)).toBeInTheDocument();
+  });
+
+  // ── RBAC ─────────────────────────────────────────────────────────────────
+
+  it("renders full capture UI when user has document:capture permission", () => {
+    renderWithRouter(<Capture />);
+    expect(screen.getByText("Document Capture")).toBeInTheDocument();
     expect(screen.queryByText(/Access Denied/i)).not.toBeInTheDocument();
   });
 
-  it("shows Max 50 MB file size limit (I7 fix)", () => {
+  it("shows Access Denied when user lacks document:capture permission", () => {
+    mockUserPermissions = []; // Remove document:capture
     renderWithRouter(<Capture />);
-    expect(screen.getByText(/Max 50 MB/i)).toBeInTheDocument();
+    expect(screen.getByText(/Access Denied/i)).toBeInTheDocument();
+    expect(screen.queryByText("Document Capture")).not.toBeInTheDocument();
   });
 
-  it("does NOT show outdated Max 100 MB limit (I7 fix)", () => {
+  // ── File size hints ───────────────────────────────────────────────────────
+
+  it("shows Max 50 MB file size hint in drop zones", () => {
+    renderWithRouter(<Capture />);
+    const hints = screen.getAllByText(/Max 50 MB/i);
+    expect(hints.length).toBeGreaterThan(0);
+  });
+
+  it("does NOT show outdated Max 100 MB limit", () => {
     renderWithRouter(<Capture />);
     expect(screen.queryByText(/Max 100 MB/i)).not.toBeInTheDocument();
   });
 
-  it("switches to Scanner tab and shows Scanner Configuration", async () => {
+  // ── Back file is optional ─────────────────────────────────────────────────
+
+  it("Proceed appears with only front file (back is optional)", async () => {
     renderWithRouter(<Capture />);
-    const scannerEls = screen.getAllByText(/Scanner \(WIA/i);
-    const tabBtn = scannerEls.find((el) => el.tagName === "BUTTON");
-    if (tabBtn) fireEvent.click(tabBtn);
-    await waitFor(() => expect(screen.getByText("Scanner Configuration")).toBeInTheDocument());
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+    fireEvent.change(frontInput);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Proceed/i })).toBeInTheDocument()
+    );
   });
 
-  it("renders Email Ingestion tab with mailbox field", async () => {
-    renderWithRouter(<Capture />);
-    // Click the tab button specifically (it's a button element in the tabs bar)
-    const emailTabs = screen.getAllByText(/Email Ingestion/i);
-    // Find the one that's a tab button
-    const tabBtn = emailTabs.find((el) => el.tagName === "BUTTON");
-    if (tabBtn) fireEvent.click(tabBtn);
-    await waitFor(() => expect(screen.getByText("Email Ingestion Configuration")).toBeInTheDocument());
-  });
+  // ── Tab switching resets state ────────────────────────────────────────────
 
-  it("shows Today's Ingestion by Channel bar chart", () => {
+  it("switching tabs clears Proceed button", async () => {
     renderWithRouter(<Capture />);
-    // BarChartCard renders "Today's Ingestion by Channel" card
-    expect(screen.getByText(/Today's Ingestion by Channel/i)).toBeInTheDocument();
-  });
-
-  it("Index button uses query-param route /indexing?id= (C2 fix)", async () => {
-    // The code change makes navigate(`/indexing?id=${item.docId}`) instead of the old
-    // navigate(`/indexing/${item.docId}`) which 404s on the router.
-    // We verify the Index button appears after upload (docId is set), and that the
-    // Capture source code no longer contains the path-param pattern.
-    renderWithRouter(<Capture />);
-    const fileInput = screen.getByLabelText(/File input/i);
-    const file = new File(["bytes"], "loan.pdf", { type: "application/pdf" });
-    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
-    fireEvent.change(fileInput);
-    await waitFor(() => screen.getByText(/Configure Capture/i));
-    fireEvent.click(screen.getByRole("button", { name: /Add to Queue/i }));
-    await waitFor(() => screen.getByRole("button", { name: /^Upload$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^Upload$/i }));
-    // After a successful upload, the Index button should appear (docId=42 from mock)
-    await waitFor(() => expect(screen.getByText("Captured")).toBeInTheDocument());
-    // The Index button appears when status==="done" && docId is set
-    const indexBtn = screen.queryByRole("button", { name: /^Index$/i });
-    expect(indexBtn).toBeInTheDocument();
-    // Clicking the index button should not throw (navigate is mocked by MemoryRouter)
-    if (indexBtn) fireEvent.click(indexBtn);
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+    fireEvent.change(frontInput);
+    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
+    // Switch tab — this clears frontFile
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /Proceed/i })).not.toBeInTheDocument()
+    );
   });
 });

@@ -15,6 +15,8 @@ import { recordsRouter } from "./routes/records.js";
 import { complianceRouter } from "./routes/compliance.js";
 import { lifecycleRouter } from "./routes/lifecycle.js";
 import { sysadminRouter } from "./routes/sysadmin.js";
+import { docTypesRouter } from "./routes/doc_types.js";
+import { extractionRouter } from "./routes/extraction.js";
 
 export function createApp(deps: CoreDeps): Express {
   const app = express();
@@ -41,6 +43,10 @@ export function createApp(deps: CoreDeps): Express {
   app.use("/compliance", complianceRouter());
   app.use("/lifecycle", lifecycleRouter());
   app.use("/admin", sysadminRouter());
+
+  // AI Ingestion + Classification pipeline
+  app.use("/doc-types", docTypesRouter());
+  app.use("/documents", extractionRouter());
 
   // I2: global error handler so unhandled async throws return 500 instead of hanging
   app.use(errorHandler);
