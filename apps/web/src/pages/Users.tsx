@@ -4,7 +4,7 @@ import { useUrlState } from "../hooks/useUrlState.js";
 import { SVC } from "../config.js";
 import { getToken } from "../api/client.js";
 
-interface Row { id: number; username: string; full_name?: string; branch?: string; status: string; }
+interface Row { id: number; username: string; full_name?: string; email?: string; branch?: string; status: string; }
 const ROLES = ["CDO", "Supervisor", "Maker", "Checker", "Indexer", "Viewer", "Auditor"];
 const PAGE_SIZE = 10;
 
@@ -73,10 +73,10 @@ export function Users() {
       </div>
 
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-        <thead><tr><th style={{ textAlign: "left", padding: 8 }}>User</th><th style={{ textAlign: "left", padding: 8 }}>Branch</th><th style={{ textAlign: "left", padding: 8 }}>Status</th></tr></thead>
+        <thead><tr><th style={{ textAlign: "left", padding: 8 }}>User</th><th style={{ textAlign: "left", padding: 8 }}>Email</th><th style={{ textAlign: "left", padding: 8 }}>Branch</th><th style={{ textAlign: "left", padding: 8 }}>Status</th></tr></thead>
         <tbody>
-          {visible.map((r) => (<tr key={r.id} style={{ borderTop: "1px solid var(--line)" }}><td style={{ padding: 8 }}>{r.username}</td><td style={{ padding: 8 }}>{r.branch ?? "—"}</td><td style={{ padding: 8 }}>{r.status}</td></tr>))}
-          {visible.length === 0 && (<tr><td colSpan={3} style={{ padding: 16, textAlign: "center", color: "var(--sil)" }}>No users found</td></tr>)}
+          {visible.map((r) => (<tr key={r.id} style={{ borderTop: "1px solid var(--line)" }}><td style={{ padding: 8 }}>{r.username}</td><td style={{ padding: 8 }}>{r.email ?? "—"}</td><td style={{ padding: 8 }}>{r.branch ?? "—"}</td><td style={{ padding: 8 }}>{r.status}</td></tr>))}
+          {visible.length === 0 && (<tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: "var(--sil)" }}>No users found</td></tr>)}
         </tbody>
       </table>
 

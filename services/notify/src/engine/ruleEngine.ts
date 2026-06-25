@@ -12,7 +12,7 @@ export interface AlertRule {
   enabled: boolean;
 }
 
-export interface Recipient { kind: "role" | "user" | "external"; value: string; }
+export interface Recipient { kind: "role" | "group" | "user" | "external"; value: string; }
 
 export interface RuleDecision {
   fire: boolean;

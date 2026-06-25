@@ -311,10 +311,11 @@ function AlertDetailPanel({
                 onChange={(e) => setEscTarget(e.target.value)}
               />
               <button
-                className="btn-primary"
+                className="btn bw"
                 onClick={handleEscalate}
                 disabled={escalating || !escTarget.trim()}
                 style={{ flexShrink: 0 }}
+                aria-label="Escalate alert"
               >
                 {escalating ? "…" : "Escalate"}
               </button>

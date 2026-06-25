@@ -71,6 +71,7 @@ export async function seed(knex: Knex): Promise<void> {
       username: "admin",
       password_hash,
       full_name: "System Administrator",
+      email: "admin@bobl.bt",
       status: "Active",
       created_by: "system",
     });

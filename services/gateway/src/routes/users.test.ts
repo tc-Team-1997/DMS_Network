@@ -19,6 +19,23 @@ beforeAll(async () => {
 });
 afterAll(async () => { await knex.destroy(); });
 
+describe("seeded admin email (P1)", () => {
+  it("the seeded admin user has a non-null email", async () => {
+    const admin = await knex("users").where({ username: "admin" }).first();
+    expect(admin.email).toBeTruthy();
+    expect(admin.email).toBe("admin@bobl.bt");
+  });
+
+  it("GET /users returns email in the response payload", async () => {
+    const res = await request(app).get("/users").set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    const admin = (res.body.users as Array<{ username: string; email?: string }>)
+      .find((u) => u.username === "admin");
+    expect(admin).toBeTruthy();
+    expect(admin!.email).toBe("admin@bobl.bt");
+  });
+});
+
 describe("supervisor user provisioning", () => {
   it("creates a new user with a role (no licensing cap)", async () => {
     const res = await request(app).post("/users").set("Authorization", `Bearer ${adminToken}`)

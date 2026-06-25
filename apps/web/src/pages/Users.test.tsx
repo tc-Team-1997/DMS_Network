@@ -40,6 +40,21 @@ describe("Users screen", () => {
     await waitFor(() => expect(screen.getByText("maker1")).toBeInTheDocument());
   });
 
+  /* P1: email column is rendered */
+  it("EMAIL: displays the user's email returned by the API", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        users: [
+          { id: 1, username: "admin", email: "admin@bobl.bt", status: "Active" },
+        ],
+      }),
+    }) as any;
+    renderUsers();
+    await waitFor(() => expect(screen.getByText("admin@bobl.bt")).toBeInTheDocument());
+    expect(screen.getByText("Email")).toBeInTheDocument();
+  });
+
   /* SVC: no hardcoded URLs */
   it("SVC: refresh calls /svc/gateway/users (not a hardcoded localhost URL)", async () => {
     const fetchMock = vi.fn().mockResolvedValue({

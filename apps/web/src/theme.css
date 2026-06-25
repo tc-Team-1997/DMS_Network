@@ -183,35 +183,82 @@ tr:hover td { background: rgba(15,23,42,.02); }
 /* ══════════════════════════════════════════════
    BUTTONS
    ══════════════════════════════════════════════ */
+/* Base application button — solid, tappable, consistent height.
+   Default (no variant) reads as a neutral secondary action. */
 .btn {
-  display:       inline-flex;
-  align-items:   center;
-  gap:           6px;
-  padding:       7px 14px;
-  border-radius: 7px;
-  font-size:     11px;
-  font-weight:   700;
-  cursor:        pointer;
-  transition:    .2s;
-  border:        none;
-  font-family:   var(--font);
-  letter-spacing:.3px;
-  white-space:   nowrap;
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             6px;
+  min-height:      32px;
+  padding:         8px 15px;
+  border-radius:   7px;
+  font-size:       11.5px;
+  font-weight:     700;
+  cursor:          pointer;
+  transition:      background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .05s ease, opacity .15s ease;
+  border:          1px solid var(--bd);
+  background:      var(--ink2);
+  color:           var(--mist);
+  font-family:     var(--font);
+  letter-spacing:  .3px;
+  white-space:     nowrap;
+  user-select:     none;
+  box-shadow:      0 1px 1px rgba(15,23,42,.04);
 }
-.bg { background: linear-gradient(135deg,var(--gold),var(--gold2)); color: #241a06; }
-.bg:hover  { opacity: .88; }
-.bs { background: rgba(15,23,42,.05); color: var(--mist); border: 1px solid var(--bd); }
-.bs:hover  { background: rgba(15,23,42,.09); }
-.bok { background: var(--GT); color: var(--G);  border: 1px solid rgba(46,204,138,.3); }
-.bx  { background: var(--RT); color: var(--R);  border: 1px solid rgba(224,82,82,.3); }
-.bw  { background: var(--WT); color: var(--W);  border: 1px solid rgba(240,160,48,.3); }
-.bb  { background: var(--BT); color: var(--B);  border: 1px solid rgba(58,159,208,.3); }
-.sm  { padding: 5px 10px; font-size: 10px; }
-.xs  { padding: 3px 8px;  font-size: 9.5px; }
+.btn:hover   { background: var(--ink3); }
+.btn:active  { transform: translateY(1px); box-shadow: none; }
+.btn:focus-visible { outline: 2px solid var(--gold2); outline-offset: 1px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
 
-/* Legacy compat */
-.btn-primary { background: linear-gradient(135deg,var(--gold),var(--gold2)); color: #241a06; border: none; border-radius: 7px; padding: 7px 14px; font-weight: 700; cursor: pointer; font-family: var(--font); }
-.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+/* ── Semantic solid-fill variants — real application buttons ── */
+/* Primary (gold accent) */
+.bg  { background: linear-gradient(135deg,var(--gold),var(--gold2)); color: #241a06; border-color: transparent; box-shadow: 0 1px 2px rgba(151,120,30,.28); }
+.bg:hover   { background: linear-gradient(135deg,var(--gold2),var(--gold2)); }
+.bg:active  { background: linear-gradient(135deg,var(--gold3),var(--gold)); }
+
+/* Secondary / neutral */
+.bs  { background: var(--ink2); color: var(--mist); border-color: var(--bd); box-shadow: 0 1px 1px rgba(15,23,42,.04); }
+.bs:hover   { background: var(--ink3); border-color: rgba(15,23,42,.18); }
+.bs:active  { background: var(--ink4); }
+
+/* Success — Approve / Resolve / Claim-confirm */
+.bok { background: var(--G); color: #06281c; border-color: transparent; box-shadow: 0 1px 2px rgba(46,204,138,.30); }
+.bok:hover  { background: #29b97c; }
+.bok:active { background: #23a36e; }
+
+/* Danger — Reject / Delete */
+.bx  { background: var(--R); color: #fff; border-color: transparent; box-shadow: 0 1px 2px rgba(224,82,82,.30); }
+.bx:hover   { background: #d34646; }
+.bx:active  { background: #bf3f3f; }
+
+/* Warning — Escalate / Hold */
+.bw  { background: var(--W); color: #3a2600; border-color: transparent; box-shadow: 0 1px 2px rgba(240,160,48,.30); }
+.bw:hover   { background: #e6962b; }
+.bw:active  { background: #cf8624; }
+
+/* Info — secondary action accent */
+.bb  { background: var(--B); color: #fff; border-color: transparent; box-shadow: 0 1px 2px rgba(58,159,208,.30); }
+.bb:hover   { background: #348fbc; }
+.bb:active  { background: #2e80a9; }
+
+/* Size modifiers — keep tap target sane */
+.sm  { min-height: 28px; padding: 6px 12px; font-size: 11px; }
+.xs  { min-height: 24px; padding: 4px 10px; font-size: 10.5px; }
+
+/* Legacy compat — alias to the gold primary application button */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 32px; padding: 8px 15px;
+  background: linear-gradient(135deg,var(--gold),var(--gold2)); color: #241a06;
+  border: 1px solid transparent; border-radius: 7px; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .3px; cursor: pointer; font-family: var(--font);
+  box-shadow: 0 1px 2px rgba(151,120,30,.28);
+  transition: background .15s ease, box-shadow .15s ease, transform .05s ease, opacity .15s ease;
+}
+.btn-primary:hover   { background: linear-gradient(135deg,var(--gold2),var(--gold2)); }
+.btn-primary:active  { transform: translateY(1px); box-shadow: none; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
 
 /* ══════════════════════════════════════════════
    FORM FIELDS

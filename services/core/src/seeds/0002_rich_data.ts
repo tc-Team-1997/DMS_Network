@@ -70,12 +70,12 @@ interface UserSpec {
 }
 
 const EXTRA_USERS: UserSpec[] = [
-  { username: "dorji.wangchuk",  full_name: "Dorji Wangchuk",  email: "dorji.wangchuk@bnb.bt",  branch: "THM-HQ", region: "Western",       status: "Active", roleName: "Maker"   },
-  { username: "pema.lhamo",      full_name: "Pema Lhamo",      email: "pema.lhamo@bnb.bt",      branch: "THM-HQ", region: "Western",       status: "Active", roleName: "Checker" },
-  { username: "tshering.dema",   full_name: "Tshering Dema",   email: "tshering.dema@bnb.bt",   branch: "PHU-01", region: "Southern",      status: "Active", roleName: "Indexer" },
-  { username: "karma.yangzom",   full_name: "Karma Yangzom",   email: "karma.yangzom@bnb.bt",   branch: "PAR-01", region: "Western",       status: "Active", roleName: "Viewer"  },
-  { username: "sonam.tobgay",    full_name: "Sonam Tobgay",    email: "sonam.tobgay@bnb.bt",    branch: "GEL-01", region: "Central-South", status: "Active", roleName: "Maker"   },
-  { username: "ugyen.tshomo",    full_name: "Ugyen Tshomo",    email: "ugyen.tshomo@bnb.bt",    branch: "MON-01", region: "Eastern",       status: "Active", roleName: "Auditor" },
+  { username: "dorji.wangchuk",  full_name: "Dorji Wangchuk",  email: "dorji.wangchuk@bobl.bt",  branch: "THM-HQ", region: "Western",       status: "Active", roleName: "Maker"   },
+  { username: "pema.lhamo",      full_name: "Pema Lhamo",      email: "pema.lhamo@bobl.bt",      branch: "THM-HQ", region: "Western",       status: "Active", roleName: "Checker" },
+  { username: "tshering.dema",   full_name: "Tshering Dema",   email: "tshering.dema@bobl.bt",   branch: "PHU-01", region: "Southern",      status: "Active", roleName: "Indexer" },
+  { username: "karma.yangzom",   full_name: "Karma Yangzom",   email: "karma.yangzom@bobl.bt",   branch: "PAR-01", region: "Western",       status: "Active", roleName: "Viewer"  },
+  { username: "sonam.tobgay",    full_name: "Sonam Tobgay",    email: "sonam.tobgay@bobl.bt",    branch: "GEL-01", region: "Central-South", status: "Active", roleName: "Maker"   },
+  { username: "ugyen.tshomo",    full_name: "Ugyen Tshomo",    email: "ugyen.tshomo@bobl.bt",    branch: "MON-01", region: "Eastern",       status: "Active", roleName: "Auditor" },
 ];
 
 // ---------------------------------------------------------------------------

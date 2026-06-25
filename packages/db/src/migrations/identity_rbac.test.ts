@@ -22,6 +22,9 @@ describe("identity_rbac migration", () => {
     expect(roles).toEqual(expect.arrayContaining(["CDO", "Supervisor", "Maker", "Checker", "Viewer", "Auditor"]));
     const admin = await knex("users").where({ username: "admin" }).first();
     expect(admin).toBeTruthy();
+    // P1: seeded admin must carry a non-null bank-style email
+    expect(admin.email).toBeTruthy();
+    expect(admin.email).toBe("admin@bobl.bt");
     const perms = await knex("permissions").pluck("key");
     expect(perms).toEqual(expect.arrayContaining(["user:create", "document:approve"]));
   });
