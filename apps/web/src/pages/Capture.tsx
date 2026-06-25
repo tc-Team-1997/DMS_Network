@@ -760,8 +760,34 @@ export default function Capture() {
         </div>
       </div>
 
-      {/* ── Channel Tabs ── */}
-      <Tabs items={TABS} active={tab} onChange={handleTabChange} />
+      {/* ── Channel Tabs + Proceed (same row, button top-right) ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <Tabs items={TABS} active={tab} onChange={handleTabChange} />
+        {!processing && (
+          <button
+            type="button"
+            aria-label="Proceed to upload and extract"
+            disabled={!hasFile}
+            onClick={hasFile ? openProceedModal : undefined}
+            style={{
+              padding: "9px 24px",
+              background: hasFile
+                ? "linear-gradient(135deg,#b8912a,#f0c84a)"
+                : "rgba(184,145,42,.25)",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: hasFile ? "pointer" : "not-allowed",
+              color: hasFile ? "#050d1a" : "rgba(5,13,26,.4)",
+              boxShadow: hasFile ? "0 4px 16px rgba(184,145,42,.3)" : "none",
+              opacity: hasFile ? 1 : 0.5,
+            }}
+          >
+            ▶ Proceed
+          </button>
+        )}
+      </div>
 
       {/* ── Tab Content ── */}
       <div style={{ marginTop: 14 }}>
@@ -790,33 +816,6 @@ export default function Capture() {
         )}
       </div>
 
-      {/* ── Proceed Button — always rendered; disabled until file selected or while processing ── */}
-      {!processing && (
-        <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            aria-label="Proceed to upload and extract"
-            disabled={!hasFile}
-            onClick={hasFile ? openProceedModal : undefined}
-            style={{
-              padding: "11px 28px",
-              background: hasFile
-                ? "linear-gradient(135deg,#b8912a,#f0c84a)"
-                : "rgba(184,145,42,.25)",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: hasFile ? "pointer" : "not-allowed",
-              color: hasFile ? "#050d1a" : "rgba(5,13,26,.4)",
-              boxShadow: hasFile ? "0 4px 16px rgba(184,145,42,.3)" : "none",
-              opacity: hasFile ? 1 : 0.5,
-            }}
-          >
-            ▶ Proceed
-          </button>
-        </div>
-      )}
 
       {/* ── Processing indicator ── */}
       {processing && (
