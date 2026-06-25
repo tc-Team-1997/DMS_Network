@@ -117,11 +117,6 @@ describe("Dashboard screen", () => {
     await waitFor(() => expect(screen.getAllByText(/KYC \/ Identity/i).length).toBeGreaterThan(0));
   });
 
-  it("shows Quick Actions section", async () => {
-    renderWithRouter(<Dashboard />);
-    await waitFor(() => expect(screen.getByText(/Quick Actions/i)).toBeInTheDocument());
-  });
-
   it("renders AI Insight Engine panel", async () => {
     renderWithRouter(<Dashboard />);
     await waitFor(() => expect(screen.getByText(/AI Insight Engine/i)).toBeInTheDocument());
@@ -153,16 +148,4 @@ describe("Dashboard screen", () => {
     ));
   });
 
-  it("Quick Actions: Scan Doc is shown to users with document:capture (I1 fix)", async () => {
-    renderWithRouter(<Dashboard />);
-    await waitFor(() => expect(screen.getByText(/Scan Doc/i)).toBeInTheDocument());
-  });
-
-  it("Quick Actions: all buttons gated — admin user sees Scan Doc (I1 fix)", async () => {
-    renderWithRouter(<Dashboard />);
-    // The mock user has document:capture so Scan Doc must appear
-    await waitFor(() => {
-      expect(screen.getByText(/Scan Doc/i)).toBeInTheDocument();
-    });
-  });
 });

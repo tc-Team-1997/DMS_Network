@@ -635,6 +635,21 @@ export default function Search() {
 
               {!loading && !error && results.hits.length > 0 && (
                 <>
+                  {/* Auto-classified results — document types found, with counts */}
+                  {(facets["doc_type"] ?? []).length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <Card title={<span>Auto-classified results <Tag variant="gold">{(facets["doc_type"] ?? []).length} types</Tag></span>}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {(facets["doc_type"] ?? []).map((f) => (
+                            <div key={f.value} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", border: "1px solid var(--bd)", borderRadius: 8, background: "var(--ink2)", fontSize: 12 }}>
+                              <span style={{ fontWeight: 600, color: "var(--wh)" }}>{f.value.replace(/_/g, " ")}</span>
+                              <span style={{ fontWeight: 700, color: "var(--navy)", background: "var(--goldT)", borderRadius: 20, padding: "1px 9px", fontSize: 11 }}>{f.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    </div>
+                  )}
                   <Card>
                     <DataTable
                       columns={columns}

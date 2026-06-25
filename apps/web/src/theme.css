@@ -438,3 +438,33 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .carousel-slide { animation: carouselFade .6s cubic-bezier(.22,.61,.36,1); }
 @keyframes spin { to{transform:rotate(360deg)} }
 .spin { animation: spin 1s linear infinite; }
+
+/* ══════════════════════════════════════════════
+   NAVY CHROME — navy topbar + sidebar on light content (login-style brand)
+   ══════════════════════════════════════════════ */
+.topbar { background: #0b1830; border-bottom: 1px solid rgba(255,255,255,.08); }
+.topbar-logo { border-right-color: rgba(255,255,255,.12); }
+.topbar-zbadge { width: 34px; height: 34px; background: var(--gold); border-radius: 8px; display: grid; place-items: center; color: #0b1830; font-weight: 700; font-family: var(--brand-font); flex-shrink: 0; font-size: 16px; }
+.topbar-brand b { color: #ffffff; font-family: var(--brand-font); }
+.topbar-brand small { color: rgba(255,255,255,.6); text-transform: none; letter-spacing: .2px; font-size: 10px; }
+.topbar-branch { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.85); }
+.topbar-branch:hover { border-color: rgba(240,200,74,.5); }
+.topbar-search input { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff; }
+.topbar-search input::placeholder { color: rgba(255,255,255,.5); }
+.topbar-search input:focus { border-color: var(--gold3); }
+.topbar-ai-tag { color: #f0c84a; background: rgba(240,200,74,.16); }
+.ic { color: rgba(255,255,255,.72); }
+.ic:hover { color: #fff; background: rgba(255,255,255,.1); }
+.notdot { border-color: #0b1830; }
+.usr-pill { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+.usr-pill b { color: #fff; }
+.usr-pill small { color: #f0c84a; }
+.sidebar { background: #0b1830; border-right: 1px solid rgba(255,255,255,.07); box-shadow: none; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
+.nav-label { color: rgba(255,255,255,.4); opacity: 1; }
+.nav-item { color: rgba(255,255,255,.66); }
+.nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
+.nav-item.active { color: #f0c84a; background: rgba(240,200,74,.1); border-left-color: #f0c84a; }
+.sidebar-footer { border-top-color: rgba(255,255,255,.08); }
+.sidebar-footer .sys { color: rgba(255,255,255,.5) !important; }
+.sidebar-footer .mono { color: rgba(255,255,255,.4) !important; }

@@ -39,7 +39,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Intelligence",
     items: [
       { label: "Executive Dashboard", path: "/dashboard",      icon: <LayoutDashboard size={15} />, permission: "dashboard:read" },
-      { label: "Branch Network",      path: "/branch-network", icon: <Globe size={15} />,           badge: { count: 3, cls: "nb-r" }, permission: "branch:read" },
       { label: "Customer 360°",       path: "/customer360",    icon: <User size={15} />,            permission: "customer:read" },
     ],
   },
@@ -115,17 +114,17 @@ export function AppShell({ children }: AppShellProps) {
       <header className="topbar">
         {/* Brand */}
         <div className="topbar-logo">
-          <div className="topbar-gem" />
+          <div className="topbar-zbadge">Z</div>
           <div className="topbar-brand">
             <b>ZorDMS</b>
-            <small>Enterprise Document Platform v4.2</small>
+            <small>Enterprise Document Management</small>
           </div>
         </div>
 
         {/* Branch selector */}
         <button className="topbar-branch" type="button">
           <span className="status-dot dot-green dot-pulse" />
-          <span>All Branches — HQ Cairo</span>
+          <span>All Branches</span>
           <ChevronDown size={11} />
         </button>
 

@@ -460,23 +460,6 @@ export default function Dashboard() {
               )}
             </div>
           </Card>
-
-          <Card title="Quick Actions">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-              {user?.permissions?.includes("document:capture") && (
-                <QuickAction icon="📷" label="Scan Doc" onClick={() => navigate("/capture")} />
-              )}
-              {user?.permissions?.includes("case:read") && (
-                <QuickAction icon="🗂️" label="New Case" onClick={() => navigate("/case-management")} />
-              )}
-              {user?.permissions?.includes("search:read") && (
-                <QuickAction icon="🔍" label="Search" onClick={() => navigate("/search")} />
-              )}
-              {user?.permissions?.includes("compliance:read") && (
-                <QuickAction icon="🛡️" label="Compliance" onClick={() => navigate("/compliance-audit")} />
-              )}
-            </div>
-          </Card>
         </div>
       </div>
 
