@@ -3,7 +3,9 @@
    Matches ZorDMS-v4.2-Enterprise.html palette exactly
    ===================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Brand font (Syne) is reserved for the ZorDMS wordmark + footer only.
+   Everything else uses the browser/OS default sans-serif (Chrome default). */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   /* ── Core Ink Palette (dark navy backgrounds) ── */
@@ -45,21 +47,31 @@
   --muted:     #7a96b4;
   --line:      rgba(255,255,255,.07);
   --bg:        #050d1a;
+
+  /* ── Fonts ── default = Chrome/OS default sans; brand = Syne (ZorDMS name + footer only) ── */
+  --font:       system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --brand-font: 'Syne', system-ui, sans-serif;
 }
 
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
 
 body {
-  font-family: 'Syne', system-ui, sans-serif;
+  font-family: var(--font);
   background: var(--ink);
   color: var(--wh);
   height: 100vh;
   overflow: hidden;
 }
 
+/* Form controls don't inherit fonts by default — make them use the app default. */
+button, input, select, textarea { font-family: inherit; }
+
+/* Brand font: reserved for the ZorDMS wordmark + footer. */
+.brand, .topbar-brand, .sidebar-footer { font-family: var(--brand-font); }
+
 /* ── Typography helpers ── */
-.serif { font-family: 'Cormorant Garamond', Georgia, serif; }
+.serif { font-family: var(--font); }
 .mono  { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: .9em; }
 
 /* ── Dotted pattern bg (used on Login left panel & overlay areas) ── */
@@ -117,7 +129,7 @@ body {
 .kw::before  { background: linear-gradient(90deg, var(--W),     #f8c070); }
 
 .kl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1.8px; color: var(--sil); margin-bottom: 8px; }
-.kv { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 700; color: var(--wh); line-height: 1; }
+.kv { font-family: var(--font); font-size: 30px; font-weight: 700; color: var(--wh); line-height: 1; }
 .ks { font-size: 10px; color: var(--sil); margin-top: 5px; }
 .ku { color: var(--G); font-weight: 700; }
 .kd { color: var(--R); font-weight: 700; }
@@ -171,7 +183,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   cursor:        pointer;
   transition:    .2s;
   border:        none;
-  font-family:   'Syne', sans-serif;
+  font-family:   var(--font);
   letter-spacing:.3px;
   white-space:   nowrap;
 }
@@ -187,7 +199,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 .xs  { padding: 3px 8px;  font-size: 9.5px; }
 
 /* Legacy compat */
-.btn-primary { background: linear-gradient(135deg,var(--gold),var(--gold3)); color: var(--ink); border: none; border-radius: 7px; padding: 7px 14px; font-weight: 700; cursor: pointer; font-family: 'Syne', sans-serif; }
+.btn-primary { background: linear-gradient(135deg,var(--gold),var(--gold3)); color: var(--ink); border: none; border-radius: 7px; padding: 7px 14px; font-weight: 700; cursor: pointer; font-family: var(--font); }
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 
 /* ══════════════════════════════════════════════
@@ -201,7 +213,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   border-radius: 7px;
   background:    rgba(255,255,255,.05);
   color:         var(--wh);
-  font-family:   'Syne', sans-serif;
+  font-family:   var(--font);
   font-size:     12px;
   outline:       none;
   transition:    border-color .2s;
@@ -212,7 +224,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 label, .label { font-size: 10.5px; color: var(--sil); display: block; letter-spacing: .3px; }
 input[type=text],input[type=date],input[type=number],input[type=password],select,textarea {
   background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 7px;
-  padding: 8px 12px; font-size: 12px; color: var(--wh); font-family: 'Syne', sans-serif;
+  padding: 8px 12px; font-size: 12px; color: var(--wh); font-family: var(--font);
   outline: none; width: 100%; transition: border-color .2s;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--gold); }
@@ -232,7 +244,7 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
   margin-bottom: 16px;
   border:        1px solid var(--bd);
 }
-.tab { padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; color: var(--sil); transition: .2s; border: none; background: none; font-family: 'Syne', sans-serif; }
+.tab { padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; color: var(--sil); transition: .2s; border: none; background: none; font-family: var(--font); }
 .tab.on { background: var(--goldT); color: var(--gold3); }
 .tab:hover:not(.on) { color: var(--mist); }
 
@@ -299,7 +311,7 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 }
 .topbar-branch:hover { border-color: rgba(184,145,42,.4); }
 .topbar-search { flex: 1; max-width: 520px; margin: 0 12px; position: relative; }
-.topbar-search input { width: 100%; background: rgba(255,255,255,.05); border: 1px solid var(--bd); border-radius: 8px; padding: 7px 38px 7px 13px; font-size: 12px; color: var(--wh); font-family: 'Syne', sans-serif; outline: none; transition: .2s; }
+.topbar-search input { width: 100%; background: rgba(255,255,255,.05); border: 1px solid var(--bd); border-radius: 8px; padding: 7px 38px 7px 13px; font-size: 12px; color: var(--wh); font-family: var(--font); outline: none; transition: .2s; }
 .topbar-search input:focus { border-color: var(--gold); }
 .topbar-search input::placeholder { color: var(--sil); }
 .topbar-ai-tag { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 9px; font-weight: 700; color: var(--gold); background: var(--goldT); padding: 1px 6px; border-radius: 3px; }
@@ -307,7 +319,7 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .ic { background: none; border: none; color: var(--sil); cursor: pointer; padding: 6px; border-radius: 6px; transition: .15s; position: relative; display: flex; }
 .ic:hover { color: var(--gold3); background: rgba(255,255,255,.06); }
 .notdot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--R); border: 1.5px solid var(--ink2); }
-.upbtn { background: linear-gradient(135deg,var(--gold),var(--gold3)); color: var(--ink); border: none; padding: 7px 14px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: 'Syne', sans-serif; letter-spacing: .4px; }
+.upbtn { background: linear-gradient(135deg,var(--gold),var(--gold3)); color: var(--ink); border: none; padding: 7px 14px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: var(--font); letter-spacing: .4px; }
 .upbtn:hover { opacity: .88; }
 .usr-pill { display: flex; align-items: center; gap: 7px; background: var(--gr); border: 1px solid var(--bd); border-radius: 7px; padding: 4px 10px 4px 6px; cursor: pointer; }
 .usr-pill:hover { background: rgba(255,255,255,.08); }
@@ -352,7 +364,7 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
    PAGE HEADER
    ══════════════════════════════════════════════ */
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
-.page-header h2 { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 700; color: var(--gold3); line-height: 1; }
+.page-header h2 { font-family: var(--font); font-size: 24px; font-weight: 700; color: var(--gold3); line-height: 1; }
 .page-header p  { font-size: 11px; color: var(--sil); margin-top: 3px; }
 .page-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -393,7 +405,7 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
   overflow-y:    auto;
 }
 .modal-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-.modal-hd h3 { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 700; color: var(--gold3); }
+.modal-hd h3 { font-family: var(--font); font-size: 20px; font-weight: 700; color: var(--gold3); }
 
 /* ══════════════════════════════════════════════
    HEATMAP

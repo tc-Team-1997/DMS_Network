@@ -39,7 +39,7 @@ export function Login() {
       <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(160deg,var(--navy),var(--navy-deep))", backgroundImage: "radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px)", backgroundSize: "16px 16px" }}>
         <div style={{ position: "absolute", top: 40, left: 56, color: "#fff", display: "flex", gap: 12, alignItems: "center", zIndex: 1 }}>
           <div style={{ width: 34, height: 34, background: "var(--gold)", borderRadius: 8, display: "grid", placeItems: "center", color: "var(--navy-deep)", fontWeight: 700 }}>Z</div>
-          <div><div style={{ fontWeight: 700 }}>ZorDMS</div><div style={{ fontSize: 12, opacity: .7 }}>Enterprise Document Management</div></div>
+          <div className="brand"><div style={{ fontWeight: 700 }}>ZorDMS</div><div style={{ fontSize: 12, opacity: .7 }}>Enterprise Document Management</div></div>
         </div>
         <Carousel slides={SLIDES} />
       </div>
@@ -80,7 +80,7 @@ export function Login() {
         </form>
 
         {/* App version — derived from the real package.json version at build time */}
-        <div style={{ position: "absolute", bottom: 22, left: 0, right: 0, textAlign: "center", color: "#94a3b8", fontSize: 12 }}>
+        <div className="brand" style={{ position: "absolute", bottom: 22, left: 0, right: 0, textAlign: "center", color: "#94a3b8", fontSize: 12 }}>
           ZorDMS · v{__APP_VERSION__}
         </div>
       </div>
