@@ -101,6 +101,7 @@ export function workflowsRouter(): Router {
         assigned_to?: string;
         doc_confidence?: number;
         created_by?: string;
+        branch?: string;
       };
       if (!body.title || !body.template_id) {
         res.status(400).json({ error: "title_and_template_required" });
@@ -156,6 +157,7 @@ export function workflowsRouter(): Router {
             status: "Active",
             sla_due_at: slaDue,
             assigned_to: body.assigned_to,
+            branch: body.branch ?? req.authUser?.branch,
             // F2: actor identity from verified JWT, NOT from body
             created_by: req.authUser?.username ?? body.created_by,
           },
@@ -211,15 +213,184 @@ export function workflowsRouter(): Router {
   );
 
   // GET /workflows — F1: requireAuth
+  //
+  // P3 CROSS-STATUS REVIEW QUEUE. Returns workflows enriched with their current
+  // (Pending) step + document ref + assignee + sla, filterable by ?status= and
+  // branch-scoped (a non-cross-branch user only sees their own branch).
+  //
+  // The UI ReviewQueue tabs map to ?status=:
+  //   Pending   → workflows that are Active with an unclaimed current step
+  //   Claimed   → Active workflows whose current step has claimed_by set
+  //   Approved  → status=Approved
+  //   Rejected  → status=Rejected
+  //   Escalated → status=Escalated
+  //   OnHold    → status=OnHold
+  const VALID_QUEUE_STATUS = new Set([
+    "Pending",
+    "Claimed",
+    "Approved",
+    "Rejected",
+    "Escalated",
+    "OnHold",
+  ]);
+
   r.get(
     "/",
     requireAuth,
     asyncHandler(async (req, res) => {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const workflows = await knex("workflows")
+      const statusFilter = typeof req.query.status === "string" ? req.query.status : undefined;
+
+      // Branch scoping: fail-closed unless the caller can read cross-branch.
+      const canCrossBranch = req.authUser?.permissions.includes("crossbranch:read") ?? false;
+      const callerBranch = req.authUser?.branch;
+
+      let q = knex("workflows")
         .orderByRaw("CASE WHEN status = 'Active' THEN 0 ELSE 1 END")
         .orderBy("created_at", "desc");
-      res.json({ workflows });
+
+      if (!canCrossBranch && callerBranch) {
+        // Show only the caller's branch OR legacy rows with no branch recorded.
+        q = q.where((b) => b.where("branch", callerBranch).orWhereNull("branch"));
+      }
+
+      // Pending/Claimed are derived from the current step; everything else maps
+      // directly to the workflow status column.
+      if (statusFilter && statusFilter !== "Pending" && statusFilter !== "Claimed") {
+        if (!VALID_QUEUE_STATUS.has(statusFilter)) {
+          res.status(400).json({ error: "invalid_status" });
+          return;
+        }
+        q = q.where("status", statusFilter);
+      } else if (statusFilter === "Pending" || statusFilter === "Claimed") {
+        q = q.where("status", "Active");
+      }
+
+      const workflows = await q;
+      const ids = workflows.map((w: { id: string }) => w.id);
+      const steps = ids.length
+        ? await knex("workflow_steps").whereIn("workflow_id", ids).orderBy("seq")
+        : [];
+      const stepsByWf = new Map<string, Array<Record<string, unknown>>>();
+      for (const s of steps) {
+        const arr = stepsByWf.get(s.workflow_id as string) ?? [];
+        arr.push(s);
+        stepsByWf.set(s.workflow_id as string, arr);
+      }
+
+      const items = workflows
+        .map((w: Record<string, unknown>) => {
+          const wfSteps = stepsByWf.get(w.id as string) ?? [];
+          const currentStep =
+            wfSteps.find((s) => s.status === "Pending") ??
+            wfSteps[wfSteps.length - 1] ??
+            null;
+          const claimed = Boolean(currentStep?.claimed_by);
+          // Derive the queue-facing status for this item.
+          let queueStatus = w.status as string;
+          if (w.status === "Active") queueStatus = claimed ? "Claimed" : "Pending";
+          return {
+            id: w.id,
+            ref_code: w.ref_code,
+            title: w.title,
+            doc_id: w.doc_id ?? null,
+            branch: w.branch ?? null,
+            priority: w.priority,
+            status: w.status,
+            queue_status: queueStatus,
+            stage: w.stage,
+            sla_due_at: w.sla_due_at ?? null,
+            assignee: (currentStep?.claimed_by as string | undefined) ?? (w.assigned_to as string | undefined) ?? null,
+            created_by: w.created_by ?? null,
+            created_at: w.created_at ?? null,
+            current_step: currentStep
+              ? {
+                  id: currentStep.id,
+                  seq: currentStep.seq,
+                  name: currentStep.name,
+                  status: currentStep.status,
+                  claimed_by: currentStep.claimed_by ?? null,
+                  claimed_at: currentStep.claimed_at ?? null,
+                  due_at: currentStep.due_at ?? null,
+                  required_permissions: JSON.parse(
+                    (currentStep.required_permissions as string) || "[]",
+                  ),
+                }
+              : null,
+          };
+        })
+        // Pending/Claimed are post-filtered because they depend on the step.
+        .filter((it: { queue_status: string }) => {
+          if (statusFilter === "Pending") return it.queue_status === "Pending";
+          if (statusFilter === "Claimed") return it.queue_status === "Claimed";
+          return true;
+        });
+
+      res.json({ workflows: items });
+    }),
+  );
+
+  // POST /workflows/:id/claim — F1: requireAuth
+  //
+  // P3 CLAIM. Assigns the current Pending step to the acting JWT user. Guards
+  // against claiming an already-claimed step, a non-pending step, or a workflow
+  // that is closed/inactive. Returns the updated workflow + steps.
+  r.post(
+    "/:id/claim",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const actorUsername = req.authUser!.username;
+
+      const workflow = await knex("workflows").where({ id: req.params.id }).first();
+      if (!workflow) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      if (["Approved", "Rejected"].includes(workflow.status)) {
+        res.status(409).json({ error: "workflow_closed" });
+        return;
+      }
+      if (["OnHold", "Escalated"].includes(workflow.status)) {
+        res.status(409).json({ error: "workflow_inactive", status: workflow.status });
+        return;
+      }
+
+      const steps = await knex("workflow_steps")
+        .where({ workflow_id: workflow.id })
+        .orderBy("seq");
+      const currentStep = steps.find((s: { status: string }) => s.status === "Pending");
+      if (!currentStep) {
+        res.status(409).json({ error: "no_pending_step" });
+        return;
+      }
+      if (currentStep.claimed_by) {
+        // Idempotent re-claim by the same user is allowed; a different user is blocked.
+        if (currentStep.claimed_by !== actorUsername) {
+          res.status(409).json({ error: "already_claimed", claimed_by: currentStep.claimed_by });
+          return;
+        }
+      }
+
+      await knex("workflow_steps").where({ id: currentStep.id }).update({
+        claimed_by: actorUsername,
+        claimed_at: new Date().toISOString(),
+      });
+
+      await writeAudit(knex, {
+        actor_id: req.authUser?.id,
+        actor_username: actorUsername,
+        action: "WORKFLOW_CLAIM",
+        entity: "workflow",
+        entity_id: String(workflow.id),
+        details: currentStep.name,
+      });
+
+      const updated = await knex("workflows").where({ id: workflow.id }).first();
+      const updatedSteps = await knex("workflow_steps")
+        .where({ workflow_id: workflow.id })
+        .orderBy("seq");
+      res.json({ workflow: updated, steps: updatedSteps });
     }),
   );
 

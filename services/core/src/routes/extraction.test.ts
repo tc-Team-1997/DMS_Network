@@ -16,9 +16,18 @@ vi.mock("../ai/client.js", () => ({
   aiProcess: vi.fn(),
 }));
 
+// ── Mock the cross-service Workflow client so no real HTTP is made ─────────────
+vi.mock("../workflow/client.js", () => ({
+  createWorkflowCase: vi.fn(),
+  resolveDefaultTemplateId: vi.fn(),
+  DEFAULT_REVIEW_TEMPLATE_NAME: "KYC & Account Opening",
+}));
+
 import { aiClassify, aiExtract } from "../ai/client.js";
+import { createWorkflowCase } from "../workflow/client.js";
 const mockClassify = aiClassify as ReturnType<typeof vi.fn>;
 const mockExtract  = aiExtract  as ReturnType<typeof vi.fn>;
+const mockCreateWorkflow = createWorkflowCase as ReturnType<typeof vi.fn>;
 
 // ── Test harness ───────────────────────────────────────────────────────────────
 
@@ -418,5 +427,124 @@ describe("POST /documents/:id/extract", () => {
     expect(storedMeta).toHaveProperty("cid_no", "22222222222");
     // extraction_status should still be DONE (not FAILED) — incomplete is not a failure
     expect(dbDoc.extraction_status).toBe("DONE");
+  });
+});
+
+// ── P3: Capture→Workflow handoff ────────────────────────────────────────────────
+
+describe("POST /documents/:id/extract — Capture→Workflow handoff", () => {
+  it("fires the handoff and records workflow_id when review_flag is true (low confidence)", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    mockClassify.mockResolvedValue({ doc_type: "BT_PASSPORT", confidence: 0.55 });
+    mockExtract.mockResolvedValue({
+      doc_type: "BT_PASSPORT",
+      valid: false,
+      review_flag: true,
+      partial: true,
+      errors: ["expiry_date missing"],
+      data: { passport_no: "BT1234567", surname: "Test" },
+    });
+    mockCreateWorkflow.mockResolvedValue({ id: "wf-1234567890123456789012345678901234", ref_code: "WF-9" });
+
+    const res = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mockCreateWorkflow).toHaveBeenCalledTimes(1);
+    // bearer is forwarded as first arg; input carries docId + branch + confidence
+    const [bearerArg, input] = mockCreateWorkflow.mock.calls[0];
+    expect(typeof bearerArg).toBe("string");
+    expect(input.docId).toBe(docId);
+    expect(input.branch).toBe("Thimphu");
+    // workflow_id surfaced in response + persisted
+    expect(res.body.workflow_id).toBe("wf-1234567890123456789012345678901234");
+    const dbDoc = await h.knex("documents").where({ id: docId }).first();
+    expect(dbDoc.workflow_id).toBe("wf-1234567890123456789012345678901234");
+  });
+
+  it("does NOT fire the handoff for clean high-confidence known docs", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    mockClassify.mockResolvedValue({ doc_type: "BT_CID_4G", confidence: 0.97 });
+    mockExtract.mockResolvedValue({
+      doc_type: "BT_CID_4G",
+      valid: true,
+      review_flag: false,
+      partial: false,
+      errors: [],
+      data: {
+        cid_no: "11504000231",
+        full_name: "Dorji Wangchuk",
+        dob: "1985-03-12",
+        expiry_date: "2030-01-01",
+        issue_date: "2021-04-01",
+        dzongkhag: "Thimphu",
+        sex: "M",
+      },
+    });
+
+    const res = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mockCreateWorkflow).not.toHaveBeenCalled();
+    expect(res.body.workflow_id).toBeNull();
+  });
+
+  it("is best-effort: extraction still succeeds (200) when the workflow service is unreachable", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    mockClassify.mockResolvedValue({ doc_type: "BT_PASSPORT", confidence: 0.55 });
+    mockExtract.mockResolvedValue({
+      doc_type: "BT_PASSPORT",
+      valid: false,
+      review_flag: true,
+      partial: true,
+      errors: ["expiry_date missing"],
+      data: { passport_no: "BT7654321" },
+    });
+    mockCreateWorkflow.mockRejectedValue(new Error("ECONNREFUSED: workflow down"));
+
+    const res = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.classification.review_flag).toBe(true);
+    // Degraded: no workflow id, but extraction completed
+    expect(res.body.workflow_id).toBeNull();
+    const dbDoc = await h.knex("documents").where({ id: docId }).first();
+    expect(dbDoc.extraction_status).toBe("DONE");
+    expect(dbDoc.workflow_id ?? null).toBeNull();
+  });
+
+  it("fires the handoff for unknown/new doc types", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    mockClassify.mockResolvedValue({ doc_type: "BHUTAN_LAND_DEED_UNKNOWN_XYZ", confidence: 0.72 });
+    mockExtract.mockResolvedValue({
+      doc_type: "BHUTAN_LAND_DEED_UNKNOWN_XYZ",
+      valid: false,
+      review_flag: true,
+      partial: true,
+      errors: ["schema not found"],
+      data: { plot_no: "THP-LR-123" },
+    });
+    mockCreateWorkflow.mockResolvedValue({ id: "wf-unknown000000000000000000000000000", ref_code: "WF-10" });
+
+    const res = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(mockCreateWorkflow).toHaveBeenCalledTimes(1);
+    expect(res.body.workflow_id).toBe("wf-unknown000000000000000000000000000");
   });
 });

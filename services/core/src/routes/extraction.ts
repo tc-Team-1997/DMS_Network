@@ -30,6 +30,7 @@ import { aiClassify, aiExtract } from "../ai/client.js";
 import { mapExtractedToDocument } from "../ai/field_mapper.js";
 import { buildNewTypeSuggestion } from "../ai/suggest_type.js";
 import { EVENTS } from "../events/index.js";
+import { createWorkflowCase } from "../workflow/client.js";
 import { findDuplicates, getDedupConfig } from "../repo/duplicates.js";
 import { newId } from "@zordms/db";
 import type { Knex } from "knex";
@@ -288,16 +289,53 @@ export function extractionRouter(): Router {
       );
 
       // If quality is low or mandatory missing, ensure review_flag is set
-      if (quality.mandatoryMissing.length > 0 || quality.score < 50) {
+      const qualityForcedReview = quality.mandatoryMissing.length > 0 || quality.score < 50;
+      if (qualityForcedReview) {
         await deps.knex("documents").where({ id: docId }).update({ review_flag: true });
       }
 
-      // ── 11. Emit event ─────────────────────────────────────────────────────
+      // Unknown / brand-new doc type (not in registry) also warrants human review.
+      const unknownType =
+        classifyResult.doc_type === "UNKNOWN" || !registryCodes.has(classifyResult.doc_type);
+      const finalReviewFlag = reviewFlag || qualityForcedReview || unknownType;
+
+      // ── 11. Capture→Workflow handoff (best-effort) ─────────────────────────
+      // If the document is flagged for review, create a maker-checker workflow
+      // case in the WORKFLOW service so it enters the review queue. A workflow
+      // outage MUST NOT fail extraction — we log + degrade.
+      let workflowId: string | null = null;
+      if (finalReviewFlag) {
+        try {
+          const wf = await createWorkflowCase(bearer, {
+            docId,
+            title: document.title ?? fileName ?? `Review ${docId}`,
+            branch: document.branch ?? undefined,
+            confidence: classifyResult.confidence,
+            priority: unknownType || quality.score < 50 ? "High" : "Normal",
+          });
+          workflowId = wf.id;
+          await deps.knex("documents").where({ id: docId }).update({ workflow_id: workflowId });
+        } catch (wfErr: any) {
+          // Degrade gracefully — extraction still succeeds without a workflow case.
+          console.warn(
+            JSON.stringify({
+              level: "warn",
+              msg: "capture_workflow_handoff_failed",
+              docId,
+              detail: String(wfErr?.message ?? wfErr),
+            }),
+          );
+        }
+      }
+
+      // ── 12. Emit event ─────────────────────────────────────────────────────
       await deps.events.emit(EVENTS.DOCUMENT_INDEXED, {
         docId,
         docType: classifyResult.doc_type,
         confidence: classifyResult.confidence,
         source: aiSource,
+        reviewFlag: finalReviewFlag,
+        workflowId,
       });
 
       // ── 12. Build response ─────────────────────────────────────────────────
@@ -316,8 +354,9 @@ export function extractionRouter(): Router {
         classification: {
           doc_type: classifyResult.doc_type,
           confidence: classifyResult.confidence,
-          review_flag: reviewFlag,
+          review_flag: finalReviewFlag,
         },
+        workflow_id: workflowId,
         mappedFields: {
           cid: mapped.cid ?? null,
           doc_no: mapped.doc_no ?? null,

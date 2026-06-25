@@ -18,6 +18,13 @@ vi.mock("../ai/client.js", () => ({
   aiProcess: vi.fn(),
 }));
 
+// ── Mock the cross-service Workflow client (no real HTTP for the handoff) ──────
+vi.mock("../workflow/client.js", () => ({
+  createWorkflowCase: vi.fn().mockResolvedValue({ id: "wf-test", ref_code: "WF-T" }),
+  resolveDefaultTemplateId: vi.fn(),
+  DEFAULT_REVIEW_TEMPLATE_NAME: "KYC & Account Opening",
+}));
+
 import { aiClassify, aiExtract } from "../ai/client.js";
 const mockClassify = aiClassify as ReturnType<typeof vi.fn>;
 const mockExtract  = aiExtract  as ReturnType<typeof vi.fn>;

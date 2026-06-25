@@ -1,12 +1,22 @@
 /**
- * ReviewQueue screen tests — mock fetch, assert table renders and claim/resolve calls correct endpoints.
+ * ReviewQueue screen tests — workflow-backed.
+ *
+ * The Review Queue is now backed by the WORKFLOW service (source of truth) via
+ * src/api/reviewQueueApi.ts. These tests mock that module and assert:
+ *   - the cross-status queue loads and KPI counts render
+ *   - tabs filter by queue_status (Pending / Claimed / Resolved / Escalated / SLA Breached)
+ *   - Claim calls POST /workflows/:id/claim (claimWorkflow) and refreshes
+ *   - an action (approve/reject/escalate) calls /act (actOnWorkflow) and refreshes
+ *   - Open in Viewer deep-links to /viewer?doc=<documentId>
+ *   - resilient: error state + RBAC read-only gating
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ReviewQueue from "./ReviewQueue.js";
-import * as aiApi from "../api/aiEngine.js";
+import * as queueApi from "../api/reviewQueueApi.js";
+import type { ReviewQueueItem } from "../api/reviewQueueApi.js";
 
-/* ── Polyfill ResizeObserver (recharts uses it in jsdom) ── */
+/* ── Polyfill ResizeObserver (recharts / jsdom) ── */
 class FakeResizeObserver {
   observe() {}
   unobserve() {}
@@ -14,325 +24,236 @@ class FakeResizeObserver {
 }
 Object.defineProperty(globalThis, "ResizeObserver", { value: FakeResizeObserver, writable: true });
 
-/* ── Stub AuthContext ── */
+/* ── Mock react-router-dom (useNavigate for deep-links, useSearchParams for useUrlState) ── */
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
+  useSearchParams: () => [new URLSearchParams(""), vi.fn()],
+}));
+
+/* ── Auth: a reviewer with review:write ── */
+let mockPermissions = ["review:read", "review:write"];
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
       id: "018f4e2a-0000-7000-8000-000000000001",
       username: "reviewer1",
       roles: ["Checker"],
-      permissions: ["review:read", "review:write"],
+      permissions: mockPermissions,
+      branch: "Thimphu",
     },
     login: vi.fn(),
     logout: vi.fn(),
   }),
 }));
 
-const PENDING_ROW: aiApi.ReviewRow = {
-  id: "018f4e2a-0001-7000-8000-000000000001",
-  doc_id: "DOC-20260623-001",
-  doc_type: "BT_CID_4G",
-  confidence: 0.60,
-  band: "0.50-0.69",
-  sla_hours: 48,
-  sla_deadline: new Date(Date.now() + 36 * 3_600_000).toISOString(), // 36h from now — not urgent
-  status: "PENDING",
-};
+/* ── Fixtures (one item per queue status) ── */
+function item(over: Partial<ReviewQueueItem>): ReviewQueueItem {
+  return {
+    id: "wf-0",
+    ref_code: "WF-0",
+    title: "Untitled",
+    doc_id: "DOC-0",
+    branch: "Thimphu",
+    priority: "Normal",
+    status: "Active",
+    queue_status: "Pending",
+    stage: "Maker",
+    sla_due_at: new Date(Date.now() + 36 * 3_600_000).toISOString(),
+    assignee: null,
+    created_by: "maker1",
+    created_at: new Date().toISOString(),
+    current_step: null,
+    ...over,
+  };
+}
 
-const CLAIMED_ROW: aiApi.ReviewRow = {
-  id: "018f4e2a-0002-7000-8000-000000000002",
-  doc_id: "DOC-20260623-002",
-  doc_type: "BT_PASSPORT",
-  confidence: 0.75,
-  band: "0.70-0.84",
-  sla_hours: 48,
-  sla_deadline: new Date(Date.now() + 40 * 3_600_000).toISOString(),
-  status: "CLAIMED",
-};
+const PENDING = item({ id: "wf-1", ref_code: "WF-1", title: "KYC Pending", doc_id: "DOC-001", queue_status: "Pending", status: "Active" });
+const CLAIMED = item({ id: "wf-2", ref_code: "WF-2", title: "KYC Claimed", doc_id: "DOC-002", queue_status: "Claimed", status: "Active", assignee: "reviewer1" });
+const APPROVED = item({ id: "wf-3", ref_code: "WF-3", title: "Loan Approved", doc_id: "DOC-003", queue_status: "Approved", status: "Approved", sla_due_at: null });
+const REJECTED = item({ id: "wf-4", ref_code: "WF-4", title: "Loan Rejected", doc_id: "DOC-004", queue_status: "Rejected", status: "Rejected", sla_due_at: null });
+const ESCALATED = item({ id: "wf-5", ref_code: "WF-5", title: "Escalated Case", doc_id: "DOC-005", queue_status: "Escalated", status: "Escalated" });
+const BREACHED = item({ id: "wf-6", ref_code: "WF-6", title: "Overdue Case", doc_id: "DOC-006", queue_status: "Pending", status: "Active", sla_due_at: new Date(Date.now() - 3_600_000).toISOString() });
 
-const RESOLVED_ROW: aiApi.ReviewRow = {
-  id: "018f4e2a-0003-7000-8000-000000000003",
-  doc_id: "DOC-20260623-003",
-  doc_type: "BOB_LOAN_APPLICATION",
-  confidence: 0.80,
-  band: "0.70-0.84",
-  sla_hours: 48,
-  sla_deadline: null,
-  status: "RESOLVED",
-};
+const ALL = [PENDING, CLAIMED, APPROVED, REJECTED, ESCALATED, BREACHED];
 
 beforeEach(() => {
-  // ReviewQueue now uses listAllReviews (C-1 fix) — mock the correct function.
-  vi.spyOn(aiApi, "listAllReviews").mockResolvedValue([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW]);
+  mockPermissions = ["review:read", "review:write"];
+  mockNavigate.mockReset();
+  vi.spyOn(queueApi, "listAllReviewQueue").mockResolvedValue(ALL);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/* ════════════════════════════════════════════════
-   ReviewQueue screen tests
-═════════════════════════════════════════════════= */
-describe("ReviewQueue screen", () => {
-  it("renders the page header and KPI cards", async () => {
+/** Click a tab button by its visible (counted) label prefix. */
+function clickTab(prefix: RegExp) {
+  const tabs = screen.getAllByRole("button");
+  const t = tabs.find((b) => prefix.test(b.textContent ?? ""));
+  expect(t).toBeDefined();
+  fireEvent.click(t!);
+}
+
+describe("ReviewQueue (workflow-backed)", () => {
+  it("loads the cross-status queue on mount and renders header + KPIs", async () => {
     render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(screen.getByText("Human-Review Queue")).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    expect(queueApi.listAllReviewQueue).toHaveBeenCalled();
     expect(screen.getByText("Pending Review")).toBeInTheDocument();
     expect(screen.getByText("Claimed / In-Progress")).toBeInTheDocument();
+    expect(screen.getByText("Escalated")).toBeInTheDocument();
     expect(screen.getByText("SLA Breached")).toBeInTheDocument();
-    expect(screen.getByText("Resolved (queue)")).toBeInTheDocument();
   });
 
-  it("calls listAllReviews on mount (not listPendingReviews) to return all statuses", async () => {
+  it("Pending tab shows only Pending items", async () => {
     render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(aiApi.listAllReviews).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(screen.getByText("KYC Pending")).toBeInTheDocument());
+    // Pending tab is the default; a Claimed item should NOT be visible
+    expect(screen.queryByText("KYC Claimed")).not.toBeInTheDocument();
   });
 
-  it("renders pending doc_id in the table", async () => {
-    render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(screen.getByText("DOC-20260623-001")).toBeInTheDocument();
-    });
-  });
-
-  it("shows claim button (aria-label=claim) for pending items", async () => {
-    render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByText("DOC-20260623-001")).toBeInTheDocument());
-
-    // Use aria-label to disambiguate from the "Claimed (1)" tab
-    expect(screen.getByRole("button", { name: "claim" })).toBeInTheDocument();
-  });
-
-  it("calls claimReview with the item id and current user when claim is clicked", async () => {
-    const claimSpy = vi.spyOn(aiApi, "claimReview").mockResolvedValue({
-      ...PENDING_ROW,
-      status: "CLAIMED",
-    });
-    vi.spyOn(aiApi, "listAllReviews")
-      .mockResolvedValueOnce([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW])
-      .mockResolvedValueOnce([{ ...PENDING_ROW, status: "CLAIMED" }, CLAIMED_ROW, RESOLVED_ROW]);
-
-    render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "claim" })).toBeInTheDocument());
-
-    fireEvent.click(screen.getByRole("button", { name: "claim" }));
-
-    await waitFor(() => {
-      expect(claimSpy).toHaveBeenCalledWith(PENDING_ROW.id, expect.any(String));
-    });
-  });
-
-  it("switches to Claimed tab and shows approve/reject buttons", async () => {
+  it("Claimed tab filters to Claimed items", async () => {
     render(<ReviewQueue />);
     await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
-
-    // Switch to Claimed tab — use the tab button with "Claimed" text
-    const tabs = screen.getAllByRole("button");
-    const claimedTab = tabs.find((b) => /^claimed/i.test(b.textContent ?? ""));
-    expect(claimedTab).toBeDefined();
-    fireEvent.click(claimedTab!);
-
-    await waitFor(() => {
-      expect(screen.getByText("DOC-20260623-002")).toBeInTheDocument();
-    });
-    expect(screen.getByRole("button", { name: "approve" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "reject" })).toBeInTheDocument();
+    await act(async () => clickTab(/^Claimed/));
+    await waitFor(() => expect(screen.getByText("KYC Claimed")).toBeInTheDocument());
+    expect(screen.queryByText("KYC Pending")).not.toBeInTheDocument();
   });
 
-  it("opens a confirmation modal when approve is clicked", async () => {
+  it("Resolved tab shows both Approved and Rejected items", async () => {
     render(<ReviewQueue />);
     await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    await act(async () => clickTab(/^Resolved/));
+    await waitFor(() => expect(screen.getByText("Loan Approved")).toBeInTheDocument());
+    expect(screen.getByText("Loan Rejected")).toBeInTheDocument();
+  });
 
-    // Switch to Claimed tab
-    const tabs = screen.getAllByRole("button");
-    const claimedTab = tabs.find((b) => /^claimed/i.test(b.textContent ?? ""));
-    fireEvent.click(claimedTab!);
-    await waitFor(() => expect(screen.getByRole("button", { name: "approve" })).toBeInTheDocument());
+  it("Escalated tab filters to Escalated items", async () => {
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    await act(async () => clickTab(/^Escalated/));
+    await waitFor(() => expect(screen.getByText("Escalated Case")).toBeInTheDocument());
+    expect(screen.queryByText("KYC Pending")).not.toBeInTheDocument();
+  });
+
+  it("SLA Breached tab shows only items past their SLA deadline", async () => {
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    await act(async () => clickTab(/^SLA Breached/));
+    await waitFor(() => expect(screen.getByText("Overdue Case")).toBeInTheDocument());
+    // The non-breached pending item should not appear here
+    expect(screen.queryByText("KYC Pending")).not.toBeInTheDocument();
+  });
+
+  it("Claim calls claimWorkflow with the workflow id and refreshes the list", async () => {
+    const claimSpy = vi
+      .spyOn(queueApi, "claimWorkflow")
+      .mockResolvedValue({ workflow: {} as never, steps: [] });
+    vi.spyOn(queueApi, "listAllReviewQueue")
+      .mockResolvedValueOnce(ALL)
+      .mockResolvedValueOnce([{ ...PENDING, queue_status: "Claimed", status: "Active", assignee: "reviewer1" }, CLAIMED, APPROVED, REJECTED, ESCALATED, BREACHED]);
+
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("KYC Pending")).toBeInTheDocument());
+
+    fireEvent.click(screen.getAllByRole("button", { name: "claim" })[0]);
+
+    await waitFor(() => expect(claimSpy).toHaveBeenCalledWith(PENDING.id));
+    // List reloaded (called a second time after the action)
+    await waitFor(() => expect(queueApi.listAllReviewQueue).toHaveBeenCalledTimes(2));
+  });
+
+  it("Approve opens a confirm modal, then calls actOnWorkflow('approve') and refreshes", async () => {
+    const actSpy = vi
+      .spyOn(queueApi, "actOnWorkflow")
+      .mockResolvedValue({ workflow: {} as never, steps: [] });
+    vi.spyOn(queueApi, "listAllReviewQueue")
+      .mockResolvedValueOnce(ALL)
+      .mockResolvedValueOnce([PENDING, { ...CLAIMED, queue_status: "Approved", status: "Approved" }, APPROVED, REJECTED, ESCALATED, BREACHED]);
+
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    await act(async () => clickTab(/^Claimed/));
+    await waitFor(() => expect(screen.getByText("KYC Claimed")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "approve" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Confirm Approve" })).toBeInTheDocument());
 
-    await waitFor(() => {
-      expect(screen.getByText("Confirm Approval")).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByRole("button", { name: /confirm approve/i }));
+    await waitFor(() => expect(actSpy).toHaveBeenCalledWith(CLAIMED.id, "approve"));
+    await waitFor(() => expect(queueApi.listAllReviewQueue).toHaveBeenCalledTimes(2));
   });
 
-  it("calls resolveReview with APPROVED when confirm approve is clicked", async () => {
-    const resolveSpy = vi.spyOn(aiApi, "resolveReview").mockResolvedValue({
-      ...CLAIMED_ROW,
-      status: "RESOLVED",
-      resolution: "APPROVED",
-    } as aiApi.ReviewRow);
-    vi.spyOn(aiApi, "listAllReviews")
-      .mockResolvedValueOnce([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW])
-      .mockResolvedValueOnce([PENDING_ROW, { ...CLAIMED_ROW, status: "RESOLVED" }, RESOLVED_ROW]);
+  it("Reject calls actOnWorkflow('reject')", async () => {
+    const actSpy = vi
+      .spyOn(queueApi, "actOnWorkflow")
+      .mockResolvedValue({ workflow: {} as never, steps: [] });
 
     render(<ReviewQueue />);
     await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    await act(async () => clickTab(/^Claimed/));
+    await waitFor(() => expect(screen.getByText("KYC Claimed")).toBeInTheDocument());
 
-    const tabs = screen.getAllByRole("button");
-    const claimedTab = tabs.find((b) => /^claimed/i.test(b.textContent ?? ""));
-    fireEvent.click(claimedTab!);
-    await waitFor(() => expect(screen.getByRole("button", { name: "approve" })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "approve" }));
-
-    await waitFor(() => expect(screen.getByText("Confirm Approval")).toBeInTheDocument());
-
-    const confirmBtn = screen.getByRole("button", { name: /confirm approve/i });
-    fireEvent.click(confirmBtn);
-
-    await waitFor(() => {
-      expect(resolveSpy).toHaveBeenCalledWith(CLAIMED_ROW.id, "APPROVED");
-    });
-  });
-
-  it("calls resolveReview with REJECTED when reject confirm is clicked", async () => {
-    const resolveSpy = vi.spyOn(aiApi, "resolveReview").mockResolvedValue({
-      ...CLAIMED_ROW,
-      status: "RESOLVED",
-      resolution: "REJECTED",
-    } as aiApi.ReviewRow);
-    vi.spyOn(aiApi, "listAllReviews")
-      .mockResolvedValueOnce([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW])
-      .mockResolvedValueOnce([PENDING_ROW, { ...CLAIMED_ROW, status: "RESOLVED" }, RESOLVED_ROW]);
-
-    render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
-
-    const tabs = screen.getAllByRole("button");
-    const claimedTab = tabs.find((b) => /^claimed/i.test(b.textContent ?? ""));
-    fireEvent.click(claimedTab!);
-    await waitFor(() => expect(screen.getByRole("button", { name: "reject" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "reject" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Confirm Reject" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /confirm reject/i }));
 
-    await waitFor(() => expect(screen.getByText("Confirm Rejection")).toBeInTheDocument());
-
-    const confirmBtn = screen.getByRole("button", { name: /confirm reject/i });
-    fireEvent.click(confirmBtn);
-
-    await waitFor(() => {
-      expect(resolveSpy).toHaveBeenCalledWith(CLAIMED_ROW.id, "REJECTED");
-    });
+    await waitFor(() => expect(actSpy).toHaveBeenCalledWith(CLAIMED.id, "reject"));
   });
 
-  it("shows resolved items in the Resolved tab", async () => {
+  it("Escalate calls actOnWorkflow('escalate')", async () => {
+    const actSpy = vi
+      .spyOn(queueApi, "actOnWorkflow")
+      .mockResolvedValue({ workflow: {} as never, steps: [] });
+
     render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("KYC Pending")).toBeInTheDocument());
 
-    const tabs = screen.getAllByRole("button");
-    const resolvedTab = tabs.find((b) => /^resolved/i.test(b.textContent ?? ""));
-    fireEvent.click(resolvedTab!);
+    fireEvent.click(screen.getAllByRole("button", { name: "escalate" })[0]);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Confirm Escalate" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /confirm escalate/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText("DOC-20260623-003")).toBeInTheDocument();
-    });
+    await waitFor(() => expect(actSpy).toHaveBeenCalledWith(PENDING.id, "escalate"));
+  });
+
+  it("Open in Viewer deep-links to /viewer?doc=<documentId>", async () => {
+    render(<ReviewQueue />);
+    await waitFor(() => expect(screen.getByText("KYC Pending")).toBeInTheDocument());
+
+    fireEvent.click(screen.getAllByRole("button", { name: "open in viewer" })[0]);
+    expect(mockNavigate).toHaveBeenCalledWith("/viewer?doc=DOC-001");
   });
 
   it("shows a detail side panel when a row is clicked", async () => {
     render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByText("DOC-20260623-001")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("KYC Pending")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByText("DOC-20260623-001"));
-
-    await waitFor(() => {
-      expect(screen.getByText("Review Detail —")).toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByText("KYC Pending"));
+    await waitFor(() => expect(screen.getByText("Review Detail —")).toBeInTheDocument());
   });
 
-  it("shows error state when listAllReviews fails", async () => {
-    vi.spyOn(aiApi, "listAllReviews").mockRejectedValue(new Error("Network error"));
-
+  it("shows an error state when the queue fails to load", async () => {
+    vi.spyOn(queueApi, "listAllReviewQueue").mockRejectedValue(new Error("Network error"));
     render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(screen.getByText(/Network error/i)).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText(/Network error/i)).toBeInTheDocument());
   });
 
-  // C-1: verify Claimed and Resolved tabs show their items (not empty)
-  it("shows claimed items in the Claimed tab (C-1 fix)", async () => {
+  it("hides claim/act buttons and shows read-only notice without review:write", async () => {
+    mockPermissions = ["review:read"];
     render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("KYC Pending")).toBeInTheDocument());
 
-    const tabs = screen.getAllByRole("button");
-    const claimedTab = tabs.find((b) => /^claimed/i.test(b.textContent ?? ""));
-    expect(claimedTab).toBeDefined();
-    await act(async () => {
-      fireEvent.click(claimedTab!);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText("DOC-20260623-002")).toBeInTheDocument();
-    });
+    // Open detail to surface the read-only notice
+    fireEvent.click(screen.getByText("KYC Pending"));
+    await waitFor(() => expect(screen.getByText("Review Detail —")).toBeInTheDocument());
+    expect(screen.getByText(/Read-only view/i)).toBeInTheDocument();
+    // No claim button in the detail panel
+    expect(screen.queryByRole("button", { name: "claim detail" })).not.toBeInTheDocument();
   });
 
-  it("shows resolved items in the Resolved tab (C-1 fix)", async () => {
-    render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
-
-    const tabs = screen.getAllByRole("button");
-    const resolvedTab = tabs.find((b) => /^resolved/i.test(b.textContent ?? ""));
-    expect(resolvedTab).toBeDefined();
-    await act(async () => {
-      fireEvent.click(resolvedTab!);
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText("DOC-20260623-003")).toBeInTheDocument();
-    });
-  });
-
-  // I-3: SLA Breached tab exists and filters breached items
-  it("shows SLA Breached tab and filters breached items (I-3 fix)", async () => {
-    const BREACHED_ROW: aiApi.ReviewRow = {
-      id: "018f4e2a-0004-7000-8000-000000000004",
-      doc_id: "DOC-20260623-004",
-      doc_type: "BT_CID_4G",
-      confidence: 0.55,
-      band: "0.50-0.69",
-      sla_hours: 2,
-      sla_deadline: new Date(Date.now() - 3_600_000).toISOString(), // 1h ago — already breached
-      status: "PENDING",
-    };
-    vi.spyOn(aiApi, "listAllReviews").mockResolvedValue([PENDING_ROW, CLAIMED_ROW, RESOLVED_ROW, BREACHED_ROW]);
-
-    render(<ReviewQueue />);
-    await waitFor(() => expect(screen.getByText("Human-Review Queue")).toBeInTheDocument());
-
-    // SLA Breached tab should exist
-    const tabs = screen.getAllByRole("button");
-    const slaTab = tabs.find((b) => /sla breached/i.test(b.textContent ?? ""));
-    expect(slaTab).toBeDefined();
-
-    await act(async () => {
-      fireEvent.click(slaTab!);
-    });
-
-    await waitFor(() => {
-      // The breached row should appear in this tab
-      expect(screen.getByText("DOC-20260623-004")).toBeInTheDocument();
-    });
-    // Non-breached pending row should not appear in SLA Breached tab
-    expect(screen.queryByText("DOC-20260623-001")).not.toBeInTheDocument();
-  });
-
-  // M-1: "In current page" subtitle is fixed to "From last fetch"
-  it("shows From last fetch subtitle on Resolved KPI card (M-1 fix)", async () => {
-    render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(screen.getByText("From last fetch")).toBeInTheDocument();
-    });
-    expect(screen.queryByText("In current page")).not.toBeInTheDocument();
-  });
-
-  // M-4: Auto-refresh skips when tab is hidden — verify by inspecting the interval callback source
-  it("interval callback checks document.visibilityState before calling reload (M-4 fix)", () => {
-    // Check that the ReviewQueue source code contains the visibility guard.
-    // This is a white-box test that confirms the implementation guard is present,
-    // since async timer interactions with fake timers + RTL are fragile.
-    const ReviewQueueSource = ReviewQueue.toString();
-    expect(ReviewQueueSource).toContain("visibilityState");
+  it("auto-refresh interval checks document.visibilityState (resilience guard)", () => {
+    const src = ReviewQueue.toString();
+    expect(src).toContain("visibilityState");
   });
 });
