@@ -1,21 +1,16 @@
 /**
- * AppShell — ZorDMS v4.2
+ * AppShell — ZorDMS
  *
- * Renders:
- *   - Topbar  (brand · branch-selector · global-search · actions · user-pill)
- *   - Sidebar (grouped nav with RBAC filtering)
- *   - Main content area (children)
- *   - Sidebar footer with system status
- *
- * RBAC: nav items whose `permission` is not in user.permissions are hidden.
+ * Topbar: login-style brand · breadcrumb · branch scope (user) · alerts · user · exit
+ * Sidebar: navy, grouped nav (RBAC-filtered), footer = version + build
  */
 import type { ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, Globe, User, Camera, FileEdit, Cpu,
+  LayoutDashboard, User, Camera, FileEdit, Cpu,
   Briefcase, Folder, FileText, Activity,
   Search, Eye, GitBranch, Shield, AlertTriangle,
-  BarChart2, Link2, Lock, Settings, Bell, Upload, ChevronDown,
+  Link2, Lock, Settings, Bell, ChevronDown, ChevronRight, MapPin, LogOut,
   Users,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext.js";
@@ -25,94 +20,99 @@ interface NavItem {
   label:       string;
   path:        string;
   icon:        ReactNode;
-  badge?:      { count: number | string; cls: "nb-r" | "nb-g" | "nb-b" };
-  permission?: string; // if set, item hidden when user lacks this permission
+  permission?: string;
 }
-
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
+interface NavGroup { label: string; items: NavItem[]; }
 
 const NAV_GROUPS: NavGroup[] = [
   {
     label: "Intelligence",
     items: [
-      { label: "Executive Dashboard", path: "/dashboard",      icon: <LayoutDashboard size={15} />, permission: "dashboard:read" },
-      { label: "Customer 360°",       path: "/customer360",    icon: <User size={15} />,            permission: "customer:read" },
+      { label: "Executive Dashboard", path: "/dashboard",   icon: <LayoutDashboard size={15} />, permission: "dashboard:read" },
+      { label: "Customer 360°",       path: "/customer360", icon: <User size={15} />,            permission: "customer:read" },
     ],
   },
   {
     label: "Ingestion",
     items: [
-      { label: "Multi-Channel Capture", path: "/capture",  icon: <Camera size={15} />,  permission: "document:capture" },
-      { label: "Indexing & QA",          path: "/indexing", icon: <FileEdit size={15} />, badge: { count: 18, cls: "nb-r" }, permission: "document:index" },
-      { label: "AI Engine",              path: "/ai-engine", icon: <Cpu size={15} />,     badge: { count: 342, cls: "nb-g" }, permission: "ai:read" },
+      { label: "Capture",       path: "/capture",   icon: <Camera size={15} />,   permission: "document:capture" },
+      { label: "Indexing & QA", path: "/indexing",  icon: <FileEdit size={15} />, permission: "document:index" },
+      { label: "AI Engine",     path: "/ai-engine", icon: <Cpu size={15} />,      permission: "ai:read" },
     ],
   },
   {
     label: "Management",
     items: [
-      { label: "Case Management",     path: "/case-management",     icon: <Briefcase size={15} />, badge: { count: 4, cls: "nb-b" }, permission: "case:read" },
-      { label: "Repository",          path: "/repository",          icon: <Folder size={15} />,     permission: "document:read" },
-      { label: "Records Management",  path: "/records-management",  icon: <FileText size={15} />,   permission: "records:read" },
-      { label: "Document Lifecycle",  path: "/document-lifecycle",  icon: <Activity size={15} />,   permission: "lifecycle:read" },
+      { label: "Case Management",    path: "/case-management",    icon: <Briefcase size={15} />, permission: "case:read" },
+      { label: "Repository",         path: "/repository",         icon: <Folder size={15} />,    permission: "document:read" },
+      { label: "Records Management", path: "/records-management", icon: <FileText size={15} />,  permission: "records:read" },
+      { label: "Document Lifecycle", path: "/document-lifecycle", icon: <Activity size={15} />,  permission: "lifecycle:read" },
     ],
   },
   {
     label: "Discovery",
     items: [
-      { label: "Enterprise Search",  path: "/search",  icon: <Search size={15} />,     permission: "search:read" },
-      { label: "Document Viewer",    path: "/viewer",  icon: <Eye size={15} />,         permission: "document:read" },
+      { label: "Enterprise Search", path: "/search", icon: <Search size={15} />, permission: "search:read" },
+      { label: "Document Viewer",   path: "/viewer", icon: <Eye size={15} />,    permission: "document:read" },
     ],
   },
   {
     label: "Process",
     items: [
-      { label: "Workflow Engine",   path: "/workflow-engine",   icon: <GitBranch size={15} />, badge: { count: 6, cls: "nb-g" }, permission: "workflow:read" },
-      { label: "Review Queue",      path: "/review-queue",      icon: <Shield size={15} />,    permission: "review:read" },
-      { label: "Compliance & Audit",path: "/compliance-audit",  icon: <Shield size={15} />,    permission: "compliance:read" },
-      { label: "Alerts & Events",   path: "/alerts",            icon: <AlertTriangle size={15} />, badge: { count: 11, cls: "nb-r" }, permission: "alerts:read" },
+      { label: "Workflow Engine",    path: "/workflow-engine",  icon: <GitBranch size={15} />,     permission: "workflow:read" },
+      { label: "Review Queue",       path: "/review-queue",     icon: <Shield size={15} />,        permission: "review:read" },
+      { label: "Compliance & Audit", path: "/compliance-audit", icon: <Shield size={15} />,        permission: "compliance:read" },
+      { label: "Alerts & Events",    path: "/alerts",           icon: <AlertTriangle size={15} />, permission: "alerts:read" },
     ],
   },
   {
     label: "Analytics & Platform",
     items: [
-      { label: "Integration Hub",       path: "/integration-hub",        icon: <Link2 size={15} />,    permission: "integration:read" },
-      { label: "Security & RBAC",       path: "/security",               icon: <Lock size={15} />,     permission: "security:read" },
-      { label: "User Management",       path: "/users",                  icon: <Users size={15} />,    permission: "user:read" },
-      { label: "System Administration", path: "/system-administration",  icon: <Settings size={15} />, permission: "admin:read" },
+      { label: "Integration Hub",       path: "/integration-hub",       icon: <Link2 size={15} />,    permission: "integration:read" },
+      { label: "Security & RBAC",       path: "/security",              icon: <Lock size={15} />,     permission: "security:read" },
+      { label: "User Management",       path: "/users",                 icon: <Users size={15} />,    permission: "user:read" },
+      { label: "System Administration", path: "/system-administration", icon: <Settings size={15} />, permission: "admin:read" },
     ],
   },
 ];
 
-/* ─────────── component ─────────── */
-export interface AppShellProps {
-  children: ReactNode;
+/* flat path → {group,label} for the breadcrumb */
+const PATH_INDEX: Record<string, { group: string; label: string }> = {};
+for (const g of NAV_GROUPS) for (const it of g.items) PATH_INDEX[it.path] = { group: g.label, label: it.label };
+
+/** "admin" → "Admin", "dorji.wangchuk" → "Dorji Wangchuk" */
+function properCase(s: string): string {
+  return s
+    .split(/[._\s-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
+
+export interface AppShellProps { children: ReactNode; }
 
 export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   function allowed(permission?: string) {
     if (!permission) return true;
     return user?.permissions?.includes(permission) ?? false;
   }
 
-  /* initials from username */
-  const initials = (user?.username ?? "?")
-    .split(/[._\s-]/)
-    .slice(0, 2)
-    .map(s => s[0]?.toUpperCase() ?? "")
-    .join("");
+  const crumb = PATH_INDEX[location.pathname];
+  const displayName = properCase(user?.username ?? "User");
+  const role = user?.roles?.[0] ?? "Staff";
+  const initials = displayName.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+  const branchLabel = user?.branch ?? "All Branches";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
 
       {/* ── Topbar ── */}
       <header className="topbar">
-        {/* Brand */}
+        {/* Brand (matches login) */}
         <div className="topbar-logo">
           <div className="topbar-zbadge">Z</div>
           <div className="topbar-brand">
@@ -121,25 +121,25 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </div>
 
-        {/* Branch selector */}
-        <button className="topbar-branch" type="button">
-          <span className="status-dot dot-green dot-pulse" />
-          <span>All Branches</span>
+        {/* Breadcrumb */}
+        {crumb && (
+          <div className="topbar-breadcrumb">
+            <span>{crumb.group}</span>
+            <ChevronRight size={13} style={{ opacity: 0.5 }} />
+            <b>{crumb.label}</b>
+          </div>
+        )}
+
+        {/* Branch scope — based on the logged-in user (left) */}
+        <button className="topbar-branch" type="button" title="Branch scope">
+          <MapPin size={12} />
+          <span>{branchLabel}</span>
           <ChevronDown size={11} />
         </button>
 
-        {/* Global search */}
-        <div className="topbar-search">
-          <input
-            type="text"
-            placeholder="Semantic AI search — customer, CID, document content, type…"
-          />
-          <span className="topbar-ai-tag">AI</span>
-        </div>
-
         {/* Right actions */}
         <div className="topbar-actions">
-          <button className="ic" type="button" title="Alerts (11)" onClick={() => navigate("/alerts")}>
+          <button className="ic" type="button" title="Alerts" onClick={() => navigate("/alerts")}>
             <Bell size={17} />
             <span className="notdot" />
           </button>
@@ -148,18 +148,18 @@ export function AppShell({ children }: AppShellProps) {
             <Shield size={17} />
           </button>
 
-          <button className="upbtn" type="button" onClick={() => navigate("/capture")}>
-            <Upload size={12} />
-            Ingest Document
-          </button>
-
-          {/* User pill */}
-          <button className="usr-pill" type="button" onClick={logout} title="Click to sign out">
+          {/* User pill — display only */}
+          <div className="usr-pill" title={`${displayName} · ${role}`}>
             <span className="usr-av">{initials}</span>
             <span>
-              <b>{user?.username ?? "User"}</b>
-              <small>{user?.roles?.[0] ?? "Staff"}</small>
+              <b>{displayName}</b>
+              <small>{role}</small>
             </span>
+          </div>
+
+          {/* Logout — separate exit button */}
+          <button className="ic exit-ic" type="button" title="Sign out" onClick={logout}>
+            <LogOut size={17} />
           </button>
         </div>
       </header>
@@ -169,13 +169,13 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* ── Sidebar ── */}
         <nav className="sidebar" aria-label="Main navigation">
-          {NAV_GROUPS.map(group => {
-            const visible = group.items.filter(i => allowed(i.permission));
+          {NAV_GROUPS.map((group) => {
+            const visible = group.items.filter((i) => allowed(i.permission));
             if (visible.length === 0) return null;
             return (
               <div key={group.label} className="nav-section">
                 <div className="nav-label">{group.label}</div>
-                {visible.map(item => (
+                {visible.map((item) => (
                   <NavLink
                     key={item.path}
                     to={item.path}
@@ -183,23 +183,16 @@ export function AppShell({ children }: AppShellProps) {
                   >
                     {item.icon}
                     <span style={{ flex: 1 }}>{item.label}</span>
-                    {item.badge && (
-                      <span className={`nb ${item.badge.cls}`}>{item.badge.count}</span>
-                    )}
                   </NavLink>
                 ))}
               </div>
             );
           })}
 
-          {/* Sidebar footer */}
+          {/* Sidebar footer — version + build only */}
           <div className="sidebar-footer">
-            <div className="sys" style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 10, color: "var(--sil)" }}>
-              <span className="status-dot dot-green dot-pulse" />
-              All 18 services healthy
-            </div>
-            <div className="mono" style={{ fontSize: 9, color: "var(--sil)", marginTop: 5 }}>
-              v4.2.1 · Build {new Date().getFullYear()}
+            <div className="mono" style={{ fontSize: 9 }}>
+              v{__APP_VERSION__} · Build {new Date().getFullYear()}
             </div>
           </div>
         </nav>

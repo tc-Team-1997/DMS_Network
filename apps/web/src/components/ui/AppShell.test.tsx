@@ -50,7 +50,7 @@ describe("AppShell", () => {
 
   it("renders all six nav group labels", () => {
     renderShell();
-    expect(screen.getByText("Intelligence")).toBeInTheDocument();
+    expect(screen.getAllByText("Intelligence").length).toBeGreaterThan(0);
     expect(screen.getByText("Ingestion")).toBeInTheDocument();
     expect(screen.getByText("Management")).toBeInTheDocument();
     expect(screen.getByText("Discovery")).toBeInTheDocument();
@@ -58,8 +58,8 @@ describe("AppShell", () => {
     expect(screen.getByText("Analytics & Platform")).toBeInTheDocument();
   });
 
-  it("renders the sidebar footer status line", () => {
+  it("renders the sidebar footer version/build line", () => {
     renderShell();
-    expect(screen.getByText("All 18 services healthy")).toBeInTheDocument();
+    expect(screen.getByText(/Build/i)).toBeInTheDocument();
   });
 });

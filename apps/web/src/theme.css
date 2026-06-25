@@ -467,4 +467,9 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .nav-item.active { color: #f0c84a; background: rgba(240,200,74,.1); border-left-color: #f0c84a; }
 .sidebar-footer { border-top-color: rgba(255,255,255,.08); }
 .sidebar-footer .sys { color: rgba(255,255,255,.5) !important; }
-.sidebar-footer .mono { color: rgba(255,255,255,.4) !important; }
+.sidebar-footer .mono { color: rgba(255,255,255,.45) !important; }
+.topbar-breadcrumb { display: flex; align-items: center; gap: 7px; color: rgba(255,255,255,.55); font-size: 12.5px; padding: 0 6px 0 14px; white-space: nowrap; }
+.topbar-breadcrumb b { color: #fff; font-weight: 600; }
+.exit-ic:hover { color: #ff6b6b !important; background: rgba(255,107,107,.12) !important; }
+/* Page titles are replaced by the topbar breadcrumb */
+.page-header h2, .page-header p { display: none; }
