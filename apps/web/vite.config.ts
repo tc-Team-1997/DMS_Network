@@ -1,5 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { createRequire } from "node:module";
+
+// Derive the app version from the actual package.json (single source of truth).
+const pkg = createRequire(import.meta.url)("./package.json") as { version: string };
 
 /**
  * ZorDMS v4.2 Dev Proxy Scheme
@@ -22,6 +26,9 @@ import react from "@vitejs/plugin-react";
  */
 export default defineConfig({
   plugins: [react()],
+
+  // Injected as a compile-time global; read in the UI as __APP_VERSION__.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
 
   server: {
     proxy: {
