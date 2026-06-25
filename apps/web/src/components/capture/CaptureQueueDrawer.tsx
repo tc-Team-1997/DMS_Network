@@ -23,13 +23,16 @@ export interface CaptureQueueDrawerProps {
 
 const STATUS_TAG: Record<
   CaptureQueueEntry["status"],
-  { label: string; variant: "green" | "amber" | "blue" | "red" | "gold" }
+  { label: string; variant: "green" | "amber" | "blue" | "red" | "gold" | "purple" }
 > = {
   ready: { label: "Ready", variant: "gold" },
   uploading: { label: "Uploading…", variant: "amber" },
   extracting: { label: "Extracting…", variant: "blue" },
+  queued: { label: "Queued", variant: "purple" },
+  running: { label: "Running…", variant: "blue" },
   done: { label: "Captured", variant: "green" },
   error: { label: "Error", variant: "red" },
+  dead: { label: "Dead-letter", variant: "red" },
 };
 
 export function CaptureQueueDrawer({
@@ -273,26 +276,35 @@ export function CaptureQueueDrawer({
                 </div>
               ) : null}
 
-              {/* Error */}
-              {selected.status === "error" && selected.errorMsg && (
-                <div
-                  style={{
-                    margin: 16,
-                    background: "rgba(255,80,80,.07)",
-                    border: "1px solid rgba(255,80,80,.3)",
-                    borderRadius: 8,
-                    padding: "10px 12px",
-                    fontSize: 12,
-                    color: "var(--R)",
-                  }}
-                >
-                  {selected.errorMsg}
-                </div>
-              )}
+              {/* Error / dead-letter */}
+              {(selected.status === "error" || selected.status === "dead") &&
+                (selected.errorMsg || selected.status === "dead") && (
+                  <div
+                    style={{
+                      margin: 16,
+                      background: "rgba(255,80,80,.07)",
+                      border: "1px solid rgba(255,80,80,.3)",
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      fontSize: 12,
+                      color: "var(--R)",
+                    }}
+                  >
+                    {selected.status === "dead" && (
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        Dead-letter — extraction retries exhausted
+                        {selected.attempts != null ? ` (${selected.attempts} attempts)` : ""}
+                      </div>
+                    )}
+                    {selected.errorMsg ?? "Extraction job failed."}
+                  </div>
+                )}
 
-              {/* Processing state */}
+              {/* Processing state — sync + async (queued / running) */}
               {(selected.status === "uploading" ||
-                selected.status === "extracting") && (
+                selected.status === "extracting" ||
+                selected.status === "queued" ||
+                selected.status === "running") && (
                 <div
                   style={{
                     display: "flex",
@@ -313,7 +325,13 @@ export function CaptureQueueDrawer({
                   </span>
                   {selected.status === "uploading"
                     ? "Uploading…"
-                    : "AI extraction in progress…"}
+                    : selected.status === "queued"
+                      ? "Queued for background extraction…"
+                      : selected.status === "running"
+                        ? `Background extraction running…${
+                            selected.attempts ? ` (attempt ${selected.attempts})` : ""
+                          }`
+                        : "AI extraction in progress…"}
                 </div>
               )}
             </div>

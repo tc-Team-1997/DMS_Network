@@ -56,9 +56,48 @@ const MOCK_DEDUP_CONFIG = {
   fuzzyThreshold: 1.0,
 };
 
+const MOCK_JOB_COUNTS = { queued: 2, running: 1, succeeded: 9, failed: 1, dead: 1 };
+
+const MOCK_JOBS = [
+  {
+    id: "job-dead-1",
+    type: "extract",
+    status: "dead",
+    attempts: 5,
+    maxAttempts: 5,
+    lastError: "extract_not_found",
+    result: null,
+    idempotencyKey: "extract:42",
+    priority: 0,
+    availableAt: "2026-06-25T09:00:00.000Z",
+    createdAt: "2026-06-25T08:59:00.000Z",
+    updatedAt: "2026-06-25T09:00:00.000Z",
+  },
+  {
+    id: "job-ok-1",
+    type: "extract",
+    status: "succeeded",
+    attempts: 1,
+    maxAttempts: 5,
+    lastError: null,
+    result: { docId: 7 },
+    idempotencyKey: "extract:7",
+    priority: 0,
+    availableAt: "2026-06-25T08:58:00.000Z",
+    createdAt: "2026-06-25T08:57:30.000Z",
+    updatedAt: "2026-06-25T08:58:00.000Z",
+  },
+];
+
 function mockFetch(url: string, options?: RequestInit) {
   const u = String(url);
   const method = (options?.method ?? "GET").toUpperCase();
+  if (u.includes("/jobs")) {
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ counts: MOCK_JOB_COUNTS, jobs: MOCK_JOBS }),
+    });
+  }
   if (u.includes("/admin/dedup-config")) {
     if (method === "PUT") {
       const body = options?.body ? JSON.parse(String(options.body)) : {};
@@ -277,6 +316,68 @@ describe("SystemAdministration screen", () => {
     });
     await waitFor(() => {
       expect(screen.getByText("Current Saved Values")).toBeInTheDocument();
+    });
+  });
+
+  // ── P8: Processing Queue tab (background job monitor) ────────────────────────
+
+  it("renders a Processing Queue tab in the navigation", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /processing queue/i })).toBeInTheDocument();
+  });
+
+  it("Processing Queue tab loads counts by status and a recent-jobs table", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /processing queue/i }));
+    });
+    // Counts by status — queued/running/succeeded/failed/dead tiles present.
+    await waitFor(() => {
+      expect(screen.getByTestId("job-count-queued").textContent).toContain("2");
+      expect(screen.getByTestId("job-count-running").textContent).toContain("1");
+      expect(screen.getByTestId("job-count-succeeded").textContent).toContain("9");
+      expect(screen.getByTestId("job-count-dead").textContent).toContain("1");
+    });
+    // Recent-jobs table shows the job type.
+    expect(screen.getAllByText("extract").length).toBeGreaterThan(0);
+  });
+
+  it("Processing Queue surfaces a dead-letter row distinctly", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /processing queue/i }));
+    });
+    await waitFor(() => {
+      // dead status tag in the row + dead-letter callouts.
+      expect(screen.getAllByText(/dead/i).length).toBeGreaterThan(0);
+      // The failing job's last_error is surfaced.
+      expect(screen.getByText("extract_not_found")).toBeInTheDocument();
+    });
+  });
+
+  it("Processing Queue Refresh button re-fetches GET /jobs", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /processing queue/i }));
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /refresh processing queue/i })).toBeInTheDocument(),
+    );
+    const before = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c: unknown[]) => String(c[0]).includes("/jobs"),
+    ).length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /refresh processing queue/i }));
+    });
+    await waitFor(() => {
+      const after = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+        (c: unknown[]) => String(c[0]).includes("/jobs"),
+      ).length;
+      expect(after).toBeGreaterThan(before);
     });
   });
 });

@@ -211,6 +211,35 @@ export async function extractDocument(id: string): Promise<ExtractionResult> {
   return res.json();
 }
 
+/** 202 response from the async-extract path (P8 durable job queue). */
+export interface EnqueuedExtraction {
+  jobId: string;
+  status: "queued";
+}
+
+/**
+ * P8 — Enqueue AI extraction as a durable background job instead of running it
+ * synchronously on the request. Returns 202 { jobId, status:"queued" }. The
+ * document's extraction_status reflects QUEUED → RUNNING → DONE/FAILED, and the
+ * job can be polled via getJob(jobId) until a terminal status.
+ *
+ * Sends `{ async: true }` to POST /documents/:id/extract (the route also accepts
+ * POST /documents/:id/extract-async). Idempotent per document id on the backend.
+ */
+export async function extractDocumentAsync(id: string): Promise<EnqueuedExtraction> {
+  const res = await fetch(`${SVC.core}/documents/${id}/extract`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ async: true }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
+  }
+  return res.json();
+}
+
 /**
  * Fetch all registered document types, including mandatoryFields / optionalFields.
  * GET SVC.core/doc-types

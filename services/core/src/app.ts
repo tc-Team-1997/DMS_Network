@@ -18,6 +18,7 @@ import { sysadminRouter } from "./routes/sysadmin.js";
 import { docTypesRouter } from "./routes/doc_types.js";
 import { extractionRouter } from "./routes/extraction.js";
 import { integrationRouter } from "./routes/integration.js";
+import { jobsRouter } from "./routes/jobs.js";
 
 export function createApp(deps: CoreDeps): Express {
   const app = express();
@@ -51,6 +52,9 @@ export function createApp(deps: CoreDeps): Express {
 
   // P7: internal ingest endpoints called by the integration hub (x-internal-token auth)
   app.use("/integration", integrationRouter());
+
+  // P8: durable job-queue status + admin monitor
+  app.use("/jobs", jobsRouter());
 
   // I2: global error handler so unhandled async throws return 500 instead of hanging
   app.use(errorHandler);

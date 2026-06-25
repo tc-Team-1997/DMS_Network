@@ -39,15 +39,30 @@ if (!globalThis.URL.createObjectURL) {
 
 const mockUploadDocument = vi.fn();
 const mockExtractDocument = vi.fn();
+const mockExtractDocumentAsync = vi.fn();
 const mockGetDocTypes = vi.fn();
 const mockPatchDocument = vi.fn();
 
 vi.mock("../api/captureApi.js", () => ({
   uploadDocument: (...args: unknown[]) => mockUploadDocument(...args),
   extractDocument: (...args: unknown[]) => mockExtractDocument(...args),
+  extractDocumentAsync: (...args: unknown[]) => mockExtractDocumentAsync(...args),
   bulkUploadDocuments: vi.fn(),
   getDocTypes: (...args: unknown[]) => mockGetDocTypes(...args),
   patchDocument: (...args: unknown[]) => mockPatchDocument(...args),
+}));
+
+// ─── Mock jobsApi (P8 async-extract polling) ─────────────────────────────────
+
+const mockGetJob = vi.fn();
+
+vi.mock("../api/jobsApi.js", () => ({
+  getJob: (...args: unknown[]) => mockGetJob(...args),
+  listJobs: vi.fn(),
+  // Keep the real terminal-status semantics so polling stops correctly.
+  isTerminalJobStatus: (s: string | undefined) =>
+    s === "succeeded" || s === "failed" || s === "dead",
+  TERMINAL_JOB_STATUSES: new Set(["succeeded", "failed", "dead"]),
 }));
 
 // ─── Auth mock — mutable so RBAC test can override ───────────────────────────
@@ -237,6 +252,16 @@ describe("Capture screen — enterprise rebuild", () => {
     mockUserBranch = "Thimphu";
     mockUploadDocument.mockResolvedValue(MOCK_UPLOAD_RESPONSE);
     mockExtractDocument.mockResolvedValue(MOCK_EXTRACTION_RESPONSE);
+    mockExtractDocumentAsync.mockResolvedValue({ jobId: "job-1", status: "queued" });
+    mockGetJob.mockResolvedValue({
+      id: "job-1",
+      type: "extract",
+      status: "succeeded",
+      attempts: 1,
+      maxAttempts: 5,
+      result: { docId: 42, confidence: 0.91 },
+      last_error: null,
+    });
     mockGetDocTypes.mockResolvedValue(MOCK_DOC_TYPES_RESPONSE);
     mockPatchDocument.mockResolvedValue(MOCK_PATCH_RESPONSE);
   });
@@ -1234,5 +1259,107 @@ describe("Capture screen — enterprise rebuild", () => {
         screen.getByText(/No raw metadata captured/i)
       ).toBeInTheDocument()
     );
+  });
+
+  // ── P8: Bulk async extract + polling ────────────────────────────────────────
+
+  /** Select bulk files, open Bulk tab, click Proceed + confirm. */
+  async function doBulkProceed(files = [mockFile("a.pdf"), mockFile("b.pdf")]) {
+    fireEvent.click(screen.getByRole("button", { name: "Bulk Upload" }));
+    await waitFor(() => screen.getByLabelText(/Drop multiple files.*file input/i));
+    const input = screen.getByLabelText(/Drop multiple files.*file input/i);
+    Object.defineProperty(input, "files", { value: files, configurable: true });
+    fireEvent.change(input);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Proceed to upload and extract/i })).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Proceed to upload and extract/i }));
+    await waitFor(() => screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+    });
+  }
+
+  it("Bulk Upload tab shows the 'process in background' toggle (default on)", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Bulk Upload" }));
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Process extraction in background"),
+      ).toBeInTheDocument(),
+    );
+    const toggle = screen.getByLabelText("Process extraction in background") as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+  });
+
+  it("bulk upload uses the async extract path (extractDocumentAsync, not extractDocument)", async () => {
+    renderWithRouter(<Capture />);
+    await doBulkProceed([mockFile("a.pdf")]);
+    await waitFor(() => expect(mockExtractDocumentAsync).toHaveBeenCalled());
+    // Async path must NOT call the synchronous extract.
+    expect(mockExtractDocument).not.toHaveBeenCalled();
+    // Enqueued by the uploaded document id.
+    expect(mockExtractDocumentAsync).toHaveBeenCalledWith(42);
+  });
+
+  it("bulk async polls GET /jobs/:id (queued → succeeded) and reaches Captured", async () => {
+    // Sequence: first poll queued, then succeeded — polling must stop on terminal.
+    mockGetJob
+      .mockResolvedValueOnce({
+        id: "job-1",
+        type: "extract",
+        status: "queued",
+        attempts: 0,
+        maxAttempts: 5,
+        result: null,
+        last_error: null,
+      })
+      .mockResolvedValueOnce({
+        id: "job-1",
+        type: "extract",
+        status: "succeeded",
+        attempts: 1,
+        maxAttempts: 5,
+        result: { docId: 42, confidence: 0.91 },
+        last_error: null,
+      });
+
+    renderWithRouter(<Capture />);
+    await doBulkProceed([mockFile("a.pdf")]);
+
+    // Polled the job at least twice (queued, then succeeded). The second poll is
+    // scheduled after the poll interval, so allow extra wall-clock time.
+    await waitFor(() => expect(mockGetJob.mock.calls.length).toBeGreaterThanOrEqual(2), {
+      timeout: 4000,
+    });
+    // Terminal reached → entry shows the captured count.
+    await waitFor(() => expect(screen.getByText(/1 Captured/)).toBeInTheDocument(), {
+      timeout: 4000,
+    });
+    expect(mockGetJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("bulk async surfaces a dead-letter job as an error/dead state", async () => {
+    mockGetJob.mockResolvedValue({
+      id: "job-1",
+      type: "extract",
+      status: "dead",
+      attempts: 5,
+      maxAttempts: 5,
+      result: null,
+      last_error: "extract_not_found",
+    });
+
+    renderWithRouter(<Capture />);
+    await doBulkProceed([mockFile("a.pdf")]);
+
+    await waitFor(() => expect(mockGetJob).toHaveBeenCalled(), { timeout: 4000 });
+    // Dead-letter status tag rendered in the compact queue list.
+    await waitFor(
+      () => expect(screen.getAllByText(/Dead-letter/i).length).toBeGreaterThan(0),
+      { timeout: 4000 },
+    );
+    // No false "Captured" count.
+    expect(screen.queryByText(/1 Captured/)).not.toBeInTheDocument();
   });
 });

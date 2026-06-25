@@ -8,6 +8,13 @@ import { catalog, categoryFor } from "../catalog/engine.js";
 import { computeQuality } from "../catalog/quality.js";
 import { burnStamp, burnRedaction, type RedactRegion } from "../repo/burnin.js";
 import { EVENTS } from "../events/index.js";
+import { enqueue } from "../queue/index.js";
+import { extractIdempotencyKey } from "../worker/handlers.js";
+
+function bearerFrom(authHeader: string | undefined): string {
+  if (!authHeader) return "";
+  return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+}
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -34,6 +41,47 @@ export function documentsRouter(): Router {
         folderId: req.body.folderId ? String(req.body.folderId) : null,
       });
       res.status(201).json({ document });
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
+  });
+
+  // POST /bulk — BULK ingestion (document:capture).
+  // Captures many files in one request, then enqueues a durable async "extract"
+  // job per document (idempotent by docId → never double-extracts) so heavy
+  // bulk loads never run extraction on the request path. Returns 202.
+  r.post("/bulk", requirePermission("document:capture"), upload.array("files", 200), async (req, res) => {
+    try {
+      const deps = req.app.locals.deps as CoreDeps;
+      const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+      if (files.length === 0) { res.status(400).json({ error: "files_required" }); return; }
+
+      const viewer = makeViewer(req);
+      const branch = (viewer.canCrossBranch && req.body.branch) ? req.body.branch : req.authUser!.branch;
+      const bearer = bearerFrom(req.headers.authorization);
+      const username = req.authUser!.username;
+
+      const items: Array<{ docId: string; jobId: string }> = [];
+      for (const file of files) {
+        const document = await captureDocument(deps, {
+          title: file.originalname,
+          filename: file.originalname,
+          mimeType: file.mimetype,
+          buffer: file.buffer,
+          branch,
+          ingestUserId: username,
+          sourceChannel: req.body.sourceChannel ?? "BULK",
+          folderId: req.body.folderId ? String(req.body.folderId) : null,
+        });
+        await deps.knex("documents").where({ id: document.id }).update({ extraction_status: "QUEUED" });
+        const job = await enqueue(
+          deps.knex,
+          "extract",
+          { docId: document.id, bearer, callerUsername: username },
+          { idempotencyKey: extractIdempotencyKey(document.id) },
+        );
+        items.push({ docId: document.id, jobId: job.id });
+      }
+
+      res.status(202).json({ count: items.length, items, status: "queued" });
     } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
   });
 

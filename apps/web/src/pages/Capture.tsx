@@ -10,13 +10,15 @@
  * Capture queue with drawer (FAB bottom-right, uiStore.captureDrawerOpen).
  * RBAC gate: document:capture.
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Card, Tag, Tabs, Modal, FormField } from "../components/ui/index.js";
 import type { TabItem } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useUiStore } from "../store/uiStore.js";
-import { uploadDocument, extractDocument } from "../api/captureApi.js";
+import { uploadDocument, extractDocument, extractDocumentAsync } from "../api/captureApi.js";
 import type { ExtractionResult } from "../api/captureApi.js";
+import { getJob, isTerminalJobStatus } from "../api/jobsApi.js";
+import type { JobStatus } from "../api/jobsApi.js";
 import { CaptureDropZone } from "../components/capture/CaptureDropZone.js";
 import { FilePreview } from "../components/capture/FilePreview.js";
 import { ExtractionResult as ExtractionResultPanel } from "../components/capture/ExtractionResult.js";
@@ -28,13 +30,27 @@ export interface CaptureQueueEntry {
   id: string;
   title: string;
   channel: "SCAN" | "UPLOAD" | "BULK";
-  status: "ready" | "uploading" | "extracting" | "done" | "error";
+  status:
+    | "ready"
+    | "uploading"
+    | "extracting"
+    | "queued"
+    | "running"
+    | "done"
+    | "error"
+    | "dead";
   frontFile: File | null;
   backFile: File | null;
   docId?: string;
   confidence?: number;
   extraction?: ExtractionResult;
   errorMsg?: string;
+  /** P8 async: durable extraction job id (bulk / background path). */
+  jobId?: string;
+  /** P8 async: last polled job status (queued/running/succeeded/failed/dead). */
+  jobStatus?: JobStatus;
+  /** P8 async: retry attempts reported by the job. */
+  attempts?: number;
 }
 
 /** Capture mode: single slot vs two-sided */
@@ -50,14 +66,38 @@ const TABS: TabItem[] = [
 
 const STATUS_TAG: Record<
   CaptureQueueEntry["status"],
-  { label: string; variant: "green" | "amber" | "blue" | "red" | "gold" }
+  { label: string; variant: "green" | "amber" | "blue" | "red" | "gold" | "purple" }
 > = {
   ready: { label: "Ready", variant: "gold" },
   uploading: { label: "Uploading…", variant: "amber" },
   extracting: { label: "Extracting…", variant: "blue" },
+  queued: { label: "Queued", variant: "purple" },
+  running: { label: "Running…", variant: "blue" },
   done: { label: "Captured", variant: "green" },
   error: { label: "Error", variant: "red" },
+  dead: { label: "Dead-letter", variant: "red" },
 };
+
+/** Map a polled job status → capture queue entry status. */
+function jobStatusToEntry(s: JobStatus): CaptureQueueEntry["status"] {
+  switch (s) {
+    case "queued":
+      return "queued";
+    case "running":
+      return "running";
+    case "succeeded":
+      return "done";
+    case "dead":
+      return "dead";
+    case "failed":
+    default:
+      return "error";
+  }
+}
+
+/** Polling cadence + ceiling for background extraction jobs. */
+const JOB_POLL_INTERVAL_MS = 1500;
+const JOB_POLL_MAX_ATTEMPTS = 40; // ~60s safety ceiling
 
 // ─── Mode Selector ────────────────────────────────────────────────────────────
 
@@ -402,9 +442,13 @@ function FileUploadTab({
 function BulkUploadTab({
   bulkFiles,
   onFiles,
+  background,
+  onBackgroundChange,
 }: {
   bulkFiles: File[];
   onFiles: (files: File[]) => void;
+  background: boolean;
+  onBackgroundChange: (v: boolean) => void;
 }) {
   return (
     <Card title="Bulk Upload">
@@ -414,6 +458,36 @@ function BulkUploadTab({
         onFiles={onFiles}
         data-testid="bulk-zone"
       />
+
+      {/* Background processing toggle — bulk extraction runs off the request path
+          via the durable job queue, polled to completion. */}
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginTop: 12,
+          padding: "9px 12px",
+          background: "var(--ink3)",
+          border: "1px solid var(--bd)",
+          borderRadius: 7,
+          cursor: "pointer",
+          fontSize: 12,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={background}
+          aria-label="Process extraction in background"
+          onChange={(e) => onBackgroundChange(e.target.checked)}
+        />
+        <span style={{ color: "var(--mist)", fontWeight: 600 }}>
+          Process extraction in background
+        </span>
+        <span style={{ color: "var(--sil)", fontSize: 10 }}>
+          Queues a durable job per document; status updates as it runs.
+        </span>
+      </label>
       {bulkFiles.length > 0 && (
         <div
           style={{
@@ -490,6 +564,9 @@ export default function Capture() {
   const [backFile, setBackFile] = useState<File | null>(null);
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
 
+  // ── Bulk: process extraction in background via durable job queue (default on) ──
+  const [bulkBackground, setBulkBackground] = useState(true);
+
   // ── Proceed/processing state ──
   const [processing, setProcessing] = useState(false);
   const [processingMsg, setProcessingMsg] = useState("");
@@ -500,6 +577,105 @@ export default function Capture() {
   // ── Capture queue ──
   const [queue, setQueue] = useState<CaptureQueueEntry[]>([]);
   const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
+
+  // ── Background job polling — track active timers so we can cancel on unmount ──
+  const pollTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const timers = pollTimers.current;
+    return () => {
+      mountedRef.current = false;
+      // Stop all in-flight polls on unmount (no leaks / no setState after unmount).
+      for (const t of timers) clearTimeout(t);
+      timers.clear();
+    };
+  }, []);
+
+  /**
+   * Poll GET /jobs/:id until a terminal status, reflecting queued → running →
+   * succeeded/failed/dead onto the queue entry. Resolves when terminal or the
+   * safety ceiling is reached. Never throws.
+   */
+  const pollJobToCompletion = useCallback(
+    (entryId: string, jobId: string) =>
+      new Promise<void>((resolve) => {
+        let attempts = 0;
+
+        const tick = async () => {
+          if (!mountedRef.current) {
+            resolve();
+            return;
+          }
+          attempts += 1;
+          try {
+            const job = await getJob(jobId);
+            if (!mountedRef.current) {
+              resolve();
+              return;
+            }
+            const entryStatus = jobStatusToEntry(job.status);
+            setQueue((q) =>
+              q.map((i) =>
+                i.id === entryId
+                  ? {
+                      ...i,
+                      status: entryStatus,
+                      jobStatus: job.status,
+                      attempts: job.attempts,
+                      confidence:
+                        job.status === "succeeded" &&
+                        job.result &&
+                        typeof (job.result as { confidence?: number }).confidence === "number"
+                          ? (job.result as { confidence: number }).confidence
+                          : i.confidence,
+                      errorMsg:
+                        job.status === "failed" || job.status === "dead"
+                          ? job.last_error ?? "Extraction job failed"
+                          : i.errorMsg,
+                    }
+                  : i,
+              ),
+            );
+
+            // STOP polling on any terminal status.
+            if (isTerminalJobStatus(job.status)) {
+              resolve();
+              return;
+            }
+          } catch (err) {
+            // Transient poll error — surface on the entry but keep trying until
+            // the ceiling so a flaky network doesn't kill an in-progress job.
+            const msg = err instanceof Error ? err.message : "Job poll failed";
+            setQueue((q) =>
+              q.map((i) => (i.id === entryId ? { ...i, errorMsg: msg } : i)),
+            );
+          }
+
+          if (attempts >= JOB_POLL_MAX_ATTEMPTS) {
+            setQueue((q) =>
+              q.map((i) =>
+                i.id === entryId && i.status !== "done"
+                  ? { ...i, status: "error", errorMsg: "Timed out waiting for extraction job." }
+                  : i,
+              ),
+            );
+            resolve();
+            return;
+          }
+
+          const t = setTimeout(() => {
+            pollTimers.current.delete(t);
+            void tick();
+          }, JOB_POLL_INTERVAL_MS);
+          pollTimers.current.add(t);
+        };
+
+        void tick();
+      }),
+    [],
+  );
 
   // ── Proceed modal (title / branch confirm) ──
   const [showProceedModal, setShowProceedModal] = useState(false);
@@ -561,6 +737,13 @@ export default function Capture() {
       setProcessing(true);
       setProcessingMsg("Uploading bulk files…");
 
+      const useBackground = bulkBackground;
+      setProcessingMsg(
+        useBackground
+          ? "Uploading & queueing background extraction…"
+          : "Uploading bulk files…",
+      );
+
       await Promise.all(
         entries.map(async (entry) => {
           try {
@@ -569,6 +752,23 @@ export default function Capture() {
               branch: proceedBranch,
               source_channel: "BULK",
             });
+
+            if (useBackground) {
+              // ── Async path: enqueue a durable extraction job, then poll ──
+              const { jobId } = await extractDocumentAsync(doc.id);
+              setQueue((q) =>
+                q.map((i) =>
+                  i.id === entry.id
+                    ? { ...i, status: "queued", docId: doc.id, jobId, jobStatus: "queued" }
+                    : i,
+                ),
+              );
+              // Poll GET /jobs/:id → reflects running → succeeded/failed/dead.
+              await pollJobToCompletion(entry.id, jobId);
+              return;
+            }
+
+            // ── Synchronous path (toggle off) ──
             setQueue((q) =>
               q.map((i) =>
                 i.id === entry.id
@@ -675,6 +875,8 @@ export default function Capture() {
     frontFile,
     backFile,
     bulkFiles,
+    bulkBackground,
+    pollJobToCompletion,
     proceedTitle,
     proceedBranch,
     setCaptureDrawerOpen,
@@ -752,7 +954,9 @@ export default function Capture() {
                 (i) =>
                   i.status === "ready" ||
                   i.status === "uploading" ||
-                  i.status === "extracting"
+                  i.status === "extracting" ||
+                  i.status === "queued" ||
+                  i.status === "running"
               ).length
             }{" "}
             In Progress
@@ -812,7 +1016,12 @@ export default function Capture() {
           />
         )}
         {tab === "bulk" && (
-          <BulkUploadTab bulkFiles={bulkFiles} onFiles={setBulkFiles} />
+          <BulkUploadTab
+            bulkFiles={bulkFiles}
+            onFiles={setBulkFiles}
+            background={bulkBackground}
+            onBackgroundChange={setBulkBackground}
+          />
         )}
       </div>
 
@@ -895,7 +1104,10 @@ export default function Capture() {
                 onClick={() =>
                   setQueue((q) =>
                     q.filter(
-                      (i) => i.status !== "done" && i.status !== "error"
+                      (i) =>
+                        i.status !== "done" &&
+                        i.status !== "error" &&
+                        i.status !== "dead"
                     )
                   )
                 }
@@ -984,7 +1196,9 @@ export default function Capture() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 12, color: "var(--sil)" }}>
             {tab === "bulk"
-              ? `${bulkFiles.length} file${bulkFiles.length !== 1 ? "s" : ""} will be uploaded and AI-extracted.`
+              ? `${bulkFiles.length} file${bulkFiles.length !== 1 ? "s" : ""} will be uploaded and AI-extracted${
+                  bulkBackground ? " in the background (queued job per document)." : "."
+                }`
               : `Uploading ${frontFile?.name ?? ""}${
                   captureMode === "front-back" && backFile
                     ? ` + ${backFile.name}`

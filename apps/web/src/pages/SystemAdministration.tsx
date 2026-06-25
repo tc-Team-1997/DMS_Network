@@ -13,6 +13,8 @@ import type {
 } from "../api/systemAdministration.js";
 import { useUrlState } from "../hooks/useUrlState.js";
 import { DocTypesPanel } from "../components/doctypes/DocTypesPanel.js";
+import { listJobs } from "../api/jobsApi.js";
+import type { JobStatus, MonitorJob } from "../api/jobsApi.js";
 
 /* ─── helpers ─── */
 function healthVariant(s: ServiceHealth["status"]): "green" | "amber" | "red" {
@@ -35,12 +37,33 @@ const TABS = [
   { key: "health", label: "Service Health" },
   { key: "dr", label: "Disaster Recovery" },
   { key: "schedules", label: "Backup & Maintenance" },
+  { key: "queue", label: "Processing Queue" },
   { key: "dedup", label: "Duplicate Detection" },
   { key: "doctypes", label: "Document Types" },
 ];
 
 type HealthRow = ServiceHealth & { _key: string };
 type ScheduleRow = ScheduleEntry & { _key: string };
+
+/* ─── Processing-queue helpers (P8 background job monitor) ─── */
+const JOB_STATUS_ORDER: JobStatus[] = ["queued", "running", "succeeded", "failed", "dead"];
+
+function jobStatusTagVariant(s: JobStatus): "green" | "amber" | "red" | "blue" | "purple" | "gold" {
+  switch (s) {
+    case "succeeded":
+      return "green";
+    case "running":
+      return "blue";
+    case "queued":
+      return "purple";
+    case "failed":
+      return "amber";
+    case "dead":
+      return "red";
+    default:
+      return "gold";
+  }
+}
 
 export function SystemAdministration() {
   const { user } = useAuth();
@@ -71,6 +94,13 @@ export function SystemAdministration() {
   const [dedupLoading, setDedupLoading] = useState(false);
   const [dedupSaving, setDedupSaving] = useState(false);
   const [dedupMsg, setDedupMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
+  // ── Processing queue (P8 background job monitor) ──
+  const [jobCounts, setJobCounts] = useState<Record<string, number>>({});
+  const [jobs, setJobs] = useState<MonitorJob[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+  const [jobsRefreshedAt, setJobsRefreshedAt] = useState<Date | null>(null);
 
   const loadAll = useCallback(async () => {
     if (!canAdmin) return;
@@ -114,6 +144,28 @@ export function SystemAdministration() {
       loadDedupConfig();
     }
   }, [tab, canAdmin, dedupConfig, loadDedupConfig]);
+
+  const loadJobs = useCallback(async () => {
+    if (!canAdmin) return;
+    setJobsLoading(true);
+    setJobsError(null);
+    try {
+      const res = await listJobs({ limit: 50 });
+      setJobCounts(res.counts ?? {});
+      setJobs(res.jobs ?? []);
+      setJobsRefreshedAt(new Date());
+    } catch (e: any) {
+      setJobsError(String(e?.message ?? "Failed to load processing queue"));
+    } finally {
+      setJobsLoading(false);
+    }
+  }, [canAdmin]);
+
+  useEffect(() => {
+    if (tab === "queue" && canAdmin && jobsRefreshedAt === null) {
+      loadJobs();
+    }
+  }, [tab, canAdmin, jobsRefreshedAt, loadJobs]);
 
   async function handleSaveDedupConfig() {
     if (!dedupDraft) return;
@@ -425,6 +477,169 @@ export function SystemAdministration() {
               </div>
             </Card>
           )}
+        </div>
+      )}
+
+      {/* ═══ PROCESSING QUEUE TAB (P8 background jobs) ═══ */}
+      {tab === "queue" && (
+        <div style={{ marginTop: 14 }}>
+          {/* Counts by status */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+              gap: 10,
+              marginBottom: 14,
+            }}
+          >
+            {JOB_STATUS_ORDER.map((s) => {
+              const count = jobCounts[s] ?? 0;
+              const isDead = s === "dead";
+              return (
+                <div
+                  key={s}
+                  data-testid={`job-count-${s}`}
+                  style={{
+                    background: "var(--ink3)",
+                    border: `1px solid ${isDead && count > 0 ? "rgba(224,82,82,.4)" : "var(--bd)"}`,
+                    borderRadius: 9,
+                    padding: "12px 14px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--sil)",
+                      marginBottom: 4,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    {s}
+                    {isDead && count > 0 && <Tag variant="red">dead-letter</Tag>}
+                  </div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 22,
+                      color: isDead && count > 0 ? "var(--R)" : "var(--mist)",
+                    }}
+                  >
+                    {count}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: "var(--sil)" }}>
+              {jobsRefreshedAt
+                ? `Last refreshed: ${jobsRefreshedAt.toLocaleTimeString()}`
+                : "Not yet loaded"}
+            </span>
+            <button
+              className="btn bg sm"
+              onClick={loadJobs}
+              disabled={jobsLoading}
+              aria-label="Refresh processing queue"
+            >
+              {jobsLoading ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+
+          {jobsError && (
+            <div
+              role="alert"
+              style={{
+                padding: "10px 14px",
+                background: "var(--RT)",
+                border: "1px solid rgba(224,82,82,.3)",
+                borderRadius: 8,
+                marginBottom: 12,
+                fontSize: 12,
+                color: "var(--R)",
+              }}
+            >
+              {jobsError}
+            </div>
+          )}
+
+          <Card
+            title={
+              <span>
+                Recent Jobs{" "}
+                {(jobCounts.dead ?? 0) > 0 && (
+                  <Tag variant="red">{jobCounts.dead} dead-letter</Tag>
+                )}
+              </span>
+            }
+          >
+            {jobsLoading && jobs.length === 0 ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>
+                Loading jobs…
+              </div>
+            ) : (
+              <DataTable<MonitorJob & { _key: string }>
+                columns={[
+                  { key: "type", header: "Type", sortable: true },
+                  {
+                    key: "status",
+                    header: "Status",
+                    width: 120,
+                    render: (r) => (
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <Tag variant={jobStatusTagVariant(r.status)}>{r.status}</Tag>
+                        {r.status === "dead" && <StatusDot color="red" />}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "attempts",
+                    header: "Attempts",
+                    width: 100,
+                    render: (r) => (
+                      <span style={{ fontSize: 12, color: "var(--sil)" }}>
+                        {r.attempts} / {r.maxAttempts}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "lastError",
+                    header: "Last Error",
+                    render: (r) => (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: r.lastError ? "var(--R)" : "var(--sil)",
+                          fontFamily: r.lastError ? "monospace" : undefined,
+                        }}
+                      >
+                        {r.lastError ?? "—"}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "createdAt",
+                    header: "Created",
+                    width: 170,
+                    render: (r) => (
+                      <span style={{ fontSize: 11, color: "var(--sil)" }}>
+                        {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
+                      </span>
+                    ),
+                  },
+                ]}
+                rows={jobs.map((j) => ({ ...j, _key: j.id }))}
+                rowKey={(r) => r._key}
+                emptyMessage="No jobs in the queue"
+                pageSize={10}
+              />
+            )}
+          </Card>
         </div>
       )}
 
