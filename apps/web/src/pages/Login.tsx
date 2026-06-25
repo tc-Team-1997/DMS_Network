@@ -42,7 +42,7 @@ export function Login() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: "100vh" }}>
       {/* LEFT — navy panel with vertically-centred auto-rotating carousel */}
-      <div style={{ position: "relative", overflow: "hidden", background: "linear-gradient(160deg,var(--navy),var(--navy-deep))", backgroundImage: "radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px)", backgroundSize: "16px 16px" }}>
+      <div style={{ position: "relative", overflow: "hidden", backgroundColor: "#0b1830", backgroundImage: "radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(160deg, #0b1830, #050d1a)", backgroundSize: "16px 16px, 100% 100%" }}>
         <div style={{ position: "absolute", top: 40, left: 56, color: "#fff", display: "flex", gap: 12, alignItems: "center", zIndex: 1 }}>
           <div style={{ width: 34, height: 34, background: "var(--gold)", borderRadius: 8, display: "grid", placeItems: "center", color: "var(--navy-deep)", fontWeight: 700 }}>Z</div>
           <div className="brand"><div style={{ fontWeight: 700 }}>ZorDMS</div><div style={{ fontSize: 12, opacity: .7 }}>Enterprise Document Management</div></div>
