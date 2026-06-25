@@ -65,6 +65,25 @@ The web app reaches each backend through a Vite dev proxy at `/svc/<service>`
 
 ---
 
+## Modules & screens
+
+The React app is organised into six navigation groups (RBAC-filtered — users
+only see what their role permits):
+
+| Group | Screens |
+| --- | --- |
+| **Intelligence** | Executive Dashboard (KPIs, day/month/quarter/year + date-range, clickable drill-downs), Customer 360° |
+| **Ingestion** | Capture (scanner / file upload / bulk · front+back · preview · dedup · quality), Indexing & QA, **AI Engine** (RAG copilot — grounded answers with citations) |
+| **Management** | Case Management, Repository, Records Management, Document Lifecycle |
+| **Discovery** | Enterprise Search (faceted + auto-classified results), Document Viewer (preview · stamp · redact · approve) |
+| **Process** | Workflow Engine (maker-checker), Review Queue, Compliance & Audit, Alerts & Events |
+| **Analytics & Platform** | Integration Hub, Security & RBAC, User Management, System Administration (**Doc-Types admin**, **Dedup config**, **Processing-Queue monitor**) |
+
+Plus a split-screen **Login** (local + any enabled SSO provider). All list
+screens use **URL-driven filters** (shareable/bookmarkable) and pagination.
+
+---
+
 ## Document lifecycle (end-to-end, wired)
 
 ```
@@ -206,6 +225,33 @@ See `docs/superpowers/specs/`:
 - `2026-06-23-zordms-microservices-architecture-design.md` — system architecture
 - `2026-06-23-zordms-idp-design.md` — AI/IDP design
 - `openapi/*.json` — per-service OpenAPI 3.1 specs
+
+---
+
+## Security & compliance
+
+- **RBAC, three layers, fail-closed.** Data-driven roles + `resource:action`
+  permissions enforced in the UI, at the gateway, and inside every service;
+  the workflow engine asks the gateway `/authz/check` for who-can-approve.
+- **Branch scoping.** Documents, workflows, and review items are branch-scoped;
+  cross-branch visibility requires `crossbranch:read`, and a user with no branch
+  and no cross-branch grant sees nothing (fail-closed).
+- **Identity & federation.** HS256 JWT with claims, TOTP MFA, and env-toggled
+  enterprise SSO (LDAP/AD, OIDC+PKCE, SAML 2.0) with JIT provisioning — the IdP
+  proves identity, ZorDMS RBAC grants authorization.
+- **Document integrity.** Versioned, content-addressable storage (SHA-256);
+  **approval stamps and redactions are burned into a new version** (PDF pages
+  rasterized so redacted content is unrecoverable); duplicate detection +
+  auto-versioning.
+- **Records compliance.** Retention years/destruction dates; an active **legal
+  hold blocks delete & disposal**; disposal is eligibility-flagged by a scheduled
+  job and requires explicit human certification (never auto-deletes).
+- **Audit trail.** Login, SSO provisioning, workflow actions, disposal
+  eligibility, and admin changes write audit rows.
+- **Boundary hardening.** **zod** request validation (`400 validation_error`) on
+  mutating routes; **HMAC-signed** inbound integration webhooks; an internal
+  service token for service-to-service calls; **UUIDv7** IDs (no enumerable
+  sequential identifiers in URLs).
 
 ---
 
