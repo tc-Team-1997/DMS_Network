@@ -77,3 +77,51 @@ describe("document versioning routes", () => {
     } finally { await h2.cleanup(); }
   });
 });
+
+describe("PATCH /documents/:id — raw metadata preservation", () => {
+  it("PATCH keeps existing raw metadata keys that were not in the patch payload", async () => {
+    const h2 = await makeTestApp();
+    try {
+      const token = await h2.tokenFor("admin");
+      // Upload a document
+      const up = await request(h2.app)
+        .post("/documents")
+        .set("Authorization", `Bearer ${token}`)
+        .field("title", "Raw Meta Test")
+        .field("branch", "Thimphu")
+        .attach("file", Buffer.from("bytes"), "doc.png");
+      const id = up.body.document.id;
+
+      // Manually set metadata in DB to simulate post-extraction raw state
+      await h2.knex("documents").where({ id }).update({
+        metadata: JSON.stringify({
+          cid_no: "99900000001",
+          full_name: "Raw Person",
+          ai_internal_score: 0.95,       // raw/unmapped key
+          raw_ocr_text: "Original OCR",  // raw/unmapped key
+        }),
+        doc_type: "BT_CID_4G",
+      });
+
+      // PATCH only the full_name field
+      const patch = await request(h2.app)
+        .patch(`/documents/${id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          metadata: { full_name: "Corrected Person" },
+        });
+
+      expect(patch.status).toBe(200);
+
+      // The patched doc's metadata must retain the raw keys
+      const dbDoc = await h2.knex("documents").where({ id }).first();
+      const meta = JSON.parse(dbDoc.metadata);
+      expect(meta.full_name).toBe("Corrected Person"); // updated
+      expect(meta.cid_no).toBe("99900000001");         // preserved
+      expect(meta.ai_internal_score).toBe(0.95);        // raw key preserved
+      expect(meta.raw_ocr_text).toBe("Original OCR"); // raw key preserved
+    } finally {
+      await h2.cleanup();
+    }
+  });
+});

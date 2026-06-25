@@ -326,4 +326,98 @@ describe("POST /documents/:id/extract", () => {
     expect(dbDoc.extraction_status).toBe("DONE");
     expect(dbDoc.extracted_at).toBeTruthy();
   });
+
+  it("returns rawMetadata with ALL keys including unmapped ones", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    mockClassify.mockResolvedValue({ doc_type: "BT_CID_4G", confidence: 0.97 });
+    mockExtract.mockResolvedValue({
+      data: {
+        cid_no: "11504000231",
+        full_name: "Dorji Wangchuk",
+        dob: "1985-03-12",
+        expiry_date: "2030-01-01",
+        // unmapped keys — these are the ones being tested
+        ai_internal_score: 0.97,
+        raw_ocr_text: "Some OCR text the model saw",
+        unusual_field_xyz: "value that has no schema mapping",
+      },
+      partial: false,
+      errors: [],
+    });
+
+    const res = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    // rawMetadata must be present in response
+    expect(res.body).toHaveProperty("rawMetadata");
+    const raw = res.body.rawMetadata as Record<string, unknown>;
+    // All unmapped keys preserved
+    expect(raw).toHaveProperty("ai_internal_score", 0.97);
+    expect(raw).toHaveProperty("raw_ocr_text", "Some OCR text the model saw");
+    expect(raw).toHaveProperty("unusual_field_xyz", "value that has no schema mapping");
+    // Mapped keys also present
+    expect(raw).toHaveProperty("cid_no", "11504000231");
+    expect(raw).toHaveProperty("full_name", "Dorji Wangchuk");
+  });
+
+  it("persists unmapped raw keys in the metadata column", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    mockClassify.mockResolvedValue({ doc_type: "BT_CID_4G", confidence: 0.95 });
+    mockExtract.mockResolvedValue({
+      data: {
+        cid_no: "00000000001",
+        full_name: "Test Person",
+        dob: "1990-01-01",
+        expiry_date: "2030-01-01",
+        completely_custom_field: "preserved_value",
+      },
+      partial: false,
+      errors: [],
+    });
+
+    await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+
+    const dbDoc = await h.knex("documents").where({ id: docId }).first();
+    const storedMeta = JSON.parse(dbDoc.metadata);
+    // The unmapped key must survive in the DB
+    expect(storedMeta).toHaveProperty("completely_custom_field", "preserved_value");
+  });
+
+  it("incomplete extraction (only partial fields) still persists what it has", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    // AI only returns 2 of the expected fields — partial=true
+    mockClassify.mockResolvedValue({ doc_type: "BT_CID_4G", confidence: 0.6 });
+    mockExtract.mockResolvedValue({
+      data: {
+        cid_no: "22222222222",
+        // missing: full_name, dob, expiry_date
+      },
+      partial: true,
+      errors: ["Could not extract full_name", "dob not found"],
+    });
+
+    const res = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    // Should still return rawMetadata with what was extracted
+    expect(res.body.rawMetadata).toHaveProperty("cid_no", "22222222222");
+    // DB should have saved partial data
+    const dbDoc = await h.knex("documents").where({ id: docId }).first();
+    const storedMeta = JSON.parse(dbDoc.metadata);
+    expect(storedMeta).toHaveProperty("cid_no", "22222222222");
+    // extraction_status should still be DONE (not FAILED) — incomplete is not a failure
+    expect(dbDoc.extraction_status).toBe("DONE");
+  });
 });

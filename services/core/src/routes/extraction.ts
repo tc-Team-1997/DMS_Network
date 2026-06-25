@@ -220,7 +220,7 @@ export function extractionRouter(): Router {
         review_flag: reviewFlag,
         extraction_status: "DONE",
         extracted_at: new Date().toISOString(),
-        metadata: JSON.stringify(mapped.metadata),
+        metadata: JSON.stringify({ ...(extractResult.data ?? {}), ...mapped.metadata }),
       };
       if (mapped.cid) updates["cid"] = mapped.cid;
       if (mapped.doc_no) updates["doc_no"] = mapped.doc_no;
@@ -353,6 +353,7 @@ export function extractionRouter(): Router {
           matchType: d.matchType,
         })),
         autoVersioned,
+        rawMetadata: extractResult.data ?? {},
       });
     } catch (err: any) {
       // Unexpected error — mark FAILED and re-throw

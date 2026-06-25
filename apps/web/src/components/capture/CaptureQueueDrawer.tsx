@@ -6,9 +6,11 @@
  * shows the ExtractionResultDrawer (editable corrections form) instead of
  * the read-only ExtractionResult panel.
  */
+import { useState } from "react";
 import { Tag } from "../ui/index.js";
 import { FilePreview } from "./FilePreview.js";
 import { ExtractionResultDrawer } from "./ExtractionResultDrawer.js";
+import { FullScreenPreview } from "./FullScreenPreview.js";
 import type { CaptureQueueEntry } from "../../pages/Capture.js";
 
 export interface CaptureQueueDrawerProps {
@@ -39,6 +41,7 @@ export function CaptureQueueDrawer({
 }: CaptureQueueDrawerProps) {
   const selected = queue.find((q) => q.id === selectedId) ?? null;
   const showDetail = selected !== null;
+  const [fullScreenFile, setFullScreenFile] = useState<File | null>(null);
 
   return (
     <>
@@ -231,7 +234,10 @@ export function CaptureQueueDrawer({
                       >
                         Front Side
                       </div>
-                      <FilePreview file={selected.frontFile} />
+                      <FilePreview
+                        file={selected.frontFile}
+                        onFullScreen={() => setFullScreenFile(selected.frontFile)}
+                      />
                     </div>
                   )}
                   {selected.backFile && (
@@ -246,7 +252,10 @@ export function CaptureQueueDrawer({
                       >
                         Back Side
                       </div>
-                      <FilePreview file={selected.backFile} />
+                      <FilePreview
+                        file={selected.backFile}
+                        onFullScreen={() => setFullScreenFile(selected.backFile)}
+                      />
                     </div>
                   )}
                 </div>
@@ -259,6 +268,7 @@ export function CaptureQueueDrawer({
                     docId={selected.docId}
                     result={selected.extraction}
                     onClose={() => onSelect(selected.id)}
+                    previewFile={selected.frontFile ?? null}
                   />
                 </div>
               ) : null}
@@ -310,6 +320,13 @@ export function CaptureQueueDrawer({
           )}
         </div>
       </div>
+
+      {/* Full-screen file preview modal */}
+      <FullScreenPreview
+        file={fullScreenFile}
+        open={fullScreenFile !== null}
+        onClose={() => setFullScreenFile(null)}
+      />
     </>
   );
 }

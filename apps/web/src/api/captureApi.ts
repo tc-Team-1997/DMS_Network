@@ -105,6 +105,8 @@ export interface ExtractionResult {
   duplicates?: ExtractionDuplicate[];
   /** true when a hash duplicate caused auto-versioning */
   autoVersioned?: boolean;
+  /** Full raw AI extraction object — ALL keys, even those not in the schema */
+  rawMetadata?: Record<string, unknown> | null;
 }
 
 // ─── Doc-types endpoint shapes ────────────────────────────────────────────────

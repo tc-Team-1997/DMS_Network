@@ -28,6 +28,7 @@ import type {
   PatchDocumentPayload,
 } from "../../api/captureApi.js";
 import { getDocTypes, patchDocument } from "../../api/captureApi.js";
+import { FullScreenPreview } from "./FullScreenPreview.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,8 @@ interface ExtractionResultDrawerProps {
   result: ExtractionResult;
   /** Called when drawer X is clicked */
   onClose: () => void;
+  /** Optional front file for full-screen preview affordance */
+  previewFile?: File | null;
 }
 
 // ─── Small helpers ────────────────────────────────────────────────────────────
@@ -287,12 +290,85 @@ function DuplicatesPanel({
   );
 }
 
+// ─── Raw metadata panel ───────────────────────────────────────────────────────
+
+function RawMetadataPanel({ rawMetadata }: { rawMetadata: Record<string, unknown> | null | undefined }) {
+  const [open, setOpen] = useState(false);
+  const hasData = rawMetadata != null && Object.keys(rawMetadata).length > 0;
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--bd)",
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "var(--ink3)",
+      }}
+    >
+      <button
+        type="button"
+        aria-label="Toggle raw extracted metadata"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: "100%",
+          padding: "10px 14px",
+          background: "transparent",
+          border: "none",
+          textAlign: "left",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          color: "var(--sil)",
+          fontSize: 11,
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: ".04em",
+        }}
+      >
+        <span>Raw extracted metadata (JSON)</span>
+        <span aria-hidden="true" style={{ fontSize: 14, color: "var(--sil)" }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </button>
+      {open && (
+        <div style={{ borderTop: "1px solid var(--bd)", padding: "10px 14px" }}>
+          {hasData ? (
+            <pre
+              aria-label="raw metadata json"
+              style={{
+                margin: 0,
+                fontSize: 10,
+                color: "var(--mist)",
+                fontFamily: "monospace",
+                overflowX: "auto",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-all",
+                maxHeight: 280,
+                overflowY: "auto",
+              }}
+            >
+              {JSON.stringify(rawMetadata, null, 2)}
+            </pre>
+          ) : (
+            <div style={{ fontSize: 12, color: "var(--sil)", fontStyle: "italic" }}>
+              No raw metadata captured.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function ExtractionResultDrawer({
   docId,
   result,
   onClose,
+  previewFile,
 }: ExtractionResultDrawerProps) {
   const { classification, mappedFields, catalog, folder, suggestedNewType, source } = result;
   const initialQuality = result.quality ?? {
@@ -301,6 +377,9 @@ export function ExtractionResultDrawer({
     mandatoryMissing: [],
     confidence: classification.confidence,
   };
+
+  // ── Full-screen preview state ──
+  const [showFullScreen, setShowFullScreen] = useState(false);
 
   // ── Doc-types for classification select ──
   const [docTypes, setDocTypes] = useState<DocType[]>([]);
@@ -484,6 +563,25 @@ export function ExtractionResultDrawer({
               </Tag>
             </div>
           </div>
+          {previewFile && (
+            <button
+              type="button"
+              aria-label="Open full screen file preview"
+              onClick={() => setShowFullScreen(true)}
+              style={{
+                padding: "6px 12px",
+                background: "var(--ink3)",
+                border: "1px solid var(--bd)",
+                borderRadius: 6,
+                fontSize: 11,
+                color: "var(--gold3)",
+                cursor: "pointer",
+                marginTop: 8,
+              }}
+            >
+              ⤢ Open full preview
+            </button>
+          )}
         </Card>
 
         {/* ── Editable: Classification ── */}
@@ -734,6 +832,9 @@ export function ExtractionResultDrawer({
           </Card>
         )}
 
+        {/* ── Raw extracted metadata ── */}
+        <RawMetadataPanel rawMetadata={result.rawMetadata} />
+
         {/* ── Save corrections button ── */}
         {saveError && (
           <div
@@ -774,6 +875,15 @@ export function ExtractionResultDrawer({
           {saving ? "Saving…" : "Save corrections"}
         </button>
       </div>
+
+      {/* Full-screen preview modal */}
+      {previewFile && (
+        <FullScreenPreview
+          file={previewFile}
+          open={showFullScreen}
+          onClose={() => setShowFullScreen(false)}
+        />
+      )}
     </div>
   );
 }

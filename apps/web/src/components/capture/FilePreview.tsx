@@ -7,9 +7,10 @@ import { useState, useEffect } from "react";
 export interface FilePreviewProps {
   file: File;
   "data-testid"?: string;
+  onFullScreen?: () => void;
 }
 
-export function FilePreview({ file, "data-testid": testId }: FilePreviewProps) {
+export function FilePreview({ file, "data-testid": testId, onFullScreen }: FilePreviewProps) {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [rotate, setRotate] = useState(0);
@@ -94,6 +95,18 @@ export function FilePreview({ file, "data-testid": testId }: FilePreviewProps) {
         >
           Reset
         </button>
+        {/* Full screen */}
+        {onFullScreen && (
+          <button
+            type="button"
+            aria-label="Open full screen preview"
+            onClick={onFullScreen}
+            style={{ ...toolBtnStyle, fontSize: 11 }}
+            title="Full screen"
+          >
+            ⤢
+          </button>
+        )}
       </div>
 
       {/* Preview area */}

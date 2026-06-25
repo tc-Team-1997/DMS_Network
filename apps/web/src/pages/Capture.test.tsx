@@ -160,6 +160,13 @@ const MOCK_EXTRACTION_RESPONSE = {
   },
   duplicates: [],
   autoVersioned: false,
+  rawMetadata: {
+    cid_no: "11504000231",
+    full_name: "Dorji Wangchuk",
+    dob: "1985-03-12",
+    unmapped_custom_key: "some_value_not_in_schema",
+    ai_internal_score: 0.97,
+  },
 };
 
 const MOCK_EXTRACTION_WITH_DUPLICATES = {
@@ -206,8 +213,12 @@ async function doFullProceed() {
     configurable: true,
   });
   fireEvent.change(frontInput);
-  await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
-  fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+  // Wait for the Proceed button to become enabled (file selected → hasFile=true)
+  await waitFor(() => {
+    const btn = screen.getByRole("button", { name: /Proceed to upload and extract/i });
+    expect(btn).not.toBeDisabled();
+  });
+  fireEvent.click(screen.getByRole("button", { name: /Proceed to upload and extract/i }));
   await waitFor(() => screen.getByRole("button", { name: /Confirm.*Proceed/i }));
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /Confirm.*Proceed/i }));
@@ -457,11 +468,24 @@ describe("Capture screen — enterprise rebuild", () => {
 
   // ── Proceed button ────────────────────────────────────────────────────────
 
-  it("Proceed button does NOT appear when no file selected", () => {
+  it("Proceed button is in the DOM but DISABLED before any file is selected", () => {
     renderWithRouter(<Capture />);
-    expect(
-      screen.queryByRole("button", { name: /Proceed/i })
-    ).not.toBeInTheDocument();
+    const btn = screen.getByRole("button", { name: /Proceed to upload and extract/i });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toBeDisabled();
+  });
+
+  it("Proceed button is ENABLED after front file is selected on File Upload tab", async () => {
+    renderWithRouter(<Capture />);
+    // Initially disabled
+    const btn = screen.getByRole("button", { name: /Proceed to upload and extract/i });
+    expect(btn).toBeDisabled();
+    // Select a file
+    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
+    Object.defineProperty(frontInput, "files", { value: [mockFile("cid.pdf")], configurable: true });
+    fireEvent.change(frontInput);
+    // Now enabled
+    await waitFor(() => expect(screen.getByRole("button", { name: /Proceed to upload and extract/i })).not.toBeDisabled());
   });
 
   it("Proceed button appears after front file is selected", async () => {
@@ -476,7 +500,7 @@ describe("Capture screen — enterprise rebuild", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: /Proceed/i })
-      ).toBeInTheDocument()
+      ).not.toBeDisabled()
     );
   });
 
@@ -496,7 +520,7 @@ describe("Capture screen — enterprise rebuild", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: /Proceed/i })
-      ).toBeInTheDocument()
+      ).not.toBeDisabled()
     );
   });
 
@@ -511,8 +535,11 @@ describe("Capture screen — enterprise rebuild", () => {
       configurable: true,
     });
     fireEvent.change(frontInput);
-    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /Proceed to upload and extract/i });
+      expect(btn).not.toBeDisabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Proceed to upload and extract/i }));
     await waitFor(() =>
       expect(screen.getByText("Confirm Capture")).toBeInTheDocument()
     );
@@ -554,8 +581,11 @@ describe("Capture screen — enterprise rebuild", () => {
       configurable: true,
     });
     fireEvent.change(frontInput);
-    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /Proceed to upload and extract/i });
+      expect(btn).not.toBeDisabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Proceed to upload and extract/i }));
     await waitFor(() =>
       screen.getByRole("button", { name: /Confirm.*Proceed/i })
     );
@@ -673,8 +703,11 @@ describe("Capture screen — enterprise rebuild", () => {
       configurable: true,
     });
     fireEvent.change(frontInput);
-    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /Proceed to upload and extract/i });
+      expect(btn).not.toBeDisabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Proceed to upload and extract/i }));
     await waitFor(() =>
       screen.getByRole("button", { name: /Confirm.*Proceed/i })
     );
@@ -1110,8 +1143,8 @@ describe("Capture screen — enterprise rebuild", () => {
     fireEvent.change(frontInput);
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /Proceed/i })
-      ).toBeInTheDocument()
+        screen.getByRole("button", { name: /Proceed to upload and extract/i })
+      ).not.toBeDisabled()
     );
   });
 
@@ -1125,13 +1158,16 @@ describe("Capture screen — enterprise rebuild", () => {
       configurable: true,
     });
     fireEvent.change(frontInput);
-    await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
-    // Switch tab — this clears frontFile
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /Proceed to upload and extract/i });
+      expect(btn).not.toBeDisabled();
+    });
+    // Switch tab — this clears frontFile, button becomes disabled
     fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: /Proceed/i })
-      ).not.toBeInTheDocument()
+        screen.getByRole("button", { name: /Proceed to upload and extract/i })
+      ).toBeDisabled()
     );
   });
 
@@ -1145,6 +1181,58 @@ describe("Capture screen — enterprise rebuild", () => {
     );
     await waitFor(() =>
       expect(mockGetDocTypes).toHaveBeenCalled()
+    );
+  });
+
+  // ── Raw metadata section ──────────────────────────────────────────────────
+
+  it("raw metadata section is visible in result drawer and shows JSON when toggled", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // The toggle button should be present
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Toggle raw extracted metadata/i })
+      ).toBeInTheDocument()
+    );
+    // Click to expand
+    fireEvent.click(
+      screen.getByRole("button", { name: /Toggle raw extracted metadata/i })
+    );
+    // The raw JSON should be visible (including unmapped key)
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("raw metadata json")
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByLabelText("raw metadata json").textContent).toContain(
+      "unmapped_custom_key"
+    );
+  });
+
+  it("raw metadata section shows fallback text when rawMetadata is null", async () => {
+    mockExtractDocument.mockResolvedValueOnce({
+      ...MOCK_EXTRACTION_RESPONSE,
+      rawMetadata: null,
+    });
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Toggle raw extracted metadata/i })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /Toggle raw extracted metadata/i })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/No raw metadata captured/i)
+      ).toBeInTheDocument()
     );
   });
 });

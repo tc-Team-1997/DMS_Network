@@ -790,23 +790,27 @@ export default function Capture() {
         )}
       </div>
 
-      {/* ── Proceed Button ── */}
-      {hasFile && !processing && (
+      {/* ── Proceed Button — always rendered; disabled until file selected or while processing ── */}
+      {!processing && (
         <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
           <button
             type="button"
             aria-label="Proceed to upload and extract"
-            onClick={openProceedModal}
+            disabled={!hasFile}
+            onClick={hasFile ? openProceedModal : undefined}
             style={{
               padding: "11px 28px",
-              background: "linear-gradient(135deg,#b8912a,#f0c84a)",
+              background: hasFile
+                ? "linear-gradient(135deg,#b8912a,#f0c84a)"
+                : "rgba(184,145,42,.25)",
               border: "none",
               borderRadius: 8,
               fontSize: 13,
               fontWeight: 700,
-              cursor: "pointer",
-              color: "#050d1a",
-              boxShadow: "0 4px 16px rgba(184,145,42,.3)",
+              cursor: hasFile ? "pointer" : "not-allowed",
+              color: hasFile ? "#050d1a" : "rgba(5,13,26,.4)",
+              boxShadow: hasFile ? "0 4px 16px rgba(184,145,42,.3)" : "none",
+              opacity: hasFile ? 1 : 0.5,
             }}
           >
             ▶ Proceed
