@@ -1,0 +1,63 @@
+# Local SSO test harness for ZorDMS.
+#
+# Spins up a REAL IdP (Keycloak) for OIDC + SAML and a REAL OpenLDAP for
+# LDAP/AD, so the gateway's three SSO providers can be exercised end-to-end on a
+# developer laptop. App code is never touched: enabling a provider is purely an
+# ENV change (see env.sso-local.example) — the SAME code then works on UAT/prod
+# by pointing the same ENV keys at the real IdP (see README promotion table).
+#
+#   docker compose -f deploy/sso-local/docker-compose.yml up -d
+#
+# Keycloak  -> http://localhost:8080  (admin / admin)
+# OpenLDAP  -> ldap://localhost:389
+#
+# NOTE: `start-dev` + `--import-realm` is DEV-ONLY (no TLS, H2 db). Do not use
+# this compose file in any shared/UAT/prod environment.
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: zordms-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      # Realm "zordms" (OIDC client + SAML client + users + groups) is imported
+      # on first boot from this read-only mount.
+      - ./realm-zordms.json:/opt/keycloak/data/import/realm-zordms.json:ro
+    healthcheck:
+      # Keycloak 25 exposes health on the management port 9000.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  openldap:
+    image: bitnami/openldap:2.6
+    container_name: zordms-openldap
+    environment:
+      # Directory root: dc=zordms,dc=local
+      LDAP_ROOT: "dc=zordms,dc=local"
+      # Admin bind DN -> cn=admin,dc=zordms,dc=local / adminpassword
+      LDAP_ADMIN_USERNAME: "admin"
+      LDAP_ADMIN_PASSWORD: "adminpassword"
+      # Users are seeded from the mounted LDIF below; disable Bitnami's default
+      # demo users so only our seed exists.
+      LDAP_SKIP_DEFAULT_TREE: "yes"
+      LDAP_CUSTOM_LDIF_DIR: "/ldifs"
+    ports:
+      - "389:1389"
+    volumes:
+      - ./ldap-seed.ldif:/ldifs/seed.ldif:ro
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:1389 -b dc=zordms,dc=local -D cn=admin,dc=zordms,dc=local -w adminpassword '(objectclass=*)' >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s

@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
 import { authRouter } from "./routes/auth.js";
@@ -17,6 +18,11 @@ export function createApp(deps: AppDeps): Express {
   app.use(express.json());
   // SAML ACS posts an application/x-www-form-urlencoded SAMLResponse.
   app.use(express.urlencoded({ extended: false }));
+  // Parse signed/HttpOnly cookies. The OIDC login->callback flow stashes its
+  // transient {state,nonce,codeVerifier} in a short-lived signed cookie so that
+  // any gateway replica behind a load balancer can complete the callback
+  // (stateless; see services/gateway/src/sso/index.ts).
+  app.use(cookieParser());
   app.locals.deps = deps;
 
   // SSO routes mount under /auth alongside local login. The SSO router owns

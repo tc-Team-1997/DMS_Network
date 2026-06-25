@@ -4,6 +4,7 @@
 // 404 { error: "provider_disabled" } via a catch-all guard.
 
 import { Router } from "express";
+import jwt from "jsonwebtoken";
 import type { Knex } from "knex";
 import type { AppConfig } from "@zordms/config";
 import { loadAuthConfig, enabledProviders, type AuthConfig } from "./authConfig.js";
@@ -17,17 +18,51 @@ export interface SsoDeps {
   ssoClients?: SsoClients;
 }
 
-interface OidcTransient { state: string; nonce: string; codeVerifier: string; createdAt: number }
+interface OidcTransient { state: string; nonce: string; codeVerifier: string }
 
-const OIDC_STATE_TTL_MS = 10 * 60 * 1000;
+// -----------------------------------------------------------------------------
+// OIDC transient state — STATELESS so any replica can complete the callback.
+//
+// Previously the {state,nonce,codeVerifier} lived in an in-process Map, which
+// breaks behind a load balancer with >1 gateway replica: /auth/oidc/callback
+// may land on a different replica than /auth/oidc/login and fail "invalid_state".
+//
+// Instead we serialize the transient into a short-lived (10m) HS256 JWT signed
+// with the gateway secret and hand it to the browser as an HttpOnly cookie
+// ("oidc_tx"). The IdP redirects the *same* browser back to the callback, which
+// carries the cookie, so any replica can verify it locally with the shared
+// secret — no shared server-side store (Redis/sticky sessions) required.
+//
+// Only OIDC needs this: LDAP is stateless already (single POST bind, no redirect
+// round-trip), and SAML uses the IdP-driven POST binding where the IdP returns a
+// self-contained signed assertion to the ACS — no server-side transient state.
+// -----------------------------------------------------------------------------
+const OIDC_TX_COOKIE = "oidc_tx";
+const OIDC_STATE_TTL_SEC = 10 * 60; // 10 minutes
+
+/** True when the gateway is serving over HTTPS (prod / behind a TLS proxy), in
+ *  which case the transient cookie must be flagged Secure. */
+function secureCookies(): boolean {
+  return process.env.NODE_ENV === "production"
+    || process.env.TRUST_PROXY === "true"
+    || process.env.HTTPS === "true";
+}
+
+/** Common flags for the OIDC transient cookie. SameSite=Lax is REQUIRED so the
+ *  top-level GET redirect back from the IdP still sends the cookie. */
+function oidcCookieOpts() {
+  return {
+    httpOnly: true as const,
+    sameSite: "lax" as const,
+    secure: secureCookies(),
+    path: "/auth/oidc",
+  };
+}
 
 /** Build the SSO router. Reads deps from app.locals at request time so tests can
  *  inject fake clients/authConfig without re-wiring. */
 export function ssoRouter(): Router {
   const r = Router();
-  // In-memory transient OIDC state store (single-node). For multi-node deploys
-  // back this with Redis; the shape is intentionally minimal.
-  const oidcStates = new Map<string, OidcTransient>();
 
   function deps(req: import("express").Request): Required<Pick<SsoDeps, "knex" | "config">> & {
     authConfig: AuthConfig;
@@ -76,11 +111,18 @@ export function ssoRouter(): Router {
   // OIDC — GET /auth/oidc/login -> redirect; GET /auth/oidc/callback -> handoff
   // -------------------------------------------------------------------------
   r.get("/oidc/login", async (req, res) => {
-    const { authConfig, ssoClients } = deps(req);
+    const { config, authConfig, ssoClients } = deps(req);
     if (!authConfig.oidc.enabled) { res.status(404).json({ error: "provider_disabled" }); return; }
     try {
       const ar = await ssoClients.oidc.buildAuthRequest(authConfig.oidc);
-      oidcStates.set(ar.state, { state: ar.state, nonce: ar.nonce, codeVerifier: ar.codeVerifier, createdAt: Date.now() });
+      // Serialize the transient into a short-lived signed cookie instead of a
+      // server-side store. exp is enforced by jwt.verify; iat lets us audit age.
+      const tx = jwt.sign(
+        { state: ar.state, nonce: ar.nonce, codeVerifier: ar.codeVerifier } as OidcTransient,
+        config.jwtSecret,
+        { algorithm: "HS256", expiresIn: OIDC_STATE_TTL_SEC },
+      );
+      res.cookie(OIDC_TX_COOKIE, tx, { ...oidcCookieOpts(), maxAge: OIDC_STATE_TTL_SEC * 1000 });
       res.redirect(ar.authorizationUrl);
     } catch {
       res.status(500).json({ error: "oidc_login_failed" });
@@ -92,11 +134,26 @@ export function ssoRouter(): Router {
     if (!authConfig.oidc.enabled) { res.status(404).json({ error: "provider_disabled" }); return; }
     const code = String(req.query.code ?? "");
     const state = String(req.query.state ?? "");
-    const transient = oidcStates.get(state);
-    if (!code || !state || !transient || Date.now() - transient.createdAt > OIDC_STATE_TTL_MS) {
+    // Always clear the transient cookie — on success and on every failure path.
+    const clear = () => res.clearCookie(OIDC_TX_COOKIE, oidcCookieOpts());
+
+    // Read + verify the signed transient cookie. A missing cookie (e.g. a
+    // different replica with no shared memory) or any mismatch/expiry is a hard
+    // 400 invalid_state — exactly as before, but now correct across replicas.
+    const raw = (req.cookies?.[OIDC_TX_COOKIE] ?? "") as string;
+    let transient: OidcTransient | null = null;
+    if (raw) {
+      try {
+        transient = jwt.verify(raw, config.jwtSecret, { algorithms: ["HS256"] }) as OidcTransient;
+      } catch {
+        transient = null; // expired/forged/tampered -> treated as invalid_state below
+      }
+    }
+    if (!code || !state || !transient || transient.state !== state) {
+      clear();
       res.status(400).json({ error: "invalid_state" }); return;
     }
-    oidcStates.delete(state);
+    clear();
     try {
       const identity = await ssoClients.oidc.exchange(authConfig.oidc, { code, state }, transient);
       const result = await mapAndIssue(knex, config, identity, {

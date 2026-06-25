@@ -208,17 +208,29 @@ describe("OIDC flow", () => {
     expect(res.headers.location).toContain("https://idp.example/authorize");
   });
 
-  it("callback with a mocked verified identity issues a JWT and hands it off to the web app", async () => {
+  it("login sets the signed HttpOnly oidc_tx transient cookie", async () => {
+    const ac = loadAuthConfig({ AUTH_OIDC_ENABLED: "true" } as NodeJS.ProcessEnv);
+    const res = await request(appWith(ac)).get("/auth/oidc/login");
+    expect(res.status).toBe(302);
+    const setCookie = (res.headers["set-cookie"] as unknown as string[]) ?? [];
+    const tx = setCookie.find((c) => c.startsWith("oidc_tx="));
+    expect(tx).toBeTruthy();
+    expect(tx).toMatch(/HttpOnly/i);
+    expect(tx).toMatch(/SameSite=Lax/i);
+    expect(tx).toMatch(/Path=\/auth\/oidc/i);
+  });
+
+  it("callback with the carried cookie issues a JWT and hands it off to the web app", async () => {
     const ac = loadAuthConfig({
       AUTH_OIDC_ENABLED: "true", WEB_APP_URL: "https://dms.bobl.bt",
     } as NodeJS.ProcessEnv);
     const identity: ExternalIdentity = { email: "oidcuser@bobl.bt", username: "oidcuser", displayName: "OIDC User" };
-    const app = appWith(ac, identity);
+    // A supertest *agent* persists Set-Cookie from /login into the /callback
+    // request, simulating the same browser completing the IdP round-trip.
+    const agent = request.agent(appWith(ac, identity));
 
-    // Prime transient state via the login redirect, then drive the callback
-    // with the fake client's fixed state "st".
-    await request(app).get("/auth/oidc/login");
-    const res = await request(app).get("/auth/oidc/callback").query({ code: "abc", state: "st" });
+    await agent.get("/auth/oidc/login");
+    const res = await agent.get("/auth/oidc/callback").query({ code: "abc", state: "st" });
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toMatch(/^https:\/\/dms\.bobl\.bt\/login#token=/);
@@ -228,12 +240,28 @@ describe("OIDC flow", () => {
 
     const created = await knex("users").where({ username: "oidcuser" }).first();
     expect(created.created_by).toBe("sso:oidc");
+    // Cookie is cleared on success.
+    const setCookie = (res.headers["set-cookie"] as unknown as string[]) ?? [];
+    expect(setCookie.some((c) => /^oidc_tx=;?/.test(c))).toBe(true);
   });
 
-  it("callback rejects an unknown/forged state", async () => {
+  it("callback with NO cookie is rejected 400 (simulates a different replica with no shared memory)", async () => {
     const ac = loadAuthConfig({ AUTH_OIDC_ENABLED: "true" } as NodeJS.ProcessEnv);
-    const res = await request(appWith(ac, { email: "x@bobl.bt" }))
-      .get("/auth/oidc/callback").query({ code: "abc", state: "forged" });
+    const identity: ExternalIdentity = { email: "oidcuser@bobl.bt", username: "oidcuser" };
+    // Fresh request (no agent) -> the Set-Cookie from /login never travels.
+    // Under the old in-memory Map this "worked" by luck on a single node; the
+    // cookie design now correctly rejects it.
+    const res = await request(appWith(ac, identity))
+      .get("/auth/oidc/callback").query({ code: "abc", state: "st" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("invalid_state");
+  });
+
+  it("callback rejects an unknown/forged state even when a valid cookie is present", async () => {
+    const ac = loadAuthConfig({ AUTH_OIDC_ENABLED: "true" } as NodeJS.ProcessEnv);
+    const agent = request.agent(appWith(ac, { email: "x@bobl.bt" }));
+    await agent.get("/auth/oidc/login"); // mints cookie for state "st"
+    const res = await agent.get("/auth/oidc/callback").query({ code: "abc", state: "forged" });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("invalid_state");
   });

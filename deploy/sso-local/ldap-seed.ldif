@@ -1,0 +1,89 @@
+# Seed directory for the local LDAP/AD test harness.
+#
+# Root dc=zordms,dc=local is created by the Bitnami image (LDAP_ROOT). This LDIF
+# adds the people + groups OUs, a couple of users (with a known password), and
+# the dms-* groups that LDAP_GROUP_ROLE_MAP maps to ZorDMS roles.
+#
+# Bind DN for the gateway service account:  cn=admin,dc=zordms,dc=local
+# Bind password:                            adminpassword
+# User search base:                         ou=people,dc=zordms,dc=local
+# Login attribute used by the seed users:   uid  (filter: (uid={{username}}))
+#
+# userPassword below is the cleartext "Password123!" — OpenLDAP hashes it on
+# import. All seed users share that password for convenience.
+
+dn: ou=people,dc=zordms,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=zordms,dc=local
+objectClass: organizationalUnit
+ou: groups
+
+# ---------------------------------------------------------------------------
+# Users
+# ---------------------------------------------------------------------------
+
+dn: uid=sonam.maker,ou=people,dc=zordms,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+uid: sonam.maker
+cn: Sonam Maker
+sn: Maker
+givenName: Sonam
+mail: sonam.maker@zordms.local
+uidNumber: 10001
+gidNumber: 10001
+homeDirectory: /home/sonam.maker
+userPassword: Password123!
+
+dn: uid=kinley.checker,ou=people,dc=zordms,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+uid: kinley.checker
+cn: Kinley Checker
+sn: Checker
+givenName: Kinley
+mail: kinley.checker@zordms.local
+uidNumber: 10002
+gidNumber: 10002
+homeDirectory: /home/kinley.checker
+userPassword: Password123!
+
+dn: uid=admin.cdo,ou=people,dc=zordms,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+uid: admin.cdo
+cn: Admin CDO
+sn: CDO
+givenName: Admin
+mail: admin.cdo@zordms.local
+uidNumber: 10003
+gidNumber: 10003
+homeDirectory: /home/admin.cdo
+userPassword: Password123!
+
+# ---------------------------------------------------------------------------
+# Groups (groupOfNames — member is the full user DN).
+# The user's group DNs come back via the default `memberOf` overlay; the
+# gateway reads LDAP_GROUP_ATTR (default memberOf) and maps each DN through
+# LDAP_GROUP_ROLE_MAP -> ZorDMS role.
+# ---------------------------------------------------------------------------
+
+dn: cn=dms-admins,ou=groups,dc=zordms,dc=local
+objectClass: groupOfNames
+cn: dms-admins
+member: uid=admin.cdo,ou=people,dc=zordms,dc=local
+
+dn: cn=dms-makers,ou=groups,dc=zordms,dc=local
+objectClass: groupOfNames
+cn: dms-makers
+member: uid=sonam.maker,ou=people,dc=zordms,dc=local
+
+dn: cn=dms-checkers,ou=groups,dc=zordms,dc=local
+objectClass: groupOfNames
+cn: dms-checkers
+member: uid=kinley.checker,ou=people,dc=zordms,dc=local

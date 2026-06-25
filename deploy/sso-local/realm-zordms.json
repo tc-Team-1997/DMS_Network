@@ -1,0 +1,166 @@
+{
+  "realm": "zordms",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "accessTokenLifespan": 300,
+  "groups": [
+    { "name": "dms-admins", "path": "/dms-admins" },
+    { "name": "dms-makers", "path": "/dms-makers" },
+    { "name": "dms-checkers", "path": "/dms-checkers" }
+  ],
+  "clientScopes": [
+    {
+      "name": "groups",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "zordms-web",
+      "name": "ZorDMS Web (OIDC)",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "zordms-local-secret-DO-NOT-USE-IN-PROD",
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:4000/auth/oidc/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:5174",
+        "http://localhost:4000"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email",
+        "groups"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5174/*"
+      }
+    },
+    {
+      "clientId": "http://localhost:4000/auth/saml/metadata",
+      "name": "ZorDMS Web (SAML)",
+      "protocol": "saml",
+      "enabled": true,
+      "frontchannelLogout": true,
+      "redirectUris": [
+        "http://localhost:4000/auth/saml/callback"
+      ],
+      "adminUrl": "http://localhost:4000/auth/saml/callback",
+      "baseUrl": "http://localhost:4000/auth/saml/callback",
+      "attributes": {
+        "saml.authnstatement": "true",
+        "saml.client.signature": "false",
+        "saml.assertion.signature": "true",
+        "saml.signing.certificate": "",
+        "saml.server.signature": "true",
+        "saml_name_id_format": "email",
+        "saml_assertion_consumer_url_post": "http://localhost:4000/auth/saml/callback",
+        "saml_single_logout_service_url_post": "http://localhost:4000/auth/saml/callback",
+        "saml_force_name_id_format": "true"
+      },
+      "defaultClientScopes": ["role_list"],
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "attribute.nameformat": "Basic",
+            "user.attribute": "email",
+            "friendly.name": "email",
+            "attribute.name": "email"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "saml",
+          "protocolMapper": "saml-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "attribute.nameformat": "Basic",
+            "single": "false",
+            "full.path": "false",
+            "friendly.name": "groups",
+            "attribute.name": "groups"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "sonam.maker",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "sonam.maker@zordms.local",
+      "firstName": "Sonam",
+      "lastName": "Maker",
+      "credentials": [
+        { "type": "password", "value": "Password123!", "temporary": false }
+      ],
+      "groups": ["/dms-makers"]
+    },
+    {
+      "username": "kinley.checker",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "kinley.checker@zordms.local",
+      "firstName": "Kinley",
+      "lastName": "Checker",
+      "credentials": [
+        { "type": "password", "value": "Password123!", "temporary": false }
+      ],
+      "groups": ["/dms-checkers"]
+    },
+    {
+      "username": "admin.cdo",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin.cdo@zordms.local",
+      "firstName": "Admin",
+      "lastName": "CDO",
+      "credentials": [
+        { "type": "password", "value": "Password123!", "temporary": false }
+      ],
+      "groups": ["/dms-admins"]
+    }
+  ]
+}
