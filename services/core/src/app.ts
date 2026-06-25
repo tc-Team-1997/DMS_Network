@@ -17,6 +17,7 @@ import { lifecycleRouter } from "./routes/lifecycle.js";
 import { sysadminRouter } from "./routes/sysadmin.js";
 import { docTypesRouter } from "./routes/doc_types.js";
 import { extractionRouter } from "./routes/extraction.js";
+import { integrationRouter } from "./routes/integration.js";
 
 export function createApp(deps: CoreDeps): Express {
   const app = express();
@@ -47,6 +48,9 @@ export function createApp(deps: CoreDeps): Express {
   // AI Ingestion + Classification pipeline
   app.use("/doc-types", docTypesRouter());
   app.use("/documents", extractionRouter());
+
+  // P7: internal ingest endpoints called by the integration hub (x-internal-token auth)
+  app.use("/integration", integrationRouter());
 
   // I2: global error handler so unhandled async throws return 500 instead of hanging
   app.use(errorHandler);

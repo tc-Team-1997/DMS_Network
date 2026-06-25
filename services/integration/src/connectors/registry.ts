@@ -29,3 +29,59 @@ export function buildConnector(system: string, ctx: ConnectorContext): Connector
 export function buildHttpConnector(opts: HttpConnectorOptions, ctx: ConnectorContext): Connector {
   return withLogging(new HttpConnector(opts), ctx.knex);
 }
+
+// P7: op -> HTTP method/path maps per system. Each connector exposes a `ping`
+// health op where the upstream has one (CBS/LOS) so management can probe liveness.
+export const OP_MAPS: Record<string, Record<string, { method: string; path: string }>> = {
+  cbs: {
+    "customer.lookup": { method: "POST", path: "/customers/lookup" },
+    "kyc.sync": { method: "POST", path: "/kyc/sync" },
+    "ping": { method: "GET", path: "/health" },
+  },
+  los: {
+    "loan.push": { method: "POST", path: "/loans" },
+    "loan.status": { method: "POST", path: "/loans/status" },
+    "ping": { method: "GET", path: "/health" },
+  },
+  kyc: {
+    "verify": { method: "POST", path: "/verify" },
+    "ping": { method: "GET", path: "/health" },
+  },
+};
+
+export const BASE_URL_ENV: Record<string, string> = {
+  cbs: "CBS_BASE_URL",
+  los: "LOS_BASE_URL",
+  kyc: "KYC_BASE_URL",
+};
+
+// Returns the live base URL for a system from env, or undefined to use the mock.
+export function liveBaseUrl(system: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const key = BASE_URL_ENV[system];
+  const val = key ? env[key] : undefined;
+  return val && val.trim() ? val.trim() : undefined;
+}
+
+export interface ConnectorSelectOptions {
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * P7: Live-or-mock connector selection.
+ *
+ * When `<SYSTEM>_BASE_URL` is set in the environment, returns a logging-wrapped
+ * HTTP connector pointed at that base URL (real upstream); otherwise falls back
+ * to the canned MOCK connector so the hub stays fully functional offline.
+ */
+export function selectConnector(system: string, ctx: ConnectorContext, opts: ConnectorSelectOptions = {}): Connector {
+  const baseUrl = liveBaseUrl(system, opts.env);
+  if (baseUrl) {
+    const opMap = OP_MAPS[system] ?? {};
+    return withLogging(
+      new HttpConnector({ system, baseUrl, opMap, fetchImpl: opts.fetchImpl }),
+      ctx.knex,
+    );
+  }
+  return buildConnector(system, ctx);
+}

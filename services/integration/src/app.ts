@@ -6,6 +6,7 @@ import { errorHandler } from "@zordms/auth";
 import { captureRawBody } from "./middleware/rawBody.js";
 import type { EventSink } from "./events/sink.js";
 import type { Connector } from "./connectors/types.js";
+import type { CoreIngestClient } from "./core/ingest.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { outboundRouter } from "./routes/outbound.js";
 import { managementRouter } from "./routes/management.js";
@@ -15,6 +16,9 @@ export interface AppDeps {
   config: AppConfig;
   events?: EventSink;
   connectorFor?: (system: string) => Connector;
+  // P7: optional core ingest client. When set, verified inbound webhooks are
+  // forwarded to core's internal ingest endpoints. Absent in pure unit tests.
+  coreIngest?: CoreIngestClient;
 }
 
 export function createApp(deps: AppDeps): Express {

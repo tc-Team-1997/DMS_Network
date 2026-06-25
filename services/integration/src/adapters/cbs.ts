@@ -13,3 +13,8 @@ export function cbsCustomerLookup(connector: Connector, cid: string): Promise<Co
 export function cbsKycSync(connector: Connector, cid: string): Promise<ConnectorResult<CbsKycSyncResult>> {
   return connector.call<CbsKycSyncResult>("kyc.sync", { cid });
 }
+
+// Health probe (live HTTP connector hits GET /health; mock returns unhandled).
+export function cbsPing(connector: Connector): Promise<ConnectorResult<unknown>> {
+  return connector.call("ping", {});
+}

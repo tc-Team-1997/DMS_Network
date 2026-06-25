@@ -2,6 +2,8 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import type { Knex } from "knex";
 import { newId } from "@zordms/db";
 import type { EventSink } from "../events/sink.js";
+import type { CoreIngestClient } from "../core/ingest.js";
+import { pathForEvent } from "../core/ingest.js";
 import { verifySignature } from "../webhooks/hmac.js";
 
 const SIGNATURE_HEADER = "x-zordms-signature";
@@ -9,8 +11,8 @@ const SIGNATURE_HEADER = "x-zordms-signature";
 interface Hook { system: string; event: string; }
 
 async function handle(req: Request, res: Response, hook: Hook): Promise<void> {
-  const deps = req.app.locals.deps as { knex: Knex; events?: EventSink };
-  const { knex, events } = deps;
+  const deps = req.app.locals.deps as { knex: Knex; events?: EventSink; coreIngest?: CoreIngestClient };
+  const { knex, events, coreIngest } = deps;
 
   // F6: Reject immediately when rawBody is absent — a fallback re-serialization would
   // never match the sender's HMAC and produces a misleading "invalid_signature" error.
@@ -35,12 +37,27 @@ async function handle(req: Request, res: Response, hook: Hook): Promise<void> {
 
   // emit the internal event for Workflow/Notify consumers
   await events?.emit(hook.event, req.body);
+
+  // P7: forward verified inbound events to CORE's internal ingest endpoint so the
+  // data is actually persisted (CBS customer-updated -> customer upsert,
+  // LOS loan-application -> loan intake). Best-effort: a brief core outage must
+  // NOT 500 the sender — we record consumed=false (+ error) and still 202.
+  // `consumed` is null when the event has no core ingest route (e.g. kyc.result).
+  let consumed: boolean | null = pathForEvent(hook.event) ? false : null;
+  let consumeError: string | null = null;
+  if (coreIngest && consumed === false) {
+    const result = await coreIngest.forward(hook.event, req.body);
+    consumed = result.ok;
+    consumeError = result.ok ? null : (result.error ?? `http_${result.status}`);
+  }
+
   // durable hand-off record (Workflow/Notify also read the event bus in production)
   await knex("integration_logs").insert({
     id: newId(), system: hook.system, endpoint: hook.event, method: "POST",
     status: 202, latency_ms: 0, direction: "inbound", success: true,
+    consumed, error: consumeError,
   });
-  res.status(202).json({ accepted: true, event: hook.event });
+  res.status(202).json({ accepted: true, event: hook.event, consumed });
 }
 
 export function webhooksRouter(): Router {

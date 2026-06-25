@@ -11,3 +11,8 @@ export function losPushLoan(connector: Connector, loan: LoanPush): Promise<Conne
 export function losLoanStatus(connector: Connector, loanId: string): Promise<ConnectorResult<LoanRef>> {
   return connector.call<LoanRef>("loan.status", { loanId });
 }
+
+// Health probe (live HTTP connector hits GET /health).
+export function losPing(connector: Connector): Promise<ConnectorResult<unknown>> {
+  return connector.call("ping", {});
+}

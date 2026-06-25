@@ -9,7 +9,10 @@ export function customersRouter(): Router {
   r.get("/:cid", requirePermission("document:read"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
-      res.json({ profile: await buildCustomerProfile(knex, req.params.cid) });
+      const profile = await buildCustomerProfile(knex, req.params.cid);
+      // P7: enrich with the CBS-sourced master record (upserted via /integration/customer-upsert)
+      const master = await knex("customers").where({ cid: req.params.cid }).first();
+      res.json({ profile: { ...profile, master: master ?? null } });
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
   return r;
