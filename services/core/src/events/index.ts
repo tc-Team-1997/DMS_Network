@@ -2,6 +2,8 @@ export const EVENTS = {
   DOCUMENT_CAPTURED: "document.captured",
   DOCUMENT_INDEXED: "document.indexed",
   DOCUMENT_CATALOGED: "document.cataloged",
+  DOCUMENT_STAMPED: "document.stamped",
+  DOCUMENT_REDACTED: "document.redacted",
 } as const;
 
 export interface DomainEvent {

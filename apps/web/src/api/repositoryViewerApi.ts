@@ -70,6 +70,26 @@ export interface Annotation {
   created_at?: string;
 }
 
+/**
+ * A normalized redaction region (0..1 of page size, TOP-LEFT origin — matches
+ * the browser/viewer coordinate system the P4 backend expects). `page` is
+ * 1-based; omit to apply to the single image / first page.
+ */
+export interface RedactionRegion {
+  page?: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Result of a stamp/redact burn — a brand-new (current) document version. */
+export interface BurnResult {
+  version: DocumentVersion;
+  download: string;
+  redaction?: { rasterized: boolean; guarantee: string };
+}
+
 export interface DashboardSummary {
   totalDocuments: number;
   pendingReview: number;
@@ -138,6 +158,28 @@ export const repositoryViewerApi = {
 
   deleteAnnotation: (docId: string, annId: string): Promise<void> =>
     http.delete(`${SVC.core}/documents/${docId}/annotations/${annId}`),
+
+  // Burn-in operations (P4) — each produces a NEW current version.
+  /**
+   * Burn an approval stamp into the document (RBAC `document:approve`).
+   * Returns the new version; reload the document afterwards to show it.
+   */
+  stamp: (
+    docId: string,
+    body: { by?: string; date?: string; label?: string; page?: number; ref?: string },
+  ): Promise<BurnResult> =>
+    http.post(`${SVC.core}/documents/${docId}/stamp`, body),
+
+  /**
+   * Burn one or more redaction regions into the document (RBAC `document:write`).
+   * DESTRUCTIVE: the covered content is physically removed from the new version.
+   * `regions` use normalized 0..1, top-left origin coordinates.
+   */
+  redact: (
+    docId: string,
+    regions: RedactionRegion[],
+  ): Promise<BurnResult> =>
+    http.post(`${SVC.core}/documents/${docId}/redact`, { regions }),
 
   // Dashboard
   dashboardSummary: (): Promise<DashboardSummary> =>

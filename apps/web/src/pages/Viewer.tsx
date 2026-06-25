@@ -11,7 +11,18 @@ import {
 } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { repositoryViewerApi } from "../api/repositoryViewerApi.js";
-import type { DocumentRecord, Annotation, DocumentVersion } from "../api/repositoryViewerApi.js";
+import type { DocumentRecord, Annotation, DocumentVersion, RedactionRegion } from "../api/repositoryViewerApi.js";
+import { actOnWorkflow } from "../api/reviewQueueApi.js";
+
+/** A redaction rectangle drawn on the preview, in normalized 0..1 (top-left origin). */
+interface DraftRegion {
+  id: string;
+  page: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -222,10 +233,18 @@ export default function Viewer() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const docIdParam = searchParams.get("doc");
+  const workflowId = searchParams.get("workflow");
 
   // Permissions
   const canAnnotate = user?.permissions.includes("annotation:write") ?? false;
   const canRead = user?.permissions.includes("document:read") ?? false;
+  // Burn-in RBAC (matches the P4 backend: stamp→document:approve, redact→document:write).
+  const canStamp = user?.permissions.includes("document:approve") ?? false;
+  const canRedact = user?.permissions.includes("document:write") ?? false;
+  // Workflow act RBAC (matches WorkflowEngine / backend ACTION_PERMISSION map).
+  const canApprove = user?.permissions.includes("document:approve") ?? false;
+  const canReject = user?.permissions.includes("document:reject") ?? false;
+  const canEscalate = user?.permissions.includes("workflow:escalate") ?? false;
 
   // Pattern 2: URL-driven page state — bookmarkable and refresh-safe
   const [viewerUrl, setViewerUrl] = useUrlState({ page: "1", annp: "1" });
@@ -244,6 +263,23 @@ export default function Viewer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
+
+  // Inline confirmation toast (stamp / redact / workflow act).
+  const [toast, setToast] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+
+  // ── Burn-in: stamp ──
+  const [stamping, setStamping] = useState(false);
+
+  // ── Burn-in: redaction (draw rectangles, then apply) ──
+  const [redactMode, setRedactMode] = useState(false);
+  const [draftRegions, setDraftRegions] = useState<DraftRegion[]>([]);
+  const [drawing, setDrawing] = useState<{ x: number; y: number } | null>(null);
+  const [drawRect, setDrawRect] = useState<DraftRegion | null>(null);
+  const [redacting, setRedacting] = useState(false);
+
+  // ── Workflow act ──
+  const [acting, setActing] = useState(false);
+  const [stampBeforeApprove, setStampBeforeApprove] = useState(true);
 
   // Annotation add modal
   const [annModalOpen, setAnnModalOpen] = useState(false);
@@ -340,6 +376,138 @@ export default function Viewer() {
     }
   }
 
+  // ── STAMP: burn an approval stamp, then reload to show the new version ──
+  const applyStamp = useCallback(async (): Promise<boolean> => {
+    if (!doc) return false;
+    setStamping(true);
+    setToast(null);
+    try {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const res = await repositoryViewerApi.stamp(doc.id, {
+        by: user?.username,
+        date: today,
+        page: currentPage,
+      });
+      await load(doc.id);
+      setToast({ kind: "ok", msg: `Approval stamp applied — now v${res.version.version_no}.` });
+      return true;
+    } catch (e: unknown) {
+      const err = e as { body?: { error?: string }; message?: string };
+      setToast({ kind: "err", msg: err?.body?.error ?? err?.message ?? "Failed to apply stamp." });
+      return false;
+    } finally {
+      setStamping(false);
+    }
+  }, [doc, user, currentPage, load]);
+
+  // ── REDACT: capture normalized rectangles, list, then burn destructively ──
+  function regionFromPointer(e: React.MouseEvent): { x: number; y: number } | null {
+    const el = canvasRef.current;
+    if (!el) return null;
+    // getBoundingClientRect already reflects the CSS scale(zoom) transform,
+    // so normalizing against its width/height yields 0..1 coords independent
+    // of the current zoom level.
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return null;
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
+  }
+
+  function handleRedactMouseDown(e: React.MouseEvent) {
+    if (!redactMode) return;
+    const p = regionFromPointer(e);
+    if (!p) return;
+    setDrawing(p);
+    setDrawRect({ id: "draft", page: currentPage, x: p.x, y: p.y, w: 0, h: 0 });
+  }
+
+  function handleRedactMouseMove(e: React.MouseEvent) {
+    if (!redactMode || !drawing) return;
+    const p = regionFromPointer(e);
+    if (!p) return;
+    const x = Math.min(drawing.x, p.x);
+    const y = Math.min(drawing.y, p.y);
+    const w = Math.abs(p.x - drawing.x);
+    const h = Math.abs(p.y - drawing.y);
+    setDrawRect({ id: "draft", page: currentPage, x, y, w, h });
+  }
+
+  function handleRedactMouseUp() {
+    if (!redactMode || !drawing || !drawRect) {
+      setDrawing(null);
+      setDrawRect(null);
+      return;
+    }
+    // Ignore accidental tiny clicks.
+    if (drawRect.w > 0.01 && drawRect.h > 0.01) {
+      setDraftRegions((prev) => [
+        ...prev,
+        { ...drawRect, id: `r${Date.now()}-${prev.length}` },
+      ]);
+    }
+    setDrawing(null);
+    setDrawRect(null);
+  }
+
+  async function applyRedaction() {
+    if (!doc || draftRegions.length === 0) return;
+    setRedacting(true);
+    setToast(null);
+    try {
+      const regions: RedactionRegion[] = draftRegions.map((r) => ({
+        page: r.page,
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+      }));
+      const res = await repositoryViewerApi.redact(doc.id, regions);
+      await load(doc.id);
+      setDraftRegions([]);
+      setRedactMode(false);
+      const note = res.redaction?.rasterized === false
+        ? " (overlay-only — content may be recoverable)"
+        : "";
+      setToast({
+        kind: "ok",
+        msg: `Redaction burned in — now v${res.version.version_no}. Original content removed${note}.`,
+      });
+    } catch (e: unknown) {
+      const err = e as { body?: { error?: string }; message?: string };
+      setToast({ kind: "err", msg: err?.body?.error ?? err?.message ?? "Failed to apply redaction." });
+    } finally {
+      setRedacting(false);
+    }
+  }
+
+  // ── APPROVE / REJECT / ESCALATE from the viewer (workflow round-trip) ──
+  async function handleWorkflowAct(action: "approve" | "reject" | "escalate") {
+    if (!workflowId) return;
+    setActing(true);
+    setToast(null);
+    try {
+      // On approve, optionally stamp first so the burned approval mark and the
+      // workflow decision are committed together before we close the loop.
+      if (action === "approve" && stampBeforeApprove && canStamp) {
+        const ok = await applyStamp();
+        if (!ok) {
+          setActing(false);
+          return; // stamp failed — don't silently approve
+        }
+      }
+      await actOnWorkflow(workflowId, action);
+      setToast({ kind: "ok", msg: `Workflow ${action}d — returning to Review Queue.` });
+      // Close the loop: review → viewer → act → back to the queue.
+      navigate("/review-queue");
+    } catch (e: unknown) {
+      const err = e as { body?: { error?: string }; message?: string };
+      setToast({ kind: "err", msg: err?.body?.error ?? err?.message ?? `Failed to ${action} workflow.` });
+    } finally {
+      setActing(false);
+    }
+  }
+
   const totalPages = doc?.page_count ?? 1;
 
   // ── Render: Access denied — I4 fix: guard is first so no partial render leaks through ─────────
@@ -422,6 +590,62 @@ export default function Viewer() {
         </div>
       </div>
 
+      {/* Workflow context banner — shown when reached via the Review Queue deep-link */}
+      {workflowId && (
+        <Card style={{ padding: "10px 14px", marginBottom: 12, borderLeft: "3px solid var(--B)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: 11, color: "var(--B)", letterSpacing: 1, textTransform: "uppercase" }}>
+                Review Workflow
+              </span>
+              <span style={{ fontSize: 12, color: "var(--mist)", fontFamily: "monospace" }} data-testid="wf-id">
+                {workflowId}
+              </span>
+            </div>
+            {doc?.review_flag && <Tag variant="amber">Review Flagged</Tag>}
+            <span style={{ fontSize: 11, color: "var(--sil)" }}>
+              Stage: {doc?.status ?? "—"} · SLA tracked in Review Queue
+            </span>
+            <button
+              className="btn bs xs"
+              style={{ marginLeft: "auto" }}
+              onClick={() => navigate("/review-queue")}
+              aria-label="back to review queue"
+            >
+              ← Back to Queue
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* Inline confirmation / error toast */}
+      {toast && (
+        <div
+          role="status"
+          style={{
+            background: toast.kind === "ok" ? "var(--GT)" : "var(--RT)",
+            border: `1px solid ${toast.kind === "ok" ? "rgba(46,204,138,.3)" : "rgba(224,82,82,.3)"}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 12,
+            fontSize: 12,
+            color: toast.kind === "ok" ? "var(--G)" : "var(--R)",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span style={{ flex: 1 }}>{toast.msg}</span>
+          <button
+            className="btn bs xs"
+            onClick={() => setToast(null)}
+            aria-label="dismiss notification"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <Card style={{ padding: "10px 14px", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -468,6 +692,42 @@ export default function Viewer() {
             </>
           )}
 
+          {/* Burn-in stamp (RBAC document:approve) — produces a new version */}
+          {canStamp && doc && (
+            <button
+              className="btn xs"
+              style={{ background: "var(--GT)", color: "var(--G)", border: "1px solid rgba(46,204,138,.3)" }}
+              onClick={() => void applyStamp()}
+              disabled={stamping}
+              aria-label="apply approval stamp"
+              title="Burn an APPROVED stamp into the document (creates a new version)"
+            >
+              {stamping ? "Stamping…" : "✓ Apply Approval Stamp"}
+            </button>
+          )}
+
+          {/* Burn-in redaction mode (RBAC document:write) — destructive */}
+          {canRedact && doc && (
+            <button
+              className="btn xs"
+              style={{
+                background: redactMode ? "var(--R)" : "var(--RT)",
+                color: redactMode ? "#fff" : "var(--R)",
+                border: "1px solid rgba(224,82,82,.3)",
+              }}
+              onClick={() => {
+                setRedactMode((m) => !m);
+                if (redactMode) setDraftRegions([]);
+              }}
+              aria-label="toggle redaction tool"
+              title="Draw rectangles to permanently remove content (creates a new version)"
+            >
+              {redactMode ? "✕ Exit Redaction" : "⛔ Redaction Tool"}
+            </button>
+          )}
+
+          <div style={{ width: 1, height: 20, background: "var(--bd)", margin: "0 4px" }} />
+
           <button className="btn bs xs" disabled title="Compare Versions — coming soon" aria-label="Compare Versions (not yet available)">Compare Versions</button>
           <button className="btn bs xs" disabled title="Share View — coming soon" aria-label="Share View (not yet available)">Share View</button>
 
@@ -500,9 +760,14 @@ export default function Viewer() {
         <Card>
           <div
             ref={canvasRef}
+            onMouseDown={handleRedactMouseDown}
+            onMouseMove={handleRedactMouseMove}
+            onMouseUp={handleRedactMouseUp}
+            onMouseLeave={handleRedactMouseUp}
+            data-testid="viewer-canvas"
             style={{
               background: "var(--gr)",
-              border: "1px solid var(--bd)",
+              border: redactMode ? "1px solid var(--R)" : "1px solid var(--bd)",
               borderRadius: 8,
               padding: 32,
               minHeight: 440,
@@ -511,6 +776,8 @@ export default function Viewer() {
               transform: `scale(${zoom / 100})`,
               transformOrigin: "top left",
               width: `${10000 / zoom}%`,
+              cursor: redactMode ? "crosshair" : "default",
+              userSelect: redactMode ? "none" : "auto",
             }}
           >
             {loading ? (
@@ -624,11 +891,152 @@ export default function Viewer() {
                 currentPage={currentPage}
               />
             )}
+
+            {/* Draft redaction rectangles (this page) + the one being drawn */}
+            {redactMode &&
+              [...draftRegions.filter((r) => r.page === currentPage), ...(drawRect ? [drawRect] : [])].map((r) => (
+                <div
+                  key={r.id}
+                  data-testid={r.id === "draft" ? "redact-draft-active" : "redact-draft"}
+                  style={{
+                    position: "absolute",
+                    left: r.x * canvasDims.w,
+                    top: r.y * canvasDims.h,
+                    width: r.w * canvasDims.w,
+                    height: r.h * canvasDims.h,
+                    background: "rgba(224,82,82,.35)",
+                    border: "2px dashed var(--R)",
+                    borderRadius: 2,
+                    pointerEvents: "none",
+                  }}
+                />
+              ))}
           </div>
+
+          {/* Redaction draft panel — destructive copy made explicit */}
+          {redactMode && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: 12,
+                background: "var(--RT)",
+                border: "1px solid rgba(224,82,82,.3)",
+                borderRadius: 8,
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--R)", fontWeight: 700, marginBottom: 4 }}>
+                ⛔ Permanent Redaction
+              </div>
+              <div style={{ fontSize: 11, color: "var(--mist)", marginBottom: 8 }}>
+                Drag on the document above to draw boxes over content to remove. Applying is
+                <strong> destructive and irreversible</strong> — the covered content is physically
+                deleted from a new document version (it cannot be recovered).
+              </div>
+              {draftRegions.length === 0 ? (
+                <div style={{ fontSize: 11, color: "var(--sil)" }}>No regions drawn yet.</div>
+              ) : (
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, marginBottom: 8 }}>
+                  {draftRegions.map((r, i) => (
+                    <li
+                      key={r.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 10,
+                        fontFamily: "monospace",
+                        color: "var(--sil)",
+                        padding: "2px 0",
+                      }}
+                    >
+                      <span style={{ flex: 1 }}>
+                        #{i + 1} · p{r.page} · x{r.x.toFixed(2)} y{r.y.toFixed(2)} w{r.w.toFixed(2)} h{r.h.toFixed(2)}
+                      </span>
+                      <button
+                        className="btn bs xs"
+                        onClick={() => setDraftRegions((prev) => prev.filter((p) => p.id !== r.id))}
+                        aria-label={`remove redaction region ${i + 1}`}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  className="btn bx xs"
+                  onClick={() => void applyRedaction()}
+                  disabled={draftRegions.length === 0 || redacting}
+                  aria-label="apply redaction"
+                >
+                  {redacting ? "Applying…" : `Apply Redaction (${draftRegions.length})`}
+                </button>
+                <button
+                  className="btn bs xs"
+                  onClick={() => setDraftRegions([])}
+                  disabled={draftRegions.length === 0 || redacting}
+                  aria-label="clear redaction regions"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Right Panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Workflow review actions — only when reached via the Review Queue */}
+          {workflowId && doc && (
+            <Card title="Review Decision">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {canStamp && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--mist)" }}>
+                    <input
+                      type="checkbox"
+                      checked={stampBeforeApprove}
+                      onChange={(e) => setStampBeforeApprove(e.target.checked)}
+                      aria-label="stamp before approve"
+                    />
+                    Apply approval stamp before approving
+                  </label>
+                )}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    className="btn bok"
+                    onClick={() => void handleWorkflowAct("approve")}
+                    disabled={!canApprove || acting || stamping}
+                    aria-label="approve"
+                  >
+                    {acting ? "Working…" : "Approve"}
+                  </button>
+                  <button
+                    className="btn bx"
+                    onClick={() => void handleWorkflowAct("reject")}
+                    disabled={!canReject || acting}
+                    aria-label="reject"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    className="btn bw"
+                    onClick={() => void handleWorkflowAct("escalate")}
+                    disabled={!canEscalate || acting}
+                    aria-label="escalate"
+                  >
+                    Escalate
+                  </button>
+                </div>
+                {!canApprove && !canReject && !canEscalate && (
+                  <div style={{ fontSize: 11, color: "var(--sil)" }}>
+                    You do not have permission to act on this workflow.
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* Metadata */}
           {doc && (
             <Card title={<span style={{ display: "flex", alignItems: "center", gap: 8 }}>Document Metadata <StatusDot color={doc.status === "Active" ? "green" : "amber"} /></span>}>

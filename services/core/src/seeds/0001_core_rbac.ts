@@ -24,6 +24,7 @@ const CORE_PERMISSIONS: Array<[string, string]> = [
   ["document:catalog", "Run auto-catalog"],
   ["document:map", "Run directory mapping"],
   ["annotation:write", "Create annotations/redactions/stamps"],
+  ["document:write", "Modify/redact document content (destructive burn-in)"],
 ];
 
 const ALL_PERM_KEYS = CORE_PERMISSIONS.map(([k]) => k);
@@ -31,9 +32,9 @@ const ALL_PERM_KEYS = CORE_PERMISSIONS.map(([k]) => k);
 const ROLES: Record<string, string[]> = {
   CDO: ALL_PERM_KEYS,
   Supervisor: ["user:create", "user:update", "user:read", "role:assign", "document:read", "admin:access", "folder:create", "folder:read", "document:catalog", "document:map"],
-  Maker: ["document:capture", "document:index", "document:read", "workflow:act", "folder:read", "annotation:write"],
+  Maker: ["document:capture", "document:index", "document:read", "workflow:act", "folder:read", "annotation:write", "document:write"],
   Checker: ["document:approve", "document:reject", "document:read", "workflow:act", "folder:read"],
-  Indexer: ["document:index", "document:read", "document:catalog", "document:map", "folder:read"],
+  Indexer: ["document:index", "document:read", "document:catalog", "document:map", "folder:read", "document:write"],
   Viewer: ["document:read", "folder:read"],
   Auditor: ["document:read", "compliance:read", "crossbranch:read", "folder:read"],
 };

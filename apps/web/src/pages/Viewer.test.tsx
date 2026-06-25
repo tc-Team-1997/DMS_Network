@@ -11,26 +11,40 @@ if (typeof ResizeObserver === "undefined") {
   };
 }
 
-// Mock react-router-dom — must not reference outer variables (hoisted)
-// Viewer.tsx uses useNavigate, useSearchParams (directly), and useUrlState
-// (which calls useSearchParams internally), so all three must be in the mock.
+// Mutable router state controlled per-test via the helpers below.
+const navigateMock = vi.fn();
+let searchString = "doc=7";
+function setSearch(s: string) { searchString = s; }
+
+// Mock react-router-dom — must not reference outer variables defined AFTER the
+// mock factory beyond the hoist-safe `navigateMock`/`searchString` lets (vitest
+// hoists vi.mock; function/var refs are read lazily at call time so this is OK).
 vi.mock("react-router-dom", () => ({
-  useNavigate: () => vi.fn(),
-  useSearchParams: () => [new URLSearchParams("doc=7"), vi.fn()],
+  useNavigate: () => navigateMock,
+  useSearchParams: () => [new URLSearchParams(searchString), vi.fn()],
 }));
 
-// Mock auth — must not reference outer variables (hoisted)
+// Mutable auth permissions, controlled per-test.
+let permissions: string[] = ["document:read", "annotation:write"];
+function setPermissions(p: string[]) { permissions = p; }
+
+// Mock auth — reads the mutable `permissions` let lazily at render time.
 vi.mock("../auth/AuthContext.js", () => ({
   useAuth: () => ({
     user: {
       id: "018f4e2a-0000-7000-8000-000000000001",
       username: "admin",
       roles: ["CDO"],
-      permissions: ["document:read", "annotation:write"],
+      permissions,
       branch: "Thimphu",
     },
     logout: () => {},
   }),
+}));
+
+// Mock the workflow review-queue API (workflow act round-trip).
+vi.mock("../api/reviewQueueApi.js", () => ({
+  actOnWorkflow: vi.fn().mockResolvedValue({ workflow: { id: "wf-1" }, steps: [] }),
 }));
 
 // Mock the API module — inline all test data (no outer variable refs)
@@ -118,6 +132,35 @@ vi.mock("../api/repositoryViewerApi.js", () => {
         annotation: { id: "018f4e2a-0099-7000-8000-000000000099", document_id: "018f4e2a-0007-7000-8000-000000000007", page: 1, kind: "redaction", x: 10, y: 10, width: 20, height: 10 },
       }),
       deleteAnnotation: vi.fn().mockResolvedValue(undefined),
+      stamp: vi.fn().mockResolvedValue({
+        version: {
+          id: "018f4e2a-00aa-7000-8000-0000000000aa",
+          document_id: "018f4e2a-0007-7000-8000-000000000007",
+          version_no: 3,
+          storage_key: "ab/cd/stamped",
+          file_hash_sha256: "stamped1234",
+          file_size_bytes: 1900000,
+          mime_type: "application/pdf",
+          created_by: "admin",
+          comment: "stamp:APPROVED",
+        },
+        download: "/documents/018f4e2a-0007-7000-8000-000000000007/download",
+      }),
+      redact: vi.fn().mockResolvedValue({
+        version: {
+          id: "018f4e2a-00bb-7000-8000-0000000000bb",
+          document_id: "018f4e2a-0007-7000-8000-000000000007",
+          version_no: 3,
+          storage_key: "ab/cd/redacted",
+          file_hash_sha256: "redacted1234",
+          file_size_bytes: 1700000,
+          mime_type: "application/pdf",
+          created_by: "admin",
+          comment: "redact",
+        },
+        download: "/documents/018f4e2a-0007-7000-8000-000000000007/download",
+        redaction: { rasterized: true, guarantee: "destructive" },
+      }),
       dashboardSummary: vi.fn().mockResolvedValue({
         totalDocuments: 42,
         pendingReview: 3,
@@ -131,6 +174,10 @@ vi.mock("../api/repositoryViewerApi.js", () => {
 describe("Viewer screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset mutable router/auth state between tests.
+    setSearch("doc=7");
+    setPermissions(["document:read", "annotation:write"]);
+    navigateMock.mockReset();
   });
 
   it("renders the page header", async () => {
@@ -267,5 +314,163 @@ describe("Viewer screen", () => {
     expect(screen.getByRole("button", { name: /share \(not yet available\)/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /compare versions \(not yet available\)/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /share view \(not yet available\)/i })).toBeDisabled();
+  });
+
+  // ── P4: STAMP ──
+  it("Apply Approval Stamp calls the stamp endpoint and reloads the document", async () => {
+    setPermissions(["document:read", "document:approve"]);
+    const { repositoryViewerApi } = await import("../api/repositoryViewerApi.js");
+    render(<Viewer />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /apply approval stamp/i })).toBeInTheDocument(),
+    );
+    // getDocument called once on initial load.
+    expect(repositoryViewerApi.getDocument).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /apply approval stamp/i }));
+    });
+
+    await waitFor(() =>
+      expect(repositoryViewerApi.stamp).toHaveBeenCalledWith(
+        "018f4e2a-0007-7000-8000-000000000007",
+        expect.objectContaining({ by: "admin" }),
+      ),
+    );
+    // Reloads the document after stamping (second getDocument call).
+    await waitFor(() => expect(repositoryViewerApi.getDocument).toHaveBeenCalledTimes(2));
+    // Inline confirmation surfaced.
+    await waitFor(() => expect(screen.getByText(/Approval stamp applied/i)).toBeInTheDocument());
+  });
+
+  it("hides the stamp button when user lacks document:approve (RBAC)", async () => {
+    setPermissions(["document:read"]);
+    render(<Viewer />);
+    await waitFor(() => expect(screen.getByText("Passport_AHI_2022.pdf")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /apply approval stamp/i })).not.toBeInTheDocument();
+  });
+
+  // ── P4: REDACT ──
+  it("posts drawn regions to the redact endpoint and reloads", async () => {
+    setPermissions(["document:read", "document:write"]);
+    const { repositoryViewerApi } = await import("../api/repositoryViewerApi.js");
+    render(<Viewer />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /toggle redaction tool/i })).toBeInTheDocument(),
+    );
+    // Enter redaction mode.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /toggle redaction tool/i }));
+    });
+
+    // Draw a rectangle on the canvas. jsdom getBoundingClientRect returns zeros,
+    // so stub it to give the drawn region a non-trivial size.
+    const canvas = screen.getByTestId("viewer-canvas");
+    canvas.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 600, height: 440, right: 600, bottom: 440, x: 0, y: 0, toJSON: () => {} }) as DOMRect;
+
+    await act(async () => {
+      fireEvent.mouseDown(canvas, { clientX: 60, clientY: 44 });
+    });
+    await act(async () => {
+      fireEvent.mouseMove(canvas, { clientX: 300, clientY: 220 });
+    });
+    await act(async () => {
+      fireEvent.mouseUp(canvas, { clientX: 300, clientY: 220 });
+    });
+
+    // Apply redaction.
+    const applyBtn = await screen.findByRole("button", { name: /apply redaction/i });
+    await act(async () => {
+      fireEvent.click(applyBtn);
+    });
+
+    await waitFor(() => expect(repositoryViewerApi.redact).toHaveBeenCalledTimes(1));
+    const [docArg, regionsArg] = (repositoryViewerApi.redact as any).mock.calls[0];
+    expect(docArg).toBe("018f4e2a-0007-7000-8000-000000000007");
+    expect(Array.isArray(regionsArg)).toBe(true);
+    expect(regionsArg.length).toBe(1);
+    expect(regionsArg[0]).toEqual(
+      expect.objectContaining({
+        page: 1,
+        x: expect.any(Number),
+        y: expect.any(Number),
+        w: expect.any(Number),
+        h: expect.any(Number),
+      }),
+    );
+    // Normalized 0..1 coords.
+    expect(regionsArg[0].x).toBeGreaterThanOrEqual(0);
+    expect(regionsArg[0].w).toBeLessThanOrEqual(1);
+    // Reloaded after redaction.
+    await waitFor(() => expect(repositoryViewerApi.getDocument).toHaveBeenCalledTimes(2));
+  });
+
+  it("hides the redaction tool when user lacks document:write (RBAC)", async () => {
+    setPermissions(["document:read"]);
+    render(<Viewer />);
+    await waitFor(() => expect(screen.getByText("Passport_AHI_2022.pdf")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /toggle redaction tool/i })).not.toBeInTheDocument();
+  });
+
+  // ── P4: APPROVE FROM VIEWER (workflow round-trip) ──
+  it("shows the workflow banner and review actions when ?workflow is present", async () => {
+    setSearch("doc=7&workflow=wf-1");
+    setPermissions(["document:read", "document:approve"]);
+    render(<Viewer />);
+    await waitFor(() => expect(screen.getByText("Review Decision")).toBeInTheDocument());
+    expect(screen.getByTestId("wf-id")).toHaveTextContent("wf-1");
+    expect(screen.getByRole("button", { name: /^approve$/i })).toBeInTheDocument();
+  });
+
+  it("Approve calls actOnWorkflow('approve') and navigates back to /review-queue", async () => {
+    setSearch("doc=7&workflow=wf-1");
+    setPermissions(["document:read", "document:approve"]);
+    const { actOnWorkflow } = await import("../api/reviewQueueApi.js");
+    render(<Viewer />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /^approve$/i })).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^approve$/i }));
+    });
+
+    await waitFor(() => expect(actOnWorkflow).toHaveBeenCalledWith("wf-1", "approve"));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/review-queue"));
+  });
+
+  it("Reject calls actOnWorkflow('reject') and navigates back", async () => {
+    setSearch("doc=7&workflow=wf-1");
+    setPermissions(["document:read", "document:reject"]);
+    const { actOnWorkflow } = await import("../api/reviewQueueApi.js");
+    render(<Viewer />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /^reject$/i })).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^reject$/i }));
+    });
+
+    await waitFor(() => expect(actOnWorkflow).toHaveBeenCalledWith("wf-1", "reject"));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/review-queue"));
+  });
+
+  it("disables workflow actions the user is not permitted for (RBAC gating)", async () => {
+    setSearch("doc=7&workflow=wf-1");
+    setPermissions(["document:read"]); // no act permissions
+    render(<Viewer />);
+    await waitFor(() => expect(screen.getByText("Review Decision")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /^approve$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^reject$/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^escalate$/i })).toBeDisabled();
+    expect(
+      screen.getByText("You do not have permission to act on this workflow."),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show the workflow banner without ?workflow", async () => {
+    render(<Viewer />);
+    await waitFor(() => expect(screen.getByText("Passport_AHI_2022.pdf")).toBeInTheDocument());
+    expect(screen.queryByText("Review Decision")).not.toBeInTheDocument();
   });
 });

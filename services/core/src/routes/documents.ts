@@ -6,6 +6,8 @@ import { captureDocument, listDocuments, getDocument, softDeleteDocument, curren
 import { addVersion, listVersions, rollback } from "../repo/versions.js";
 import { catalog, categoryFor } from "../catalog/engine.js";
 import { computeQuality } from "../catalog/quality.js";
+import { burnStamp, burnRedaction, type RedactRegion } from "../repo/burnin.js";
+import { EVENTS } from "../events/index.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -119,6 +121,88 @@ export function documentsRouter(): Router {
       const version = await rollback(deps, document.id, Number(req.body.version));
       res.json({ version });
     } catch (e: any) { res.status(400).json({ error: String(e.message ?? e) }); }
+  });
+
+  // POST /:id/stamp — burn a visible APPROVED stamp into a NEW version (document:approve)
+  // Body: { label?: "APPROVED", by: string, date?: string, page?: number, ref?: string }
+  // Returns: { version, download } where download is the path to fetch the new bytes.
+  r.post("/:id/stamp", requirePermission("document:approve"), async (req, res) => {
+    try {
+      const deps = req.app.locals.deps as CoreDeps;
+      const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
+      if (!document) { res.status(404).json({ error: "not_found" }); return; }
+      const v = await currentVersion(deps.knex, document.id);
+      if (!v) { res.status(404).json({ error: "no_version" }); return; }
+
+      const by = String(req.body?.by ?? req.authUser!.username);
+      if (!by) { res.status(400).json({ error: "by_required" }); return; }
+      const label = String(req.body?.label ?? "APPROVED");
+      const date = String(req.body?.date ?? new Date().toISOString().slice(0, 10));
+      const page = req.body?.page != null ? Number(req.body.page) : undefined;
+      const ref = req.body?.ref != null ? String(req.body.ref) : undefined;
+
+      const original = await deps.storage.get(v.storage_key);
+      const stamped = await burnStamp(original, v.mime_type, { label, by, date, page, ref });
+
+      const version = await addVersion(deps, document.id, {
+        buffer: stamped,
+        mimeType: v.mime_type,
+        createdBy: req.authUser!.username,
+        comment: `stamp:${label} by ${by} on ${date}${ref ? ` ref ${ref}` : ""}`,
+      });
+      await deps.events.emit(EVENTS.DOCUMENT_STAMPED, {
+        docId: document.id, version: version.version_no, by, label, hash: version.file_hash_sha256,
+      });
+      res.status(201).json({ version, download: `/documents/${document.id}/download` });
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
+  });
+
+  // POST /:id/redact — DESTRUCTIVELY redact regions into a NEW version (document:write)
+  // Body: { regions: [{ page:number, x:number, y:number, w:number, h:number }] }
+  //   coords normalized 0..1 of page/image size, TOP-LEFT origin.
+  // Returns: { version, download, redaction: { rasterized, guarantee } }
+  r.post("/:id/redact", requirePermission("document:write"), async (req, res) => {
+    try {
+      const deps = req.app.locals.deps as CoreDeps;
+      const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
+      if (!document) { res.status(404).json({ error: "not_found" }); return; }
+      const v = await currentVersion(deps.knex, document.id);
+      if (!v) { res.status(404).json({ error: "no_version" }); return; }
+
+      const raw = req.body?.regions;
+      if (!Array.isArray(raw) || raw.length === 0) { res.status(400).json({ error: "regions_required" }); return; }
+      const regions: RedactRegion[] = raw.map((r: any) => ({
+        page: Number(r.page ?? 1),
+        x: Number(r.x), y: Number(r.y), w: Number(r.w), h: Number(r.h),
+      }));
+      if (regions.some((r) => [r.x, r.y, r.w, r.h].some((n) => !Number.isFinite(n)))) {
+        res.status(400).json({ error: "invalid_region" }); return;
+      }
+
+      const original = await deps.storage.get(v.storage_key);
+      const { bytes, rasterized } = await burnRedaction(original, v.mime_type, regions);
+
+      const version = await addVersion(deps, document.id, {
+        buffer: bytes,
+        mimeType: v.mime_type,
+        createdBy: req.authUser!.username,
+        comment: `redact:${regions.length} region(s) ${rasterized ? "(rasterized,destructive)" : "(overlay)"}`,
+      });
+      await deps.events.emit(EVENTS.DOCUMENT_REDACTED, {
+        docId: document.id, version: version.version_no, regions: regions.length, rasterized,
+        hash: version.file_hash_sha256,
+      });
+      res.status(201).json({
+        version,
+        download: `/documents/${document.id}/download`,
+        redaction: {
+          rasterized,
+          guarantee: rasterized
+            ? "destructive: underlying content removed (raster re-embed / pixel overwrite)"
+            : "overlay-only: opaque rectangles drawn (poppler unavailable)",
+        },
+      });
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
   });
 
   // PATCH /:id — metadata correction (document:index) — C1: branch-scoped
