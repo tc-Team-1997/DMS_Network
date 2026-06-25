@@ -21,7 +21,8 @@ const pkg = createRequire(import.meta.url)("./package.json") as { version: strin
  *   /svc/ai        -> http://localhost:8000  ai       (OCR/NLP/classification)
  *
  * Legacy direct paths (kept for backwards compat with existing code):
- *   /auth, /users, /authz, /health -> http://localhost:4000
+ *   /auth, /authz, /health -> http://localhost:4000
+ *   NOTE: /users is NOT proxied — it conflicts with the SPA /users route.
  * ─────────────────────────────────────────────────────────────────────
  */
 export default defineConfig({
@@ -71,8 +72,9 @@ export default defineConfig({
       },
 
       // ── Legacy direct paths (kept for existing code) ─────────────
+      // NOTE: "/users" is intentionally omitted — it conflicts with the React
+      // Router /users SPA route. All Users API calls use /svc/gateway/users.
       "/auth":   { target: "http://localhost:4000", changeOrigin: true },
-      "/users":  { target: "http://localhost:4000", changeOrigin: true },
       "/authz":  { target: "http://localhost:4000", changeOrigin: true },
       "/health": { target: "http://localhost:4000", changeOrigin: true },
     },

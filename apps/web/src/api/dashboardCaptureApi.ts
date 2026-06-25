@@ -22,7 +22,7 @@ export interface DocumentRecord {
   catalog_category?: string;
   status: string;
   doc_type?: string;
-  ingest_timestamp?: string;
+  ingest_timestamp?: string | number;  // API returns Unix ms (number); accept both
   review_flag?: boolean;
   confidence?: number;
   source_channel?: string;
@@ -48,7 +48,7 @@ export interface CaptureQueueItem {
   confidence?: number;
   catalog_category?: string;
   branch?: string;
-  ingest_timestamp?: string;
+  ingest_timestamp?: string | number;  // API returns Unix ms (number); accept both
 }
 
 export const dashboardCaptureApi = {

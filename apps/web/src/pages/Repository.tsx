@@ -546,7 +546,11 @@ export default function Repository() {
     const byMonth: Record<string, number> = {};
     docs.forEach((d) => {
       if (!d.ingest_timestamp) return;
-      const m = d.ingest_timestamp.slice(0, 7);
+      // ingest_timestamp may be a Unix ms number or an ISO string
+      const ts = typeof d.ingest_timestamp === "number"
+        ? new Date(d.ingest_timestamp).toISOString()
+        : String(d.ingest_timestamp);
+      const m = ts.slice(0, 7);
       byMonth[m] = (byMonth[m] ?? 0) + 1;
     });
     return Object.entries(byMonth)

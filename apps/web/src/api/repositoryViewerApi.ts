@@ -39,7 +39,7 @@ export interface DocumentRecord {
   confidence?: number;
   branch?: string;
   status: "Active" | "Deleted";
-  ingest_timestamp?: string;
+  ingest_timestamp?: string | number;  // API returns Unix ms (number); accept both
 }
 
 export interface DocumentVersion {
