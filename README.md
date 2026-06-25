@@ -14,6 +14,34 @@ queue** for scale, **per-service OpenAPI**, and **env-toggled enterprise SSO**.
 
 ---
 
+## Capabilities at a glance (tender coverage)
+
+| # | Tender requirement | ZorDMS capability | Status |
+| --- | --- | --- | --- |
+| 1 | Multi-channel capture (scan / upload / bulk) | Capture: Scanner / File Upload / Bulk, single or front+back, live preview | ✅ |
+| 2 | Intelligent document processing (AI/OCR) | Local VLM via Ollama (qwen2.5-vl) classify + extract; OCR fallback; GPU vLLM in prod | ✅ |
+| 3 | Auto-classification, metadata & new-type detection | Doc-type registry + per-type fields + **AI sample-based field inference** + admin CRUD | ✅ |
+| 4 | Duplicate detection | Hash + CID/doc-no matching, auto-versioning, admin config | ✅ |
+| 5 | Maker–checker workflow + SLA/escalation | `/act` state machine, claim, SLA auto-escalation cron, capture→workflow handoff | ✅ |
+| 6 | Review queue | Cross-status queue: claim / approve / reject / escalate | ✅ |
+| 7 | Viewer: preview, annotate, **stamp, redact**, approve | Burned-into-version stamp/redact (destructive) + approve-from-viewer round-trip | ✅ |
+| 8 | Records, retention & legal holds | Retention dates, **legal-hold blocks disposal**, scheduled eligibility + human certify | ✅ |
+| 9 | Enterprise search | Faceted / full-text (PG-FTS), auto-classified results | ✅ (Elasticsearch cutover: ready) |
+| 10 | Compliance & audit trail | Audit rows across services, Compliance & Audit screen | ✅ |
+| 11 | Core-banking integration (CBS / LOS / KYC) | Connectors (live via env), inbound webhooks→core upsert, HMAC in/out | ✅ |
+| 12 | RBAC, unlimited supervisor-provisioned users | Data-driven RBAC, 3-layer fail-closed, branch scoping | ✅ |
+| 13 | SSO — Active Directory / OIDC / SAML 2.0 | Env-toggled LDAP/OIDC(PKCE)/SAML + JIT provisioning + group→role map | ✅ |
+| 14 | Notifications & email (maker/checker/escalate) | Role/group → user-email resolution + SMTP | ✅ |
+| 15 | Scale, queuing, no data loss | Durable DB job queue: persist-on-enqueue, retries/backoff, DLQ, idempotency, crash recovery | ✅ |
+| 16 | API / interoperability | Per-service **OpenAPI 3.1** + zod boundary validation | ✅ |
+| 17 | Database (PostgreSQL / Oracle 19c) | Database-per-service, switchable via env, **UUIDv7** keys | ✅ |
+| 18 | On-premises / air-gapped deployment | K8s/RKE2, local models (Ollama) or GPU vLLM, MinIO/S3, offline registry | ✅ (target) |
+
+~960 Node tests + ~150 Python tests + Playwright e2e, all green. See the full
+wiring status in `docs/superpowers/specs/2026-06-25-system-wiring-and-roadmap.md`.
+
+---
+
 ## Quick start (local dev)
 
 No external database required — local dev runs entirely on in-memory SQLite.
