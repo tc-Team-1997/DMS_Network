@@ -82,7 +82,7 @@ now carry an **email** (used by notifications). Identifiers are **UUIDv7**.
 | **core** | 4001 | Node/Express | Documents, repository/folders, capture, indexing + Bhutan metadata, versioning, **viewer/stamp/redact**, auto-catalog, **dedup**, **doc-type admin**, **records/legal-hold/disposal**, Customer 360, Compliance, **durable job queue**. |
 | **workflow** | 4002 | Node/Express | Maker–checker `/act` state machine, **claim**, SLA & auto-escalation cron, cross-status review queue. |
 | **notify** | 4003 | Node/Express | Multi-channel alerts; **role/group → user-email resolution**; SMTP (email). |
-| **search** | 4004 | Node/Express | Full-text / faceted search (SQL/PG-FTS; Elasticsearch-cutover ready). |
+| **search** | 4004 | Node/Express | Full-text / faceted search — SQL/PG-FTS default, **Elasticsearch** backend env-selectable (SQL fallback). |
 | **integration** | 4005 | Node/Express | CBS/LOS/KYC connectors (live via env, mock fallback), **inbound webhooks consumed by core**, HMAC in/out. |
 | **ai** (optional) | 8000 | Python/FastAPI | IDP pipeline: classify → extract → **metadata field inference**, copilot (RAG), human-review queue, OCR — on **local Ollama models**. |
 | **web** | 5174 | React + Vite | The enterprise UI. |
@@ -90,6 +90,39 @@ now carry an **email** (used by notifications). Identifiers are **UUIDv7**.
 
 The web app reaches each backend through a Vite dev proxy at `/svc/<service>`
 (env-overridable `VITE_SVC_*`), so the frontend uses stable, **no-hardcoded** paths.
+
+---
+
+## API documentation (OpenAPI / Swagger)
+
+Every backend service publishes an **OpenAPI 3.1** contract. With the stack
+running (`./start.sh`), fetch a service's live spec — through the web proxy or
+on the service's own port — or open the committed spec file.
+
+| Service | Live spec (via web proxy) | Direct port | Committed spec file | Auth |
+| --- | --- | --- | --- | --- |
+| gateway | `…/svc/gateway/openapi.json` | `:4000/openapi.json` | `docs/superpowers/specs/openapi/gateway.json` | Bearer JWT |
+| core | `…/svc/core/openapi.json` (27 paths) | `:4001/openapi.json` | `…/openapi/core.json` | Bearer JWT · `x-internal-token` |
+| workflow | `…/svc/workflow/openapi.json` | `:4002/openapi.json` | `…/openapi/workflow.json` | Bearer JWT |
+| notify | `…/svc/notify/openapi.json` | `:4003/openapi.json` | `…/openapi/notify.json` | Bearer JWT |
+| search | `…/svc/search/openapi.json` | `:4004/openapi.json` | `…/openapi/search.json` | Bearer JWT |
+| integration | `…/svc/integrate/openapi.json` | `:4005/openapi.json` | `…/openapi/integration.json` | Bearer JWT · HMAC inbound · `x-internal-token` |
+| **ai** (FastAPI) | — | `:8000/openapi.json` | `…/openapi/ai.json` | Bearer JWT |
+
+`…` = `http://localhost:5174` (web proxy) for the proxy column, and
+`http://localhost` for the direct-port column.
+
+**Interactive docs (Swagger UI / ReDoc):**
+- The **AI service** (FastAPI) ships them out of the box:
+  **Swagger UI → http://localhost:8000/docs** · **ReDoc → http://localhost:8000/redoc**.
+- For the **Node services**, open any `openapi.json` in a viewer — paste the URL
+  (or the committed `docs/superpowers/specs/openapi/*.json`) into
+  **https://editor.swagger.io** or **https://redocly.github.io/redoc/**.
+
+All mutating endpoints are **zod-validated** at the boundary (invalid bodies
+return `400 { error: "validation_error", issues: [...] }`). The integration
+service additionally documents the HMAC-signed inbound webhook contract and the
+`x-internal-token` service-to-service calls.
 
 ---
 
