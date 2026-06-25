@@ -15,7 +15,7 @@ import { Card, Tag, Tabs, Modal, FormField } from "../components/ui/index.js";
 import type { TabItem } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { useUiStore } from "../store/uiStore.js";
-import { uploadDocument, extractDocument, extractDocumentAsync } from "../api/captureApi.js";
+import { uploadDocument, extractDocument, extractDocumentAsync, getExtraction } from "../api/captureApi.js";
 import type { ExtractionResult } from "../api/captureApi.js";
 import { getJob, isTerminalJobStatus } from "../api/jobsApi.js";
 import type { JobStatus } from "../api/jobsApi.js";
@@ -599,7 +599,7 @@ export default function Capture() {
    * safety ceiling is reached. Never throws.
    */
   const pollJobToCompletion = useCallback(
-    (entryId: string, jobId: string) =>
+    (entryId: string, jobId: string, docId: string) =>
       new Promise<void>((resolve) => {
         let attempts = 0;
 
@@ -638,6 +638,42 @@ export default function Capture() {
                   : i,
               ),
             );
+
+            // On success, read back the PERSISTED extraction result so the queue
+            // drawer can render the same editable ExtractionResultDrawer as the
+            // synchronous capture path (mapped fields / quality / duplicates /
+            // raw metadata). The job result is only a summary {docId,confidence};
+            // the full result lives on GET /documents/:id/extraction.
+            if (job.status === "succeeded") {
+              try {
+                const extraction = await getExtraction(docId);
+                if (!mountedRef.current) {
+                  resolve();
+                  return;
+                }
+                setQueue((q) =>
+                  q.map((i) =>
+                    i.id === entryId
+                      ? {
+                          ...i,
+                          extraction,
+                          confidence: extraction.classification.confidence,
+                        }
+                      : i,
+                  ),
+                );
+              } catch (fetchErr) {
+                // Job succeeded but reading the persisted result failed — keep
+                // the "done" status, surface a note so the user can retry/open.
+                const msg =
+                  fetchErr instanceof Error
+                    ? fetchErr.message
+                    : "Failed to load extraction result";
+                setQueue((q) =>
+                  q.map((i) => (i.id === entryId ? { ...i, errorMsg: msg } : i)),
+                );
+              }
+            }
 
             // STOP polling on any terminal status.
             if (isTerminalJobStatus(job.status)) {
@@ -764,7 +800,8 @@ export default function Capture() {
                 ),
               );
               // Poll GET /jobs/:id → reflects running → succeeded/failed/dead.
-              await pollJobToCompletion(entry.id, jobId);
+              // On success, the full extraction is read back via getExtraction.
+              await pollJobToCompletion(entry.id, jobId, doc.id);
               return;
             }
 

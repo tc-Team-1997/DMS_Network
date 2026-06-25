@@ -22,11 +22,19 @@ const ROLES: Record<string, string[]> = {
 // Rich integration_config rows — natural key is `system` (UNIQUE in migration).
 // base_url uses Bhutan-bank internal hostnames on the BFS intranet (10.40.x.x range).
 // auth_type matches the values checked by the webhook/connector layer.
+//
+// `secret` is the INBOUND HMAC secret used to verify signed webhooks that these
+// systems POST to /webhooks/<system>/*. The seeded values below are LOCAL/DEV
+// ONLY — they exist so the signed inbound chain can be demonstrated end-to-end
+// out of the box. Rotate per environment via PUT /integration/systems/:id/inbound-secret.
+// Signing recipe: signature header `x-zordms-signature: sha256=<hex>` where
+// <hex> = HMAC-SHA256(secret, RAW request body bytes).
 const RICH_SYSTEMS: Array<{
   system: string;
   base_url: string;
   auth_type: string;
   enabled: boolean;
+  secret?: string;
 }> = [
   // Core Banking System — TCS BaNCS hosted on BFS datacenter
   {
@@ -34,6 +42,8 @@ const RICH_SYSTEMS: Array<{
     base_url: "https://bancs.bfs.internal:8443/api/v2",
     auth_type: "hmac",
     enabled: true,
+    // LOCAL/DEV inbound HMAC secret — replace per environment.
+    secret: "cbs-local-inbound-secret",
   },
   // Loan Origination System
   {
@@ -41,6 +51,8 @@ const RICH_SYSTEMS: Array<{
     base_url: "https://los.bfs.internal/api/v1",
     auth_type: "hmac",
     enabled: true,
+    // LOCAL/DEV inbound HMAC secret — replace per environment.
+    secret: "los-local-inbound-secret",
   },
   // KYC / AML verification engine (Jumio on-prem relay)
   {
@@ -48,6 +60,8 @@ const RICH_SYSTEMS: Array<{
     base_url: "https://kyc-engine.bfs.internal:9443/verify",
     auth_type: "hmac",
     enabled: true,
+    // LOCAL/DEV inbound HMAC secret — replace per environment.
+    secret: "kyc-local-inbound-secret",
   },
   // Active Directory / LDAP identity bridge
   {
@@ -390,6 +404,9 @@ export async function seed(knex: Knex): Promise<void> {
         base_url: s.base_url,
         auth_type: s.auth_type,
         enabled: s.enabled,
+        // Seed the LOCAL/DEV inbound HMAC secret when one is defined so the
+        // signed inbound webhook chain works out of the box (consumed:true).
+        secret: s.secret ?? null,
       });
     }
   }

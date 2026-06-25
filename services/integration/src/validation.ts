@@ -62,6 +62,14 @@ export const TestOutboundSchema = z
   .strict();
 export type TestOutbound = z.infer<typeof TestOutboundSchema>;
 
+/** PUT /integration/systems/:id/inbound-secret — set/rotate the inbound HMAC secret. */
+export const SetInboundSecretSchema = z
+  .object({
+    secret: z.string().min(8),
+  })
+  .strict();
+export type SetInboundSecret = z.infer<typeof SetInboundSecretSchema>;
+
 /* ----------------------------- Inbound webhooks ------------------------------ */
 /*
  * These document the HMAC-signed inbound contract. Signature verification on the

@@ -211,6 +211,31 @@ export async function extractDocument(id: string): Promise<ExtractionResult> {
   return res.json();
 }
 
+/**
+ * Read the PERSISTED extraction result for a document (no re-running the
+ * pipeline). Used by the background/async capture path: once a durable
+ * extraction job reaches `succeeded`, the full ExtractionResult
+ * (mappedFields / quality / duplicates / rawMetadata) is read back so the
+ * queue drawer can render the same editable ExtractionResultDrawer as the
+ * synchronous single-capture path.
+ *
+ * GET /documents/:id/extraction — returns the same ExtractionResult shape the
+ * synchronous POST /documents/:id/extract returns, read from the persisted
+ * record rather than recomputed.
+ */
+export async function getExtraction(id: string): Promise<ExtractionResult> {
+  const res = await fetch(`${SVC.core}/documents/${id}/extraction`, {
+    method: "GET",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
+  }
+  return res.json();
+}
+
 /** 202 response from the async-extract path (P8 durable job queue). */
 export interface EnqueuedExtraction {
   jobId: string;

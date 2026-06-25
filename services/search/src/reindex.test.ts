@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import knexLib from "knex";
 import { fileURLToPath } from "node:url";
 import { buildServiceKnex } from "@zordms/db";
-import { reindexAll } from "./reindex.js";
+import { reindexAll, reindexFromCorpus } from "./reindex.js";
 
 // Use the search service's own migration directory for a sqlite test DB
 const migrationsDir = fileURLToPath(new URL("./migrations", import.meta.url));
@@ -60,5 +60,34 @@ describe("reindexAll", () => {
     const result = await reindexAll(knex, be as any);
     expect(be.indexed.every((d) => d.status !== "Deleted")).toBe(true);
     expect(result.indexed).toBe(2); // only the 2 non-deleted
+  });
+});
+
+describe("reindexFromCorpus", () => {
+  // Use buildServiceKnex (same as the route test) so the seed file's ESM `.js`
+  // imports resolve. This runs the real search migrations + seeds, populating
+  // the `search_index` corpus (the boot-time / admin backfill path).
+  const corpusKnex = buildServiceKnex({
+    migrationsDir,
+    seedsDir,
+    db: { client: "sqlite3" as const, host: "", port: 0, user: "", password: "", name: "", oracleConnectString: "" },
+  });
+
+  beforeAll(async () => {
+    await corpusKnex.migrate.latest();
+    await corpusKnex.seed.run();
+  });
+  afterAll(async () => { await corpusKnex.destroy(); });
+
+  it("bulk-loads every search_index row through backend.reindexAll", async () => {
+    const total = (await corpusKnex("search_index").count<{ c: number }[]>("* as c"))[0].c as number;
+    expect(total).toBeGreaterThan(0);
+    const be = memBackend();
+    const { indexed } = await reindexFromCorpus(corpusKnex, be as any);
+    expect(indexed).toBe(Number(total));
+    expect(be.indexed).toHaveLength(Number(total));
+    // mapped to SearchDoc shape
+    expect(be.indexed[0]).toHaveProperty("doc_id");
+    expect(be.indexed[0]).toHaveProperty("doc_type");
   });
 });

@@ -1,0 +1,42 @@
+# Local single-node Elasticsearch 8 harness for ZorDMS search.
+#
+# DEV ONLY: security (xpack.security) is DISABLED so the node serves plain HTTP
+# on :9200 with no auth/TLS. Never use this in any shared/UAT/prod environment.
+#
+#   docker compose -f deploy/es-local/docker-compose.yml up -d
+#
+# Then point the search service at it:
+#   SEARCH_BACKEND=elasticsearch ELASTICSEARCH_NODE=http://localhost:9200 ./restart.sh
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: zordms-elasticsearch
+    environment:
+      # Single-node discovery — no cluster bootstrap needed.
+      discovery.type: single-node
+      # Disable security for local dev: plain HTTP, no auth, no TLS.
+      xpack.security.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      # Constrain heap so it runs comfortably on a laptop.
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      # Disable ML / disk-watermark friction on small dev disks.
+      xpack.ml.enabled: "false"
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+    ports:
+      - "9200:9200"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - zordms-es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  zordms-es-data:

@@ -11,6 +11,7 @@ import {
   LosLoanApplicationSchema,
   KycVerificationResultSchema,
   LogsQuerySchema,
+  SetInboundSecretSchema,
 } from "./validation.js";
 
 extendZodWithOpenApi(z);
@@ -288,6 +289,40 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         },
       },
       401: { description: "Missing or invalid bearer token" },
+    },
+  });
+
+  registry.registerPath({
+    method: "put",
+    path: "/integration/systems/{id}/inbound-secret",
+    summary: "Set or rotate a connected system's inbound HMAC secret",
+    security: [{ [bearerAuth.name]: [] }],
+    request: {
+      params: z.object({ id: z.string().openapi({ description: "System natural key, e.g. cbs" }) }),
+      body: {
+        content: {
+          "application/json": {
+            schema: SetInboundSecretSchema.openapi("SetInboundSecret"),
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Secret set",
+        content: {
+          "application/json": {
+            schema: z.object({ system: z.string(), inboundSecretSet: z.boolean() }),
+          },
+        },
+      },
+      400: {
+        description: "Validation error",
+        content: { "application/json": { schema: ValidationError } },
+      },
+      401: { description: "Missing or invalid bearer token" },
+      403: { description: "Insufficient permission (integration:manage)" },
+      404: { description: "System not found" },
     },
   });
 

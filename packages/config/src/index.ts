@@ -49,9 +49,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       replicationLagSeconds: Number(env.REPLICATION_LAG_SECONDS ?? 5),
     },
     search: {
+      // SEARCH_BACKEND: "sql" (default) | "elasticsearch" (alias: "es").
       backend: (env.SEARCH_BACKEND ?? "sql") as "sql" | "elasticsearch",
-      esNode: env.ES_NODE ?? "http://localhost:9200",
-      esIndex: env.ES_INDEX ?? "zordms-documents",
+      // ELASTICSEARCH_NODE is the canonical key; ES_NODE kept as a legacy alias.
+      esNode: env.ELASTICSEARCH_NODE ?? env.ES_NODE ?? "http://localhost:9200",
+      esIndex: env.ELASTICSEARCH_INDEX ?? env.ES_INDEX ?? "zordms-documents",
     },
   };
 }

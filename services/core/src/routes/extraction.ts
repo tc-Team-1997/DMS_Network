@@ -45,9 +45,6 @@ export function extractionRouter(): Router {
     const document = await getDocument(deps.knex, docId, viewer);
     if (!document) { res.status(404).json({ error: "not_found" }); return; }
 
-    // Reflect queued state immediately so the UI can show progress.
-    await deps.knex("documents").where({ id: docId }).update({ extraction_status: "QUEUED" });
-
     const job = await enqueue(
       deps.knex,
       "extract",
@@ -55,7 +52,15 @@ export function extractionRouter(): Router {
       { idempotencyKey: extractIdempotencyKey(docId), priority: 0 },
     );
 
-    res.status(202).json({ jobId: job.id, status: "queued" });
+    // Only mark the document as QUEUED when a genuinely new job was created.
+    // If the idempotent enqueue returned an existing terminal job (succeeded/
+    // failed/dead), the document's extraction_status must not be regressed —
+    // e.g. a DONE doc must stay DONE even after a repeat async-extract call.
+    if (job.status === "queued") {
+      await deps.knex("documents").where({ id: docId }).update({ extraction_status: "QUEUED" });
+    }
+
+    res.status(202).json({ jobId: job.id, status: job.status });
   }
 
   /**

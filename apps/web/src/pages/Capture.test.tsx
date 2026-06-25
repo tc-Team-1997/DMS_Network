@@ -40,6 +40,7 @@ if (!globalThis.URL.createObjectURL) {
 const mockUploadDocument = vi.fn();
 const mockExtractDocument = vi.fn();
 const mockExtractDocumentAsync = vi.fn();
+const mockGetExtraction = vi.fn();
 const mockGetDocTypes = vi.fn();
 const mockPatchDocument = vi.fn();
 
@@ -47,6 +48,7 @@ vi.mock("../api/captureApi.js", () => ({
   uploadDocument: (...args: unknown[]) => mockUploadDocument(...args),
   extractDocument: (...args: unknown[]) => mockExtractDocument(...args),
   extractDocumentAsync: (...args: unknown[]) => mockExtractDocumentAsync(...args),
+  getExtraction: (...args: unknown[]) => mockGetExtraction(...args),
   bulkUploadDocuments: vi.fn(),
   getDocTypes: (...args: unknown[]) => mockGetDocTypes(...args),
   patchDocument: (...args: unknown[]) => mockPatchDocument(...args),
@@ -253,6 +255,7 @@ describe("Capture screen — enterprise rebuild", () => {
     mockUploadDocument.mockResolvedValue(MOCK_UPLOAD_RESPONSE);
     mockExtractDocument.mockResolvedValue(MOCK_EXTRACTION_RESPONSE);
     mockExtractDocumentAsync.mockResolvedValue({ jobId: "job-1", status: "queued" });
+    mockGetExtraction.mockResolvedValue(MOCK_EXTRACTION_RESPONSE);
     mockGetJob.mockResolvedValue({
       id: "job-1",
       type: "extract",
@@ -1337,6 +1340,59 @@ describe("Capture screen — enterprise rebuild", () => {
       timeout: 4000,
     });
     expect(mockGetJob).toHaveBeenCalledWith("job-1");
+  });
+
+  it("succeeded background job fetches the full extraction result (getExtraction by doc id)", async () => {
+    renderWithRouter(<Capture />);
+    await doBulkProceed([mockFile("a.pdf")]);
+
+    // Once the job reaches succeeded, the full persisted extraction is read back
+    // via getExtraction(docId) so the drawer can render the editable form.
+    await waitFor(() => expect(mockGetExtraction).toHaveBeenCalledWith(42), {
+      timeout: 4000,
+    });
+  });
+
+  it("opening a completed background job shows the FULL editable result drawer (same as sync)", async () => {
+    renderWithRouter(<Capture />);
+    await doBulkProceed([mockFile("a.pdf")]);
+
+    // Wait for the background job to succeed and the full extraction to load.
+    await waitFor(() => expect(mockGetExtraction).toHaveBeenCalledWith(42), {
+      timeout: 4000,
+    });
+    await waitFor(() => expect(screen.getByText(/1 Captured/)).toBeInTheDocument(), {
+      timeout: 4000,
+    });
+
+    // Open the queue drawer and select the completed background item.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Toggle capture queue drawer/i }),
+    );
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i }),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: /Queue item:/i })[0]);
+    });
+
+    // The SAME editable ExtractionResultDrawer as the sync path is rendered:
+    // editable classification, pre-filled fields, quality score, raw metadata.
+    await waitFor(() =>
+      expect(
+        screen.getAllByText(/Classification \(editable\)/i).length,
+      ).toBeGreaterThan(0),
+    );
+    await waitFor(() => {
+      const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
+      return inputs.some((el) => el.value === "Dorji Wangchuk");
+    });
+    expect(
+      screen.getByRole("button", { name: /Save corrections/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Toggle raw extracted metadata/i }),
+    ).toBeInTheDocument();
   });
 
   it("bulk async surfaces a dead-letter job as an error/dead state", async () => {

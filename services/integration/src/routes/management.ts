@@ -2,7 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import type { ConnectedSystem } from "@zordms/types";
-import { LogsQuerySchema, parseOr400 } from "../validation.js";
+import { LogsQuerySchema, SetInboundSecretSchema, parseOr400 } from "../validation.js";
 
 export function managementRouter(): Router {
   const r = Router();
@@ -44,6 +44,26 @@ export function managementRouter(): Router {
         });
       }
       res.json({ systems });
+    } catch (err) { next(err); }
+  });
+
+  // Set/rotate the INBOUND HMAC secret for a connected system (admin RBAC).
+  // `:id` is the system natural key (e.g. "cbs", "los") — the same key the
+  // inbound webhook handler verifies signatures against. Lets each environment
+  // configure its own secret instead of relying only on the seeded dev value.
+  // The secret value itself is never echoed back in the response.
+  r.put("/systems/:id/inbound-secret", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const body = parseOr400(SetInboundSecretSchema, req.body, res);
+      if (!body) return;
+      const system = req.params.id;
+      const updated = await knex("integration_config").where({ system }).update({ secret: body.secret });
+      if (!updated) {
+        res.status(404).json({ error: "system_not_found" });
+        return;
+      }
+      res.json({ system, inboundSecretSet: true });
     } catch (err) { next(err); }
   });
 

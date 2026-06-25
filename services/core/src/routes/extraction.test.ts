@@ -548,3 +548,102 @@ describe("POST /documents/:id/extract — Capture→Workflow handoff", () => {
     expect(res.body.workflow_id).toBe("wf-unknown000000000000000000000000000");
   });
 });
+
+// ── P8: Async-extract idempotency — QUEUED reset regression ───────────────────
+//
+// Bug fixed: POST /documents/:id/extract {async:true} was setting
+// extraction_status=QUEUED BEFORE the idempotent enqueue. On a doc that is
+// already DONE, the idempotent enqueue returns the existing succeeded job, but
+// the document was wrongly showing QUEUED.
+//
+// Fix: extraction_status is only set to QUEUED when a genuinely new job is
+// enqueued (job.status === "queued"). If the existing job is already succeeded,
+// the document stays DONE.
+
+describe("POST /documents/:id/extract {async:true} — idempotency / QUEUED reset", () => {
+  it("a genuinely new async-extract sets extraction_status=QUEUED and returns 202", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    const res = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ async: true });
+
+    expect(res.status).toBe(202);
+    expect(res.body).toHaveProperty("jobId");
+    expect(res.body.status).toBe("queued");
+
+    const dbDoc = await h.knex("documents").where({ id: docId }).first();
+    expect(dbDoc.extraction_status).toBe("QUEUED");
+  });
+
+  it("repeat async-extract on an already-DONE doc does NOT regress extraction_status", async () => {
+    const token = await h.tokenFor("admin");
+    const docId = await upload(token);
+
+    // Step 1: run a sync extraction to get the doc to DONE.
+    mockClassify.mockResolvedValue({ doc_type: "BT_CID_4G", confidence: 0.97 });
+    mockExtract.mockResolvedValue({
+      doc_type: "BT_CID_4G",
+      valid: true,
+      review_flag: false,
+      partial: false,
+      errors: [],
+      data: {
+        cid_no: "11504000231",
+        full_name: "Dorji Wangchuk",
+        dob: "1985-03-12",
+        expiry_date: "2030-01-01",
+        issue_date: "2021-04-01",
+        dzongkhag: "Thimphu",
+        sex: "M",
+      },
+    });
+    const syncRes = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(syncRes.status).toBe(200);
+
+    // Confirm DONE in DB, and note doc_type/confidence are set.
+    const afterSync = await h.knex("documents").where({ id: docId }).first();
+    expect(afterSync.extraction_status).toBe("DONE");
+    expect(afterSync.doc_type).toBe("BT_CID_4G");
+
+    // Step 2: Simulate a prior async job that already succeeded for this doc.
+    const { extractIdempotencyKey } = await import("../worker/handlers.js");
+    const { enqueue: enqueueJob, complete: completeJob } = await import("../queue/index.js");
+    const priorJob = await enqueueJob(
+      h.knex,
+      "extract",
+      { docId },
+      { idempotencyKey: extractIdempotencyKey(docId) },
+    );
+    // Mark it succeeded (simulating the worker finishing it).
+    await h.knex("jobs").where({ id: priorJob.id }).update({ status: "running" });
+    await completeJob(h.knex, priorJob.id, { docId, docType: "BT_CID_4G" });
+
+    // Verify the job is now succeeded.
+    const jobRow = await h.knex("jobs").where({ id: priorJob.id }).first();
+    expect(jobRow.status).toBe("succeeded");
+
+    // Step 3: Repeat async-extract on the DONE document.
+    const repeatRes = await request(h.app)
+      .post(`/documents/${docId}/extract`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ async: true });
+
+    // Must still be 202 (idempotent).
+    expect(repeatRes.status).toBe(202);
+    // The returned jobId must be the SAME existing job.
+    expect(repeatRes.body.jobId).toBe(priorJob.id);
+    // Status in the response must reflect the existing job's terminal status.
+    expect(repeatRes.body.status).toBe("succeeded");
+
+    // CRITICAL: extraction_status must NOT have been reset to QUEUED.
+    const afterRepeat = await h.knex("documents").where({ id: docId }).first();
+    expect(afterRepeat.extraction_status).toBe("DONE");
+    // doc_type / confidence must also be intact.
+    expect(afterRepeat.doc_type).toBe("BT_CID_4G");
+  });
+});
