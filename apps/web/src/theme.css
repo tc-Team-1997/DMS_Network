@@ -375,7 +375,7 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .topbar-search input::placeholder { color: var(--sil); }
 .topbar-ai-tag { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 9px; font-weight: 700; color: var(--gold3); background: var(--goldT); padding: 1px 6px; border-radius: 3px; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.ic { background: none; border: none; color: var(--sil); cursor: pointer; padding: 6px; border-radius: 6px; transition: .15s; position: relative; display: flex; }
+.ic { background: none; border: none; color: var(--sil); cursor: pointer; padding: 6px; border-radius: 6px; transition: .15s; position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
 .ic:hover { color: var(--gold3); background: rgba(15,23,42,.06); }
 .notdot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--R); border: 1.5px solid var(--ink2); }
 .upbtn { background: linear-gradient(135deg,var(--gold),var(--gold2)); color: #241a06; border: none; padding: 7px 14px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; font-family: var(--font); letter-spacing: .4px; }
@@ -385,6 +385,13 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .usr-av { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg,var(--navy),var(--gold)); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .usr-pill b     { font-size: 11px; font-weight: 600; display: block; color: var(--wh); }
 .usr-pill small { font-size: 9px; color: var(--gold3); letter-spacing: .4px; text-transform: uppercase; }
+
+/* Topbar user identity — avatar + name·role, vertically centred with the icons */
+.usr-identity { display: inline-flex; align-items: center; gap: 8px; padding: 0 2px; }
+.usr-name-role { display: inline-flex; align-items: center; gap: 4px; line-height: 1; white-space: nowrap; }
+.usr-name-role b { font-size: 12px; font-weight: 600; color: #fff; }
+.usr-dot { color: rgba(255,255,255,.4); }
+.usr-role { font-size: 11px; color: #f0c84a; letter-spacing: .3px; }
 
 /* ══════════════════════════════════════════════
    SIDEBAR

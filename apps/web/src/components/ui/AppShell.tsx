@@ -131,7 +131,7 @@ export function AppShell({ children }: AppShellProps) {
         )}
 
         {/* Branch scope — based on the logged-in user (left) */}
-        <Tooltip label="Branch scope">
+        <Tooltip label="Branch scope" placement="bottom">
           <button className="topbar-branch" type="button" aria-label="Branch scope">
             <MapPin size={12} />
             <span>{branchLabel}</span>
@@ -141,14 +141,14 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Right actions */}
         <div className="topbar-actions">
-          <Tooltip label="Alerts &amp; Events">
+          <Tooltip label="Alerts &amp; Events" placement="bottom">
             <button className="ic" type="button" aria-label="Alerts & Events" onClick={() => navigate("/alerts")}>
               <Bell size={17} />
               <span className="notdot" />
             </button>
           </Tooltip>
 
-          <Tooltip label="Compliance &amp; Audit">
+          <Tooltip label="Compliance &amp; Audit" placement="bottom">
             <button className="ic" type="button" aria-label="Compliance & Audit" onClick={() => navigate("/compliance-audit")}>
               <Shield size={17} />
             </button>
@@ -165,7 +165,7 @@ export function AppShell({ children }: AppShellProps) {
           </div>
 
           {/* Logout — separate exit button */}
-          <Tooltip label="Sign out">
+          <Tooltip label="Sign out" placement="bottom">
             <button className="ic exit-ic" type="button" aria-label="Sign out" onClick={logout}>
               <LogOut size={17} />
             </button>
