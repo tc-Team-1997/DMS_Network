@@ -1,13 +1,17 @@
 /**
- * Capture.test.tsx — Enterprise capture screen tests
+ * Capture.test.tsx — ZorDMS Capture screen (enterprise rebuild)
  *
  * Covers:
  * - 3 tabs: Scanner, File Upload, Bulk Upload
- * - Front/Back slot rendering per tab
- * - Proceed button (appears once file selected)
+ * - Capture mode toggle (Single Side / Front & Back) on Scanner + Upload tabs
+ * - Single Side = one slot; Front & Back = two slots
+ * - Proceed button appears when file selected
  * - Proceed flow: POST /documents + /extract (mocked captureApi)
  * - Processing state
- * - Extraction result display
+ * - Editable result form (pre-filled from extraction data)
+ * - Save corrections -> PATCH /documents/:id
+ * - Quality panel (score + mandatory checklist)
+ * - Duplicates list + "Open in Viewer" link
  * - Queue drawer + FAB toggle
  * - RBAC gate (document:capture)
  */
@@ -26,7 +30,6 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   };
 }
 
-// Mock URL.createObjectURL and revokeObjectURL for FilePreview
 if (!globalThis.URL.createObjectURL) {
   globalThis.URL.createObjectURL = vi.fn(() => "blob:mock");
   globalThis.URL.revokeObjectURL = vi.fn();
@@ -36,16 +39,24 @@ if (!globalThis.URL.createObjectURL) {
 
 const mockUploadDocument = vi.fn();
 const mockExtractDocument = vi.fn();
+const mockGetDocTypes = vi.fn();
+const mockPatchDocument = vi.fn();
 
 vi.mock("../api/captureApi.js", () => ({
   uploadDocument: (...args: unknown[]) => mockUploadDocument(...args),
   extractDocument: (...args: unknown[]) => mockExtractDocument(...args),
   bulkUploadDocuments: vi.fn(),
+  getDocTypes: (...args: unknown[]) => mockGetDocTypes(...args),
+  patchDocument: (...args: unknown[]) => mockPatchDocument(...args),
 }));
 
 // ─── Auth mock — mutable so RBAC test can override ───────────────────────────
 
-let mockUserPermissions: string[] = ["document:capture", "document:read", "document:index"];
+let mockUserPermissions: string[] = [
+  "document:capture",
+  "document:read",
+  "document:index",
+];
 let mockUserBranch = "Thimphu";
 
 vi.mock("../auth/AuthContext.js", () => ({
@@ -76,6 +87,34 @@ const MOCK_UPLOAD_RESPONSE = {
   document: { id: 42, title: "Test Document", status: "Active" },
 };
 
+const MOCK_DOC_TYPES_RESPONSE = {
+  docTypes: [
+    {
+      code: "BT_CID_4G",
+      description: "Bhutan CID Card (4G, 2025+)",
+      jurisdiction: "BT",
+      issuer: "DCRC",
+      category: "KYC / Identity",
+      system: true,
+      created_at: "2026-06-25T00:00:00.000Z",
+      mandatoryFields: ["full_name", "dob", "expiry_date"],
+      optionalFields: ["cid", "doc_no", "sex", "dzongkhag"],
+    },
+    {
+      code: "BOB_LOAN_APPLICATION",
+      description: "BoB Loan Application",
+      jurisdiction: "BT",
+      issuer: "Bank of Bhutan",
+      category: "Loan & Credit",
+      system: true,
+      created_at: "2026-06-25T00:00:00.000Z",
+      mandatoryFields: ["application_no", "loan_type", "loan_amount", "applicant_cid"],
+      optionalFields: ["cid", "doc_no", "purpose", "officer"],
+    },
+  ],
+  total: 2,
+};
+
 const MOCK_EXTRACTION_RESPONSE = {
   document: {
     id: 42,
@@ -90,7 +129,11 @@ const MOCK_EXTRACTION_RESPONSE = {
     cid: "11504000231",
     doc_no: null,
     mappedKeys: ["cid", "full_name", "dob"],
-    data: { cid_no: "11504000231", full_name: "Dorji Wangchuk", dob: "1985-03-12" },
+    data: {
+      cid_no: "11504000231",
+      full_name: "Dorji Wangchuk",
+      dob: "1985-03-12",
+    },
     partial: false,
     errors: [],
   },
@@ -109,12 +152,59 @@ const MOCK_EXTRACTION_RESPONSE = {
   },
   suggestedNewType: null,
   source: "ai",
+  quality: {
+    score: 98,
+    completeness: 1.0,
+    mandatoryMissing: [],
+    confidence: 0.97,
+  },
+  duplicates: [],
+  autoVersioned: false,
+};
+
+const MOCK_EXTRACTION_WITH_DUPLICATES = {
+  ...MOCK_EXTRACTION_RESPONSE,
+  quality: {
+    score: 75,
+    completeness: 0.67,
+    mandatoryMissing: ["expiry_date"],
+    confidence: 0.97,
+  },
+  duplicates: [
+    {
+      id: 5,
+      title: "National ID — Dorji Wangchuk",
+      doc_type: "BT_CID_4G",
+      branch: "THM-HQ",
+      ingest_timestamp: "2026-06-24T10:30:00.000Z",
+      matchType: "hash",
+    },
+  ],
+};
+
+const MOCK_PATCH_RESPONSE = {
+  document: { id: 42, title: "Test Document", doc_type: "BT_CID_4G" },
+  quality: {
+    score: 94,
+    completeness: 1.0,
+    mandatoryMissing: [],
+    confidence: 0.97,
+  },
+  catalog: {
+    category: "KYC / Identity",
+    route: "AUTO",
+    mandatoryOk: true,
+    missing: [],
+  },
 };
 
 /** Full proceed flow helper — selects front file, clicks Proceed, confirms, awaits extraction. */
 async function doFullProceed() {
   const frontInput = screen.getByLabelText(/Front Side.*file input/i);
-  Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+  Object.defineProperty(frontInput, "files", {
+    value: [mockFile()],
+    configurable: true,
+  });
   fireEvent.change(frontInput);
   await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
   fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
@@ -128,10 +218,16 @@ async function doFullProceed() {
 
 describe("Capture screen — enterprise rebuild", () => {
   beforeEach(() => {
-    mockUserPermissions = ["document:capture", "document:read", "document:index"];
+    mockUserPermissions = [
+      "document:capture",
+      "document:read",
+      "document:index",
+    ];
     mockUserBranch = "Thimphu";
     mockUploadDocument.mockResolvedValue(MOCK_UPLOAD_RESPONSE);
     mockExtractDocument.mockResolvedValue(MOCK_EXTRACTION_RESPONSE);
+    mockGetDocTypes.mockResolvedValue(MOCK_DOC_TYPES_RESPONSE);
+    mockPatchDocument.mockResolvedValue(MOCK_PATCH_RESPONSE);
   });
 
   afterEach(() => {
@@ -165,42 +261,185 @@ describe("Capture screen — enterprise rebuild", () => {
     expect(screen.queryByText(/Today's Ingestion by Channel/i)).not.toBeInTheDocument();
   });
 
+  // ── Capture mode selector ─────────────────────────────────────────────────
+
+  it("File Upload tab shows mode selector with Single Side and Front & Back", () => {
+    renderWithRouter(<Capture />);
+    // Default tab is File Upload
+    expect(
+      screen.getByRole("button", { name: /Single Side mode/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Front & Back mode/i })
+    ).toBeInTheDocument();
+  });
+
+  it("Single Side mode is selected by default", () => {
+    renderWithRouter(<Capture />);
+    const singleBtn = screen.getByRole("button", { name: /Single Side mode/i });
+    expect(singleBtn).toHaveAttribute("aria-pressed", "true");
+    const fbBtn = screen.getByRole("button", { name: /Front & Back mode/i });
+    expect(fbBtn).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("File Upload tab in Single Side mode shows only one drop zone (front)", () => {
+    renderWithRouter(<Capture />);
+    // Single mode: only front zone visible, no back zone
+    expect(
+      screen.getByLabelText(/Front Side.*file input/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/Back Side.*file input/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("switching to Front & Back mode shows both front and back slots on File Upload tab", async () => {
+    renderWithRouter(<Capture />);
+    const fbBtn = screen.getByRole("button", { name: /Front & Back mode/i });
+    fireEvent.click(fbBtn);
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/Front Side.*file input/i)
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByLabelText(/Back Side.*file input/i)).toBeInTheDocument();
+  });
+
+  it("switching back to Single Side mode hides the back slot", async () => {
+    renderWithRouter(<Capture />);
+    // Go to Front & Back
+    fireEvent.click(screen.getByRole("button", { name: /Front & Back mode/i }));
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Back Side.*file input/i)).toBeInTheDocument()
+    );
+    // Go back to Single
+    fireEvent.click(screen.getByRole("button", { name: /Single Side mode/i }));
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText(/Back Side.*file input/i)
+      ).not.toBeInTheDocument()
+    );
+  });
+
+  it("Scanner tab shows mode selector", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Single Side mode/i })
+      ).toBeInTheDocument()
+    );
+    expect(
+      screen.getByRole("button", { name: /Front & Back mode/i })
+    ).toBeInTheDocument();
+  });
+
+  it("Scanner tab in Front & Back mode shows Front Side Capture and Back Side Capture cards", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Front & Back mode/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Front & Back mode/i }));
+    await waitFor(() =>
+      expect(screen.getByText("Front Side Capture")).toBeInTheDocument()
+    );
+    expect(screen.getByText("Back Side Capture")).toBeInTheDocument();
+  });
+
+  it("Scanner tab in Single Side mode shows only front zone", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/Front Side.*file input/i)
+      ).toBeInTheDocument()
+    );
+    // Single mode — no back zone
+    expect(
+      screen.queryByLabelText(/Back Side.*file input/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("Bulk Upload tab does NOT show mode selector", async () => {
+    renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: "Bulk Upload" }));
+    await waitFor(() => screen.getByLabelText(/Drop multiple files.*file input/i));
+    expect(
+      screen.queryByRole("button", { name: /Single Side mode/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Front & Back mode/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("switching tabs resets capture mode to Single Side", async () => {
+    renderWithRouter(<Capture />);
+    // Switch to Front & Back
+    fireEvent.click(screen.getByRole("button", { name: /Front & Back mode/i }));
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Back Side.*file input/i)).toBeInTheDocument()
+    );
+    // Switch to Scanner tab — mode resets
+    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Single Side mode/i })
+      ).toHaveAttribute("aria-pressed", "true")
+    );
+    // Switch back to File Upload tab — mode still resets
+    fireEvent.click(screen.getByRole("button", { name: "File Upload" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByLabelText(/Back Side.*file input/i)
+      ).not.toBeInTheDocument()
+    );
+  });
+
   // ── File Upload tab — Front/Back slots ────────────────────────────────────
 
-  it("File Upload tab shows Front Side and Back Side card titles", () => {
+  it("File Upload tab in Front & Back mode shows Front Side and Back Side card titles", async () => {
     renderWithRouter(<Capture />);
-    // File Upload is the default tab
-    expect(screen.getByText("Front Side")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Front & Back mode/i }));
+    await waitFor(() =>
+      expect(screen.getByText("Front Side")).toBeInTheDocument()
+    );
     expect(screen.getByText("Back Side")).toBeInTheDocument();
   });
 
-  it("File Upload tab has two file inputs (front and back)", () => {
+  it("File Upload tab Front & Back mode has two file inputs", async () => {
     renderWithRouter(<Capture />);
-    const frontInput = screen.getByLabelText(/Front Side.*file input/i);
-    const backInput = screen.getByLabelText(/Back Side.*file input/i);
-    expect(frontInput).toBeInTheDocument();
-    expect(backInput).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Front & Back mode/i }));
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/Front Side.*file input/i)
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByLabelText(/Back Side.*file input/i)).toBeInTheDocument();
   });
 
-  // ── Scanner tab — Front/Back slots ───────────────────────────────────────
-
-  it("Scanner tab shows Front Side Capture and Back Side Capture cards", async () => {
-    renderWithRouter(<Capture />);
-    fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
-    await waitFor(() => expect(screen.getByText("Front Side Capture")).toBeInTheDocument());
-    expect(screen.getByText("Back Side Capture")).toBeInTheDocument();
-  });
+  // ── Scanner tab ───────────────────────────────────────────────────────────
 
   it("Scanner tab shows Scanner Configuration", async () => {
     renderWithRouter(<Capture />);
     fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
-    await waitFor(() => expect(screen.getByText("Scanner Configuration")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Scanner Configuration")).toBeInTheDocument()
+    );
   });
 
-  it("Scanner tab has front and back file inputs", async () => {
+  it("Scanner tab Front & Back mode has front and back file inputs", async () => {
     renderWithRouter(<Capture />);
     fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
-    await waitFor(() => screen.getByLabelText(/Front Side.*file input/i));
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Front & Back mode/i })
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Front & Back mode/i }));
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/Front Side.*file input/i)
+      ).toBeInTheDocument()
+    );
     expect(screen.getByLabelText(/Back Side.*file input/i)).toBeInTheDocument();
   });
 
@@ -209,7 +448,9 @@ describe("Capture screen — enterprise rebuild", () => {
   it("Bulk Upload tab shows multi-file drop zone input", async () => {
     renderWithRouter(<Capture />);
     fireEvent.click(screen.getByRole("button", { name: "Bulk Upload" }));
-    await waitFor(() => screen.getByLabelText(/Drop multiple files.*file input/i));
+    await waitFor(() =>
+      screen.getByLabelText(/Drop multiple files.*file input/i)
+    );
     const bulkInput = screen.getByLabelText(/Drop multiple files.*file input/i);
     expect(bulkInput).toHaveAttribute("multiple");
   });
@@ -218,30 +459,44 @@ describe("Capture screen — enterprise rebuild", () => {
 
   it("Proceed button does NOT appear when no file selected", () => {
     renderWithRouter(<Capture />);
-    expect(screen.queryByRole("button", { name: /Proceed/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Proceed/i })
+    ).not.toBeInTheDocument();
   });
 
   it("Proceed button appears after front file is selected", async () => {
     renderWithRouter(<Capture />);
     const frontInput = screen.getByLabelText(/Front Side.*file input/i);
     const file = mockFile("cid.pdf");
-    Object.defineProperty(frontInput, "files", { value: [file], configurable: true });
+    Object.defineProperty(frontInput, "files", {
+      value: [file],
+      configurable: true,
+    });
     fireEvent.change(frontInput);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Proceed/i })).toBeInTheDocument()
+      expect(
+        screen.getByRole("button", { name: /Proceed/i })
+      ).toBeInTheDocument()
     );
   });
 
   it("Proceed button appears after bulk files are selected", async () => {
     renderWithRouter(<Capture />);
     fireEvent.click(screen.getByRole("button", { name: "Bulk Upload" }));
-    await waitFor(() => screen.getByLabelText(/Drop multiple files.*file input/i));
+    await waitFor(() =>
+      screen.getByLabelText(/Drop multiple files.*file input/i)
+    );
     const input = screen.getByLabelText(/Drop multiple files.*file input/i);
     const files = [mockFile("a.pdf"), mockFile("b.pdf")];
-    Object.defineProperty(input, "files", { value: files, configurable: true });
+    Object.defineProperty(input, "files", {
+      value: files,
+      configurable: true,
+    });
     fireEvent.change(input);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Proceed/i })).toBeInTheDocument()
+      expect(
+        screen.getByRole("button", { name: /Proceed/i })
+      ).toBeInTheDocument()
     );
   });
 
@@ -251,17 +506,24 @@ describe("Capture screen — enterprise rebuild", () => {
     renderWithRouter(<Capture />);
     const frontInput = screen.getByLabelText(/Front Side.*file input/i);
     const file = mockFile("passport.pdf");
-    Object.defineProperty(frontInput, "files", { value: [file], configurable: true });
+    Object.defineProperty(frontInput, "files", {
+      value: [file],
+      configurable: true,
+    });
     fireEvent.change(frontInput);
     await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
     fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
-    await waitFor(() => expect(screen.getByText("Confirm Capture")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Confirm Capture")).toBeInTheDocument()
+    );
   });
 
   it("Proceed flow calls uploadDocument with correct file and branch", async () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
-    await waitFor(() => expect(mockUploadDocument).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockUploadDocument).toHaveBeenCalledTimes(1)
+    );
     expect(mockUploadDocument).toHaveBeenCalledWith(
       expect.any(File),
       expect.objectContaining({ branch: "Thimphu" })
@@ -271,33 +533,47 @@ describe("Capture screen — enterprise rebuild", () => {
   it("Proceed flow calls extractDocument with doc id from upload response", async () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
-    await waitFor(() => expect(mockExtractDocument).toHaveBeenCalledWith(42));
+    await waitFor(() =>
+      expect(mockExtractDocument).toHaveBeenCalledWith(42)
+    );
   });
 
   it("shows processing state while upload/extract runs", async () => {
     let resolveExtract!: (v: unknown) => void;
-    mockExtractDocument.mockReturnValue(new Promise((r) => { resolveExtract = r; }));
+    mockExtractDocument.mockReturnValue(
+      new Promise((r) => {
+        resolveExtract = r;
+      })
+    );
 
     renderWithRouter(<Capture />);
     const frontInput = screen.getByLabelText(/Front Side.*file input/i);
     const file = mockFile("kyc.pdf");
-    Object.defineProperty(frontInput, "files", { value: [file], configurable: true });
+    Object.defineProperty(frontInput, "files", {
+      value: [file],
+      configurable: true,
+    });
     fireEvent.change(frontInput);
     await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
     fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
-    await waitFor(() => screen.getByRole("button", { name: /Confirm.*Proceed/i }));
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Confirm.*Proceed/i })
+    );
     fireEvent.click(screen.getByRole("button", { name: /Confirm.*Proceed/i }));
 
-    await waitFor(() => expect(screen.getByText(/Processing…/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/Processing…/i)).toBeInTheDocument()
+    );
     await act(async () => resolveExtract(MOCK_EXTRACTION_RESPONSE));
   });
 
   it("shows AI Classification Result section after successful extraction", async () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
-    // getAllByText because drawer may duplicate it — just ensure at least one is present
     await waitFor(() =>
-      expect(screen.getAllByText("AI Classification Result").length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText("AI Classification Result").length
+      ).toBeGreaterThan(0)
     );
   });
 
@@ -330,7 +606,9 @@ describe("Capture screen — enterprise rebuild", () => {
     await doFullProceed();
     await waitFor(() =>
       expect(
-        screen.getAllByText("/BoB/Customers/11504000231/KYC/Identity/2026/").length
+        screen.getAllByText(
+          "/BoB/Customers/11504000231/KYC/Identity/2026/"
+        ).length
       ).toBeGreaterThan(0)
     );
   });
@@ -339,7 +617,9 @@ describe("Capture screen — enterprise rebuild", () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
     await waitFor(() =>
-      expect(screen.getAllByText("Dorji Wangchuk").length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText("Dorji Wangchuk").length
+      ).toBeGreaterThan(0)
     );
     expect(screen.getAllByText("11504000231").length).toBeGreaterThan(0);
   });
@@ -356,15 +636,16 @@ describe("Capture screen — enterprise rebuild", () => {
 
     renderWithRouter(<Capture />);
     await doFullProceed();
-    // Text is split between elements so use getAllByText with a custom matcher
     await waitFor(() =>
       expect(
-        screen.getAllByText((content) => content.includes("UNKNOWN_DOC_X")).length
+        screen.getAllByText((content) =>
+          content.includes("UNKNOWN_DOC_X")
+        ).length
       ).toBeGreaterThan(0)
     );
   });
 
-  it("shows 'Create new document type' heading for suggestedNewType", async () => {
+  it("shows 'Suggested New Document Type' heading for suggestedNewType", async () => {
     mockExtractDocument.mockResolvedValueOnce({
       ...MOCK_EXTRACTION_RESPONSE,
       suggestedNewType: {
@@ -376,7 +657,9 @@ describe("Capture screen — enterprise rebuild", () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
     await waitFor(() =>
-      expect(screen.getAllByText("Suggested New Document Type").length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText("Suggested New Document Type").length
+      ).toBeGreaterThan(0)
     );
   });
 
@@ -385,14 +668,312 @@ describe("Capture screen — enterprise rebuild", () => {
 
     renderWithRouter(<Capture />);
     const frontInput = screen.getByLabelText(/Front Side.*file input/i);
-    Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+    Object.defineProperty(frontInput, "files", {
+      value: [mockFile()],
+      configurable: true,
+    });
     fireEvent.change(frontInput);
     await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
     fireEvent.click(screen.getByRole("button", { name: /Proceed/i }));
-    await waitFor(() => screen.getByRole("button", { name: /Confirm.*Proceed/i }));
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Confirm.*Proceed/i })); });
-    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Confirm.*Proceed/i })
+    );
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Confirm.*Proceed/i })
+      );
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toBeInTheDocument()
+    );
     expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+  });
+
+  // ── Editable form (ExtractionResultDrawer) ───────────────────────────────
+
+  it("drawer shows editable Classification section after extraction", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    // The drawer auto-opens; it contains the editable form
+    await waitFor(() =>
+      expect(
+        screen.getByRole("dialog", { name: /Capture queue drawer/i })
+      ).toBeInTheDocument()
+    );
+    // Classification editable form
+    await waitFor(() =>
+      expect(
+        screen.getAllByText(/Classification \(editable\)/i).length
+      ).toBeGreaterThan(0)
+    );
+  });
+
+  it("editable form is pre-filled with extraction data (Dorji Wangchuk)", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // Wait for doc-types to load and form to render
+    await waitFor(() => {
+      const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
+      return inputs.some((el) => el.value === "Dorji Wangchuk");
+    });
+    const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
+    const filledInput = inputs.find((el) => el.value === "Dorji Wangchuk");
+    expect(filledInput).toBeTruthy();
+  });
+
+  it("editable form allows changing a field value", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // Wait for field inputs to appear
+    await waitFor(() => {
+      const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
+      return inputs.some((el) => el.value === "Dorji Wangchuk");
+    });
+    const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
+    const nameInput = inputs.find(
+      (el) => el.value === "Dorji Wangchuk"
+    ) as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Sonam Dorji" } });
+    expect(nameInput.value).toBe("Sonam Dorji");
+  });
+
+  it("Save corrections button is visible in the result drawer", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Save corrections/i })
+      ).toBeInTheDocument()
+    );
+  });
+
+  it("Save corrections calls patchDocument with doc id and edited metadata", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Save corrections/i })
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Save corrections/i })
+      );
+    });
+
+    await waitFor(() =>
+      expect(mockPatchDocument).toHaveBeenCalledWith(
+        42,
+        expect.objectContaining({
+          doc_type: "BT_CID_4G",
+          metadata: expect.any(Object),
+        })
+      )
+    );
+  });
+
+  it("after successful save, recomputed quality score is shown", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Save corrections/i })
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: /Save corrections/i })
+      );
+    });
+
+    // PATCH response returns quality.score=94
+    await waitFor(() =>
+      expect(screen.getAllByText("94").length).toBeGreaterThan(0)
+    );
+  });
+
+  // ── Quality / Completeness panel ─────────────────────────────────────────
+
+  it("quality score is shown in the result drawer", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // MOCK_EXTRACTION_RESPONSE has quality.score=98
+    await waitFor(() =>
+      expect(screen.getAllByText("98").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("Quality panel shows completeness percentage", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getAllByText(/Completeness:/i).length
+      ).toBeGreaterThan(0)
+    );
+  });
+
+  it("mandatory fields checklist shows green check when field is present", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // mandatoryMissing=[] so all fields present → "present" aria-labels
+    await waitFor(() => {
+      const presentMarks = screen.queryAllByLabelText("present");
+      return presentMarks.length > 0;
+    });
+    const presentMarks = screen.queryAllByLabelText("present");
+    expect(presentMarks.length).toBeGreaterThan(0);
+  });
+
+  it("mandatory fields checklist shows missing indicator for absent mandatory fields", async () => {
+    mockExtractDocument.mockResolvedValueOnce(MOCK_EXTRACTION_WITH_DUPLICATES);
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // mandatoryMissing=["expiry_date"] → "missing" aria-label present
+    await waitFor(() => {
+      const missingMarks = screen.queryAllByLabelText("missing");
+      return missingMarks.length > 0;
+    });
+    const missingMarks = screen.queryAllByLabelText("missing");
+    expect(missingMarks.length).toBeGreaterThan(0);
+  });
+
+  // ── Duplicates ────────────────────────────────────────────────────────────
+
+  it("shows no duplicates section when duplicates array is empty", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // duplicates=[] and autoVersioned=false → no duplicates list
+    // The Duplicate Detection card should not appear
+    await waitFor(() => {
+      // Give doc-types a moment to load
+      return screen.queryAllByText("AI Classification Result").length > 0;
+    });
+    expect(
+      screen.queryByRole("list", { name: /duplicates list/i }) ||
+        screen.queryByLabelText(/duplicates list/i)
+    ).toBeNull();
+  });
+
+  it("shows duplicates list when extraction returns duplicates", async () => {
+    mockExtractDocument.mockResolvedValueOnce(MOCK_EXTRACTION_WITH_DUPLICATES);
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/duplicates list/i)
+      ).toBeInTheDocument()
+    );
+    expect(
+      screen.getByText("National ID — Dorji Wangchuk")
+    ).toBeInTheDocument();
+  });
+
+  it("each duplicate row shows its matchType", async () => {
+    mockExtractDocument.mockResolvedValueOnce(MOCK_EXTRACTION_WITH_DUPLICATES);
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText(/duplicates list/i)
+      ).toBeInTheDocument()
+    );
+    // matchType="hash"
+    expect(screen.getAllByText("hash").length).toBeGreaterThan(0);
+  });
+
+  it("each duplicate row has Open in Viewer button linking to /viewer?doc=<id>", async () => {
+    mockExtractDocument.mockResolvedValueOnce(MOCK_EXTRACTION_WITH_DUPLICATES);
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Open duplicate 5 in Viewer/i })
+      ).toBeInTheDocument()
+    );
+  });
+
+  it("shows auto-versioned notice when autoVersioned=true", async () => {
+    mockExtractDocument.mockResolvedValueOnce({
+      ...MOCK_EXTRACTION_RESPONSE,
+      autoVersioned: true,
+      duplicates: [],
+    });
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getAllByText(/Auto-versioned/i).length
+      ).toBeGreaterThan(0)
+    );
+  });
+
+  // ── Drawer — solid background + close button ──────────────────────────────
+
+  it("drawer has Close result drawer button (X)", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    // The ExtractionResultDrawer has its own close X button
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Close result drawer/i })
+      ).toBeInTheDocument()
+    );
+  });
+
+  it("drawer Close drawer button is accessible (aria-label)", async () => {
+    renderWithRouter(<Capture />);
+    const fab = screen.getByRole("button", { name: /Toggle capture queue drawer/i });
+    fireEvent.click(fab);
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Close drawer/i })
+    );
+    expect(
+      screen.getByRole("button", { name: /Close drawer/i })
+    ).toBeInTheDocument();
   });
 
   // ── Queue ─────────────────────────────────────────────────────────────────
@@ -400,9 +981,10 @@ describe("Capture screen — enterprise rebuild", () => {
   it("adds item to capture queue after Proceed and shows queue section", async () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
-    // "Capture Queue" appears in both the inline panel and drawer header
     await waitFor(() =>
-      expect(screen.getAllByText(/Capture Queue/i).length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText(/Capture Queue/i).length
+      ).toBeGreaterThan(0)
     );
   });
 
@@ -410,7 +992,9 @@ describe("Capture screen — enterprise rebuild", () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
     await waitFor(() =>
-      expect(screen.getAllByText("1 items").length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText("1 items").length
+      ).toBeGreaterThan(0)
     );
   });
 
@@ -419,7 +1003,9 @@ describe("Capture screen — enterprise rebuild", () => {
     await doFullProceed();
     // Drawer should auto-open after proceed
     await waitFor(() =>
-      expect(screen.getByRole("dialog", { name: /Capture queue drawer/i })).toBeInTheDocument()
+      expect(
+        screen.getByRole("dialog", { name: /Capture queue drawer/i })
+      ).toBeInTheDocument()
     );
   });
 
@@ -427,7 +1013,9 @@ describe("Capture screen — enterprise rebuild", () => {
     renderWithRouter(<Capture />);
     await doFullProceed();
     await waitFor(() => screen.getAllByRole("button", { name: /Queue item:/i }));
-    const queueItems = screen.getAllByRole("button", { name: /Queue item:/i });
+    const queueItems = screen.getAllByRole("button", {
+      name: /Queue item:/i,
+    });
     expect(queueItems.length).toBeGreaterThan(0);
   });
 
@@ -442,25 +1030,39 @@ describe("Capture screen — enterprise rebuild", () => {
 
   it("FAB click opens the capture queue drawer", async () => {
     renderWithRouter(<Capture />);
-    const fab = screen.getByRole("button", { name: /Toggle capture queue drawer/i });
+    const fab = screen.getByRole("button", {
+      name: /Toggle capture queue drawer/i,
+    });
     fireEvent.click(fab);
     await waitFor(() =>
-      expect(screen.getByRole("dialog", { name: /Capture queue drawer/i })).toBeInTheDocument()
+      expect(
+        screen.getByRole("dialog", { name: /Capture queue drawer/i })
+      ).toBeInTheDocument()
     );
   });
 
   it("drawer close button is accessible", async () => {
     renderWithRouter(<Capture />);
-    const fab = screen.getByRole("button", { name: /Toggle capture queue drawer/i });
+    const fab = screen.getByRole("button", {
+      name: /Toggle capture queue drawer/i,
+    });
     fireEvent.click(fab);
-    await waitFor(() => screen.getByRole("button", { name: /Close drawer/i }));
-    expect(screen.getByRole("button", { name: /Close drawer/i })).toBeInTheDocument();
+    await waitFor(() =>
+      screen.getByRole("button", { name: /Close drawer/i })
+    );
+    expect(
+      screen.getByRole("button", { name: /Close drawer/i })
+    ).toBeInTheDocument();
   });
 
   it("drawer shows empty state when no queue entries", async () => {
     renderWithRouter(<Capture />);
-    fireEvent.click(screen.getByRole("button", { name: /Toggle capture queue drawer/i }));
-    await waitFor(() => screen.getByRole("dialog", { name: /Capture queue drawer/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Toggle capture queue drawer/i })
+    );
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
     expect(screen.getByText(/No captures yet/i)).toBeInTheDocument();
   });
 
@@ -492,15 +1094,24 @@ describe("Capture screen — enterprise rebuild", () => {
     expect(screen.queryByText(/Max 100 MB/i)).not.toBeInTheDocument();
   });
 
-  // ── Back file is optional ─────────────────────────────────────────────────
+  // ── Back file is optional in Front & Back mode ────────────────────────────
 
-  it("Proceed appears with only front file (back is optional)", async () => {
+  it("Proceed appears with only front file in Front & Back mode (back is optional)", async () => {
     renderWithRouter(<Capture />);
+    fireEvent.click(screen.getByRole("button", { name: /Front & Back mode/i }));
+    await waitFor(() =>
+      screen.getByLabelText(/Front Side.*file input/i)
+    );
     const frontInput = screen.getByLabelText(/Front Side.*file input/i);
-    Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+    Object.defineProperty(frontInput, "files", {
+      value: [mockFile()],
+      configurable: true,
+    });
     fireEvent.change(frontInput);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Proceed/i })).toBeInTheDocument()
+      expect(
+        screen.getByRole("button", { name: /Proceed/i })
+      ).toBeInTheDocument()
     );
   });
 
@@ -509,13 +1120,31 @@ describe("Capture screen — enterprise rebuild", () => {
   it("switching tabs clears Proceed button", async () => {
     renderWithRouter(<Capture />);
     const frontInput = screen.getByLabelText(/Front Side.*file input/i);
-    Object.defineProperty(frontInput, "files", { value: [mockFile()], configurable: true });
+    Object.defineProperty(frontInput, "files", {
+      value: [mockFile()],
+      configurable: true,
+    });
     fireEvent.change(frontInput);
     await waitFor(() => screen.getByRole("button", { name: /Proceed/i }));
     // Switch tab — this clears frontFile
     fireEvent.click(screen.getByRole("button", { name: "Scanner" }));
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /Proceed/i })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole("button", { name: /Proceed/i })
+      ).not.toBeInTheDocument()
+    );
+  });
+
+  // ── doc-types loaded from API ─────────────────────────────────────────────
+
+  it("getDocTypes is called when the result drawer opens", async () => {
+    renderWithRouter(<Capture />);
+    await doFullProceed();
+    await waitFor(() =>
+      screen.getByRole("dialog", { name: /Capture queue drawer/i })
+    );
+    await waitFor(() =>
+      expect(mockGetDocTypes).toHaveBeenCalled()
     );
   });
 });

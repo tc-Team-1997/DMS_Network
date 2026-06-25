@@ -69,6 +69,28 @@ export interface SuggestedNewType {
   sampleFields: string[];
 }
 
+/** Quality/completeness scoring returned by the extraction and PATCH endpoints */
+export interface ExtractionQuality {
+  /** 0–100 composite score (40% mandatory completeness + 60% AI confidence) */
+  score: number;
+  /** 0–1 ratio of mandatory fields present */
+  completeness: number;
+  /** field names that are mandatory but absent */
+  mandatoryMissing: string[];
+  /** AI confidence passed through from classification */
+  confidence: number;
+}
+
+/** Single duplicate entry returned by the extraction pipeline */
+export interface ExtractionDuplicate {
+  id: number;
+  title: string;
+  doc_type: string;
+  branch: string;
+  ingest_timestamp: string;
+  matchType: "hash" | "cid" | "doc_no";
+}
+
 export interface ExtractionResult {
   document: UploadedDocument;
   classification: ExtractionClassification;
@@ -77,6 +99,48 @@ export interface ExtractionResult {
   folder: ExtractionFolder | null;
   suggestedNewType: SuggestedNewType | null;
   source: "ai" | "ocr-fallback";
+  /** Quality/completeness score — present in extraction response */
+  quality?: ExtractionQuality;
+  /** Detected duplicates — empty array when dedup disabled or no match */
+  duplicates?: ExtractionDuplicate[];
+  /** true when a hash duplicate caused auto-versioning */
+  autoVersioned?: boolean;
+}
+
+// ─── Doc-types endpoint shapes ────────────────────────────────────────────────
+
+export interface DocType {
+  code: string;
+  description: string;
+  jurisdiction: string;
+  issuer: string;
+  category: string;
+  system: boolean;
+  created_at: string;
+  mandatoryFields: string[];
+  optionalFields: string[];
+}
+
+export interface DocTypesResponse {
+  docTypes: DocType[];
+  total: number;
+}
+
+// ─── PATCH /documents/:id shapes ─────────────────────────────────────────────
+
+export interface PatchDocumentPayload {
+  doc_type?: string;
+  catalog_category?: string;
+  cid?: string;
+  doc_no?: string;
+  folder_id?: number;
+  metadata?: Record<string, string | number | null>;
+}
+
+export interface PatchDocumentResponse {
+  document: UploadedDocument;
+  quality: ExtractionQuality;
+  catalog: ExtractionCatalog;
 }
 
 // ─── API functions ────────────────────────────────────────────────────────────
@@ -136,6 +200,46 @@ export async function extractDocument(id: number): Promise<ExtractionResult> {
   const res = await fetch(`${SVC.core}/documents/${id}/extract`, {
     method: "POST",
     headers: { ...authHeaders(), "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
+  }
+  return res.json();
+}
+
+/**
+ * Fetch all registered document types, including mandatoryFields / optionalFields.
+ * GET SVC.core/doc-types
+ */
+export async function getDocTypes(): Promise<DocTypesResponse> {
+  const res = await fetch(`${SVC.core}/doc-types`, {
+    method: "GET",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body });
+  }
+  return res.json();
+}
+
+/**
+ * Save uploader corrections for a captured document.
+ * PATCH SVC.core/documents/:id
+ * Metadata fields are MERGED into existing metadata (not replaced).
+ * Returns updated document record with recomputed quality.
+ */
+export async function patchDocument(
+  id: number,
+  payload: PatchDocumentPayload
+): Promise<PatchDocumentResponse> {
+  const res = await fetch(`${SVC.core}/documents/${id}`, {
+    method: "PATCH",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 
   if (!res.ok) {

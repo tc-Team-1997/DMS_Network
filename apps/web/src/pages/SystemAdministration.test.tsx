@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { SystemAdministration } from "./SystemAdministration.js";
 
@@ -49,8 +49,23 @@ const MOCK_SCHEDULES = [
   { name: "Index optimisation", kind: "maintenance", cron: "0 4 * * 6", last_run: "2026-06-21T04:00:00Z", next_run: "2026-06-28T04:00:00Z" },
 ];
 
-function mockFetch(url: string) {
+const MOCK_DEDUP_CONFIG = {
+  enabled: true,
+  matchBy: ["hash", "cid"],
+  action: "flag",
+  fuzzyThreshold: 1.0,
+};
+
+function mockFetch(url: string, options?: RequestInit) {
   const u = String(url);
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (u.includes("/admin/dedup-config")) {
+    if (method === "PUT") {
+      const body = options?.body ? JSON.parse(String(options.body)) : {};
+      return Promise.resolve({ ok: true, json: async () => ({ dedupConfig: { ...MOCK_DEDUP_CONFIG, ...body } }) });
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ dedupConfig: MOCK_DEDUP_CONFIG }) });
+  }
   if (u.includes("/admin/health"))
     return Promise.resolve({ ok: true, json: async () => ({ health: MOCK_HEALTH }) });
   if (u.includes("/admin/dr"))
@@ -160,5 +175,108 @@ describe("SystemAdministration screen", () => {
     await waitFor(() => screen.getAllByText(/core/i).length > 0);
     // 6 rows, pageSize=10 — all on one page, pager hidden
     expect(screen.queryByRole("button", { name: /prev/i })).toBeNull();
+  });
+
+  // ── Dedup config tab tests ──────────────────────────────────────────────────
+
+  it("renders a Duplicate Detection tab in the navigation", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /duplicate detection/i })).toBeInTheDocument();
+  });
+
+  it("loads dedup config when Duplicate Detection tab is clicked", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /duplicate detection/i }));
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText("Enable duplicate detection")).toBeInTheDocument();
+    });
+    // Verify default enabled state from mock
+    const enabledCheckbox = screen.getByLabelText("Enable duplicate detection") as HTMLInputElement;
+    expect(enabledCheckbox.checked).toBe(true);
+  });
+
+  it("shows matchBy checkboxes: hash, cid, doc_no", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /duplicate detection/i }));
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText("Match by hash")).toBeInTheDocument();
+      expect(screen.getByLabelText("Match by cid")).toBeInTheDocument();
+      expect(screen.getByLabelText("Match by doc_no")).toBeInTheDocument();
+    });
+  });
+
+  it("shows action radio buttons for flag and auto_version", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /duplicate detection/i }));
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText("Flag duplicate")).toBeInTheDocument();
+      expect(screen.getByLabelText("Auto-version duplicate")).toBeInTheDocument();
+    });
+  });
+
+  it("shows fuzzy threshold range input", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /duplicate detection/i }));
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText("Fuzzy threshold")).toBeInTheDocument();
+    });
+  });
+
+  it("shows Save button gated by admin:access permission", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /duplicate detection/i }));
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save dedup config/i })).toBeInTheDocument();
+    });
+  });
+
+  it("calls PUT /admin/dedup-config when Save is clicked and shows success", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /duplicate detection/i }));
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /save dedup config/i })).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save dedup config/i }));
+    });
+    await waitFor(() => {
+      const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c: unknown[]) => ({ url: String(c[0]), method: (c[1] as RequestInit)?.method?.toUpperCase() ?? "GET" })
+      );
+      expect(calls.some((c) => c.url.includes("/admin/dedup-config") && c.method === "PUT")).toBe(true);
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/Duplicate detection configuration saved/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows current saved values card after config loads", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("15m RPO")).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /duplicate detection/i }));
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Current Saved Values")).toBeInTheDocument();
+    });
   });
 });

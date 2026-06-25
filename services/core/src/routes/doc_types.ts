@@ -2,11 +2,15 @@
  * GET /doc-types — Document Type Registry
  *
  * Returns the known document types from the doc_type_registry table.
+ * Each type includes mandatoryFields and optionalFields derived from
+ * the catalog engine (MANDATORY per category) and per-type extras.
+ *
  * Public read (still requires auth); no special permission needed beyond requireAuth.
  */
 import { Router } from "express";
 import { requireAuth } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
+import { fieldSchemaForType } from "../catalog/quality.js";
 
 export function docTypesRouter(): Router {
   const r = Router();
@@ -39,9 +43,17 @@ export function docTypesRouter(): Router {
         created_at: null,
       }));
 
+      const allTypes = [...registryRows, ...dynamic];
+
+      // Attach field schema to each type
+      const docTypesWithSchema = allTypes.map((dt: any) => {
+        const { mandatoryFields, optionalFields } = fieldSchemaForType(dt.code, dt.category);
+        return { ...dt, mandatoryFields, optionalFields };
+      });
+
       res.json({
-        docTypes: [...registryRows, ...dynamic],
-        total: registryRows.length + dynamic.length,
+        docTypes: docTypesWithSchema,
+        total: docTypesWithSchema.length,
       });
     } catch (e: any) {
       res.status(500).json({ error: "internal", detail: String(e?.message ?? e) });

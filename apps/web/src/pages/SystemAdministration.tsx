@@ -9,6 +9,7 @@ import type {
   ServiceHealth,
   DrPosture,
   ScheduleEntry,
+  DedupConfig,
 } from "../api/systemAdministration.js";
 import { useUrlState } from "../hooks/useUrlState.js";
 
@@ -33,6 +34,7 @@ const TABS = [
   { key: "health", label: "Service Health" },
   { key: "dr", label: "Disaster Recovery" },
   { key: "schedules", label: "Backup & Maintenance" },
+  { key: "dedup", label: "Duplicate Detection" },
 ];
 
 type HealthRow = ServiceHealth & { _key: string };
@@ -57,6 +59,13 @@ export function SystemAdministration() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
+  // Dedup config state
+  const [dedupConfig, setDedupConfig] = useState<DedupConfig | null>(null);
+  const [dedupDraft, setDedupDraft] = useState<DedupConfig | null>(null);
+  const [dedupLoading, setDedupLoading] = useState(false);
+  const [dedupSaving, setDedupSaving] = useState(false);
+  const [dedupMsg, setDedupMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
   const loadAll = useCallback(async () => {
     if (!canAdmin) return;
     setLoading(true);
@@ -79,6 +88,44 @@ export function SystemAdministration() {
   }, [canAdmin]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  const loadDedupConfig = useCallback(async () => {
+    if (!canAdmin) return;
+    setDedupLoading(true);
+    try {
+      const res = await systemAdministrationApi.getDedupConfig();
+      setDedupConfig(res.dedupConfig);
+      setDedupDraft({ ...res.dedupConfig });
+    } catch {
+      // best-effort
+    } finally {
+      setDedupLoading(false);
+    }
+  }, [canAdmin]);
+
+  useEffect(() => {
+    if (tab === "dedup" && canAdmin && !dedupConfig) {
+      loadDedupConfig();
+    }
+  }, [tab, canAdmin, dedupConfig, loadDedupConfig]);
+
+  async function handleSaveDedupConfig() {
+    if (!dedupDraft) return;
+    setDedupSaving(true);
+    setDedupMsg(null);
+    try {
+      const res = await systemAdministrationApi.putDedupConfig(dedupDraft);
+      setDedupConfig(res.dedupConfig);
+      setDedupDraft({ ...res.dedupConfig });
+      setDedupMsg({ kind: "success", text: "Duplicate detection configuration saved." });
+    } catch (e: unknown) {
+      const err = e as { body?: { errors?: string[] }; message?: string };
+      const detail = err?.body?.errors?.join(", ") ?? err?.message ?? "Save failed.";
+      setDedupMsg({ kind: "error", text: detail });
+    } finally {
+      setDedupSaving(false);
+    }
+  }
 
   if (!canAdmin) {
     return (
@@ -369,6 +416,192 @@ export function SystemAdministration() {
             <Card>
               <div style={{ padding: 40, textAlign: "center", color: "var(--sil)" }}>
                 {loading ? "Loading DR posture…" : "No DR data available"}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ═══ DUPLICATE DETECTION TAB ═══ */}
+      {tab === "dedup" && (
+        <div style={{ marginTop: 14, maxWidth: 560 }}>
+          <Card title="Duplicate Detection Configuration">
+            {dedupLoading ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--sil)" }}>Loading…</div>
+            ) : dedupDraft ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* Enabled toggle */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>Enabled</div>
+                    <div style={{ fontSize: 11, color: "var(--sil)", marginTop: 2 }}>
+                      Enable or disable duplicate detection globally.
+                    </div>
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={dedupDraft.enabled}
+                      onChange={(e) => setDedupDraft({ ...dedupDraft, enabled: e.target.checked })}
+                      aria-label="Enable duplicate detection"
+                    />
+                    <span style={{ fontSize: 11, color: dedupDraft.enabled ? "var(--G)" : "var(--sil)" }}>
+                      {dedupDraft.enabled ? "On" : "Off"}
+                    </span>
+                  </label>
+                </div>
+
+                {/* Match By */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Match By</div>
+                  <div style={{ fontSize: 11, color: "var(--sil)", marginBottom: 8 }}>
+                    Select which fields to use for duplicate matching.
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    {(["hash", "cid", "doc_no"] as const).map((field) => (
+                      <label
+                        key={field}
+                        style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12 }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={dedupDraft.matchBy.includes(field)}
+                          aria-label={`Match by ${field}`}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...dedupDraft.matchBy, field]
+                              : dedupDraft.matchBy.filter((f) => f !== field);
+                            setDedupDraft({ ...dedupDraft, matchBy: next });
+                          }}
+                        />
+                        <span style={{ fontFamily: "monospace", color: "var(--gold2)" }}>{field}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Action</div>
+                  <div style={{ fontSize: 11, color: "var(--sil)", marginBottom: 8 }}>
+                    What to do when a duplicate is detected.
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    {(["flag", "auto_version"] as const).map((act) => (
+                      <label
+                        key={act}
+                        style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12 }}
+                      >
+                        <input
+                          type="radio"
+                          name="dedup-action"
+                          value={act}
+                          checked={dedupDraft.action === act}
+                          aria-label={act === "flag" ? "Flag duplicate" : "Auto-version duplicate"}
+                          onChange={() => setDedupDraft({ ...dedupDraft, action: act })}
+                        />
+                        <span>
+                          {act === "flag" ? (
+                            <>Flag &mdash; <span style={{ color: "var(--sil)", fontSize: 10 }}>report in extract response</span></>
+                          ) : (
+                            <>Auto-version &mdash; <span style={{ color: "var(--sil)", fontSize: 10 }}>supersede original</span></>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fuzzy Threshold */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                    Fuzzy Threshold
+                    <span style={{ marginLeft: 8, fontSize: 11, fontFamily: "monospace", color: "var(--gold2)" }}>
+                      {dedupDraft.fuzzyThreshold.toFixed(2)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--sil)", marginBottom: 8 }}>
+                    Similarity threshold for fuzzy matching (0.0 – 1.0). Use 1.0 for exact match only.
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={dedupDraft.fuzzyThreshold}
+                    aria-label="Fuzzy threshold"
+                    onChange={(e) =>
+                      setDedupDraft({ ...dedupDraft, fuzzyThreshold: parseFloat(e.target.value) })
+                    }
+                    style={{ width: "100%" }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--sil)" }}>
+                    <span>0.0 (loose)</span>
+                    <span>1.0 (exact)</span>
+                  </div>
+                </div>
+
+                {/* Feedback message */}
+                {dedupMsg && (
+                  <div
+                    role="status"
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      background: dedupMsg.kind === "success" ? "var(--GT)" : "var(--RT)",
+                      border: `1px solid ${dedupMsg.kind === "success" ? "rgba(46,204,138,.3)" : "rgba(224,82,82,.3)"}`,
+                      color: dedupMsg.kind === "success" ? "var(--G)" : "var(--R)",
+                    }}
+                  >
+                    {dedupMsg.text}
+                  </div>
+                )}
+
+                {/* Save button — gated on admin:write */}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button
+                    className="btn bs sm"
+                    onClick={() => { setDedupDraft({ ...dedupConfig! }); setDedupMsg(null); }}
+                    disabled={dedupSaving}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    className="btn bg sm"
+                    onClick={handleSaveDedupConfig}
+                    disabled={dedupSaving || !canAdmin}
+                    aria-label="Save dedup config"
+                  >
+                    {dedupSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--sil)" }}>
+                No configuration available.
+              </div>
+            )}
+          </Card>
+
+          {/* Current values display */}
+          {dedupConfig && (
+            <Card title="Current Saved Values" style={{ marginTop: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 11 }}>
+                {[
+                  ["Enabled", dedupConfig.enabled ? "Yes" : "No"],
+                  ["Match By", dedupConfig.matchBy.join(", ")],
+                  ["Action", dedupConfig.action],
+                  ["Fuzzy Threshold", dedupConfig.fuzzyThreshold.toFixed(2)],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--bd)" }}
+                  >
+                    <span style={{ color: "var(--sil)" }}>{label}</span>
+                    <span style={{ fontFamily: "monospace", color: "var(--mist)" }}>{value}</span>
+                  </div>
+                ))}
               </div>
             </Card>
           )}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Search as SearchIcon, Filter, Bookmark, BookmarkCheck, Download, ChevronDown, ChevronUp, Clock, BarChart2, Zap } from "lucide-react";
+import { Search as SearchIcon, Filter, Bookmark, BookmarkCheck, Download, ChevronDown, ChevronUp, Clock, BarChart2, Zap, X } from "lucide-react";
 import {
   KpiCard,
   Card,
@@ -171,7 +171,7 @@ function HitPanel({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <h3 style={{ margin: 0, fontSize: 14 }}>Document Preview</h3>
-        <button className="ic" onClick={onClose} aria-label="Close panel">×</button>
+        <button className="ic" onClick={onClose} aria-label="Close panel"><X size={14} /></button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -743,7 +743,7 @@ export default function Search() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h3 style={{ margin: 0, fontSize: 14 }}>Saved Searches</h3>
-            <button className="ic" onClick={() => setShowSavedPanel(false)}>×</button>
+            <button className="ic" onClick={() => setShowSavedPanel(false)} aria-label="Close saved searches"><X size={14} /></button>
           </div>
           {savedSearches.length === 0 && (
             <div style={{ color: "var(--sil)", fontSize: 12, textAlign: "center", padding: 20 }}>

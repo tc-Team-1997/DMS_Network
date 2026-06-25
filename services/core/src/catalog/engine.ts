@@ -39,7 +39,7 @@ const ALERT_RULE: Record<string, string> = {
   "HR & Staff": "90 days before contract_end",
 };
 
-function categoryFor(docType: string): string {
+export function categoryFor(docType: string): string {
   if (docType === "BT_CID_4G" || docType === "BT_CITIZENSHIP") return "KYC / Identity";
   if (docType === "BT_PASSPORT" || docType === "FOREIGN_PASSPORT") return "KYC / Identity";
   if (/^BOB_LOAN_/.test(docType)) return "Loan & Credit";

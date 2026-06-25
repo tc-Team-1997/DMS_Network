@@ -28,6 +28,10 @@ export interface DocumentRecord {
   branch?: string;
   status: string;
   ingest_timestamp?: string;
+  cid?: string | null;
+  doc_no?: string | null;
+  extraction_status?: string;
+  extracted_at?: string;
 }
 
 export interface DocumentVersion {

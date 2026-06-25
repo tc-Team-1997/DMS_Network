@@ -2,9 +2,11 @@
  * Capture.tsx — ZorDMS Multi-Channel Document Capture (Enterprise)
  *
  * Three tabs: Scanner | File Upload | Bulk Upload
- * Front + Back side capture slots per tab (except Bulk = many files).
- * Real-time file preview with zoom, rotate controls.
- * Proceed → POST /documents → POST /documents/:id/extract → result.
+ * Capture mode selector on Scanner + File Upload tabs: "Single Side" | "Front & Back".
+ *   - Single Side: one file slot (front only).
+ *   - Front & Back: two slots (Front + Back).
+ * Default mode: Single Side. Bulk Upload is unchanged (multi-file only).
+ * Proceed → POST /documents → POST /documents/:id/extract → editable result drawer.
  * Capture queue with drawer (FAB bottom-right, uiStore.captureDrawerOpen).
  * RBAC gate: document:capture.
  */
@@ -35,6 +37,9 @@ export interface CaptureQueueEntry {
   errorMsg?: string;
 }
 
+/** Capture mode: single slot vs two-sided */
+export type CaptureMode = "single" | "front-back";
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TABS: TabItem[] = [
@@ -54,14 +59,71 @@ const STATUS_TAG: Record<
   error: { label: "Error", variant: "red" },
 };
 
+// ─── Mode Selector ────────────────────────────────────────────────────────────
+
+function CaptureModeSelector({
+  mode,
+  onChange,
+}: {
+  mode: CaptureMode;
+  onChange: (m: CaptureMode) => void;
+}) {
+  return (
+    <div
+      aria-label="Capture mode selector"
+      style={{
+        display: "flex",
+        gap: 0,
+        border: "1px solid var(--bd)",
+        borderRadius: 8,
+        overflow: "hidden",
+        width: "fit-content",
+        marginBottom: 14,
+      }}
+    >
+      {(
+        [
+          { value: "single", label: "Single Side" },
+          { value: "front-back", label: "Front & Back" },
+        ] as const
+      ).map(({ value, label }) => (
+        <button
+          key={value}
+          type="button"
+          aria-label={`${label} mode`}
+          aria-pressed={mode === value}
+          onClick={() => onChange(value)}
+          style={{
+            padding: "7px 18px",
+            border: "none",
+            borderRight: value === "single" ? "1px solid var(--bd)" : "none",
+            background: mode === value ? "rgba(184,145,42,.15)" : "var(--ink3)",
+            color: mode === value ? "var(--gold3)" : "var(--sil)",
+            fontSize: 12,
+            fontWeight: mode === value ? 700 : 400,
+            cursor: "pointer",
+            transition: "background .15s, color .15s",
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Scanner tab — WIA/TWAIN config ──────────────────────────────────────────
 
 function ScannerTab({
+  mode,
+  onModeChange,
   frontFile,
   backFile,
   onFront,
   onBack,
 }: {
+  mode: CaptureMode;
+  onModeChange: (m: CaptureMode) => void;
   frontFile: File | null;
   backFile: File | null;
   onFront: (f: File) => void;
@@ -72,113 +134,198 @@ function ScannerTab({
   const [scanColor, setScanColor] = useState("Color (24-bit)");
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <Card title="Scanner Configuration">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-            <FormField
-              as="select"
-              label="Scanner Device"
-              value={scanDevice}
-              onChange={(e) => setScanDevice((e.target as HTMLSelectElement).value)}
+    <div>
+      <CaptureModeSelector mode={mode} onChange={onModeChange} />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: mode === "front-back" ? "1fr 1fr" : "1fr",
+          gap: 14,
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Card title="Scanner Configuration">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 10,
+                marginBottom: 10,
+              }}
             >
-              <option>FUJITSU fi-8170 (WIA)</option>
-              <option>Canon DR-G2110 (TWAIN)</option>
-              <option>Kodak S3100 (ISIS)</option>
-            </FormField>
-            <FormField as="select" label="Protocol" value="WIA 2.0" onChange={() => {}}>
-              <option>WIA 2.0</option>
-              <option>TWAIN 2.4</option>
-              <option>ISIS</option>
-            </FormField>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-            <FormField
-              as="select"
-              label="Resolution"
-              value={scanResolution}
-              onChange={(e) => setScanResolution((e.target as HTMLSelectElement).value)}
-            >
-              <option>150 DPI</option>
-              <option>200 DPI</option>
-              <option>300 DPI</option>
-              <option>600 DPI</option>
-            </FormField>
-            <FormField
-              as="select"
-              label="Color Profile"
-              value={scanColor}
-              onChange={(e) => setScanColor((e.target as HTMLSelectElement).value)}
-            >
-              <option>Color (24-bit)</option>
-              <option>Greyscale (8-bit)</option>
-              <option>B&amp;W (1-bit)</option>
-              <option>Auto</option>
-            </FormField>
-          </div>
-          <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 2, marginBottom: 8 }}>
-            {scanDevice} · {scanResolution} · {scanColor}
-          </div>
-        </Card>
-
-        {/* Front side drop zone */}
-        <Card title="Front Side Capture">
-          <CaptureDropZone
-            label="Front Side — Drop or scan"
-            onFiles={([f]) => f && onFront(f)}
-            data-testid="scanner-front-zone"
-          />
-          {frontFile && (
-            <div style={{ marginTop: 10 }}>
-              <FilePreview file={frontFile} data-testid="scanner-front-preview" />
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* Back side drop zone */}
-        <Card title="Back Side Capture">
-          <CaptureDropZone
-            label="Back Side — Drop or scan (optional)"
-            onFiles={([f]) => f && onBack(f)}
-            data-testid="scanner-back-zone"
-          />
-          {backFile && (
-            <div style={{ marginTop: 10 }}>
-              <FilePreview file={backFile} data-testid="scanner-back-preview" />
-            </div>
-          )}
-        </Card>
-
-        {/* Scanner status */}
-        <Card title="Scanner Status">
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {[
-              { label: "Device", value: scanDevice },
-              { label: "Protocol", value: "WIA 2.0" },
-              { label: "Resolution", value: scanResolution },
-              { label: "Color Mode", value: scanColor },
-              { label: "Paper Feeder", value: "Ready (50 sheets)" },
-              { label: "Connection", value: "USB 3.0 · Online" },
-            ].map((row) => (
-              <div
-                key={row.label}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "7px 10px",
-                  background: "var(--ink3)",
-                  borderRadius: 6,
-                  fontSize: 11,
-                }}
+              <FormField
+                as="select"
+                label="Scanner Device"
+                value={scanDevice}
+                onChange={(e) =>
+                  setScanDevice((e.target as HTMLSelectElement).value)
+                }
               >
-                <span style={{ color: "var(--sil)" }}>{row.label}</span>
-                <span style={{ color: "var(--mist)" }}>{row.value}</span>
+                <option>FUJITSU fi-8170 (WIA)</option>
+                <option>Canon DR-G2110 (TWAIN)</option>
+                <option>Kodak S3100 (ISIS)</option>
+              </FormField>
+              <FormField
+                as="select"
+                label="Protocol"
+                value="WIA 2.0"
+                onChange={() => {}}
+              >
+                <option>WIA 2.0</option>
+                <option>TWAIN 2.4</option>
+                <option>ISIS</option>
+              </FormField>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 10,
+                marginBottom: 10,
+              }}
+            >
+              <FormField
+                as="select"
+                label="Resolution"
+                value={scanResolution}
+                onChange={(e) =>
+                  setScanResolution((e.target as HTMLSelectElement).value)
+                }
+              >
+                <option>150 DPI</option>
+                <option>200 DPI</option>
+                <option>300 DPI</option>
+                <option>600 DPI</option>
+              </FormField>
+              <FormField
+                as="select"
+                label="Color Profile"
+                value={scanColor}
+                onChange={(e) =>
+                  setScanColor((e.target as HTMLSelectElement).value)
+                }
+              >
+                <option>Color (24-bit)</option>
+                <option>Greyscale (8-bit)</option>
+                <option>B&amp;W (1-bit)</option>
+                <option>Auto</option>
+              </FormField>
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                color: "var(--sil)",
+                marginTop: 2,
+                marginBottom: 8,
+              }}
+            >
+              {scanDevice} · {scanResolution} · {scanColor}
+            </div>
+          </Card>
+
+          {/* Front side drop zone — always visible */}
+          <Card
+            title={
+              mode === "front-back" ? "Front Side Capture" : "Document Capture"
+            }
+          >
+            <CaptureDropZone
+              label={
+                mode === "front-back"
+                  ? "Front Side — Drop or scan"
+                  : "Front Side — Drop or scan"
+              }
+              onFiles={([f]) => f && onFront(f)}
+              data-testid="scanner-front-zone"
+            />
+            {frontFile && (
+              <div style={{ marginTop: 10 }}>
+                <FilePreview file={frontFile} data-testid="scanner-front-preview" />
               </div>
-            ))}
+            )}
+          </Card>
+        </div>
+
+        {/* Back side — only in Front & Back mode */}
+        {mode === "front-back" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Card title="Back Side Capture">
+              <CaptureDropZone
+                label="Back Side — Drop or scan (optional)"
+                onFiles={([f]) => f && onBack(f)}
+                data-testid="scanner-back-zone"
+              />
+              {backFile && (
+                <div style={{ marginTop: 10 }}>
+                  <FilePreview
+                    file={backFile}
+                    data-testid="scanner-back-preview"
+                  />
+                </div>
+              )}
+            </Card>
+
+            {/* Scanner status */}
+            <Card title="Scanner Status">
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  { label: "Device", value: scanDevice },
+                  { label: "Protocol", value: "WIA 2.0" },
+                  { label: "Resolution", value: scanResolution },
+                  { label: "Color Mode", value: scanColor },
+                  { label: "Paper Feeder", value: "Ready (50 sheets)" },
+                  { label: "Connection", value: "USB 3.0 · Online" },
+                ].map((row) => (
+                  <div
+                    key={row.label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "7px 10px",
+                      background: "var(--ink3)",
+                      borderRadius: 6,
+                      fontSize: 11,
+                    }}
+                  >
+                    <span style={{ color: "var(--sil)" }}>{row.label}</span>
+                    <span style={{ color: "var(--mist)" }}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
-        </Card>
+        )}
+
+        {/* Scanner status in single mode (below front zone) */}
+        {mode === "single" && (
+          <Card title="Scanner Status">
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {[
+                { label: "Device", value: scanDevice },
+                { label: "Protocol", value: "WIA 2.0" },
+                { label: "Resolution", value: scanResolution },
+                { label: "Color Mode", value: scanColor },
+                { label: "Paper Feeder", value: "Ready (50 sheets)" },
+                { label: "Connection", value: "USB 3.0 · Online" },
+              ].map((row) => (
+                <div
+                  key={row.label}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "7px 10px",
+                    background: "var(--ink3)",
+                    borderRadius: 6,
+                    fontSize: 11,
+                  }}
+                >
+                  <span style={{ color: "var(--sil)" }}>{row.label}</span>
+                  <span style={{ color: "var(--mist)" }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -187,43 +334,65 @@ function ScannerTab({
 // ─── File Upload tab ──────────────────────────────────────────────────────────
 
 function FileUploadTab({
+  mode,
+  onModeChange,
   frontFile,
   backFile,
   onFront,
   onBack,
 }: {
+  mode: CaptureMode;
+  onModeChange: (m: CaptureMode) => void;
   frontFile: File | null;
   backFile: File | null;
   onFront: (f: File) => void;
   onBack: (f: File) => void;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-      <Card title="Front Side">
-        <CaptureDropZone
-          label="Front Side — Drop or click to select"
-          onFiles={([f]) => f && onFront(f)}
-          data-testid="upload-front-zone"
-        />
-        {frontFile && (
-          <div style={{ marginTop: 10 }}>
-            <FilePreview file={frontFile} data-testid="upload-front-preview" />
-          </div>
-        )}
-      </Card>
+    <div>
+      <CaptureModeSelector mode={mode} onChange={onModeChange} />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: mode === "front-back" ? "1fr 1fr" : "1fr",
+          gap: 14,
+        }}
+      >
+        <Card title={mode === "front-back" ? "Front Side" : "Document"}>
+          <CaptureDropZone
+            label={
+              mode === "front-back"
+                ? "Front Side — Drop or click to select"
+                : "Front Side — Drop or click to select"
+            }
+            onFiles={([f]) => f && onFront(f)}
+            data-testid="upload-front-zone"
+          />
+          {frontFile && (
+            <div style={{ marginTop: 10 }}>
+              <FilePreview file={frontFile} data-testid="upload-front-preview" />
+            </div>
+          )}
+        </Card>
 
-      <Card title="Back Side">
-        <CaptureDropZone
-          label="Back Side — Drop or click to select (optional)"
-          onFiles={([f]) => f && onBack(f)}
-          data-testid="upload-back-zone"
-        />
-        {backFile && (
-          <div style={{ marginTop: 10 }}>
-            <FilePreview file={backFile} data-testid="upload-back-preview" />
-          </div>
+        {mode === "front-back" && (
+          <Card title="Back Side">
+            <CaptureDropZone
+              label="Back Side — Drop or click to select (optional)"
+              onFiles={([f]) => f && onBack(f)}
+              data-testid="upload-back-zone"
+            />
+            {backFile && (
+              <div style={{ marginTop: 10 }}>
+                <FilePreview
+                  file={backFile}
+                  data-testid="upload-back-preview"
+                />
+              </div>
+            )}
+          </Card>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
@@ -246,7 +415,14 @@ function BulkUploadTab({
         data-testid="bulk-zone"
       />
       {bulkFiles.length > 0 && (
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div
+          style={{
+            marginTop: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
           {bulkFiles.map((f, i) => (
             <div
               key={i}
@@ -260,14 +436,31 @@ function BulkUploadTab({
                 fontSize: 11,
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--sil)" strokeWidth="2">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--sil)"
+                strokeWidth="2"
+              >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
-              <span style={{ flex: 1, color: "var(--mist)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span
+                style={{
+                  flex: 1,
+                  color: "var(--mist)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {f.name}
               </span>
-              <span style={{ color: "var(--sil)" }}>{(f.size / 1024).toFixed(0)} KB</span>
+              <span style={{ color: "var(--sil)" }}>
+                {(f.size / 1024).toFixed(0)} KB
+              </span>
             </div>
           ))}
         </div>
@@ -280,12 +473,17 @@ function BulkUploadTab({
 
 export default function Capture() {
   const { user } = useAuth();
-  const canCapture = user?.permissions?.includes("document:capture") ?? false;
+  const canCapture =
+    user?.permissions?.includes("document:capture") ?? false;
 
-  const { captureDrawerOpen, setCaptureDrawerOpen, toggleCaptureDrawer } = useUiStore();
+  const { captureDrawerOpen, setCaptureDrawerOpen, toggleCaptureDrawer } =
+    useUiStore();
 
   // ── Tab state ──
   const [tab, setTab] = useState<"scanner" | "upload" | "bulk">("upload");
+
+  // ── Capture mode (shared between scanner + upload tabs) ──
+  const [captureMode, setCaptureMode] = useState<CaptureMode>("single");
 
   // ── Front/Back file slots ──
   const [frontFile, setFrontFile] = useState<File | null>(null);
@@ -296,7 +494,8 @@ export default function Capture() {
   const [processing, setProcessing] = useState(false);
   const [processingMsg, setProcessingMsg] = useState("");
   const [procError, setProcError] = useState<string | null>(null);
-  const [currentExtraction, setCurrentExtraction] = useState<ExtractionResult | null>(null);
+  const [currentExtraction, setCurrentExtraction] =
+    useState<ExtractionResult | null>(null);
 
   // ── Capture queue ──
   const [queue, setQueue] = useState<CaptureQueueEntry[]>([]);
@@ -305,10 +504,13 @@ export default function Capture() {
   // ── Proceed modal (title / branch confirm) ──
   const [showProceedModal, setShowProceedModal] = useState(false);
   const [proceedTitle, setProceedTitle] = useState("");
-  const [proceedBranch, setProceedBranch] = useState(user?.branch ?? "Thimphu");
+  const [proceedBranch, setProceedBranch] = useState(
+    user?.branch ?? "Thimphu"
+  );
 
   // ── Computed "has file" for Proceed button ──
-  const hasFile = tab === "bulk" ? bulkFiles.length > 0 : frontFile !== null;
+  const hasFile =
+    tab === "bulk" ? bulkFiles.length > 0 : frontFile !== null;
 
   // ── Clear per-tab slots when tab changes ──
   function handleTabChange(key: string) {
@@ -318,6 +520,14 @@ export default function Capture() {
     setBulkFiles([]);
     setCurrentExtraction(null);
     setProcError(null);
+    // Reset mode to single when switching tabs
+    setCaptureMode("single");
+  }
+
+  // ── When mode changes to single, clear back file ──
+  function handleModeChange(m: CaptureMode) {
+    setCaptureMode(m);
+    if (m === "single") setBackFile(null);
   }
 
   // ── Open modal to confirm title/branch before proceeding ──
@@ -361,7 +571,9 @@ export default function Capture() {
             });
             setQueue((q) =>
               q.map((i) =>
-                i.id === entry.id ? { ...i, status: "extracting", docId: doc.id } : i
+                i.id === entry.id
+                  ? { ...i, status: "extracting", docId: doc.id }
+                  : i
               )
             );
             const extraction = await extractDocument(doc.id);
@@ -378,9 +590,12 @@ export default function Capture() {
               )
             );
           } catch (err) {
-            const msg = err instanceof Error ? err.message : "Upload failed";
+            const msg =
+              err instanceof Error ? err.message : "Upload failed";
             setQueue((q) =>
-              q.map((i) => (i.id === entry.id ? { ...i, status: "error", errorMsg: msg } : i))
+              q.map((i) =>
+                i.id === entry.id ? { ...i, status: "error", errorMsg: msg } : i
+              )
             );
           }
         })
@@ -399,7 +614,7 @@ export default function Capture() {
       channel,
       status: "uploading",
       frontFile,
-      backFile,
+      backFile: captureMode === "front-back" ? backFile : null,
     };
     setQueue((q) => [...q, entry]);
     setProcessing(true);
@@ -415,7 +630,11 @@ export default function Capture() {
       });
 
       setQueue((q) =>
-        q.map((i) => (i.id === queueId ? { ...i, status: "extracting", docId: doc.id } : i))
+        q.map((i) =>
+          i.id === queueId
+            ? { ...i, status: "extracting", docId: doc.id }
+            : i
+        )
       );
       setProcessingMsg("AI extraction in progress…");
 
@@ -442,7 +661,9 @@ export default function Capture() {
       const msg = err instanceof Error ? err.message : "Capture failed";
       setProcError(msg);
       setQueue((q) =>
-        q.map((i) => (i.id === queueId ? { ...i, status: "error", errorMsg: msg } : i))
+        q.map((i) =>
+          i.id === queueId ? { ...i, status: "error", errorMsg: msg } : i
+        )
       );
     } finally {
       setProcessing(false);
@@ -450,6 +671,7 @@ export default function Capture() {
     }
   }, [
     tab,
+    captureMode,
     frontFile,
     backFile,
     bulkFiles,
@@ -498,17 +720,43 @@ export default function Capture() {
         <div>
           <h2
             className="serif"
-            style={{ fontSize: 24, fontWeight: 700, color: "var(--gold3)", lineHeight: 1, margin: 0 }}
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: "var(--gold3)",
+              lineHeight: 1,
+              margin: 0,
+            }}
           >
             Document Capture
           </h2>
-          <p style={{ fontSize: 11, color: "var(--sil)", marginTop: 4, marginBottom: 0 }}>
-            Scanner · File Upload · Bulk Upload — AI auto-classification &amp; extraction
+          <p
+            style={{
+              fontSize: 11,
+              color: "var(--sil)",
+              marginTop: 4,
+              marginBottom: 0,
+            }}
+          >
+            Scanner · File Upload · Bulk Upload — AI auto-classification &amp;
+            extraction
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Tag variant="green">{queue.filter((i) => i.status === "done").length} Captured</Tag>
-          <Tag variant="amber">{queue.filter((i) => i.status === "ready" || i.status === "uploading" || i.status === "extracting").length} In Progress</Tag>
+          <Tag variant="green">
+            {queue.filter((i) => i.status === "done").length} Captured
+          </Tag>
+          <Tag variant="amber">
+            {
+              queue.filter(
+                (i) =>
+                  i.status === "ready" ||
+                  i.status === "uploading" ||
+                  i.status === "extracting"
+              ).length
+            }{" "}
+            In Progress
+          </Tag>
         </div>
       </div>
 
@@ -519,6 +767,8 @@ export default function Capture() {
       <div style={{ marginTop: 14 }}>
         {tab === "scanner" && (
           <ScannerTab
+            mode={captureMode}
+            onModeChange={handleModeChange}
             frontFile={frontFile}
             backFile={backFile}
             onFront={setFrontFile}
@@ -527,6 +777,8 @@ export default function Capture() {
         )}
         {tab === "upload" && (
           <FileUploadTab
+            mode={captureMode}
+            onModeChange={handleModeChange}
             frontFile={frontFile}
             backFile={backFile}
             onFront={setFrontFile}
@@ -587,8 +839,14 @@ export default function Capture() {
             }}
           />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--mist)" }}>Processing…</div>
-            <div style={{ fontSize: 11, color: "var(--sil)", marginTop: 2 }}>{processingMsg}</div>
+            <div
+              style={{ fontSize: 13, fontWeight: 600, color: "var(--mist)" }}
+            >
+              Processing…
+            </div>
+            <div style={{ fontSize: 11, color: "var(--sil)", marginTop: 2 }}>
+              {processingMsg}
+            </div>
           </div>
         </div>
       )}
@@ -611,7 +869,7 @@ export default function Capture() {
         </div>
       )}
 
-      {/* ── Extraction result inline ── */}
+      {/* ── Extraction result inline (read-only summary) ── */}
       {currentExtraction && !processing && (
         <div style={{ marginTop: 20 }}>
           <ExtractionResultPanel result={currentExtraction} />
@@ -622,11 +880,22 @@ export default function Capture() {
       {queue.length > 0 && (
         <div style={{ marginTop: 20 }}>
           <Card
-            title={<span>Capture Queue <Tag variant="gold">{queue.length} items</Tag></span>}
+            title={
+              <span>
+                Capture Queue{" "}
+                <Tag variant="gold">{queue.length} items</Tag>
+              </span>
+            }
             action={
               <button
                 type="button"
-                onClick={() => setQueue((q) => q.filter((i) => i.status !== "done" && i.status !== "error"))}
+                onClick={() =>
+                  setQueue((q) =>
+                    q.filter(
+                      (i) => i.status !== "done" && i.status !== "error"
+                    )
+                  )
+                }
                 style={{
                   padding: "4px 10px",
                   background: "var(--ink3)",
@@ -671,13 +940,30 @@ export default function Capture() {
                     }}
                   >
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, color: "var(--mist)", fontWeight: 600 }}>{item.title}</div>
-                      <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--mist)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {item.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "var(--sil)",
+                          marginTop: 1,
+                        }}
+                      >
                         {item.channel}
-                        {item.confidence != null && ` · AI: ${Math.round(item.confidence * 100)}%`}
+                        {item.confidence != null &&
+                          ` · AI: ${Math.round(item.confidence * 100)}%`}
                       </div>
                     </div>
-                    <Tag variant={s.variant} style={{ fontSize: 10 }}>{s.label}</Tag>
+                    <Tag variant={s.variant} style={{ fontSize: 10 }}>
+                      {s.label}
+                    </Tag>
                   </div>
                 );
               })}
@@ -687,26 +973,38 @@ export default function Capture() {
       )}
 
       {/* ── Proceed modal ── */}
-      <Modal open={showProceedModal} onClose={() => setShowProceedModal(false)} title="Confirm Capture">
+      <Modal
+        open={showProceedModal}
+        onClose={() => setShowProceedModal(false)}
+        title="Confirm Capture"
+      >
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 12, color: "var(--sil)" }}>
             {tab === "bulk"
               ? `${bulkFiles.length} file${bulkFiles.length !== 1 ? "s" : ""} will be uploaded and AI-extracted.`
-              : `Uploading ${frontFile?.name ?? ""}${backFile ? ` + ${backFile.name}` : ""}`}
+              : `Uploading ${frontFile?.name ?? ""}${
+                  captureMode === "front-back" && backFile
+                    ? ` + ${backFile.name}`
+                    : ""
+                }`}
           </div>
           {tab !== "bulk" && (
             <FormField
               label="Document Title *"
               placeholder="e.g. Passport — Sonam Dorji"
               value={proceedTitle}
-              onChange={(e) => setProceedTitle((e.target as HTMLInputElement).value)}
+              onChange={(e) =>
+                setProceedTitle((e.target as HTMLInputElement).value)
+              }
             />
           )}
           <FormField
             as="select"
             label="Branch"
             value={proceedBranch}
-            onChange={(e) => setProceedBranch((e.target as HTMLSelectElement).value)}
+            onChange={(e) =>
+              setProceedBranch((e.target as HTMLSelectElement).value)
+            }
           >
             <option>Thimphu</option>
             <option>Phuentsholing</option>
@@ -784,7 +1082,14 @@ export default function Capture() {
           zIndex: 150,
         }}
       >
-        <span style={{ position: "relative", fontSize: 20, color: "#050d1a", lineHeight: 1 }}>
+        <span
+          style={{
+            position: "relative",
+            fontSize: 20,
+            color: "#050d1a",
+            lineHeight: 1,
+          }}
+        >
           ☰
           {queue.length > 0 && (
             <span

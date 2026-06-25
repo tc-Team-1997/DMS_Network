@@ -1,11 +1,14 @@
 /**
  * CaptureQueueDrawer — right-side drawer showing capture queue items.
  * Opened via the FAB (floating action button) using uiStore.captureDrawerOpen.
- * Each item is clickable to view its preview and extraction details.
+ *
+ * When an item with a completed extraction is selected, the right column
+ * shows the ExtractionResultDrawer (editable corrections form) instead of
+ * the read-only ExtractionResult panel.
  */
 import { Tag } from "../ui/index.js";
 import { FilePreview } from "./FilePreview.js";
-import { ExtractionResult } from "./ExtractionResult.js";
+import { ExtractionResultDrawer } from "./ExtractionResultDrawer.js";
 import type { CaptureQueueEntry } from "../../pages/Capture.js";
 
 export interface CaptureQueueDrawerProps {
@@ -35,6 +38,7 @@ export function CaptureQueueDrawer({
   onSelect,
 }: CaptureQueueDrawerProps) {
   const selected = queue.find((q) => q.id === selectedId) ?? null;
+  const showDetail = selected !== null;
 
   return (
     <>
@@ -62,14 +66,14 @@ export function CaptureQueueDrawer({
           top: 0,
           right: 0,
           bottom: 0,
-          width: 480,
-          background: "var(--ink1)",
+          width: showDetail ? 820 : 480,
+          background: "var(--ink2)",
           borderLeft: "1px solid var(--bd)",
           zIndex: 201,
           display: "flex",
           flexDirection: "column",
           transform: open ? "translateX(0)" : "translateX(100%)",
-          transition: "transform .28s cubic-bezier(.4,0,.2,1)",
+          transition: "transform .28s cubic-bezier(.4,0,.2,1), width .2s",
           boxShadow: open ? "-8px 0 32px rgba(0,0,0,.4)" : "none",
         }}
       >
@@ -81,6 +85,7 @@ export function CaptureQueueDrawer({
             justifyContent: "space-between",
             padding: "16px 20px",
             borderBottom: "1px solid var(--bd)",
+            flexShrink: 0,
           }}
         >
           <div>
@@ -100,7 +105,7 @@ export function CaptureQueueDrawer({
               border: "none",
               color: "var(--sil)",
               cursor: "pointer",
-              fontSize: 18,
+              fontSize: 22,
               lineHeight: 1,
               padding: 4,
             }}
@@ -114,14 +119,22 @@ export function CaptureQueueDrawer({
           {/* Queue list (left column) */}
           <div
             style={{
-              width: selected ? 200 : "100%",
-              borderRight: selected ? "1px solid var(--bd)" : "none",
+              width: showDetail ? 220 : "100%",
+              borderRight: showDetail ? "1px solid var(--bd)" : "none",
               overflowY: "auto",
+              flexShrink: 0,
               transition: "width .2s",
             }}
           >
             {queue.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--sil)", fontSize: 12 }}>
+              <div
+                style={{
+                  padding: "32px 20px",
+                  textAlign: "center",
+                  color: "var(--sil)",
+                  fontSize: 12,
+                }}
+              >
                 No captures yet.
               </div>
             ) : (
@@ -141,7 +154,9 @@ export function CaptureQueueDrawer({
                       borderBottom: "1px solid var(--bd)",
                       cursor: "pointer",
                       background: isSelected ? "rgba(184,145,42,.08)" : "transparent",
-                      borderLeft: isSelected ? "3px solid var(--gold3)" : "3px solid transparent",
+                      borderLeft: isSelected
+                        ? "3px solid var(--gold3)"
+                        : "3px solid transparent",
                       transition: "background .15s",
                     }}
                   >
@@ -185,34 +200,74 @@ export function CaptureQueueDrawer({
 
           {/* Item detail (right column — only when selected) */}
           {selected && (
-            <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* File preview */}
-              {selected.frontFile && (
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 4, textTransform: "uppercase" }}>
-                    Front Side
-                  </div>
-                  <FilePreview file={selected.frontFile} />
-                </div>
-              )}
-              {selected.backFile && (
-                <div>
-                  <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 4, textTransform: "uppercase" }}>
-                    Back Side
-                  </div>
-                  <FilePreview file={selected.backFile} />
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {/* File preview row (above the extraction result) */}
+              {(selected.frontFile || selected.backFile) && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    padding: "12px 16px",
+                    borderBottom: "1px solid var(--bd)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {selected.frontFile && (
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "var(--sil)",
+                          marginBottom: 4,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Front Side
+                      </div>
+                      <FilePreview file={selected.frontFile} />
+                    </div>
+                  )}
+                  {selected.backFile && (
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "var(--sil)",
+                          marginBottom: 4,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Back Side
+                      </div>
+                      <FilePreview file={selected.backFile} />
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Extraction result */}
-              {selected.extraction && (
-                <ExtractionResult result={selected.extraction} />
-              )}
+              {/* Editable extraction result drawer */}
+              {selected.extraction && selected.docId != null ? (
+                <div style={{ flex: 1, overflow: "hidden" }}>
+                  <ExtractionResultDrawer
+                    docId={selected.docId}
+                    result={selected.extraction}
+                    onClose={() => onSelect(selected.id)}
+                  />
+                </div>
+              ) : null}
 
               {/* Error */}
               {selected.status === "error" && selected.errorMsg && (
                 <div
                   style={{
+                    margin: 16,
                     background: "rgba(255,80,80,.07)",
                     border: "1px solid rgba(255,80,80,.3)",
                     borderRadius: 8,
@@ -226,12 +281,14 @@ export function CaptureQueueDrawer({
               )}
 
               {/* Processing state */}
-              {(selected.status === "uploading" || selected.status === "extracting") && (
+              {(selected.status === "uploading" ||
+                selected.status === "extracting") && (
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
+                    margin: 16,
                     background: "var(--ink3)",
                     borderRadius: 8,
                     padding: "12px 14px",
@@ -239,8 +296,14 @@ export function CaptureQueueDrawer({
                     color: "var(--sil)",
                   }}
                 >
-                  <span style={{ fontSize: 16, animation: "spin 1s linear infinite" }}>⟳</span>
-                  {selected.status === "uploading" ? "Uploading…" : "AI extraction in progress…"}
+                  <span
+                    style={{ fontSize: 16, animation: "spin 1s linear infinite" }}
+                  >
+                    ⟳
+                  </span>
+                  {selected.status === "uploading"
+                    ? "Uploading…"
+                    : "AI extraction in progress…"}
                 </div>
               )}
             </div>

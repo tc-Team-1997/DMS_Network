@@ -4,6 +4,8 @@ import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { captureDocument, listDocuments, getDocument, softDeleteDocument, currentVersion } from "../repo/documents.js";
 import { addVersion, listVersions, rollback } from "../repo/versions.js";
+import { catalog, categoryFor } from "../catalog/engine.js";
+import { computeQuality } from "../catalog/quality.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -117,6 +119,83 @@ export function documentsRouter(): Router {
       const version = await rollback(deps, document.id, Number(req.body.version));
       res.json({ version });
     } catch (e: any) { res.status(400).json({ error: String(e.message ?? e) }); }
+  });
+
+  // PATCH /:id — metadata correction (document:index) — C1: branch-scoped
+  // Body: { doc_type?, catalog_category?, cid?, doc_no?, folder_id?, metadata? }
+  r.patch("/:id", requirePermission("document:index"), async (req, res) => {
+    try {
+      const deps = req.app.locals.deps as CoreDeps;
+      const document = await getDocument(deps.knex, Number(req.params.id), makeViewer(req));
+      if (!document) { res.status(404).json({ error: "not_found" }); return; }
+
+      const body = req.body as {
+        doc_type?: string;
+        catalog_category?: string;
+        cid?: string;
+        doc_no?: string;
+        folder_id?: number | null;
+        metadata?: Record<string, unknown>;
+      };
+
+      // Merge metadata
+      let existingMeta: Record<string, unknown> = {};
+      try {
+        if (document.metadata) existingMeta = JSON.parse(document.metadata);
+      } catch { /* ignore */ }
+
+      const mergedMeta = body.metadata
+        ? { ...existingMeta, ...body.metadata }
+        : existingMeta;
+
+      const newDocType = body.doc_type ?? document.doc_type ?? "UNKNOWN";
+
+      // Recompute catalog
+      const fields = { ...mergedMeta, ...(body.cid ? { cid_no: body.cid } : document.cid ? { cid_no: document.cid } : {}) };
+      const catalogResult = catalog({
+        docType: newDocType,
+        confidence: document.confidence ?? 0,
+        fields,
+      });
+
+      // Recompute quality — use the doc-type-derived category (not _Review/Pending override)
+      const qualityCategory = body.catalog_category ?? categoryFor(newDocType);
+      const quality = computeQuality(
+        qualityCategory,
+        fields,
+        document.confidence ?? 0,
+      );
+
+      const updates: Record<string, unknown> = {
+        metadata: JSON.stringify(mergedMeta),
+        doc_type: newDocType,
+        review_flag: quality.mandatoryMissing.length > 0 || (document.confidence ?? 0) < 0.85,
+      };
+      if (body.catalog_category) updates["catalog_category"] = body.catalog_category;
+      else if (catalogResult.route !== "HUMAN_REVIEW") updates["catalog_category"] = catalogResult.category;
+      if (body.cid !== undefined) updates["cid"] = body.cid;
+      if (body.doc_no !== undefined) updates["doc_no"] = body.doc_no;
+      if (body.folder_id !== undefined) updates["folder_id"] = body.folder_id;
+
+      await deps.knex("documents").where({ id: document.id }).update(updates);
+      const updated = await deps.knex("documents").where({ id: document.id }).first();
+
+      res.json({
+        document: { ...updated, review_flag: Boolean(updated.review_flag) },
+        quality: {
+          score: quality.score,
+          completeness: quality.completeness,
+          mandatoryMissing: quality.mandatoryMissing,
+          confidence: quality.confidence,
+        },
+        catalog: {
+          category: catalogResult.category,
+          route: catalogResult.route,
+          mandatoryOk: catalogResult.mandatoryOk,
+          missing: catalogResult.missing,
+        },
+      });
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
   });
 
   return r;

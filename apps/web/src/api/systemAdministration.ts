@@ -29,6 +29,13 @@ export interface ScheduleEntry {
   next_run?: string;
 }
 
+export interface DedupConfig {
+  enabled: boolean;
+  matchBy: Array<"hash" | "cid" | "doc_no">;
+  action: "flag" | "auto_version";
+  fuzzyThreshold: number;
+}
+
 export const systemAdministrationApi = {
   getHealth: () =>
     http.get<{ health: ServiceHealth[] }>(`${BASE}/admin/health`),
@@ -38,4 +45,10 @@ export const systemAdministrationApi = {
 
   getSchedules: () =>
     http.get<{ schedules: ScheduleEntry[] }>(`${BASE}/admin/schedules`),
+
+  getDedupConfig: () =>
+    http.get<{ dedupConfig: DedupConfig }>(`${BASE}/admin/dedup-config`),
+
+  putDedupConfig: (body: Partial<DedupConfig>) =>
+    http.put<{ dedupConfig: DedupConfig }>(`${BASE}/admin/dedup-config`, body),
 };

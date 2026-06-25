@@ -10,7 +10,10 @@
  *   4. Auto-catalog via catalog/engine.ts.
  *   5. Auto-map via mapper/directory.ts (folder assignment).
  *   6. Set doc_type, confidence, review_flag, extraction_status.
- *   7. Return enriched document + classification + mappedFields + catalog + suggestedNewType.
+ *   7. Duplicate detection (honoring dedup config).
+ *   8. Auto-versioning if dedup action=auto_version and hash duplicate found.
+ *   9. Quality/completeness scoring.
+ *  10. Return enriched document + classification + mappedFields + catalog + suggestedNewType + quality + duplicates.
  *
  * Degrades gracefully if AI service is unreachable (ocr-fallback source).
  */
@@ -19,13 +22,15 @@ import { Router } from "express";
 import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { getDocument, currentVersion } from "../repo/documents.js";
-import { catalog } from "../catalog/engine.js";
+import { catalog, categoryFor } from "../catalog/engine.js";
+import { computeQuality } from "../catalog/quality.js";
 import { resolvePath, defaultAcls, domainForPath } from "../mapper/directory.js";
 import { setFolderAcls, effectiveAcls } from "../repo/acls.js";
 import { aiClassify, aiExtract } from "../ai/client.js";
 import { mapExtractedToDocument } from "../ai/field_mapper.js";
 import { buildNewTypeSuggestion } from "../ai/suggest_type.js";
 import { EVENTS } from "../events/index.js";
+import { findDuplicates, getDedupConfig } from "../repo/duplicates.js";
 import type { Knex } from "knex";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -70,6 +75,46 @@ function addYears(iso: string, years: number): string {
 function extractBearerToken(authHeader: string | undefined): string {
   if (!authHeader) return "";
   return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+}
+
+/** Append a new document_version to an existing document (auto-versioning). Safe + idempotent.
+ *  Idempotency: uses dupeDocId as the "source" marker in the comment.
+ *  If a version with that marker already exists, skip.
+ */
+async function appendVersionToExisting(
+  knex: Knex,
+  originalDocId: number,
+  dupeDoc: { id: number; file_hash_sha256: string; current_version: number; file_size_bytes: number },
+  storageKey: string,
+  createdBy: string,
+): Promise<void> {
+  const marker = `auto-versioned from doc#${dupeDoc.id}`;
+  await knex.transaction(async (tx) => {
+    // Idempotency: if this dupe doc was already absorbed, skip
+    const alreadyVersioned = await tx("document_versions")
+      .where({ document_id: originalDocId })
+      .andWhereRaw("comment = ?", [marker])
+      .first();
+    if (alreadyVersioned) return;
+
+    const maxRow = await tx("document_versions").where({ document_id: originalDocId }).max("version_no as m");
+    const nextVer = Number(maxRow[0]?.m ?? 0) + 1;
+
+    await tx("document_versions").insert({
+      document_id: originalDocId,
+      version_no: nextVer,
+      storage_key: storageKey,
+      file_hash_sha256: dupeDoc.file_hash_sha256,
+      file_size_bytes: dupeDoc.file_size_bytes,
+      created_by: createdBy,
+      comment: marker,
+    });
+    await tx("documents").where({ id: originalDocId }).update({
+      current_version: nextVer,
+      file_hash_sha256: dupeDoc.file_hash_sha256,
+      file_size_bytes: dupeDoc.file_size_bytes,
+    });
+  });
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────────
@@ -189,7 +234,66 @@ export function extractionRouter(): Router {
 
       await deps.knex("documents").where({ id: docId }).update(updates);
 
-      // ── 9. Emit event ──────────────────────────────────────────────────────
+      // ── 9. Duplicate detection (honors dedup config) ───────────────────────
+      const dedupCfg = await getDedupConfig(deps.knex);
+      let duplicates: Awaited<ReturnType<typeof findDuplicates>> = [];
+      let autoVersioned = false;
+
+      if (dedupCfg.enabled) {
+        duplicates = await findDuplicates(deps.knex, {
+          docId,
+          fileHashSha256: document.file_hash_sha256,
+          cid: mapped.cid ?? document.cid,
+          docNo: mapped.doc_no ?? document.doc_no,
+          docType: classifyResult.doc_type,
+          matchBy: dedupCfg.matchBy,
+        });
+
+        // Auto-versioning: if hash duplicate found and action=auto_version
+        if (
+          dedupCfg.action === "auto_version" &&
+          duplicates.length > 0
+        ) {
+          const hashDupe = duplicates.find((d) => d.matchType === "hash");
+          if (hashDupe) {
+            // Append the current document's version to the original document
+            await appendVersionToExisting(
+              deps.knex,
+              hashDupe.id,
+              {
+                id: docId,
+                file_hash_sha256: document.file_hash_sha256,
+                current_version: document.current_version,
+                file_size_bytes: document.file_size_bytes ?? 0,
+              },
+              version.storage_key,
+              callerUsername,
+            );
+            // Soft-handle the duplicate document (mark as superseded)
+            await deps.knex("documents").where({ id: docId }).update({
+              status: "Superseded",
+              extraction_status: "DONE",
+            });
+            autoVersioned = true;
+          }
+        }
+      }
+
+      // ── 10. Quality scoring ────────────────────────────────────────────────
+      // Use the doc-type-derived category for quality (not the _Review/Pending override)
+      const qualityCategory = categoryFor(classifyResult.doc_type);
+      const quality = computeQuality(
+        qualityCategory,
+        fields,
+        classifyResult.confidence,
+      );
+
+      // If quality is low or mandatory missing, ensure review_flag is set
+      if (quality.mandatoryMissing.length > 0 || quality.score < 50) {
+        await deps.knex("documents").where({ id: docId }).update({ review_flag: true });
+      }
+
+      // ── 11. Emit event ─────────────────────────────────────────────────────
       await deps.events.emit(EVENTS.DOCUMENT_INDEXED, {
         docId,
         docType: classifyResult.doc_type,
@@ -197,7 +301,7 @@ export function extractionRouter(): Router {
         source: aiSource,
       });
 
-      // ── 10. Build response ─────────────────────────────────────────────────
+      // ── 12. Build response ─────────────────────────────────────────────────
       const updatedDoc = await deps.knex("documents").where({ id: docId }).first();
       const finalDoc = { ...updatedDoc, review_flag: Boolean(updatedDoc.review_flag) };
 
@@ -234,6 +338,21 @@ export function extractionRouter(): Router {
         folder: folderId ? { folderId, path: mapPath, acls: mapAcls } : null,
         suggestedNewType: suggestedNewType ?? null,
         source: aiSource,
+        quality: {
+          score: quality.score,
+          completeness: quality.completeness,
+          mandatoryMissing: quality.mandatoryMissing,
+          confidence: quality.confidence,
+        },
+        duplicates: duplicates.map((d) => ({
+          id: d.id,
+          title: d.title,
+          doc_type: d.doc_type,
+          branch: d.branch,
+          ingest_timestamp: d.ingest_timestamp,
+          matchType: d.matchType,
+        })),
+        autoVersioned,
       });
     } catch (err: any) {
       // Unexpected error — mark FAILED and re-throw

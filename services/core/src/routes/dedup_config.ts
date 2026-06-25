@@ -1,35 +1,26 @@
+/**
+ * Admin: Dedup Config endpoints
+ *
+ * GET  /admin/dedup-config   (RBAC: admin:read)
+ * PUT  /admin/dedup-config   (RBAC: admin:write)
+ *
+ * Shape: { enabled:boolean, matchBy:string[], action:"flag"|"auto_version", fuzzyThreshold:number }
+ */
+
 import { Router } from "express";
 import { requireAuth, requirePermission } from "@zordms/auth";
-import { serviceHealth, drPosture, schedules } from "../modules/sysadmin.js";
 import type { CoreDeps } from "../deps.js";
 import { getDedupConfig, setDedupConfig } from "../repo/duplicates.js";
 
 const VALID_MATCH_BY = new Set(["hash", "cid", "doc_no"]);
 const VALID_ACTIONS = new Set(["flag", "auto_version"]);
 
-export function sysadminRouter(): Router {
+export function dedupConfigRouter(): Router {
   const r = Router();
   r.use(requireAuth);
-  r.use(requirePermission("admin:access"));
 
-  r.get("/health", async (req, res) => {
-    try {
-      const { knex } = req.app.locals.deps as CoreDeps;
-      res.json({ health: await serviceHealth(knex) });
-    } catch (e: any) { res.status(500).json({ error: "internal" }); }
-  });
-
-  r.get("/dr", (req, res) => {
-    try {
-      const { config } = req.app.locals.deps as CoreDeps;
-      res.json({ dr: drPosture(config) });
-    } catch (e: any) { res.status(500).json({ error: "internal" }); }
-  });
-
-  r.get("/schedules", (_req, res) => res.json({ schedules: schedules() }));
-
-  // ── GET /admin/dedup-config ─────────────────────────────────────────────────
-  r.get("/dedup-config", async (req, res) => {
+  // GET /admin/dedup-config
+  r.get("/dedup-config", requirePermission("admin:access"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const cfg = await getDedupConfig(knex);
@@ -39,14 +30,18 @@ export function sysadminRouter(): Router {
     }
   });
 
-  // ── PUT /admin/dedup-config ─────────────────────────────────────────────────
-  r.put("/dedup-config", async (req, res) => {
+  // PUT /admin/dedup-config
+  r.put("/dedup-config", requirePermission("admin:access"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       const body = req.body as Record<string, unknown>;
 
+      // Validate
       const errors: string[] = [];
-      if (body.enabled !== undefined && typeof body.enabled !== "boolean") errors.push("enabled must be boolean");
+
+      if (body.enabled !== undefined && typeof body.enabled !== "boolean") {
+        errors.push("enabled must be boolean");
+      }
       if (body.matchBy !== undefined) {
         if (!Array.isArray(body.matchBy)) {
           errors.push("matchBy must be an array");
@@ -63,7 +58,10 @@ export function sysadminRouter(): Router {
         if (isNaN(ft) || ft < 0 || ft > 1) errors.push("fuzzyThreshold must be a number between 0 and 1");
       }
 
-      if (errors.length > 0) { res.status(422).json({ errors }); return; }
+      if (errors.length > 0) {
+        res.status(422).json({ errors });
+        return;
+      }
 
       const updated = await setDedupConfig(knex, {
         enabled: body.enabled as boolean | undefined,
@@ -71,6 +69,7 @@ export function sysadminRouter(): Router {
         action: body.action as "flag" | "auto_version" | undefined,
         fuzzyThreshold: body.fuzzyThreshold !== undefined ? Number(body.fuzzyThreshold) : undefined,
       });
+
       res.json({ dedupConfig: updated });
     } catch (e: any) {
       res.status(500).json({ error: "internal", detail: String(e?.message ?? e) });
