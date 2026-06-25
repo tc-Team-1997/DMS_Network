@@ -249,7 +249,7 @@ export function DocumentLifecycle() {
               <div key={stage} style={{ display: "flex", alignItems: "center" }}>
                 <div style={{
                   minWidth: 110, padding: 12,
-                  background: STAGE_BG[stage] ?? "rgba(255,255,255,.03)",
+                  background: STAGE_BG[stage] ?? "rgba(15,23,42,.03)",
                   border: `1px solid ${STAGE_COLORS[stage] ?? "var(--bd)"}20`,
                   borderRadius: idx === 0 ? "8px 0 0 8px" : idx === arr.length - 1 ? "0 8px 8px 0" : 0,
                   textAlign: "center",
@@ -326,7 +326,7 @@ export function DocumentLifecycle() {
                         </span>
                         <div style={{
                           flex: 1, height: 6, borderRadius: 3,
-                          background: stage.complete ? STAGE_COLORS[stage.stage] ?? "var(--G)" : "rgba(255,255,255,.07)",
+                          background: stage.complete ? STAGE_COLORS[stage.stage] ?? "var(--G)" : "rgba(15,23,42,.07)",
                         }} />
                         <span style={{ fontSize: 11, color: stage.complete ? "var(--G)" : "var(--sil)", flexShrink: 0 }}>
                           {stage.complete ? "Done" : "Pending"}
@@ -345,7 +345,7 @@ export function DocumentLifecycle() {
                       { label: "Type", value: trace.doc_type },
                       { label: "Versions", value: String(trace.versions.length) },
                     ].map((kv) => (
-                      <div key={kv.label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+                      <div key={kv.label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid rgba(15,23,42,.08)" }}>
                         <span style={{ color: "var(--sil)" }}>{kv.label}</span>
                         <span className={kv.label === "Document ID" ? "mono" : ""} style={{ color: kv.label === "Document ID" ? "var(--gold3)" : "inherit" }}>{kv.value}</span>
                       </div>

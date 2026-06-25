@@ -121,7 +121,7 @@ function FacetPanel({
                   cursor: "pointer",
                   fontSize: 11,
                   background: current === f.value ? "rgba(184,145,42,.18)" : "transparent",
-                  color: current === f.value ? "var(--gold2)" : "var(--fg)",
+                  color: current === f.value ? "var(--gold2)" : "var(--mist)",
                   marginBottom: 2,
                 }}
               >
@@ -206,7 +206,7 @@ function HitPanel({
         <div
           style={{
             background: "var(--ink3)", borderRadius: 6, padding: 12,
-            fontSize: 12, lineHeight: 1.7, color: "var(--fg)", border: "1px solid var(--bd)",
+            fontSize: 12, lineHeight: 1.7, color: "var(--wh)", border: "1px solid var(--bd)",
           }}
         >
           {hit.snippet || <span style={{ color: "var(--sil)" }}>No preview available.</span>}
@@ -457,7 +457,7 @@ export default function Search() {
             <Bookmark size={14} />
             <span style={{ marginLeft: 6 }}>Saved</span>
             {savedSearches.length > 0 && (
-              <span style={{ marginLeft: 4, fontSize: 10, background: "var(--gold2)", color: "var(--ink1)", borderRadius: 8, padding: "1px 5px" }}>
+              <span style={{ marginLeft: 4, fontSize: 10, background: "var(--gold2)", color: "#241a06", borderRadius: 8, padding: "1px 5px" }}>
                 {savedSearches.length}
               </span>
             )}

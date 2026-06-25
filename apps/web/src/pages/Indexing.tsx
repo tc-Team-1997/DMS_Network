@@ -344,23 +344,23 @@ export default function Indexing() {
                     <button
                       disabled={!hasPrev}
                       onClick={() => hasPrev && setSelectedDoc(queue[currentIdx - 1])}
-                      style={{ padding: "4px 10px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 5, fontSize: 10, color: hasPrev ? "var(--mist)" : "var(--sil)", cursor: hasPrev ? "pointer" : "not-allowed", opacity: hasPrev ? 1 : 0.5 }}
+                      style={{ padding: "4px 10px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 5, fontSize: 10, color: hasPrev ? "var(--mist)" : "var(--sil)", cursor: hasPrev ? "pointer" : "not-allowed", opacity: hasPrev ? 1 : 0.5 }}
                       aria-label="Previous document"
                     >◀ Prev</button>
                     <span style={{ fontSize: 11, color: "var(--sil)" }}>{selectedDoc ? `${currentIdx + 1}/${queue.length}` : "0/0"}</span>
                     <button
                       disabled={!hasNext}
                       onClick={() => hasNext && setSelectedDoc(queue[currentIdx + 1])}
-                      style={{ padding: "4px 10px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 5, fontSize: 10, color: hasNext ? "var(--mist)" : "var(--sil)", cursor: hasNext ? "pointer" : "not-allowed", opacity: hasNext ? 1 : 0.5 }}
+                      style={{ padding: "4px 10px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 5, fontSize: 10, color: hasNext ? "var(--mist)" : "var(--sil)", cursor: hasNext ? "pointer" : "not-allowed", opacity: hasNext ? 1 : 0.5 }}
                       aria-label="Next document"
                     >Next ▶</button>
                   </div>
                 );
               })()}
             >
-              <div style={{ background: "rgba(255,255,255,.03)", border: "1px dashed rgba(255,255,255,.1)", borderRadius: 8, padding: 24, minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ background: "var(--ink3)", border: "1px dashed var(--bd)", borderRadius: 8, padding: 24, minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {selectedDoc ? (
-                  <div style={{ background: "rgba(255,255,255,.05)", borderRadius: 5, padding: 16, maxWidth: 240, width: "100%" }}>
+                  <div style={{ background: "var(--ink4)", borderRadius: 5, padding: 16, maxWidth: 240, width: "100%" }}>
                     <div style={{ fontSize: 8, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--gold)", marginBottom: 10 }}>
                       {docType === "BT_PASSPORT" ? "KINGDOM OF BHUTAN · PASSPORT" : docType === "BT_CID_4G" ? "BHUTAN · CITIZEN ID CARD 4G" : "BOB LOAN APPLICATION"}
                     </div>
@@ -371,12 +371,12 @@ export default function Indexing() {
                         </svg>
                       </div>
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                        <div style={{ height: 7, background: "rgba(255,255,255,.15)", borderRadius: 2, width: "90%" }}/>
-                        <div style={{ height: 7, background: "rgba(255,255,255,.1)", borderRadius: 2, width: "70%" }}/>
-                        <div style={{ height: 7, background: "rgba(255,255,255,.1)", borderRadius: 2, width: "80%" }}/>
+                        <div style={{ height: 7, background: "rgba(15,23,42,.15)", borderRadius: 2, width: "90%" }}/>
+                        <div style={{ height: 7, background: "rgba(15,23,42,.10)", borderRadius: 2, width: "70%" }}/>
+                        <div style={{ height: 7, background: "rgba(15,23,42,.10)", borderRadius: 2, width: "80%" }}/>
                       </div>
                     </div>
-                    <div style={{ marginTop: 10, fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: "var(--sil)", background: "rgba(0,0,0,.25)", padding: 6, borderRadius: 3, letterSpacing: 1 }}>
+                    <div style={{ marginTop: 10, fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: "var(--sil)", background: "rgba(15,23,42,.06)", padding: 6, borderRadius: 3, letterSpacing: 1 }}>
                       {selectedDoc.title.slice(0, 30).toUpperCase()}
                     </div>
                     <div style={{ marginTop: 8, fontSize: 10, color: "var(--sil)" }}>
@@ -437,7 +437,7 @@ export default function Indexing() {
               <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 10.5, color: "var(--sil)", display: "block", marginBottom: 4 }}>Select Document to Index</label>
                 <select
-                  style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 7, padding: "8px 12px", fontSize: 12, color: "var(--wh)", width: "100%", fontFamily: "inherit" }}
+                  style={{ background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, padding: "8px 12px", fontSize: 12, color: "var(--wh)", width: "100%", fontFamily: "inherit" }}
                   value=""
                   onChange={(e) => {
                     const id = Number(e.target.value);
@@ -582,7 +582,7 @@ export default function Indexing() {
             )}
 
             {/* Actions */}
-            <div style={{ display: "flex", gap: 8, marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.07)" }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--bd)" }}>
               <button
                 onClick={submitIndex}
                 disabled={submitting}
@@ -605,7 +605,7 @@ export default function Indexing() {
               <button
                 disabled
                 title="Legal hold placement is not yet available — contact your compliance officer."
-                style={{ padding: "9px 14px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--sil)", cursor: "not-allowed", opacity: 0.6 }}
+                style={{ padding: "9px 14px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--sil)", cursor: "not-allowed", opacity: 0.6 }}
                 aria-label="Hold — coming soon"
               >
                 Hold
@@ -649,7 +649,7 @@ export default function Indexing() {
           <Card title="QA Checklist — Active Document">
             {selectedDoc ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ background: "rgba(255,255,255,.04)", borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 6 }}>
+                <div style={{ background: "var(--ink3)", borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 6 }}>
                   <strong>{selectedDoc.title}</strong>
                   <span style={{ color: "var(--sil)", fontSize: 11, marginLeft: 8 }}>#{selectedDoc.id} · {selectedDoc.branch}</span>
                 </div>
@@ -678,26 +678,36 @@ export default function Indexing() {
             )}
           </Card>
           <Card title="QA Statistics">
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11 }}>
-              {[
-                { label: "Image Quality Pass Rate", pct: 94, color: "var(--G)" },
-                { label: "Legible Fields", pct: 97, color: "var(--gold2)" },
-                { label: "Not Expired", pct: 88, color: "var(--W)" },
-                { label: "MRZ Verified", pct: 91, color: "var(--B)" },
-                { label: "Security Features", pct: 78, color: "var(--P)" },
-                { label: "CBS Name Match", pct: 99, color: "var(--G)" },
-              ].map((row) => (
-                <div key={row.label}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                    <span style={{ color: "var(--sil)" }}>{row.label}</span>
-                    <span style={{ color: row.color, fontWeight: 600 }}>{row.pct}%</span>
-                  </div>
-                  <div style={{ height: 4, background: "rgba(255,255,255,.07)", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${row.pct}%`, background: row.color, borderRadius: 4 }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            {queue.length === 0 ? (
+              <div style={{ color: "var(--sil)", fontSize: 12, padding: "12px 0" }}>
+                {queueLoading ? "Loading…" : "No queue data yet"}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11 }}>
+                {(() => {
+                  const total = queue.length;
+                  const highConf = queue.filter((d) => (d.confidence ?? 0) >= 0.9).length;
+                  const indexed = queue.filter((d) => !!d.doc_type).length;
+                  const noFlag = queue.filter((d) => !d.review_flag).length;
+                  const rows = [
+                    { label: "AI Confidence ≥90%", pct: Math.round((highConf / total) * 100), color: "var(--G)" },
+                    { label: "Indexed", pct: Math.round((indexed / total) * 100), color: "var(--gold2)" },
+                    { label: "No Review Flag", pct: Math.round((noFlag / total) * 100), color: "var(--B)" },
+                  ];
+                  return rows.map((row) => (
+                    <div key={row.label}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <span style={{ color: "var(--sil)" }}>{row.label}</span>
+                        <span style={{ color: row.color, fontWeight: 600 }}>{row.pct}%</span>
+                      </div>
+                      <div style={{ height: 4, background: "var(--bd)", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${row.pct}%`, background: row.color, borderRadius: 4 }} />
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -723,7 +733,7 @@ export default function Indexing() {
           </button>
           <button
             onClick={() => setRejectOpen(false)}
-            style={{ padding: "9px 14px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}
+            style={{ padding: "9px 14px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}
           >
             Cancel
           </button>

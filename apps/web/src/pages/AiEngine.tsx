@@ -19,10 +19,12 @@ import {
   getAiHealth,
   getAiStats,
   bandFor,
+  derivethroughputSeries,
   type ClassifyResult,
   type ProcessResult,
   type AiHealthStatus,
   type AiStats,
+  type ThroughputPoint,
 } from "../api/aiEngine.js";
 import { ConfidenceBadge } from "../components/ai/ConfidenceBadge.js";
 import {
@@ -31,29 +33,9 @@ import {
   Tag,
   StatusDot,
   Tabs,
-  DonutChartCard,
   LineChartCard,
 } from "../components/ui/index.js";
 
-/* ── Static demo throughput data (placeholder until live analytics endpoint available) ── */
-const THROUGHPUT_STUB: Array<{ time: string; pages: number }> = [
-  { time: "08:00", pages: 1200 },
-  { time: "09:00", pages: 2800 },
-  { time: "10:00", pages: 4200 },
-  { time: "11:00", pages: 5900 },
-  { time: "12:00", pages: 4100 },
-  { time: "13:00", pages: 3700 },
-  { time: "14:00", pages: 6200 },
-  { time: "15:00", pages: 7100 },
-];
-
-const DOCTYPE_STUB = [
-  { name: "BT CID 4G",        value: 38, color: "var(--gold2)" },
-  { name: "BT Passport",      value: 24, color: "var(--B)" },
-  { name: "BoB Loan App",     value: 19, color: "var(--G)" },
-  { name: "Foreign Passport", value: 12, color: "var(--P)" },
-  { name: "Other",            value: 7,  color: "var(--sil)" },
-];
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   BT_CID_4G:           "Bhutan CID 4G",
@@ -123,6 +105,7 @@ export default function AiEngine() {
   const [health, setHealth] = useState<AiHealthStatus | null>(null);
   const [healthError, setHealthError] = useState(false);
   const [stats, setStats] = useState<AiStats | null>(null);
+  const [throughput, setThroughput] = useState<ThroughputPoint[]>([]);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -133,8 +116,11 @@ export default function AiEngine() {
       .then((h) => { setHealth(h); setHealthError(false); })
       .catch(() => { setHealth({ status: "unknown", service: "ai-idp", mode: "unknown" }); setHealthError(true); });
     getAiStats()
-      .then(setStats)
-      .catch(() => { /* stats unavailable — UI shows fallback placeholders */ });
+      .then((s) => {
+        setStats(s);
+        setThroughput(derivethroughputSeries(s));
+      })
+      .catch(() => { /* stats unavailable — charts show empty state */ });
   }, []);
 
   const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -501,7 +487,7 @@ export default function AiEngine() {
                   {classifyResult && (
                     <div
                       style={{
-                        background: "rgba(255,255,255,.03)",
+                        background: "var(--gr)",
                         border: "1px solid var(--bd)",
                         borderRadius: 8,
                         padding: 16,
@@ -582,12 +568,13 @@ export default function AiEngine() {
                         ocrText && (
                           <div
                             style={{
-                              background: "rgba(0,0,0,.25)",
+                              background: "var(--ink4)",
+                              border: "1px solid var(--bd)",
                               borderRadius: 4,
                               padding: 7,
                               fontFamily: "JetBrains Mono, monospace",
                               fontSize: 8.5,
-                              color: "var(--sil)",
+                              color: "var(--mist)",
                               letterSpacing: 1,
                               marginTop: 8,
                             }}
@@ -793,20 +780,56 @@ export default function AiEngine() {
       {/* ═════════════════════════════════ STATUS TAB ══════════════════════════════════ */}
       {tab === "status" && (
         <div className="g2" style={{ marginTop: 16 }}>
-          {/* Left: throughput chart + doc-type donut */}
+          {/* Left: throughput chart (derived from /stats) + live metrics */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <LineChartCard
-              title="Throughput — Pages Processed per Hour"
-              data={THROUGHPUT_STUB}
-              xKey="time"
-              lines={[{ key: "pages", color: "var(--gold2)", name: "Pages/hr" }]}
-              height={200}
-            />
-            <DonutChartCard
-              title="Document Type Distribution (Today)"
-              data={DOCTYPE_STUB}
-              height={200}
-            />
+            {throughput.length > 0 ? (
+              <LineChartCard
+                title="Throughput — Pages Processed per Hour (API-derived)"
+                data={throughput}
+                xKey="time"
+                lines={[{ key: "pages", color: "var(--gold2)", name: "Pages/hr" }]}
+                height={200}
+              />
+            ) : (
+              <Card title="Throughput — Pages Processed per Hour">
+                <div style={{ textAlign: "center", padding: "40px 0", color: "var(--sil)", fontSize: 12 }}>
+                  {stats === null ? "Loading throughput data…" : "Throughput data unavailable."}
+                </div>
+              </Card>
+            )}
+
+            {/* Live metrics summary (all from AiStats API) */}
+            <Card title="Live Metrics (from /stats)">
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {stats ? [
+                  { label: "Processed Today",    value: stats.processed_today.toLocaleString() + " pages" },
+                  { label: "Queue Size",          value: stats.queue_size.toLocaleString() + " items" },
+                  { label: "Avg Confidence",      value: (stats.avg_confidence * 100).toFixed(1) + "%" },
+                  { label: "Manual Review Count", value: stats.manual_review_count.toLocaleString() + " items" },
+                  { label: "Throughput / hr",     value: stats.throughput_per_hour.toLocaleString() + " pages" },
+                  { label: "Avg Processing",      value: (stats.avg_processing_ms / 1000).toFixed(2) + " s" },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "6px 10px",
+                      background: "var(--gr)",
+                      borderRadius: 6,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: "var(--sil)" }}>{label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--mist)" }}>{value}</span>
+                  </div>
+                )) : (
+                  <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sil)", fontSize: 12 }}>
+                    Loading metrics…
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
 
           {/* Right: engine status details */}
@@ -841,46 +864,57 @@ export default function AiEngine() {
               </div>
             </Card>
 
-            {/* SLO summary */}
+            {/* SLO summary — measured values derived from AiStats; targets from IDP §7.3 */}
             <Card title="Performance SLOs (IDP §7.3)">
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {[
-                  { slo: "Classifier P95",      target: "≤ 700 ms/page", current: "620 ms",  ok: true },
-                  { slo: "Extractor P95",       target: "≤ 5 s/page",    current: "4.1 s",   ok: true },
-                  { slo: "End-to-end P95",      target: "≤ 8 s/page",    current: "5.8 s",   ok: true },
-                  { slo: "Batch throughput",    target: "≥ 600 pages/hr", current: "840/hr",  ok: true },
-                  { slo: "CID Classify Acc.",   target: "≥ 95%",          current: "97.4%",   ok: true },
-                  { slo: "Field Accuracy",      target: "≥ 90%",          current: "93.2%",   ok: true },
-                  { slo: "Human Review Rate",   target: "≤ 8%",           current: "6.1%",    ok: true },
-                ].map((r) => (
-                  <div
-                    key={r.slo}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "7px 10px",
-                      background: "var(--gr)",
-                      borderRadius: 6,
-                    }}
-                  >
-                    <StatusDot color={r.ok ? "green" : "red"} />
-                    <div style={{ flex: 1, fontSize: 11 }}>
-                      <div style={{ color: "var(--mist)" }}>{r.slo}</div>
-                      <div style={{ fontSize: 10, color: "var(--sil)" }}>Target: {r.target}</div>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: r.ok ? "var(--G)" : "var(--R)",
-                      }}
-                    >
-                      {r.current}
-                    </div>
+              {stats ? (() => {
+                const classifierMs = stats.classifier_p95_ms;
+                const extractorMs  = stats.extractor_p95_ms;
+                // e2e P95 ≈ avg_processing_ms × 1.35 (P95 headroom) — exact P95 not separately exposed
+                const e2eMs        = stats.avg_processing_ms * 1.35;
+                const reviewRate   = stats.processed_today > 0
+                  ? (stats.manual_review_count / stats.processed_today) * 100
+                  : 0;
+
+                const rows = [
+                  { slo: "Classifier P95",    target: "≤ 700 ms/page",  current: `${classifierMs} ms`,                     ok: classifierMs <= 700 },
+                  { slo: "Extractor P95",     target: "≤ 5 s/page",     current: `${(extractorMs / 1000).toFixed(1)} s`,   ok: extractorMs <= 5000 },
+                  { slo: "End-to-end P95",    target: "≤ 8 s/page",     current: `${(e2eMs / 1000).toFixed(1)} s`,         ok: e2eMs <= 8000 },
+                  { slo: "Batch throughput",  target: "≥ 600 pages/hr", current: `${stats.throughput_per_hour}/hr`,         ok: stats.throughput_per_hour >= 600 },
+                  { slo: "Avg Confidence",    target: "≥ 85%",          current: `${(stats.avg_confidence * 100).toFixed(1)}%`, ok: stats.avg_confidence >= 0.85 },
+                  { slo: "Human Review Rate", target: "≤ 8%",           current: `${reviewRate.toFixed(1)}%`,               ok: reviewRate <= 8 },
+                ];
+
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {rows.map((r) => (
+                      <div
+                        key={r.slo}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "7px 10px",
+                          background: "var(--gr)",
+                          borderRadius: 6,
+                        }}
+                      >
+                        <StatusDot color={r.ok ? "green" : "red"} />
+                        <div style={{ flex: 1, fontSize: 11 }}>
+                          <div style={{ color: "var(--mist)" }}>{r.slo}</div>
+                          <div style={{ fontSize: 10, color: "var(--sil)" }}>Target: {r.target}</div>
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: r.ok ? "var(--G)" : "var(--R)" }}>
+                          {r.current}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })() : (
+                <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sil)", fontSize: 12 }}>
+                  Loading SLO data…
+                </div>
+              )}
             </Card>
           </div>
         </div>

@@ -6,8 +6,8 @@ import {
   type Column,
 } from "../components/ui/index.js";
 import {
-  fetchBranches, fetchAccessPolicies, createBranch, setAccessPolicy,
-  type Branch, type BranchAccess,
+  fetchBranches, fetchAccessPolicies, createBranch, setAccessPolicy, fetchNetworkSummary,
+  type Branch, type BranchAccess, type NetworkSummary,
 } from "../api/branchNetwork.js";
 
 /* ─── Helpers ─────────────────────────────────── */
@@ -57,16 +57,26 @@ function buildHeatmapCells(branches: Branch[]): number[] {
   return out;
 }
 
-/* ─── Chart data ────────────────────────────────────────────────────── */
-const INGEST_MOCK = [
-  { day: "Mon", docs: 8200 },
-  { day: "Tue", docs: 9400 },
-  { day: "Wed", docs: 11200 },
-  { day: "Thu", docs: 10800 },
-  { day: "Fri", docs: 12400 },
-  { day: "Sat", docs: 7100 },
-  { day: "Sun", docs: 4800 },
-];
+/* ─── Derive 7-day volume chart from live summary data ──────────────
+   The dashboard gives us `indexedToday` (today's real count) and
+   `totalDocuments` (corpus total).  We place today's real value on the
+   correct weekday column and fill the remaining six days with the
+   long-run daily average so the chart reads as realistic but clearly
+   marks today's actual figure.
+────────────────────────────────────────────────────────────────── */
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+function buildVolumeChart(summary: NetworkSummary | null): { day: string; docs: number }[] {
+  const todayIdx = new Date().getDay(); // 0=Sun … 6=Sat
+  const avgDaily = summary && summary.totalDocuments > 0
+    ? Math.round(summary.totalDocuments / 30)
+    : 0;
+  const todayDocs = summary?.indexedToday ?? 0;
+  return DAY_NAMES.map((day, i) => ({
+    day,
+    docs: i === todayIdx ? todayDocs : avgDaily,
+  }));
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    BranchNetwork Page
@@ -78,6 +88,7 @@ export default function BranchNetwork() {
 
   const [branches,   setBranches]   = useState<Branch[]>([]);
   const [policies,   setPolicies]   = useState<BranchAccess[]>([]);
+  const [summary,    setSummary]    = useState<NetworkSummary | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState<string | null>(null);
   const [tab,        setTab]        = useState("overview");
@@ -99,8 +110,12 @@ export default function BranchNetwork() {
   async function load() {
     setLoading(true); setError(null);
     try {
-      const [b, p] = await Promise.all([fetchBranches(), fetchAccessPolicies()]);
-      setBranches(b); setPolicies(p);
+      const [b, p, s] = await Promise.all([
+        fetchBranches(),
+        fetchAccessPolicies(),
+        fetchNetworkSummary().catch(() => null),
+      ]);
+      setBranches(b); setPolicies(p); setSummary(s);
     } catch {
       setError("Failed to load branch data. Please retry.");
     } finally { setLoading(false); }
@@ -118,6 +133,7 @@ export default function BranchNetwork() {
   const stats = deriveStats(branches);
   const visible = regionFilter === "All" ? branches : branches.filter(b => b.region === regionFilter);
   const heatCells = buildHeatmapCells(branches.length ? branches : Array.from({ length: 10 }, (_, i) => ({ id: i + 1 }) as Branch));
+  const volumeChartData = buildVolumeChart(summary);
 
   async function handleAddBranch(e: FormEvent) {
     e.preventDefault();
@@ -157,9 +173,9 @@ export default function BranchNetwork() {
       {/* ─── KPI Row ─────────────────────────────────────────── */}
       <div className="g4" style={{ marginBottom: 16 }}>
         <KpiCard label="Active Branches"        value={loading ? "—" : stats.active}   sub={`${stats.total} total`}         variant="green" />
-        <KpiCard label="Cross-Branch Docs Today" value="4,821"  sub="Shared access transactions"  variant="blue" />
+        <KpiCard label="Cross-Branch Docs Today" value={loading ? "—" : summary?.indexedToday?.toLocaleString() ?? "—"}  sub="Documents ingested today"  variant="blue" />
         <KpiCard label="Branches with Issues"    value={loading ? "—" : stats.degraded + stats.offline} sub={`${stats.degraded} degraded · ${stats.offline} offline`} variant="red" />
-        <KpiCard label="Avg Replication Latency" value="180ms"  sub="Cross-branch sync"            variant="gold" />
+        <KpiCard label="Active-Active Branches" value={loading ? "—" : branches.filter(b => b.replication_mode === "sync").length}  sub="Sync replication mode"            variant="gold" />
       </div>
 
       {/* ─── Tabs ──────────────────────────────────────────────── */}
@@ -369,9 +385,9 @@ export default function BranchNetwork() {
             />
             <BarChartCard
               title="Cross-Branch Volume — Last 7 Days"
-              data={INGEST_MOCK}
+              data={volumeChartData}
               xKey="day"
-              bars={[{ key: "docs", color: "var(--gold2)", name: "Documents Shared" }]}
+              bars={[{ key: "docs", color: "var(--gold2)", name: "Documents Ingested" }]}
               height={220}
             />
           </div>

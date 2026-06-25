@@ -164,7 +164,7 @@ function MetadataPanel({ doc, parsedMeta }: MetadataPanelProps) {
             display: "flex",
             justifyContent: "space-between",
             padding: "5px 0",
-            borderBottom: "1px solid rgba(255,255,255,.04)",
+            borderBottom: "1px solid var(--bd)",
             fontSize: 11,
           }}
         >
@@ -196,7 +196,7 @@ function MetadataPanel({ doc, parsedMeta }: MetadataPanelProps) {
                 display: "flex",
                 justifyContent: "space-between",
                 padding: "4px 0",
-                borderBottom: "1px solid rgba(255,255,255,.03)",
+                borderBottom: "1px solid var(--line)",
                 fontSize: 10,
               }}
             >
@@ -461,7 +461,7 @@ export default function Viewer() {
               min={1}
               max={totalPages}
               onChange={(e) => setCurrentPage(Math.max(1, Math.min(totalPages, Number(e.target.value))))}
-              style={{ width: 34, textAlign: "center", padding: 4, background: "rgba(255,255,255,.05)", border: "1px solid var(--bd)", borderRadius: 5, color: "var(--wh)", fontSize: 11 }}
+              style={{ width: 34, textAlign: "center", padding: 4, background: "rgba(15,23,42,.04)", border: "1px solid var(--bd)", borderRadius: 5, color: "var(--wh)", fontSize: 11 }}
             />
             <span style={{ fontSize: 11, color: "var(--sil)" }}>/ {totalPages}</span>
             <button className="btn bs xs" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>◀ Prev</button>
@@ -483,7 +483,7 @@ export default function Viewer() {
           <div
             ref={canvasRef}
             style={{
-              background: "rgba(255,255,255,.03)",
+              background: "var(--gr)",
               border: "1px solid var(--bd)",
               borderRadius: 8,
               padding: 32,
@@ -521,11 +521,11 @@ export default function Viewer() {
                 </div>
 
                 {/* Title */}
-                <div style={{ height: 12, background: "rgba(255,255,255,.18)", borderRadius: 2, marginBottom: 8, width: "80%" }} />
+                <div style={{ height: 12, background: "rgba(15,23,42,.12)", borderRadius: 2, marginBottom: 8, width: "80%" }} />
 
                 {/* Content lines */}
                 {[100, 70, 90, 55, 85].map((w, i) => (
-                  <div key={i} style={{ height: 9, background: "rgba(255,255,255,.08)", borderRadius: 2, marginBottom: 7, width: `${w}%` }} />
+                  <div key={i} style={{ height: 9, background: "rgba(15,23,42,.07)", borderRadius: 2, marginBottom: 7, width: `${w}%` }} />
                 ))}
 
                 {/* Highlight overlay example */}
@@ -539,14 +539,14 @@ export default function Viewer() {
 
                 {/* More content */}
                 {[80, 65, 95].map((w, i) => (
-                  <div key={i} style={{ height: 9, background: "rgba(255,255,255,.08)", borderRadius: 2, marginBottom: 7, width: `${w}%` }} />
+                  <div key={i} style={{ height: 9, background: "rgba(15,23,42,.07)", borderRadius: 2, marginBottom: 7, width: `${w}%` }} />
                 ))}
 
                 {/* Redaction overlay example */}
                 {annotations.filter((a) => a.page === currentPage && a.kind === "redaction").length > 0 && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                     <div style={{ fontSize: 10, color: "var(--sil)" }}>REDACTED:</div>
-                    <div style={{ height: 12, width: 160, background: "rgba(255,255,255,.18)", borderRadius: 2 }} />
+                    <div style={{ height: 12, width: 160, background: "#1a1a1a", borderRadius: 2 }} />
                   </div>
                 )}
 
@@ -805,8 +805,8 @@ export default function Viewer() {
                   placeholder={String(placeholder)}
                   onChange={(e) => (setter as (v: string) => void)(e.target.value)}
                   style={{
-                    background: "rgba(255,255,255,.05)",
-                    border: "1px solid rgba(255,255,255,.1)",
+                    background: "rgba(15,23,42,.03)",
+                    border: "1px solid var(--bd)",
                     borderRadius: 6,
                     padding: "6px 8px",
                     fontSize: 11,

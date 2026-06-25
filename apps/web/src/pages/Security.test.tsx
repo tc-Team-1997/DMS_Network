@@ -60,6 +60,8 @@ describe("Security screen", () => {
 
   it("renders all four KPI cards", async () => {
     await act(async () => { render(<Security />); });
+    // "Active Users" appears as a KPI card label — use getAllByText since
+    // the "Active Sessions" card uses "Active Accounts" now (not "Active Users")
     expect(screen.getByText("Active Users")).toBeInTheDocument();
     expect(screen.getByText("MFA Enrolled")).toBeInTheDocument();
     expect(screen.getByText("Failed Logins (24h)")).toBeInTheDocument();
@@ -148,18 +150,18 @@ describe("Security screen", () => {
     expect(screen.getByText("audit log endpoint pending")).toBeInTheDocument();
   });
 
-  /* ── M1: Stable keys for security events (no index key warnings) ── */
-  it("M1: Recent Security Events list renders without index-based keys (stable event+time keys)", async () => {
+  /* ── M1: Recent Security Events shows correct empty state (audit log endpoint pending) ── */
+  it("M1: Recent Security Events shows empty state when audit log endpoint is not yet exposed", async () => {
     await act(async () => { render(<Security />); });
 
-    // Navigate to Analytics tab to see security events
+    // Navigate to Analytics tab to see security events section
     const analyticsTab = screen.getByText("Access Analytics");
     await act(async () => { fireEvent.click(analyticsTab); });
 
-    // Both LOGIN_FAILED events have different times so keys are unique
+    // Should show the empty state message (no hardcoded events)
     await waitFor(() => {
-      const loginFailedEvents = screen.getAllByText("LOGIN_FAILED");
-      expect(loginFailedEvents.length).toBe(2);
+      expect(screen.getByText("Recent Security Events")).toBeInTheDocument();
+      expect(screen.getByText("Audit log endpoint not yet exposed.")).toBeInTheDocument();
     });
   });
 

@@ -29,17 +29,14 @@ const SYSTEM_CATALOGUE = [
   { id: "s3",   label: "Cold Archive (S3 Glacier)",          detail: "AWS S3 · AES-256 · 7-year retention · Automatic tiering",     icon: "🗄️"  },
 ];
 
-/* ─── Charts seed data (derived from live logs when available) ─── */
+/* ─── Charts derived from live logs only (no random seed data) ─── */
 const HOUR_LABELS = ["00","02","04","06","08","10","12","14","16","18","20","22"];
 
 function buildCallsChart(logs: IntegrationLog[]) {
-  if (!logs.length) {
-    return HOUR_LABELS.map((h) => ({ hour: h, calls: Math.floor(Math.random() * 80 + 20), errors: Math.floor(Math.random() * 5) }));
-  }
   return HOUR_LABELS.map((h) => {
     const n = logs.filter((l) => (l.created_at ?? "").includes(`T${h}`)).length;
     const e = logs.filter((l) => (l.created_at ?? "").includes(`T${h}`) && !l.success).length;
-    return { hour: h, calls: n || Math.floor(Math.random() * 80 + 20), errors: e };
+    return { hour: h, calls: n, errors: e };
   });
 }
 
@@ -47,7 +44,7 @@ function buildLatencyChart(logs: IntegrationLog[]) {
   const systems = ["cbs","los","kyc","erp","crm"];
   return systems.map((s) => {
     const sl = logs.filter((l) => l.system === s);
-    const avg = sl.length ? Math.round(sl.reduce((a, l) => a + l.latency_ms, 0) / sl.length) : Math.floor(Math.random() * 120 + 10);
+    const avg = sl.length ? Math.round(sl.reduce((a, l) => a + l.latency_ms, 0) / sl.length) : 0;
     return { system: s.toUpperCase(), latency: avg };
   });
 }
@@ -108,14 +105,23 @@ export default function IntegrationHub() {
 
   useEffect(() => { void load(); }, [load]);
 
-  /* KPI computations */
+  /* KPI computations — derived entirely from API responses */
   const totalSystems  = systems.length || SYSTEM_CATALOGUE.length;
-  const activeSystems = systems.filter((s) => s.status === "up" || s.status === "mock").length || 12;
-  const totalCalls    = logs.length ? `${(logs.length / 1000).toFixed(1)}K` : "2.84M";
+  const activeSystems = systems.filter((s) => s.status === "up" || s.status === "mock").length;
+  const totalCalls    = logs.length >= 1000
+    ? `${(logs.length / 1000).toFixed(1)}K`
+    : String(logs.length);
   const avgLatency    = logs.length
     ? `${Math.round(logs.reduce((a, l) => a + l.latency_ms, 0) / logs.length)}ms`
-    : "38ms";
+    : "—";
   const failedCalls   = logs.filter((l) => !l.success).length;
+  /* p95 latency: sort latencies and pick the 95th percentile value */
+  const p95Latency = logs.length
+    ? (() => {
+        const sorted = [...logs].map((l) => l.latency_ms).sort((a, b) => a - b);
+        return sorted[Math.floor(sorted.length * 0.95)] ?? sorted[sorted.length - 1];
+      })()
+    : null;
 
   /* Enrich systems list with catalogue data */
   const enrichedSystems: Array<ConnectedSystem & { label: string; detail: string; icon: string }> =
@@ -226,7 +232,7 @@ export default function IntegrationHub() {
       <div className="g4" style={{ marginBottom: 14 }}>
         <KpiCard label="Active Integrations"  value={loading ? "…" : activeSystems} sub={`of ${totalSystems} configured`}  variant="green" />
         <KpiCard label="API Calls Today"       value={loading ? "…" : totalCalls}    sub="across all connected systems"      variant="blue" />
-        <KpiCard label="Avg Latency"           value={loading ? "…" : avgLatency}    sub="p50 · 38ms p95 · 142ms"           variant="gold" />
+        <KpiCard label="Avg Latency"           value={loading ? "…" : avgLatency}    sub={p95Latency != null ? `p95 · ${p95Latency}ms` : "no log data yet"}   variant="gold" />
         <KpiCard label="Failed Calls (24h)"    value={loading ? "…" : failedCalls}   sub="auto-retry enabled"                variant="red" />
       </div>
 
@@ -421,25 +427,20 @@ export default function IntegrationHub() {
                     cbs: "var(--gold2)", los: "var(--B)", kyc: "var(--G)",
                     swift: "var(--P)", erp: "var(--W)",
                   };
-                  const TOP = ["cbs", "los", "kyc", "swift", "erp"];
-                  const computed = TOP.map((id) => ({
-                    name: id.toUpperCase(),
-                    value: logs.filter((l) => l.system === id).length || 1,
-                    color: SYSTEM_COLORS[id] ?? "var(--sil)",
-                  }));
-                  // Fall back to static proportions when no live log data is present
-                  const total = computed.reduce((s, d) => s + d.value, 0);
-                  const isAllOne = computed.every((d) => d.value === 1);
-                  if (isAllOne) {
-                    return [
-                      { name: "CBS",   value: 38, color: "var(--gold2)" },
-                      { name: "LOS",   value: 27, color: "var(--B)" },
-                      { name: "KYC",   value: 18, color: "var(--G)" },
-                      { name: "SWIFT", value: 11, color: "var(--P)" },
-                      { name: "ERP",   value: 6,  color: "var(--W)" },
-                    ];
-                  }
-                  return computed.filter((d) => d.value > 0);
+                  // Compute counts from live log data only
+                  const counts = logs.reduce<Record<string, number>>((acc, l) => {
+                    acc[l.system] = (acc[l.system] ?? 0) + 1;
+                    return acc;
+                  }, {});
+                  const entries = Object.entries(counts)
+                    .map(([id, value]) => ({
+                      name: id.toUpperCase(),
+                      value,
+                      color: SYSTEM_COLORS[id] ?? "var(--sil)",
+                    }))
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 6);
+                  return entries;
                 })()}
                 height={200}
               />

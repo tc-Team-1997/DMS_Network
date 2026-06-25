@@ -22,13 +22,58 @@ interface AiInsight {
   meta: string;
 }
 
-const MOCK_INSIGHTS: AiInsight[] = [
-  { id: 1, level: "critical", text: "42 KYC documents expired — Thimphu HQ · RMA compliance breach risk", meta: "CRITICAL · 8 min ago · Auto-escalated to CDO" },
-  { id: 2, level: "warning", text: "20 passports: name mismatch vs CBS records — possible fraud pattern", meta: "HIGH RISK · Confidence 91% · Phuentsholing cluster" },
-  { id: 3, level: "info", text: "342 passports queued for AI batch processing — ETA 4 min", meta: "OCR Queue · Auto-classification ready" },
-  { id: 4, level: "success", text: "Loan batch #L-2026-0892 — 87 docs indexed · zero exceptions", meta: "Maker-checker workflow auto-triggered" },
-  { id: 5, level: "compliance", text: "2,104 documents eligible for auto-disposal — awaiting legal hold check", meta: "Records Management · Scheduled 03:00 AM" },
-];
+/** Build AI insights derived from real API data (byCategory, pending, indexedToday) */
+function buildInsights(
+  pending: number,
+  indexedToday: number,
+  byCategory: Record<string, number>,
+): AiInsight[] {
+  const insights: AiInsight[] = [];
+  if (pending > 0) {
+    insights.push({
+      id: 1,
+      level: "critical",
+      text: `${pending} document${pending !== 1 ? "s" : ""} flagged for review — possible compliance/fraud risk`,
+      meta: "CRITICAL · Requires manual review · Auto-escalated",
+    });
+  }
+  if (indexedToday > 0) {
+    insights.push({
+      id: 2,
+      level: "info",
+      text: `${indexedToday.toLocaleString()} document${indexedToday !== 1 ? "s" : ""} indexed today — AI batch processing active`,
+      meta: "OCR Queue · Auto-classification ready",
+    });
+  }
+  const kyc = byCategory["KYC / Identity"] ?? 0;
+  if (kyc > 0) {
+    insights.push({
+      id: 3,
+      level: "success",
+      text: `${kyc.toLocaleString()} KYC / Identity documents catalogued`,
+      meta: "Maker-checker workflow triggered where required",
+    });
+  }
+  const loan = byCategory["Loan & Credit"] ?? 0;
+  if (loan > 0) {
+    insights.push({
+      id: 4,
+      level: "compliance",
+      text: `${loan.toLocaleString()} Loan & Credit documents on record`,
+      meta: "Records Management · Retention policy applied",
+    });
+  }
+  // Always at least show one placeholder when nothing computed yet
+  if (insights.length === 0) {
+    insights.push({
+      id: 5,
+      level: "info",
+      text: "AI engine active — no critical findings at this time",
+      meta: "Monitoring all branches · Real-time",
+    });
+  }
+  return insights;
+}
 
 const insightAccent: Record<AiInsight["level"], string> = {
   critical: "var(--R)",
@@ -50,8 +95,8 @@ function QuickAction({ icon, label, onClick }: { icon: string; label: string; on
         justifyContent: "center",
         gap: 5,
         padding: "12px 8px",
-        background: "rgba(255,255,255,.06)",
-        border: "1px solid rgba(255,255,255,.09)",
+        background: "var(--ink3)",
+        border: "1px solid var(--bd)",
         borderRadius: 8,
         cursor: "pointer",
         fontSize: 11,
@@ -65,8 +110,8 @@ function QuickAction({ icon, label, onClick }: { icon: string; label: string; on
         (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(184,145,42,.35)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,.06)";
-        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,.09)";
+        (e.currentTarget as HTMLButtonElement).style.background = "var(--ink3)";
+        (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--bd)";
       }}
     >
       <span style={{ fontSize: 18 }}>{icon}</span>
@@ -80,7 +125,7 @@ function BranchBar({ name, count, pct, color }: { name: string; count: string; p
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
       <span style={{ width: 110, color: "var(--sil)", flexShrink: 0 }}>{name}</span>
-      <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,.07)", borderRadius: 2, overflow: "hidden" }}>
+      <div style={{ flex: 1, height: 4, background: "var(--bd)", borderRadius: 2, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2 }} />
       </div>
       <span style={{ color, fontWeight: 600, minWidth: 42, textAlign: "right" }}>{count}</span>
@@ -147,10 +192,28 @@ const ACTIVITY_COLS: Column<ActivityRow>[] = [
 ];
 
 /* ═══════════════════════════════ DASHBOARD ═══════════════════════════════ */
+/* ─── Compute branch volume stats from document list ─── */
+function buildBranchStats(docs: DocumentRecord[]) {
+  const counts: Record<string, number> = {};
+  for (const d of docs) {
+    if (d.branch) counts[d.branch] = (counts[d.branch] ?? 0) + 1;
+  }
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const max = sorted[0]?.[1] ?? 1;
+  const COLORS = ["var(--gold2)", "var(--B)", "var(--G)", "var(--P)", "var(--W)"];
+  return sorted.slice(0, 5).map(([name, count], i) => ({
+    name,
+    count: count.toLocaleString(),
+    pct: Math.round((count / max) * 100),
+    color: COLORS[i % COLORS.length],
+  }));
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [allDocs, setAllDocs] = useState<DocumentRecord[]>([]);
   const [recentDocs, setRecentDocs] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,6 +228,7 @@ export default function Dashboard() {
         dashboardCaptureApi.listDocuments().catch(() => ({ documents: [] })),
       ]);
       setSummary(s);
+      setAllDocs(docsResp.documents);
       setRecentDocs(docsResp.documents.slice(0, 12));
       setLastSync("just now");
     } catch (err: unknown) {
@@ -185,6 +249,22 @@ export default function Dashboard() {
   const indexedToday = summary?.indexedToday ?? 0;
   const byCategory = summary?.byCategory ?? {};
 
+  // Compute channel breakdown from document source_channel field
+  const channelCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of allDocs) {
+      const ch = d.source_channel ?? "UPLOAD";
+      counts[ch] = (counts[ch] ?? 0) + 1;
+    }
+    return counts;
+  }, [allDocs]);
+  const totalIngested = allDocs.length;
+
+  // Compute branch stats from documents
+  const branchStats = useMemo(() => buildBranchStats(allDocs), [allDocs]);
+  // Compute AI insights from real data
+  const aiInsights = useMemo(() => buildInsights(pending, indexedToday, byCategory), [pending, indexedToday, byCategory]);
+
   const donutData = buildDonutData(byCategory);
   // useMemo prevents chart data from re-randomising on every re-render (fixes I6)
   const inflowData = useMemo(() => buildInflowData(total, indexedToday), [total, indexedToday]);
@@ -204,10 +284,12 @@ export default function Dashboard() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <Tag variant="gold">AI Active</Tag>
-          <Tag variant="blue">84 Branches</Tag>
+          {!loading && branchStats.length > 0 && (
+            <Tag variant="blue">{branchStats.length} Branches</Tag>
+          )}
           <button
             onClick={load}
-            style={{ padding: "7px 14px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer", fontWeight: 600 }}
+            style={{ padding: "7px 14px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer", fontWeight: 600 }}
           >
             Refresh
           </button>
@@ -242,9 +324,9 @@ export default function Dashboard() {
           variant="red"
         />
         <KpiCard
-          label="Expiring ≤ 90 Days"
-          value="3,841"
-          sub={<>Critical ≤7d: <span style={{ color: "var(--R)" }}>142</span></>}
+          label="Total Ingested"
+          value={loading ? "…" : totalIngested.toLocaleString()}
+          sub={loading ? "" : `${Object.keys(channelCounts).length} channel${Object.keys(channelCounts).length !== 1 ? "s" : ""} active`}
           variant="amber"
         />
       </div>
@@ -258,21 +340,21 @@ export default function Dashboard() {
           variant="green"
         />
         <KpiCard
-          label="Pending Approvals"
-          value="834"
-          sub={<span style={{ color: "var(--R)", fontWeight: 700 }}>18 escalated</span>}
+          label="Categories"
+          value={loading ? "…" : Object.keys(byCategory).length.toLocaleString()}
+          sub={loading ? "" : Object.keys(byCategory).slice(0, 2).join(" · ") || "No categories yet"}
           variant="purple"
         />
         <KpiCard
-          label="Active Workflows"
-          value="1,247"
-          sub="6 stuck · 3 escalated"
+          label="Branches Active"
+          value={loading ? "…" : branchStats.length.toLocaleString()}
+          sub={loading || branchStats.length === 0 ? "No data yet" : `Top: ${branchStats[0]?.name ?? "—"}`}
           variant="blue"
         />
         <KpiCard
-          label="Legal Holds Active"
-          value="23"
-          sub="14 RMA · 6 litigation"
+          label="Channels Active"
+          value={loading ? "…" : Object.keys(channelCounts).length.toLocaleString()}
+          sub={loading ? "" : Object.keys(channelCounts).slice(0, 2).join(" · ") || "No data yet"}
           variant="gold"
         />
       </div>
@@ -292,12 +374,7 @@ export default function Dashboard() {
         />
         <DonutChartCard
           title={<span>Doc Type Distribution <Tag variant="gold">MTD</Tag></span>}
-          data={donutData.length > 0 ? donutData : [
-            { name: "KYC / Identity", value: 42, color: "#b8912a" },
-            { name: "Loan & Credit", value: 28, color: "#3a9fd0" },
-            { name: "Compliance", value: 18, color: "#2ecc8a" },
-            { name: "Records", value: 12, color: "#9b6fe0" },
-          ]}
+          data={donutData.length > 0 ? donutData : [{ name: "No data yet", value: 1, color: "var(--bd)" }]}
           height={160}
         />
       </div>
@@ -305,13 +382,13 @@ export default function Dashboard() {
       {/* ── Bottom 3-col grid ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 280px", gap: 14, marginBottom: 16 }}>
         {/* AI Insight Engine */}
-        <div style={{ background: "linear-gradient(135deg,rgba(10,18,32,.95),rgba(15,34,64,.9))", border: "1px solid rgba(184,145,42,.25)", borderRadius: 10, padding: 16 }}>
+        <div style={{ background: "var(--ink2)", border: "1px solid rgba(184,145,42,.25)", borderRadius: 10, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12, fontWeight: 700, color: "var(--gold3)" }}>
             <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold3)", animation: "pa 1.5s infinite" }} />
-            AI Insight Engine · {MOCK_INSIGHTS.length} findings
+            AI Insight Engine · {aiInsights.length} findings
           </div>
-          {MOCK_INSIGHTS.map((ins) => (
-            <div key={ins.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 10px", borderRadius: 7, background: "rgba(255,255,255,.04)", marginBottom: 6, borderLeft: `2px solid ${insightAccent[ins.level]}` }}>
+          {aiInsights.map((ins) => (
+            <div key={ins.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 10px", borderRadius: 7, background: "var(--ink3)", marginBottom: 6, borderLeft: `2px solid ${insightAccent[ins.level]}` }}>
               <div>
                 <div style={{ fontSize: 11, color: "var(--mist)", lineHeight: 1.5 }}>{ins.text}</div>
                 <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 2 }}>{ins.meta}</div>
@@ -320,9 +397,9 @@ export default function Dashboard() {
           ))}
           <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
             <button style={{ flex: 1, padding: "7px 12px", background: "linear-gradient(135deg,#b8912a,#f0c84a)", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", color: "#050d1a" }}>
-              Review All ({MOCK_INSIGHTS.length})
+              Review All ({aiInsights.length})
             </button>
-            <button style={{ padding: "7px 12px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
+            <button style={{ padding: "7px 12px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
               Dismiss
             </button>
           </div>
@@ -339,38 +416,48 @@ export default function Dashboard() {
             <div style={{ width: 8, height: 8, borderRadius: 2, background: "rgba(184,145,42,.5)" }} />Med
             <div style={{ width: 8, height: 8, borderRadius: 2, background: "var(--gold3)" }} />Peak
           </div>
-          <div style={{ borderTop: "1px solid rgba(255,255,255,.07)", marginTop: 8, paddingTop: 10 }}>
+          <div style={{ borderTop: "1px solid var(--bd)", marginTop: 8, paddingTop: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--mist)", marginBottom: 8 }}>Top Branches by Volume</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <BranchBar name="Thimphu HQ" count="12,841" pct={92} color="var(--gold2)" />
-              <BranchBar name="Phuentsholing" count="9,220" pct={74} color="var(--B)" />
-              <BranchBar name="Gelephu" count="7,614" pct={61} color="var(--G)" />
-              <BranchBar name="Bumthang" count="5,104" pct={42} color="var(--P)" />
-              <BranchBar name="Mongar" count="3,921" pct={31} color="var(--W)" />
+              {branchStats.length > 0 ? branchStats.map((b) => (
+                <BranchBar key={b.name} name={b.name} count={b.count} pct={b.pct} color={b.color} />
+              )) : (
+                <div style={{ fontSize: 11, color: "var(--sil)" }}>No branch data yet</div>
+              )}
             </div>
           </div>
         </Card>
 
         {/* Quick Actions + SLA */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <Card title={<span>SLA Compliance <Tag variant="green">96.2%</Tag></span>}>
+          <Card title={
+            <span>
+              Category Breakdown{" "}
+              {!loading && <Tag variant="green">{Object.keys(byCategory).length} types</Tag>}
+            </span>
+          }>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 11 }}>
-              {[
-                { label: "KYC Processing", pct: 98, color: "var(--G)" },
-                { label: "Loan Indexing", pct: 95, color: "var(--gold2)" },
-                { label: "Compliance Docs", pct: 91, color: "var(--W)" },
-                { label: "Cross-Branch", pct: 88, color: "var(--B)" },
-              ].map((row) => (
-                <div key={row.label}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                    <span style={{ color: "var(--sil)" }}>{row.label}</span>
-                    <span style={{ color: row.color, fontWeight: 600 }}>{row.pct}%</span>
-                  </div>
-                  <div style={{ height: 4, background: "rgba(255,255,255,.07)", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${row.pct}%`, background: row.color, borderRadius: 4 }} />
-                  </div>
-                </div>
-              ))}
+              {Object.keys(byCategory).length > 0 ? (() => {
+                const maxVal = Math.max(...Object.values(byCategory));
+                const COLORS = ["var(--G)", "var(--gold2)", "var(--W)", "var(--B)", "var(--P)"];
+                return Object.entries(byCategory).slice(0, 5).map(([label, count], i) => {
+                  const pct = maxVal > 0 ? Math.round((count / maxVal) * 100) : 0;
+                  const color = COLORS[i % COLORS.length];
+                  return (
+                    <div key={label}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                        <span style={{ color: "var(--sil)" }}>{label}</span>
+                        <span style={{ color, fontWeight: 600 }}>{count.toLocaleString()}</span>
+                      </div>
+                      <div style={{ height: 4, background: "var(--bd)", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 4 }} />
+                      </div>
+                    </div>
+                  );
+                });
+              })() : (
+                <div style={{ color: "var(--sil)", fontSize: 11 }}>{loading ? "Loading…" : "No category data yet"}</div>
+              )}
             </div>
           </Card>
 

@@ -92,7 +92,7 @@ export function WorkflowBuilder({ steps, compact = false }: WorkflowBuilderProps
                   ? "rgba(224,82,82,.15)"
                   : s.status === "Pending"
                   ? "rgba(184,145,42,.1)"
-                  : "rgba(255,255,255,.05)",
+                  : "rgba(15,23,42,.04)",
                 border: `2px solid ${stepBorderColor(s.status)}`,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 11, fontWeight: 700, color: stepColor(s.status),
@@ -106,7 +106,7 @@ export function WorkflowBuilder({ steps, compact = false }: WorkflowBuilderProps
             {i < steps.length - 1 && (
               <div style={{
                 width: 24, height: 2,
-                background: s.status === "Approved" ? "rgba(46,204,138,.4)" : "rgba(255,255,255,.08)",
+                background: s.status === "Approved" ? "rgba(46,204,138,.4)" : "rgba(15,23,42,.12)",
                 margin: "0 2px", marginBottom: 18,
               }} />
             )}
@@ -128,7 +128,7 @@ export function WorkflowBuilder({ steps, compact = false }: WorkflowBuilderProps
               borderRadius: 8,
               padding: "12px 14px",
               minWidth: 160,
-              background: "rgba(255,255,255,.02)",
+              background: "rgba(15,23,42,.02)",
               display: "flex", flexDirection: "column", gap: 6,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -174,7 +174,7 @@ export function WorkflowBuilder({ steps, compact = false }: WorkflowBuilderProps
                     ? "rgba(224,82,82,.12)"
                     : s.status === "Pending"
                     ? "rgba(184,145,42,.12)"
-                    : "rgba(255,255,255,.06)",
+                    : "rgba(15,23,42,.05)",
                   color: stepColor(s.status),
                   fontWeight: 700,
                   textTransform: "uppercase",
@@ -188,7 +188,7 @@ export function WorkflowBuilder({ steps, compact = false }: WorkflowBuilderProps
               }}>
                 <div style={{
                   width: 24, height: 2,
-                  background: s.status === "Approved" ? "rgba(46,204,138,.4)" : "rgba(255,255,255,.1)",
+                  background: s.status === "Approved" ? "rgba(46,204,138,.4)" : "rgba(15,23,42,.12)",
                 }} />
                 <span style={{ color: "var(--sil)", fontSize: 14 }}>›</span>
               </div>

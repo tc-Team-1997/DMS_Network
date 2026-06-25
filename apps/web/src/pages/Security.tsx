@@ -92,16 +92,7 @@ function roleBadge(roles: string[] | undefined) {
 /* ─── Available roles ─── */
 const ALL_ROLES = ["CDO", "Supervisor", "Maker", "Checker", "Indexer", "Viewer", "Auditor"];
 
-/* ─── MFA chart seed data ─── */
-const loginActivityData = [
-  { day: "Mon", logins: 142, failed: 3 },
-  { day: "Tue", logins: 168, failed: 1 },
-  { day: "Wed", logins: 155, failed: 7 },
-  { day: "Thu", logins: 171, failed: 2 },
-  { day: "Fri", logins: 193, failed: 4 },
-  { day: "Sat", logins: 64,  failed: 0 },
-  { day: "Sun", logins: 38,  failed: 1 },
-];
+/* loginActivityData is derived at runtime from the users API response (see component) */
 
 /* ─── Main component ─── */
 export default function Security() {
@@ -142,17 +133,19 @@ export default function Security() {
 
   useEffect(() => { void load(); }, [load]);
 
-  /* KPI computations */
-  const activeUsers    = users.filter((u) => u.status === "Active").length || 284;
+  /* KPI computations — derived entirely from API responses */
+  const activeUsers    = users.filter((u) => u.status === "Active").length;
   const mfaCount       = users.filter((u) => u.mfa_enabled).length;
-  const mfaPct         = users.length ? Math.round((mfaCount / users.length) * 100) : 97;
+  const mfaPct         = users.length ? Math.round((mfaCount / users.length) * 100) : 0;
   const lockedCount    = users.filter((u) => u.status === "Locked").length;
 
+  /* MFA donut: counts derived from real user data */
+  const mfaEnrolled    = mfaCount;
+  const mfaPending     = users.length - mfaCount;
   const mfaDonut = [
-    { name: "TOTP Enrolled",   value: Math.round(mfaPct * 0.6), color: "var(--G)" },
-    { name: "SMS OTP",         value: Math.round(mfaPct * 0.4), color: "var(--B)" },
-    { name: "Pending Enroll",  value: 100 - mfaPct,             color: "var(--W)" },
-  ];
+    { name: "MFA Enrolled",    value: mfaEnrolled, color: "var(--G)" },
+    { name: "Pending Enroll",  value: mfaPending,  color: "var(--W)" },
+  ].filter((d) => d.value > 0);
 
   /* User table columns */
   const userColumns: Column<UserTableRow>[] = [
@@ -320,39 +313,51 @@ export default function Security() {
                 height={180}
               />
               <Card title="Role Distribution">
-                {[
-                  { role: "CDO",        count: users.filter(u => (u as any).roles?.includes?.("CDO")).length || 2,   color: "var(--gold2)" },
-                  { role: "Supervisor", count: users.filter(u => (u as any).roles?.includes?.("Supervisor")).length || 8,  color: "var(--W)" },
-                  { role: "Maker",      count: users.filter(u => (u as any).roles?.includes?.("Maker")).length || 84,     color: "var(--B)" },
-                  { role: "Checker",    count: users.filter(u => (u as any).roles?.includes?.("Checker")).length || 62,    color: "var(--G)" },
-                  { role: "Indexer",    count: users.filter(u => (u as any).roles?.includes?.("Indexer")).length || 48,    color: "var(--B)" },
-                  { role: "Viewer",     count: users.filter(u => (u as any).roles?.includes?.("Viewer")).length || 56,     color: "var(--P)" },
-                  { role: "Auditor",    count: users.filter(u => (u as any).roles?.includes?.("Auditor")).length || 24,    color: "var(--P)" },
-                ].map((item) => (
-                  <div key={item.role} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, flex: 1 }}>{item.role}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--wh)" }}>{item.count}</span>
-                    <div style={{ width: 80, height: 6, background: "var(--ink3)", borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ width: `${Math.min(100, (item.count / (activeUsers || 1)) * 100)}%`, height: "100%", background: item.color, borderRadius: 3 }} />
+                {users.length === 0 ? (
+                  <div style={{ color: "var(--sil)", fontSize: 12, padding: "8px 0" }}>No user data available</div>
+                ) : (
+                  [
+                    { role: "CDO",        count: users.filter(u => (u as any).roles?.includes?.("CDO")).length,        color: "var(--gold2)" },
+                    { role: "Supervisor", count: users.filter(u => (u as any).roles?.includes?.("Supervisor")).length,  color: "var(--W)" },
+                    { role: "Maker",      count: users.filter(u => (u as any).roles?.includes?.("Maker")).length,       color: "var(--B)" },
+                    { role: "Checker",    count: users.filter(u => (u as any).roles?.includes?.("Checker")).length,     color: "var(--G)" },
+                    { role: "Indexer",    count: users.filter(u => (u as any).roles?.includes?.("Indexer")).length,     color: "var(--B)" },
+                    { role: "Viewer",     count: users.filter(u => (u as any).roles?.includes?.("Viewer")).length,      color: "var(--P)" },
+                    { role: "Auditor",    count: users.filter(u => (u as any).roles?.includes?.("Auditor")).length,     color: "var(--P)" },
+                  ].map((item) => (
+                    <div key={item.role} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, flex: 1 }}>{item.role}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--wh)" }}>{item.count}</span>
+                      <div style={{ width: 80, height: 6, background: "var(--ink3)", borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ width: `${Math.min(100, (item.count / (users.length || 1)) * 100)}%`, height: "100%", background: item.color, borderRadius: 3 }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </Card>
               <Card title="Active Sessions">
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
-                  {[
-                    { label: "Total Active Sessions", value: "142", color: "var(--wh)" },
-                    { label: "Across Branches",       value: "84",  color: "var(--B)" },
-                    { label: "Mobile Sessions",       value: "38",  color: "var(--G)" },
-                    { label: "API Tokens Active",     value: "17",  color: "var(--gold2)" },
-                    { label: "Sessions > 6h",         value: "9",   color: "var(--W)" },
-                  ].map((item) => (
-                    <div key={item.label} style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "var(--sil)" }}>{item.label}</span>
-                      <span style={{ color: item.color, fontWeight: 600 }}>{item.value}</span>
-                    </div>
-                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--sil)" }}>Active Accounts</span>
+                    <span style={{ color: "var(--wh)", fontWeight: 600 }}>{loading ? "…" : activeUsers}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--sil)" }}>MFA on</span>
+                    <span style={{ color: "var(--G)", fontWeight: 600 }}>{loading ? "…" : mfaCount}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--sil)" }}>Accounts locked</span>
+                    <span style={{ color: "var(--R)", fontWeight: 600 }}>{loading ? "…" : lockedCount}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--sil)" }}>Total users</span>
+                    <span style={{ color: "var(--B)", fontWeight: 600 }}>{loading ? "…" : users.length}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--bd)", paddingTop: 6, marginTop: 2 }}>
+                    <span style={{ color: "var(--sil)" }}>Live session data</span>
+                    <span style={{ color: "var(--sil)", fontSize: 10 }}>endpoint pending</span>
+                  </div>
                 </div>
               </Card>
             </div>
@@ -444,69 +449,79 @@ export default function Security() {
         {tab === "charts" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div className="g2">
+              {/* User status breakdown chart — derived from live /users data */}
               <BarChartCard
-                title="Login Activity (Last 7 Days)"
-                data={loginActivityData}
-                xKey="day"
+                title="User Account Status (Live)"
+                data={[
+                  { status: "Active",  count: activeUsers,  locked: 0 },
+                  { status: "Locked",  count: 0,            locked: lockedCount },
+                  { status: "MFA On",  count: mfaCount,     locked: 0 },
+                  { status: "MFA Off", count: users.length - mfaCount, locked: 0 },
+                ]}
+                xKey="status"
                 bars={[
-                  { key: "logins", name: "Successful Logins", color: "var(--G)" },
-                  { key: "failed", name: "Failed Logins",     color: "var(--R)" },
+                  { key: "count",  name: "Users",  color: "var(--G)" },
+                  { key: "locked", name: "Locked", color: "var(--R)" },
                 ]}
                 height={220}
               />
+              {/* Role user-count donut — computed from users API (roles field if present) */}
               <DonutChartCard
-                title="Permission Coverage by Role"
-                data={[
-                  { name: "CDO",         value: 100, color: "var(--gold2)" },
-                  { name: "Supervisor",  value: 40,  color: "var(--W)" },
-                  { name: "Maker",       value: 25,  color: "var(--B)" },
-                  { name: "Checker",     value: 20,  color: "var(--G)" },
-                  { name: "Indexer",     value: 12,  color: "var(--B)" },
-                  { name: "Viewer",      value: 5,   color: "var(--P)" },
-                  { name: "Auditor",     value: 15,  color: "var(--P)" },
-                ]}
+                title="Users by Role"
+                data={(() => {
+                  const ROLES = [
+                    { name: "CDO",        color: "var(--gold2)" },
+                    { name: "Supervisor", color: "var(--W)" },
+                    { name: "Maker",      color: "var(--B)" },
+                    { name: "Checker",    color: "var(--G)" },
+                    { name: "Indexer",    color: "var(--B)" },
+                    { name: "Viewer",     color: "var(--P)" },
+                    { name: "Auditor",    color: "var(--P)" },
+                  ];
+                  const counts = ROLES.map((r) => ({
+                    name: r.name,
+                    value: users.filter((u) => (u as any).roles?.includes?.(r.name)).length,
+                    color: r.color,
+                  })).filter((d) => d.value > 0);
+                  // If no roles field is returned by the API, show total by status instead
+                  if (counts.length === 0 && users.length > 0) {
+                    return [
+                      { name: "Active",  value: activeUsers,  color: "var(--G)" },
+                      { name: "Locked",  value: lockedCount,  color: "var(--R)" },
+                    ].filter((d) => d.value > 0);
+                  }
+                  return counts;
+                })()}
                 height={220}
               />
             </div>
             <div className="g2">
               <Card title="Recent Security Events">
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {[
-                    { time: "10:42", event: "USER_CREATE",  actor: "admin",  entity: "user/maker_99",    severity: "info"    },
-                    { time: "09:18", event: "USER_LOCK",    actor: "admin",  entity: "user/viewer_44",   severity: "warning" },
-                    { time: "08:55", event: "LOGIN",        actor: "cdo_01", entity: "auth",             severity: "info"    },
-                    { time: "08:31", event: "USER_ROLES",   actor: "admin",  entity: "user/indexer_12",  severity: "info"    },
-                    { time: "08:07", event: "LOGIN_FAILED", actor: "unknown",entity: "auth",             severity: "danger"  },
-                    { time: "07:44", event: "LOGIN_FAILED", actor: "unknown",entity: "auth",             severity: "danger"  },
-                    { time: "07:20", event: "LOGIN",        actor: "maker_01",entity: "auth",            severity: "info"    },
-                  ].map((ev) => (
-                    <div key={`${ev.time}-${ev.event}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "var(--gr)", border: "1px solid var(--bd)", borderRadius: 6 }}>
-                      <StatusDot color={ev.severity === "danger" ? "red" : ev.severity === "warning" ? "amber" : "green"} />
-                      <span style={{ fontSize: 10, color: "var(--sil)", width: 36, flexShrink: 0 }}>{ev.time}</span>
-                      <Tag variant={ev.severity === "danger" ? "red" : ev.severity === "warning" ? "amber" : "blue"} style={{ fontSize: 10 }}>{ev.event}</Tag>
-                      <span style={{ fontSize: 11, flex: 1 }}>
-                        <strong>{ev.actor}</strong> → <span style={{ color: "var(--sil)" }}>{ev.entity}</span>
-                      </span>
-                    </div>
-                  ))}
+                <div style={{ color: "var(--sil)", fontSize: 12, padding: "12px 0", textAlign: "center" }}>
+                  <div style={{ marginBottom: 6 }}>Audit log endpoint not yet exposed.</div>
+                  <div style={{ fontSize: 11 }}>
+                    Events are written to <code>audit_log</code> table on the gateway service.
+                    A <code>GET /audit-log</code> route is needed to surface live data here.
+                  </div>
                 </div>
               </Card>
               <Card title="Threat Intelligence">
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {[
-                    { label: "Blocked IPs (24h)",     value: "3",    color: "var(--R)" },
-                    { label: "Failed Login Attempts",  value: "7",    color: "var(--W)" },
-                    { label: "Suspicious API Calls",   value: "2",    color: "var(--W)" },
-                    { label: "Brute-force Attempts",   value: "1",    color: "var(--R)" },
-                    { label: "MFA Bypass Attempts",    value: "0",    color: "var(--G)" },
-                    { label: "Privilege Escalations",  value: "0",    color: "var(--G)" },
-                    { label: "Data Exfil Attempts",    value: "0",    color: "var(--G)" },
-                  ].map((item) => (
-                    <div key={item.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--bd)" }}>
-                      <span style={{ fontSize: 12, color: "var(--mist)" }}>{item.label}</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{item.value}</span>
-                    </div>
-                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--bd)" }}>
+                    <span style={{ fontSize: 12, color: "var(--mist)" }}>Locked Accounts</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: lockedCount > 0 ? "var(--R)" : "var(--G)" }}>{loading ? "…" : lockedCount}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--bd)" }}>
+                    <span style={{ fontSize: 12, color: "var(--mist)" }}>MFA Not Enrolled</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: (users.length - mfaCount) > 0 ? "var(--W)" : "var(--G)" }}>{loading ? "…" : users.length - mfaCount}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--bd)" }}>
+                    <span style={{ fontSize: 12, color: "var(--mist)" }}>MFA Secured</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "var(--G)" }}>{loading ? "…" : mfaCount}</span>
+                  </div>
+                  <div style={{ padding: "6px 0", fontSize: 10, color: "var(--sil)", borderTop: "1px solid var(--bd)", marginTop: 2 }}>
+                    IP-block, login-fail, and brute-force counts require the audit log endpoint.
+                  </div>
                 </div>
               </Card>
             </div>

@@ -711,7 +711,7 @@ export default function Alerts() {
           aria-label="Access denied"
         >
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Access Denied</div>
-          <div style={{ fontSize: 12, color: "var(--fg)" }}>
+          <div style={{ fontSize: 12, color: "var(--mist)" }}>
             You do not have permission to view alerts. Contact your administrator to request{" "}
             <code>alert:read</code> access.
           </div>

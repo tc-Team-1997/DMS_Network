@@ -112,7 +112,7 @@ export function ComplianceAudit() {
   const donutData = scorecard
     ? [
         { name: "Compliant", value: scorecard.score, color: "var(--G)" },
-        { name: "Gap", value: 100 - scorecard.score, color: "rgba(255,255,255,0.07)" },
+        { name: "Gap", value: 100 - scorecard.score, color: "rgba(15,23,42,.08)" },
       ]
     : [];
 
@@ -143,7 +143,7 @@ export function ComplianceAudit() {
             width: 24, height: 24, borderRadius: "50%",
             background: "linear-gradient(135deg,var(--navy),var(--gold2))",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 9, fontWeight: 700, flexShrink: 0,
+            fontSize: 9, fontWeight: 700, flexShrink: 0, color: "#fff",
           }}>
             {(r.actor_username ?? "SY").slice(0, 2).toUpperCase()}
           </span>

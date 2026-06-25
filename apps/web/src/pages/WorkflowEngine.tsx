@@ -638,8 +638,8 @@ export default function WorkflowEngine() {
           style={{ marginBottom: 14 }}
         >
           <div style={{
-            background: "rgba(255,255,255,.02)",
-            border: "1px dashed rgba(255,255,255,.08)",
+            background: "rgba(15,23,42,.03)",
+            border: "1px dashed rgba(15,23,42,.12)",
             borderRadius: 8, padding: 20,
           }}>
             <SelectedWorkflowBuilder workflowId={selected.id} />

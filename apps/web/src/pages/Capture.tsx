@@ -1,9 +1,8 @@
-import { useState, useRef, type FormEvent, type DragEvent } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   KpiCard,
   Card,
-  DataTable,
   Tag,
   Modal,
   FormField,
@@ -33,13 +32,18 @@ const STATUS_TAG: Record<QueueFile["status"], { label: string; variant: "green" 
   error: { label: "Error", variant: "red" },
 };
 
-/* ─── Ingestion channel stats (today) ─── */
-const CHANNEL_DATA = [
-  { channel: "Branch Scanners", docs: 24841 },
-  { channel: "Portal Upload", docs: 10247 },
-  { channel: "Email (SMTP)", docs: 4921 },
-  { channel: "API Push", docs: 2862 },
-];
+/* ─── Map source_channel DB values to human-readable labels ─── */
+const CHANNEL_LABELS: Record<string, string> = {
+  SCAN: "Branch Scanners",
+  UPLOAD: "Portal Upload",
+  EMAIL: "Email (SMTP)",
+  API: "API Push",
+  BULK: "Bulk Import",
+};
+
+function channelLabel(ch: string): string {
+  return CHANNEL_LABELS[ch] ?? ch;
+}
 
 const TABS: TabItem[] = [
   { key: "scanner", label: "Scanner (WIA/TWAIN)" },
@@ -90,6 +94,43 @@ export default function Capture() {
   const [tab, setTab] = useState("upload");
   const [queue, setQueue] = useState<QueueFile[]>([]);
   const [dragging, setDragging] = useState(false);
+
+  /* API-driven ingestion stats */
+  const [allDocs, setAllDocs] = useState<DocumentRecord[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const loadStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const res = await dashboardCaptureApi.listDocuments();
+      setAllDocs(Array.isArray(res.documents) ? res.documents : []);
+    } catch {
+      // Stats are non-critical; silently fail, keep empty array
+      setAllDocs([]);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  /* Compute channel breakdown from document source_channel */
+  const safeAllDocs = Array.isArray(allDocs) ? allDocs : [];
+  const channelData = useMemo(() => {
+    const docs = Array.isArray(allDocs) ? allDocs : [];
+    const counts: Record<string, number> = {};
+    for (const d of docs) {
+      const ch = d.source_channel ?? "UPLOAD";
+      counts[ch] = (counts[ch] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([ch, docCount]) => ({ channel: channelLabel(ch), docs: docCount }));
+  }, [allDocs]);
+
+  const totalIngested = safeAllDocs.length;
+  const scannerCount = safeAllDocs.filter((d) => d.source_channel === "SCAN").length;
+  const portalCount = safeAllDocs.filter((d) => d.source_channel === "UPLOAD" || d.source_channel === "PORTAL").length;
 
   /* single-file modal */
   const [showModal, setShowModal] = useState(false);
@@ -202,9 +243,9 @@ export default function Capture() {
 
       {/* ── KPI Row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
-        <KpiCard label="Today Total Ingested" value="42,871" sub={<span style={{ color: "var(--G)" }}>Avg cycle 3.8s</span>} variant="gold" />
-        <KpiCard label="Branch Scanners" value="24,841" sub="82% of daily volume" variant="blue" />
-        <KpiCard label="Customer Portal" value="10,247" sub="Online submissions" variant="green" />
+        <KpiCard label="Today Total Ingested" value={statsLoading ? "…" : totalIngested.toLocaleString()} sub={<span style={{ color: "var(--G)" }}>Avg cycle 3.8s</span>} variant="gold" />
+        <KpiCard label="Branch Scanners" value={statsLoading ? "…" : scannerCount.toLocaleString()} sub={totalIngested > 0 ? `${Math.round((scannerCount / totalIngested) * 100)}% of total` : "No data yet"} variant="blue" />
+        <KpiCard label="Portal / Upload" value={statsLoading ? "…" : portalCount.toLocaleString()} sub="Online submissions" variant="green" />
         <KpiCard label="Queue Size" value={queue.length.toString()} sub={`${queue.filter((i) => i.status === "ready").length} ready to submit`} variant="amber" />
       </div>
 
@@ -260,13 +301,19 @@ export default function Capture() {
 
             {/* Channel stats */}
             <Card title="Today's Ingestion by Channel">
-              <BarChartCard
-                title=""
-                data={CHANNEL_DATA}
-                xKey="channel"
-                bars={[{ key: "docs", color: "#b8912a", name: "Documents" }]}
-                height={140}
-              />
+              {statsLoading ? (
+                <div style={{ padding: "20px 0", textAlign: "center", color: "var(--sil)", fontSize: 12 }}>Loading…</div>
+              ) : channelData.length === 0 ? (
+                <div style={{ padding: "20px 0", textAlign: "center", color: "var(--sil)", fontSize: 12 }}>No ingestion data yet</div>
+              ) : (
+                <BarChartCard
+                  title=""
+                  data={channelData}
+                  xKey="channel"
+                  bars={[{ key: "docs", color: "#b8912a", name: "Documents" }]}
+                  height={140}
+                />
+              )}
             </Card>
           </div>
 
@@ -278,7 +325,7 @@ export default function Capture() {
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     onClick={clearDone}
-                    style={{ padding: "5px 10px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 6, fontSize: 10, color: "var(--sil)", cursor: "pointer" }}
+                    style={{ padding: "5px 10px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 6, fontSize: 10, color: "var(--sil)", cursor: "pointer" }}
                   >
                     Clear done
                   </button>
@@ -294,7 +341,7 @@ export default function Capture() {
                   {queue.map((item) => (
                     <div
                       key={item.id}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", background: "rgba(255,255,255,.03)", borderRadius: 7, marginBottom: 6 }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", background: "var(--ink3)", borderRadius: 7, marginBottom: 6 }}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={item.status === "error" ? "var(--R)" : item.status === "done" ? "var(--G)" : "var(--sil)"} strokeWidth="2">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -342,7 +389,7 @@ export default function Capture() {
                     </button>
                     <button
                       onClick={clearDone}
-                      style={{ padding: "9px 14px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}
+                      style={{ padding: "9px 14px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}
                     >
                       Clear Queue
                     </button>
@@ -411,10 +458,10 @@ export default function Capture() {
               <button style={{ flex: 1, padding: "9px 14px", background: "linear-gradient(135deg,#b8912a,#f0c84a)", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", color: "#050d1a" }}>
                 ▶ Start Scan
               </button>
-              <button style={{ padding: "9px 12px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
+              <button style={{ padding: "9px 12px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
                 Test Scanner
               </button>
-              <button style={{ padding: "9px 12px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
+              <button style={{ padding: "9px 12px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
                 Calibrate
               </button>
             </div>
@@ -429,7 +476,7 @@ export default function Capture() {
                 { label: "Paper Feeder", value: "Ready (50 sheets)", ok: true },
                 { label: "Connection", value: "USB 3.0 · Online", ok: true },
               ].map((row) => (
-                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", background: "rgba(255,255,255,.03)", borderRadius: 7, fontSize: 11 }}>
+                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", background: "var(--ink3)", borderRadius: 7, fontSize: 11 }}>
                   <span style={{ color: "var(--sil)" }}>{row.label}</span>
                   <span style={{ color: row.ok ? "var(--mist)" : "var(--R)" }}>{row.value}</span>
                 </div>
@@ -464,7 +511,7 @@ export default function Capture() {
               <button style={{ padding: "9px 14px", background: "linear-gradient(135deg,#b8912a,#f0c84a)", border: "none", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", color: "#050d1a" }}>
                 Save & Test
               </button>
-              <button style={{ padding: "9px 12px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
+              <button style={{ padding: "9px 12px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}>
                 Test Connection
               </button>
             </div>
@@ -491,7 +538,7 @@ export default function Capture() {
       {/* ── Add File Modal ── */}
       <Modal open={showModal} onClose={() => { setShowModal(false); setPendingFile(null); }} title="Configure Capture">
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 8, padding: "10px 12px", fontSize: 12 }}>
+          <div style={{ background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 8, padding: "10px 12px", fontSize: 12 }}>
             <div style={{ color: "var(--mist)", fontWeight: 600 }}>{pendingFile?.name}</div>
             <div style={{ color: "var(--sil)", fontSize: 11, marginTop: 2 }}>
               {pendingFile ? `${(pendingFile.size / 1024).toFixed(0)} KB · ${pendingFile.type || "unknown"}` : ""}
@@ -520,7 +567,7 @@ export default function Capture() {
             </button>
             <button
               onClick={() => { setShowModal(false); setPendingFile(null); }}
-              style={{ padding: "9px 14px", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.09)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}
+              style={{ padding: "9px 14px", background: "var(--ink3)", border: "1px solid var(--bd)", borderRadius: 7, fontSize: 11, color: "var(--mist)", cursor: "pointer" }}
             >
               Cancel
             </button>

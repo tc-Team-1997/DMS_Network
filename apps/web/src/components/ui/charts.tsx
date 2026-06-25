@@ -1,6 +1,6 @@
 /**
  * Chart wrapper components using recharts.
- * All inherit the ZorDMS v4.2 dark palette.
+ * All inherit the ZorDMS v4.2 light palette.
  */
 import {
   ResponsiveContainer,
@@ -21,7 +21,7 @@ const TOOLTIP_STYLE = {
 
 /* ───────── shared axis / grid props ───────── */
 const axisProps = { tick: { fill: "var(--sil)", fontSize: 10 }, axisLine: false, tickLine: false } as const;
-const gridProps = { stroke: "rgba(255,255,255,.06)", strokeDasharray: "3 3" } as const;
+const gridProps = { stroke: "rgba(15,23,42,.07)", strokeDasharray: "3 3" } as const;
 
 /* ──────────────────────────────────────────── */
 /* LINE CHART CARD                              */
@@ -29,7 +29,8 @@ const gridProps = { stroke: "rgba(255,255,255,.06)", strokeDasharray: "3 3" } as
 export interface LineChartCardProps {
   title:    ReactNode;
   action?:  ReactNode;
-  data:     Record<string, unknown>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data:     any[];
   /** key in data for X axis */
   xKey:     string;
   /** series definitions */
@@ -73,7 +74,8 @@ export function LineChartCard({
 export interface BarChartCardProps {
   title:    ReactNode;
   action?:  ReactNode;
-  data:     Record<string, unknown>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data:     any[];
   xKey:     string;
   bars:     { key: string; color?: string; name?: string }[];
   height?:  number;

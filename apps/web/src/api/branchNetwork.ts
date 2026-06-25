@@ -28,6 +28,13 @@ export interface BranchStats {
   offline: number;
 }
 
+/** Summary data from the dashboard endpoint — used for KPIs derived from the document corpus. */
+export interface NetworkSummary {
+  totalDocuments: number;
+  indexedToday: number;
+  pendingReview: number;
+}
+
 export async function fetchBranches(): Promise<Branch[]> {
   const data = await http.get<{ branches: Branch[] }>(`${SVC.core}/branches`);
   return data.branches;
@@ -36,6 +43,11 @@ export async function fetchBranches(): Promise<Branch[]> {
 export async function fetchAccessPolicies(): Promise<BranchAccess[]> {
   const data = await http.get<{ policies: BranchAccess[] }>(`${SVC.core}/branches/access`);
   return data.policies;
+}
+
+/** Fetch network-level summary (documents indexed today, totals) from the core dashboard endpoint. */
+export async function fetchNetworkSummary(): Promise<NetworkSummary> {
+  return http.get<NetworkSummary>(`${SVC.core}/dashboard/summary`);
 }
 
 export async function createBranch(payload: {

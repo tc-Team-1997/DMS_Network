@@ -169,7 +169,7 @@ function PreviewPanel({ doc, versions, onViewInViewer, canDelete, onDelete }: Pr
         ["Source", doc.source_channel],
         ["Review Flag", doc.review_flag ? "Yes" : "No"],
       ].map(([label, value]) => (
-        <div key={label} style={{ display: "flex", justifyContent: "space-between", paddingBottom: 4, borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+        <div key={label} style={{ display: "flex", justifyContent: "space-between", paddingBottom: 4, borderBottom: "1px solid var(--bd)" }}>
           <span style={{ color: "var(--sil)" }}>{label}</span>
           <span style={{ color: doc.review_flag && label === "Review Flag" ? "var(--W)" : "var(--mist)" }}>{value}</span>
         </div>
@@ -588,7 +588,7 @@ export default function Repository() {
 
       {/* ── Browse Tab ── */}
       {tab === "browse" && (
-        <div className="g3c">
+        <div style={{ display: "grid", gridTemplateColumns: "220px 1fr 260px", gap: 14 }}>
           {/* Folder Tree Panel */}
           <Card title="Folder Structure" style={{ padding: 12 }}>
             {!canFolderRead ? (
@@ -641,7 +641,7 @@ export default function Repository() {
                   onChange={(e) => setFilterText(e.target.value)}
                   placeholder="Search…"
                   style={{
-                    background: "rgba(255,255,255,.05)",
+                    background: "rgba(15,23,42,.04)",
                     border: "1px solid var(--bd)",
                     borderRadius: 6,
                     padding: "4px 10px",
@@ -812,7 +812,7 @@ export default function Repository() {
             <label style={{ display: "block", fontSize: 10.5, color: "var(--sil)", marginBottom: 4 }}>File</label>
             <input
               type="file"
-              style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 7, padding: "8px 12px", fontSize: 12, color: "var(--wh)", width: "100%" }}
+              style={{ background: "rgba(15,23,42,.03)", border: "1px solid var(--bd)", borderRadius: 7, padding: "8px 12px", fontSize: 12, color: "var(--wh)", width: "100%" }}
               onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
               aria-label="file"
             />

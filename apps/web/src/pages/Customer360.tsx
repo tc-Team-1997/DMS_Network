@@ -42,7 +42,7 @@ function KycRing({ pct }: { pct: number }) {
   return (
     <div style={{ position: "relative", width: 68, height: 68, flexShrink: 0 }}>
       <svg width="68" height="68" viewBox="0 0 68 68">
-        <circle cx="34" cy="34" r={r} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="6" />
+        <circle cx="34" cy="34" r={r} fill="none" stroke="rgba(15,23,42,.08)" strokeWidth="6" />
         <circle
           cx="34" cy="34" r={r} fill="none"
           stroke="var(--gold2)" strokeWidth="6"

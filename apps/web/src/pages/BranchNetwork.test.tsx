@@ -35,6 +35,11 @@ vi.mock("../api/branchNetwork.js", () => ({
     { id: 1, source_branch: "THI001", target_branch: "PAR002", policy: "read",  created_at: "2026-01-01" },
     { id: 2, source_branch: "PAR002", target_branch: "THI001", policy: "write", created_at: "2026-01-02" },
   ]),
+  fetchNetworkSummary: vi.fn().mockResolvedValue({
+    totalDocuments: 48210,
+    indexedToday: 312,
+    pendingReview: 7,
+  }),
   createBranch: vi.fn().mockResolvedValue({ id: 4, code: "NEW004", name: "New Branch", status: "Active", replication_mode: "async" }),
   setAccessPolicy: vi.fn().mockResolvedValue({ id: 3, source_branch: "NEW004", target_branch: "THI001", policy: "read" }),
 }));

@@ -130,7 +130,7 @@ export function SystemAdministration() {
         const pct = Math.min(100, r.latency_ms > 0 ? Math.min(r.latency_ms / 10, 100) : 0);
         const barColor = pct > 80 ? "var(--R)" : pct > 50 ? "var(--W)" : "var(--G)";
         return (
-          <div style={{ background: "rgba(255,255,255,.07)", borderRadius: 3, height: 6, overflow: "hidden" }}>
+          <div style={{ background: "rgba(15,23,42,.06)", borderRadius: 3, height: 6, overflow: "hidden" }}>
             <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: 3, minWidth: pct > 0 ? 4 : 0 }} />
           </div>
         );

@@ -4,8 +4,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import AiEngine from "./AiEngine.js";
-// Import bandFor directly from source module — not via ConfidenceBadge re-export chain (I-6).
-import { bandFor } from "../api/aiEngine.js";
+// Import bandFor and derivethroughputSeries directly from source module (I-6).
+import { bandFor, derivethroughputSeries } from "../api/aiEngine.js";
 import * as aiApi from "../api/aiEngine.js";
 
 /* ── Polyfill ResizeObserver (recharts uses it in jsdom) ── */
@@ -399,5 +399,70 @@ describe("AiEngine screen", () => {
         "P<BWAD0E2810896<<<<<<<<<<<<<<<<<<<5011095M3312272BWA<<<<<<<<<0",
       );
     });
+  });
+
+  it("shows live metrics and SLO rows in status tab derived from API stats (not hardcoded)", async () => {
+    render(<AiEngine />);
+    await waitFor(() => expect(screen.getByText("AI Processing Engine")).toBeInTheDocument());
+
+    // Switch to status tab
+    const statusTab = screen.getByRole("button", { name: /engine status/i });
+    await act(async () => { fireEvent.click(statusTab); });
+
+    await waitFor(() => {
+      // Throughput from mock: 840 pages/hr → should appear in the live metrics card
+      expect(screen.getByText("840 pages")).toBeInTheDocument();
+    });
+
+    // Stats-derived SLO: classifier_p95_ms=620 should appear as "620 ms"
+    await waitFor(() => {
+      expect(screen.getByText("620 ms")).toBeInTheDocument();
+    });
+
+    // SLO for extractor: extractor_p95_ms=4100 → "4.1 s"
+    expect(screen.getByText("4.1 s")).toBeInTheDocument();
+  });
+});
+
+/* ════════════════════════════════════════════════
+   derivethroughputSeries unit tests
+═════════════════════════════════════════════════= */
+describe("derivethroughputSeries", () => {
+  const MOCK_STATS: aiApi.AiStats = {
+    queue_size: 100,
+    processed_today: 5000,
+    avg_confidence: 0.93,
+    manual_review_count: 12,
+    throughput_per_hour: 800,
+    avg_processing_ms: 3500,
+    classifier_p95_ms: 620,
+    extractor_p95_ms: 4000,
+  };
+
+  it("returns 8 data points", () => {
+    const series = derivethroughputSeries(MOCK_STATS);
+    expect(series).toHaveLength(8);
+  });
+
+  it("each point has a time string and pages number", () => {
+    const series = derivethroughputSeries(MOCK_STATS);
+    for (const pt of series) {
+      expect(typeof pt.time).toBe("string");
+      expect(typeof pt.pages).toBe("number");
+      expect(pt.pages).toBeGreaterThan(0);
+    }
+  });
+
+  it("pages values vary around throughput_per_hour (not all identical)", () => {
+    const series = derivethroughputSeries(MOCK_STATS);
+    const unique = new Set(series.map((p) => p.pages));
+    expect(unique.size).toBeGreaterThan(1);
+  });
+
+  it("highest pages value equals throughput_per_hour × peak factor (rounded)", () => {
+    const series = derivethroughputSeries(MOCK_STATS);
+    const maxPages = Math.max(...series.map((p) => p.pages));
+    // Peak factor is 1.05 for index 6 (14:00 slot)
+    expect(maxPages).toBe(Math.round(800 * 1.05));
   });
 });
