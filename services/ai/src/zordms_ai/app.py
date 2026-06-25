@@ -7,6 +7,7 @@ from zordms_ai.api.idp import idp_router
 from zordms_ai.api.ocr import ocr_router
 from zordms_ai.api.review import review_router
 from zordms_ai.classify.classifier import Classifier
+from zordms_ai.classify.field_inference import FieldInferer
 from zordms_ai.db import Base, make_engine, make_session_factory
 from zordms_ai.extract.extractor import Extractor
 from zordms_ai.inference.ollama_adapter import OllamaVisionAdapter
@@ -70,12 +71,19 @@ def make_components(settings: Settings):
     classifier = Classifier(vision_client, settings.ollama_vlm_model if isinstance(vision_client, OllamaVisionAdapter) else settings.classifier_model)
     extractor = Extractor(vision_client, settings.ollama_vlm_model if isinstance(vision_client, OllamaVisionAdapter) else settings.extractor_model)
     orchestrator = Orchestrator(classifier, extractor, session_factory)
+    field_inferer = FieldInferer(
+        vision_client,
+        settings.ollama_vlm_model
+        if isinstance(vision_client, OllamaVisionAdapter)
+        else settings.extractor_model,
+    )
     return {
         "vllm": vision_client,
         "session_factory": session_factory,
         "classifier": classifier,
         "extractor": extractor,
         "orchestrator": orchestrator,
+        "field_inferer": field_inferer,
     }
 
 

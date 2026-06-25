@@ -12,6 +12,7 @@ import type {
   DedupConfig,
 } from "../api/systemAdministration.js";
 import { useUrlState } from "../hooks/useUrlState.js";
+import { DocTypesPanel } from "../components/doctypes/DocTypesPanel.js";
 
 /* ─── helpers ─── */
 function healthVariant(s: ServiceHealth["status"]): "green" | "amber" | "red" {
@@ -35,6 +36,7 @@ const TABS = [
   { key: "dr", label: "Disaster Recovery" },
   { key: "schedules", label: "Backup & Maintenance" },
   { key: "dedup", label: "Duplicate Detection" },
+  { key: "doctypes", label: "Document Types" },
 ];
 
 type HealthRow = ServiceHealth & { _key: string };
@@ -43,6 +45,10 @@ type ScheduleRow = ScheduleEntry & { _key: string };
 export function SystemAdministration() {
   const { user } = useAuth();
   const canAdmin = Boolean(user?.permissions.includes("admin:access"));
+  // `doctype:write` (P5) gates create/edit/delete of document types; CDO has all perms.
+  const canWriteDocTypes = Boolean(
+    user?.permissions.includes("doctype:write") || user?.permissions.includes("admin:access"),
+  );
 
   /* ─── Pattern 2: URL-driven tab selection ─── */
   const [urlState, setUrlState] = useUrlState({
@@ -674,6 +680,11 @@ export function SystemAdministration() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* ═══ DOCUMENT TYPES TAB ═══ */}
+      {tab === "doctypes" && (
+        <DocTypesPanel canWrite={canWriteDocTypes} />
       )}
     </div>
   );

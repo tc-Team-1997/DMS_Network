@@ -1,5 +1,6 @@
 import type { Knex } from "knex";
 import { newId } from "@zordms/db";
+import { fieldObjectsForType } from "../catalog/quality.js";
 
 /**
  * Seed: populate doc_type_registry with the canonical IDP types.
@@ -52,9 +53,18 @@ const REGISTRY_ROWS: DocTypeRow[] = [
 
 export async function seed(knex: Knex): Promise<void> {
   for (const row of REGISTRY_ROWS) {
+    const { mandatoryFields, optionalFields } = fieldObjectsForType(row.code, row.category);
+    const fieldCols = {
+      mandatory_fields: JSON.stringify(mandatoryFields),
+      optional_fields: JSON.stringify(optionalFields),
+    };
+
     const exists = await knex("doc_type_registry").where({ code: row.code }).first();
     if (!exists) {
-      await knex("doc_type_registry").insert({ id: newId(), ...row });
+      await knex("doc_type_registry").insert({ id: newId(), ...row, ...fieldCols });
+    } else if (exists.mandatory_fields == null && exists.optional_fields == null) {
+      // Backfill stored field schemas onto rows seeded before the columns existed.
+      await knex("doc_type_registry").where({ code: row.code }).update(fieldCols);
     }
   }
 }

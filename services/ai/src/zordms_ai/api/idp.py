@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 
 from zordms_ai.auth import require_auth
+from zordms_ai.classify.field_inference import InferFieldsResult
 from zordms_ai.pipeline.preprocess import b64_png, to_page_images
 from zordms_ai.seeds import seed_review_queue
 
@@ -41,6 +42,52 @@ async def extract_endpoint(
         "partial": res.partial,
         "errors": res.errors,
     }
+
+
+@idp_router.post("/infer-fields")
+async def infer_fields_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+    doc_type_hint: str = Form(""),
+) -> dict:
+    """Propose a METADATA FIELD SCHEMA from a SAMPLE document.
+
+    An admin uploads a representative document (image or PDF) and the vision
+    model proposes the fields to capture for that doc type. The response always
+    has HTTP 200; if the backend is unavailable it returns an empty ``fields``
+    list with ``degraded: true`` and a human ``note`` rather than a 500.
+
+    Response shape::
+
+        {
+          "doc_type_hint": str | null,
+          "fields": [
+            {"name": str, "label": str, "type": "string|date|number|enum",
+             "mandatory": bool, "sample_value": str},
+            ...
+          ],
+          "degraded": bool,
+          "note": str | null
+        }
+    """
+    hint = doc_type_hint.strip() or None
+    raw = await file.read()
+    try:
+        image_b64 = b64_png(
+            to_page_images(raw, file.content_type or "image/png")[0]
+        )
+    except Exception:  # preprocess/backend deps unavailable — degrade, don't 500
+        return InferFieldsResult(
+            doc_type_hint=hint,
+            fields=[],
+            degraded=True,
+            note="Could not read the sample document. Upload a valid image or PDF.",
+        ).model_dump()
+
+    result = await request.app.state.field_inferer.infer(
+        image_b64=image_b64, doc_type_hint=hint
+    )
+    return result.model_dump()
 
 
 @idp_router.post("/seed")

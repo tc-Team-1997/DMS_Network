@@ -86,14 +86,17 @@ describe("GET /doc-types field schema", () => {
 
     const cid = res.body.docTypes.find((d: any) => d.code === "BT_CID_4G");
     expect(cid).toBeDefined();
+    // Field schemas are field-objects: { name, type?, mandatory }
+    const cidMandatory = cid.mandatoryFields.map((f: any) => f.name);
     // KYC / Identity mandatory: full_name, dob, expiry_date
-    expect(cid.mandatoryFields).toContain("full_name");
-    expect(cid.mandatoryFields).toContain("dob");
-    expect(cid.mandatoryFields).toContain("expiry_date");
+    expect(cidMandatory).toContain("full_name");
+    expect(cidMandatory).toContain("dob");
+    expect(cidMandatory).toContain("expiry_date");
     // Optional fields include per-type extras
     expect(Array.isArray(cid.optionalFields)).toBe(true);
     // cid and doc_no should appear in optionalFields (not mandatory for KYC)
-    expect(cid.optionalFields.some((f: string) => ["cid", "doc_no", "sex"].includes(f))).toBe(true);
+    const cidOptional = cid.optionalFields.map((f: any) => f.name);
+    expect(cidOptional.some((f: string) => ["cid", "doc_no", "sex"].includes(f))).toBe(true);
   });
 
   it("BOB_LOAN_APPLICATION has Loan & Credit mandatory fields", async () => {
@@ -104,10 +107,11 @@ describe("GET /doc-types field schema", () => {
 
     const loan = res.body.docTypes.find((d: any) => d.code === "BOB_LOAN_APPLICATION");
     expect(loan).toBeDefined();
-    expect(loan.mandatoryFields).toContain("application_no");
-    expect(loan.mandatoryFields).toContain("applicant_cid");
-    expect(loan.mandatoryFields).toContain("loan_type");
-    expect(loan.mandatoryFields).toContain("loan_amount");
+    const loanMandatory = loan.mandatoryFields.map((f: any) => f.name);
+    expect(loanMandatory).toContain("application_no");
+    expect(loanMandatory).toContain("applicant_cid");
+    expect(loanMandatory).toContain("loan_type");
+    expect(loanMandatory).toContain("loan_amount");
   });
 
   it("no field appears in both mandatoryFields and optionalFields for same type", async () => {
@@ -117,8 +121,8 @@ describe("GET /doc-types field schema", () => {
       .set("Authorization", `Bearer ${token}`);
 
     for (const dt of res.body.docTypes) {
-      const mandatorySet = new Set(dt.mandatoryFields as string[]);
-      const overlap = (dt.optionalFields as string[]).filter((f: string) => mandatorySet.has(f));
+      const mandatorySet = new Set((dt.mandatoryFields as any[]).map((f) => f.name));
+      const overlap = (dt.optionalFields as any[]).map((f) => f.name).filter((f: string) => mandatorySet.has(f));
       expect(overlap).toEqual([]);
     }
   });

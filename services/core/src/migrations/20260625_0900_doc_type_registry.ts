@@ -16,7 +16,12 @@ export async function up(knex: Knex): Promise<void> {
     t.string("issuer", 120).notNullable().defaultTo("Unknown");
     t.string("category", 80);          // catalog category hint
     t.boolean("system").notNullable().defaultTo(true);  // false = user-created
+    // Per-type metadata field schemas — JSON arrays of field-objects { name, type?, mandatory }
+    // Stored (not derived) so they are admin-editable; seeded from the derived maps.
+    t.text("mandatory_fields");        // JSON array of field-objects
+    t.text("optional_fields");         // JSON array of field-objects
     t.timestamp("created_at").defaultTo(knex.fn.now());
+    t.timestamp("updated_at");
   });
 
   // ── extraction_status on documents ─────────────────────────────────────────

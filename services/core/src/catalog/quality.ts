@@ -72,6 +72,46 @@ export function fieldSchemaForType(
 }
 
 /**
+ * A single metadata field definition as stored on a doc type and consumed by
+ * the UI / AI agent.
+ *   - name:      field key (e.g. "full_name")
+ *   - type:      optional UI hint ("string" | "date" | "number" | ...)
+ *   - mandatory: whether the field is required for this doc type
+ */
+export interface FieldObject {
+  name: string;
+  type?: string;
+  mandatory: boolean;
+}
+
+/**
+ * Lightweight type inference from a field name, used only to seed a sensible
+ * default `type` hint on the stored field-objects. Best-effort; editable later.
+ */
+export function inferFieldType(name: string): string {
+  const n = name.toLowerCase();
+  if (/(date|_at|expiry|dob|start|end)/.test(n)) return "date";
+  if (/(amount|count|no$|_no|number|value|salary|area|grade)/.test(n)) return "number";
+  return "string";
+}
+
+/**
+ * Returns the derived field schema for a doc type as field-objects
+ * ({ name, type?, mandatory }). Used as the SEED source for the stored
+ * mandatory_fields / optional_fields columns so behavior is unchanged.
+ */
+export function fieldObjectsForType(
+  docType: string,
+  category: string | null | undefined,
+): { mandatoryFields: FieldObject[]; optionalFields: FieldObject[] } {
+  const { mandatoryFields, optionalFields } = fieldSchemaForType(docType, category);
+  return {
+    mandatoryFields: mandatoryFields.map((name) => ({ name, type: inferFieldType(name), mandatory: true })),
+    optionalFields: optionalFields.map((name) => ({ name, type: inferFieldType(name), mandatory: false })),
+  };
+}
+
+/**
  * Compute quality score for a document given its extracted fields and category.
  */
 export function computeQuality(
