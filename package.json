@@ -2,12 +2,16 @@
   "name": "zordms",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "dev": "bash scripts/dev.sh"
+    "dev": "bash start.sh",
+    "stop": "bash stop.sh",
+    "restart": "bash restart.sh"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

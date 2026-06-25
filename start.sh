@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+#
+# Start the full ZorDMS dev stack on SQLite (no external Postgres/Oracle needed).
+# Frees the ports first, then launches every service + the web app in the
+# background, writes logs to .devlogs/, and waits until the gateway + web are up.
+#
+#   gateway      :4000   login / users / authz            (REQUIRED for login)
+#   core         :4001   documents / repository / records / enterprise
+#   workflow     :4002   workflows / cases
+#   notify       :4003   alerts / realtime
+#   search       :4004   enterprise search
+#   integration  :4005   connectors / webhooks
+#   ai (python)  :8000   OCR / classification (started only if the venv exists)
+#   web          :5174   React app  ->  http://localhost:5174   (admin / admin123)
+#
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+LOGDIR="$ROOT/.devlogs"
+mkdir -p "$LOGDIR"
+
+# 1) Free the ports (idempotent start / restart).
+bash "$ROOT/stop.sh"
+
+# 2) Launch each Node service + the web app (DB_CLIENT=sqlite3 is baked into
+#    each service's `dev` script).
+echo "Starting ZorDMS dev stack..."
+start_node() {  # <label> <pnpm-filter>
+  echo "  -> $1"
+  pnpm --filter "$2" dev > "$LOGDIR/$1.log" 2>&1 &
+}
+start_node gateway     @zordms/gateway
+start_node core        @zordms/core
+start_node workflow    @zordms/workflow
+start_node notify      @zordms/notify
+start_node search      @zordms/search
+start_node integration @zordms/integration
+start_node web         @zordms/web
+
+# 3) Optional Python AI service (only if its venv has been set up).
+if [ -x "$ROOT/services/ai/.venv/bin/uvicorn" ]; then
+  echo "  -> ai (python)"
+  ( cd "$ROOT/services/ai" && exec .venv/bin/uvicorn app.main:app --port 8000 ) > "$LOGDIR/ai.log" 2>&1 &
+else
+  echo "  -> ai (python)  [skipped — run: cd services/ai && python3 -m venv .venv && .venv/bin/pip install -e '.[dev]']"
+fi
+
+# 4) Wait for the two things needed to log in.
+echo ""
+printf "Waiting for gateway + web"
+for _ in $(seq 1 40); do
+  if curl -fsS localhost:4000/health >/dev/null 2>&1 && curl -fsS localhost:5174 >/dev/null 2>&1; then
+    echo ""
+    echo "✅ ZorDMS is up:  http://localhost:5174   (sign in: admin / admin123)"
+    echo "   Logs:  $LOGDIR/<service>.log"
+    echo "   Stop:  ./stop.sh      Restart: ./restart.sh"
+    exit 0
+  fi
+  printf "."
+  sleep 1
+done
+
+echo ""
+echo "⚠️  gateway/web health check timed out. Check the logs:"
+echo "    tail -n 40 $LOGDIR/gateway.log"
+echo "    tail -n 40 $LOGDIR/web.log"
+exit 1

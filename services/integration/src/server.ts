@@ -17,5 +17,5 @@ const app = createApp({
   events,
   connectorFor: (system) => buildConnector(system, { knex }),
 });
-const port = Number(process.env.INTEGRATION_PORT ?? 4006);
+const port = Number(process.env.INTEGRATION_PORT ?? 4005);
 app.listen(port, () => console.log(`ZorDMS integration hub on :${port}`));

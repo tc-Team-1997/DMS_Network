@@ -34,3 +34,6 @@ dist/
 .turbo/
 *.local
 .env
+
+# local dev logs
+.devlogs/

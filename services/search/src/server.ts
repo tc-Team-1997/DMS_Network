@@ -11,5 +11,5 @@ await knex.seed.run();
 const backend = selectBackend(config, knex);
 const app = createApp({ knex, config, backend });
 await startIndexConsumer({ knex, backend }).catch((e) => console.error("consumer start failed", e));
-const port = Number(process.env.SEARCH_PORT ?? 4005);
+const port = Number(process.env.SEARCH_PORT ?? 4004);
 app.listen(port, () => console.log(`ZorDMS search (${backend.name}) on :${port}`));
