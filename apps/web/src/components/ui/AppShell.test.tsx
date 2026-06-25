@@ -5,7 +5,7 @@
  * can see a user with all permissions, making nav groups visible.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppShell } from "./AppShell.js";
 
@@ -88,14 +88,18 @@ describe("AppShell", () => {
     expect(document.querySelector(".usr-pill")).toBeNull();
   });
 
-  it("renders tooltip bubble spans for icon-only action buttons", () => {
+  it("shows a portal tooltip on hover of an icon-only action button", async () => {
     renderShell();
-    // Tooltip bubbles are aria-hidden visual aids; query by CSS class
-    const bubbles = document.querySelectorAll(".zor-tooltip-bubble");
-    const labels = Array.from(bubbles).map((b) => b.textContent ?? "");
-    expect(labels.some((l) => /sign out/i.test(l))).toBe(true);
-    expect(labels.some((l) => /alerts/i.test(l))).toBe(true);
-    expect(labels.some((l) => /compliance/i.test(l))).toBe(true);
+    const signOut = screen.getByRole("button", { name: /sign out/i });
+    const wrap = signOut.closest(".zor-tooltip-wrap");
+    expect(wrap).not.toBeNull();
+    fireEvent.mouseEnter(wrap as Element);
+    // The bubble appears (after the hover-intent delay) as a role=tooltip…
+    await waitFor(() =>
+      expect(screen.getByRole("tooltip")).toHaveTextContent(/sign out/i),
+    );
+    // …and is portaled to <body>, so it can't be clipped by the topbar.
+    expect(screen.getByRole("tooltip").parentElement).toBe(document.body);
   });
 
   it("sign-out button has aria-label 'Sign out'", () => {

@@ -1,18 +1,89 @@
 /**
- * Tooltip — lightweight hover tooltip wrapper for ZorDMS
+ * Tooltip — collision-aware hover/focus tooltip for ZorDMS.
  *
- * Renders children as-is; on hover shows a small floating label above them.
- * Uses CSS-only positioning (no portal, no third-party lib).
+ * Enterprise-grade behaviour:
+ *  - Rendered in a portal on <body> so it is NEVER clipped by an ancestor's
+ *    overflow:hidden / stacking context (e.g. the topbar or sidebar).
+ *  - Measured on open, then AUTO-POSITIONED: it tries the preferred side and
+ *    flips to the first side (top/bottom/right/left) that fits the viewport,
+ *    then clamps within the viewport so it can never run off-screen.
+ *  - Opens on hover AND keyboard focus; closes on leave/blur, on Escape, and
+ *    repositions on scroll/resize.
+ *  - The bubble is role="tooltip"; the wrapped control keeps its own
+ *    accessible name (aria-label).
  */
-import type { ReactNode, CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+
+type Side = "top" | "bottom" | "left" | "right";
 
 export interface TooltipProps {
-  /** Label shown on hover */
+  /** Label shown on hover/focus. */
   label: string;
-  /** The element(s) to wrap — typically an icon button */
+  /** The element(s) to wrap — typically an icon button. */
   children: ReactNode;
-  /** Optional placement override (default: "top") */
-  placement?: "top" | "bottom";
+  /** Preferred side; the tooltip auto-flips if it doesn't fit. Default "top". */
+  placement?: Side;
+  /** Hover-intent delay before showing (ms). Default 120. */
+  delay?: number;
+}
+
+const GAP = 8; // distance between trigger and bubble
+const MARGIN = 8; // min distance from the viewport edge
+
+/** Order in which sides are tried for each preferred side. */
+const FLIP_ORDER: Record<Side, Side[]> = {
+  top: ["top", "bottom", "right", "left"],
+  bottom: ["bottom", "top", "right", "left"],
+  left: ["left", "right", "top", "bottom"],
+  right: ["right", "left", "top", "bottom"],
+};
+
+function computePosition(
+  trigger: DOMRect,
+  tip: { width: number; height: number },
+  prefer: Side,
+): { top: number; left: number } {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  const fits = (s: Side): boolean => {
+    if (s === "top") return trigger.top - GAP - tip.height >= MARGIN;
+    if (s === "bottom") return trigger.bottom + GAP + tip.height <= vh - MARGIN;
+    if (s === "left") return trigger.left - GAP - tip.width >= MARGIN;
+    return trigger.right + GAP + tip.width <= vw - MARGIN; // right
+  };
+
+  const side = FLIP_ORDER[prefer].find(fits) ?? prefer;
+
+  let top = 0;
+  let left = 0;
+  if (side === "top") {
+    top = trigger.top - GAP - tip.height;
+    left = trigger.left + trigger.width / 2 - tip.width / 2;
+  } else if (side === "bottom") {
+    top = trigger.bottom + GAP;
+    left = trigger.left + trigger.width / 2 - tip.width / 2;
+  } else if (side === "left") {
+    left = trigger.left - GAP - tip.width;
+    top = trigger.top + trigger.height / 2 - tip.height / 2;
+  } else {
+    left = trigger.right + GAP;
+    top = trigger.top + trigger.height / 2 - tip.height / 2;
+  }
+
+  // Clamp inside the viewport so it can never run off-screen.
+  left = Math.min(Math.max(MARGIN, left), Math.max(MARGIN, vw - MARGIN - tip.width));
+  top = Math.min(Math.max(MARGIN, top), Math.max(MARGIN, vh - MARGIN - tip.height));
+  return { top, left };
 }
 
 const wrapStyle: CSSProperties = {
@@ -22,66 +93,96 @@ const wrapStyle: CSSProperties = {
   justifyContent: "center",
 };
 
-const tipStyle: CSSProperties = {
-  position: "absolute",
-  bottom: "calc(100% + 6px)",
-  left: "50%",
-  transform: "translateX(-50%)",
-  background: "rgba(10, 20, 40, 0.92)",
+const bubbleStyle: CSSProperties = {
+  position: "fixed",
+  zIndex: 99999,
+  background: "rgba(10, 20, 40, 0.94)",
   color: "#e8eaf0",
   fontSize: 11,
   fontWeight: 500,
   letterSpacing: "0.02em",
   whiteSpace: "nowrap",
-  padding: "3px 8px",
-  borderRadius: 4,
+  padding: "4px 9px",
+  borderRadius: 5,
+  boxShadow: "0 6px 18px rgba(0,0,0,.28)",
   pointerEvents: "none",
-  opacity: 0,
-  transition: "opacity 0.15s ease",
-  zIndex: 9999,
+  transition: "opacity .12s ease",
 };
 
-const tipStyleBottom: CSSProperties = {
-  ...tipStyle,
-  bottom: "auto",
-  top: "calc(100% + 6px)",
-};
+export function Tooltip({ label, children, placement = "top", delay = 120 }: TooltipProps) {
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
-/**
- * Hover tooltip wrapper.
- *
- * @example
- * <Tooltip label="Sign out">
- *   <button onClick={logout}><LogOut size={17} /></button>
- * </Tooltip>
- */
-export function Tooltip({ label, children, placement = "top" }: TooltipProps) {
-  const activeTipStyle = placement === "bottom" ? tipStyleBottom : tipStyle;
+  const hide = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    setOpen(false);
+    setCoords(null);
+  }, []);
+
+  const show = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setOpen(true), delay);
+  }, [delay]);
+
+  // Clean up any pending timer on unmount.
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  // Position once open (measure the rendered bubble), keep it in place on
+  // scroll/resize, and dismiss on Escape.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const t = triggerRef.current?.getBoundingClientRect();
+      const b = tipRef.current?.getBoundingClientRect();
+      if (!t || !b) return;
+      setCoords(computePosition(t, { width: b.width, height: b.height }, placement));
+    };
+    place();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") hide(); };
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, placement, hide]);
 
   return (
-    <span
-      style={wrapStyle}
-      className="zor-tooltip-wrap"
-      data-tip={label}
-      aria-label={label}
-    >
-      {children}
-      {/* The bubble — shown via CSS :hover on the wrapper */}
+    <>
       <span
-        className="zor-tooltip-bubble"
-        role="tooltip"
-        style={activeTipStyle}
-        aria-hidden="true"
+        ref={triggerRef}
+        style={wrapStyle}
+        className="zor-tooltip-wrap"
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
       >
-        {label}
+        {children}
       </span>
-
-      {/* Inject scoped style once — idempotent if multiple Tooltips render */}
-      <style>{`
-        .zor-tooltip-wrap:hover .zor-tooltip-bubble {
-          opacity: 1 !important;
-        }
-      `}</style>
-    </span>
+      {open &&
+        createPortal(
+          <div
+            ref={tipRef}
+            role="tooltip"
+            className="zor-tooltip-bubble"
+            style={{
+              ...bubbleStyle,
+              // Render off-screen for the first measuring pass, then snap in.
+              top: coords ? coords.top : -9999,
+              left: coords ? coords.left : -9999,
+              opacity: coords ? 1 : 0,
+            }}
+          >
+            {label}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
