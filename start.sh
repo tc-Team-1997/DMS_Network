@@ -44,7 +44,13 @@ start_node web         @zordms/web
 # 3) Optional Python AI service (only if its venv has been set up).
 if [ -x "$ROOT/services/ai/.venv/bin/uvicorn" ]; then
   echo "  -> ai (python)"
-  ( cd "$ROOT/services/ai" && exec env SEARCH_URL="http://localhost:4004" .venv/bin/uvicorn zordms_ai.app:create_app --factory --port 8000 ) > "$LOGDIR/ai.log" 2>&1 &
+  ( cd "$ROOT/services/ai" && exec env \
+      SEARCH_URL="http://localhost:4004" \
+      OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}" \
+      OLLAMA_VLM_MODEL="${OLLAMA_VLM_MODEL:-qwen2.5vl:7b}" \
+      OLLAMA_TEXT_MODEL="${OLLAMA_TEXT_MODEL:-granite3.3:8b}" \
+      AI_BACKEND="${AI_BACKEND:-auto}" \
+    .venv/bin/uvicorn zordms_ai.app:create_app --factory --port 8000 ) > "$LOGDIR/ai.log" 2>&1 &
 else
   echo "  -> ai (python)  [skipped — run: cd services/ai && python3 -m venv .venv && .venv/bin/pip install -e '.[dev]']"
 fi

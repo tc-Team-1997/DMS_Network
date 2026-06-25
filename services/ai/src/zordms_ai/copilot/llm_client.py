@@ -3,19 +3,22 @@
 Priority:
   1. Anthropic SDK  (if ANTHROPIC_API_KEY is set)
   2. OpenAI SDK     (if OPENAI_API_KEY is set)
-  3. Grounded-extractive fallback (always available — composes answer from snippets)
+  3. Ollama local   (if Ollama is available and no cloud key configured)
+  4. Grounded-extractive fallback (always available — composes answer from snippets)
 
-All three code paths return the same shape: (answer: str, model_label: str).
+All four code paths return the same shape: (answer: str, model_label: str).
 Citations are always sourced from the retrieved search hits — not hallucinated.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import textwrap
 from typing import Any
 
 from zordms_ai.copilot.search_client import SearchHit
+from zordms_ai.inference import ollama_client
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +164,46 @@ async def _openai_answer(
         return _extractive_answer(question, hits, False)
 
 
+# ─────────────────────────── Ollama ──────────────────────────────────────────
+
+async def _ollama_answer(
+    question: str,
+    history: list[dict[str, str]],
+    hits: list[SearchHit],
+    settings: Any,
+) -> tuple[str, str]:
+    """Generate an answer using the local Ollama text model."""
+    context_block = _build_context_block(hits)
+    system = _build_system_prompt(context_block)
+    # Build a single user prompt that includes conversation history
+    history_text = ""
+    for turn in history[-6:]:
+        role = turn.get("role", "user")
+        content = turn.get("content", "")
+        history_text += f"{role.capitalize()}: {content}\n"
+    prompt = f"{history_text}User: {question}" if history_text else question
+
+    base_url = getattr(settings, "ollama_base_url", "http://localhost:11434")
+    model = getattr(settings, "ollama_text_model", "granite3.3:8b")
+    timeout = getattr(settings, "ollama_timeout_s", 180.0)
+
+    try:
+        answer = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: ollama_client.text_complete(
+                prompt,
+                model=model,
+                base_url=base_url,
+                timeout=timeout,
+                system=system,
+            ),
+        )
+        return answer, f"ollama:{model}"
+    except Exception as exc:
+        logger.warning("Ollama text_complete error: %s", exc)
+        return _extractive_answer(question, hits, False)
+
+
 # ─────────────────────────── Public interface ─────────────────────────────────
 
 async def generate_answer(
@@ -173,8 +216,14 @@ async def generate_answer(
     """Generate a grounded answer.
 
     Returns ``(answer_text, model_label)`` where *model_label* identifies the
-    backend used (e.g. ``"anthropic/claude-haiku-4-5"`` or
-    ``"grounded-extractive-fallback"``).
+    backend used (e.g. ``"anthropic/claude-haiku-4-5"``,
+    ``"ollama:granite3.3:8b"``, or ``"grounded-extractive-fallback"``).
+
+    Priority:
+      1. Anthropic SDK  (if ANTHROPIC_API_KEY is set)
+      2. OpenAI SDK     (if OPENAI_API_KEY is set)
+      3. Ollama local   (if Ollama is available)
+      4. Grounded-extractive fallback
     """
     anthropic_key = getattr(settings, "anthropic_api_key", None) or os.environ.get("ANTHROPIC_API_KEY")
     openai_key = getattr(settings, "openai_api_key", None) or os.environ.get("OPENAI_API_KEY")
@@ -189,5 +238,10 @@ async def generate_answer(
         if not getattr(settings, "openai_api_key", None):
             settings = type("_S", (object,), dict(vars(settings), openai_api_key=openai_key))()
         return await _openai_answer(question, history, hits, settings)
+
+    # Check if Ollama is available (uses short timeout to avoid blocking)
+    ollama_url = getattr(settings, "ollama_base_url", "http://localhost:11434")
+    if ollama_client.is_available(ollama_url):
+        return await _ollama_answer(question, history, hits, settings)
 
     return _extractive_answer(question, hits, degraded)

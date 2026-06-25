@@ -17,6 +17,15 @@ from zordms_ai.settings import Settings
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
+@pytest.fixture(autouse=True)
+def _no_ambient_ollama():
+    """These tests cover the cloud/extractive paths; disable any locally-running
+    Ollama so results are deterministic regardless of the host. The dedicated
+    Ollama-path tests live in test_ollama_backend.py and patch this explicitly."""
+    with patch("zordms_ai.inference.ollama_client.is_available", return_value=False):
+        yield
+
+
 def _make_settings(**kwargs) -> Settings:
     defaults = dict(
         database_url="sqlite+pysqlite:///:memory:",

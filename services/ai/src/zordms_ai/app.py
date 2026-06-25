@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 
 from zordms_ai.api.copilot import copilot_router
@@ -7,11 +9,50 @@ from zordms_ai.api.review import review_router
 from zordms_ai.classify.classifier import Classifier
 from zordms_ai.db import Base, make_engine, make_session_factory
 from zordms_ai.extract.extractor import Extractor
+from zordms_ai.inference.ollama_adapter import OllamaVisionAdapter
+from zordms_ai.inference import ollama_client
 from zordms_ai.inference.vllm_client import VLLMClient
 from zordms_ai.pipeline.orchestrator import Orchestrator
 from zordms_ai.review import models as _review_models  # noqa: F401 — registers ReviewItem with Base
 from zordms_ai.seeds import seed_review_queue
 from zordms_ai.settings import Settings, get_settings
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_vision_client(settings: Settings):
+    """Return the vision inference client based on AI_BACKEND resolution.
+
+    Resolution order for "auto":
+      1. If Ollama is reachable -> OllamaVisionAdapter
+      2. Otherwise -> VLLMClient (existing path)
+
+    For "ollama"  -> always OllamaVisionAdapter
+    For "vllm"    -> always VLLMClient
+    For "mock"    -> VLLMClient pointing at vllm_base_url (tests mock HTTP)
+    """
+    backend = settings.ai_backend
+
+    if backend == "ollama" or (
+        backend == "auto"
+        and ollama_client.is_available(settings.ollama_base_url)
+    ):
+        logger.info(
+            "AI backend: ollama (model=%s, url=%s)",
+            settings.ollama_vlm_model,
+            settings.ollama_base_url,
+        )
+        return OllamaVisionAdapter(
+            base_url=settings.ollama_base_url,
+            vlm_model=settings.ollama_vlm_model,
+            timeout_s=settings.ollama_timeout_s,
+        )
+
+    logger.info(
+        "AI backend: vllm (url=%s)",
+        settings.vllm_base_url,
+    )
+    return VLLMClient(settings.vllm_base_url, settings.vllm_api_key, settings.request_timeout_s)
 
 
 def make_components(settings: Settings):
@@ -22,12 +63,15 @@ def make_components(settings: Settings):
     # every startup.  The call is idempotent — rows are only inserted when
     # none of the seed doc_ids already exist in the table.
     seed_review_queue(session_factory)
-    vllm = VLLMClient(settings.vllm_base_url, settings.vllm_api_key, settings.request_timeout_s)
-    classifier = Classifier(vllm, settings.classifier_model)
-    extractor = Extractor(vllm, settings.extractor_model)
+    vision_client = _resolve_vision_client(settings)
+    # Classifier uses the VLM model; pass the resolved model name for Ollama,
+    # or the existing classifier_model for vLLM (VLLMClient ignores the model
+    # field on the adapter — it's embedded in OllamaVisionAdapter).
+    classifier = Classifier(vision_client, settings.ollama_vlm_model if isinstance(vision_client, OllamaVisionAdapter) else settings.classifier_model)
+    extractor = Extractor(vision_client, settings.ollama_vlm_model if isinstance(vision_client, OllamaVisionAdapter) else settings.extractor_model)
     orchestrator = Orchestrator(classifier, extractor, session_factory)
     return {
-        "vllm": vllm,
+        "vllm": vision_client,
         "session_factory": session_factory,
         "classifier": classifier,
         "extractor": extractor,

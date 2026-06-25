@@ -25,6 +25,20 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-haiku-4-5"
     openai_model: str = "gpt-4o-mini"
 
+    # ── Ollama local inference (Apple Silicon / M-series) ──────────────────
+    # AI_BACKEND: auto | ollama | vllm | mock
+    #   auto  = use Ollama when is_available() else fall back to vllm/mock
+    #   ollama = always use Ollama (fail loud if not running)
+    #   vllm   = always use the remote vLLM endpoint
+    #   mock   = no network; deterministic dummy responses (useful in CI)
+    ai_backend: Literal["auto", "ollama", "vllm", "mock"] = "auto"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_vlm_model: str = "qwen2.5vl:7b"
+    ollama_text_model: str = "granite3.3:8b"
+    # Generous timeout — first vision call cold-loads a multi-GB model into
+    # Metal memory, which far exceeds the 8s vLLM default.
+    ollama_timeout_s: float = 180.0
+
     @property
     def is_degraded(self) -> bool:
         return self.inference_mode == "cpu_degraded"

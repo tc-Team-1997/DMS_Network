@@ -8,11 +8,15 @@ import io
 #   @patch("zordms_ai.pipeline.preprocess.convert_from_bytes")
 #   @patch("zordms_ai.pipeline.preprocess._encode_png")
 # work correctly whether or not the packages are installed.
+# Import independently — a missing pdf2image must not disable Pillow image
+# processing (and vice-versa).
 try:
     from pdf2image import convert_from_bytes  # type: ignore[import-untyped]
-    from PIL import Image  # type: ignore[import-untyped]
 except ImportError:
     convert_from_bytes = None  # type: ignore[assignment]
+try:
+    from PIL import Image  # type: ignore[import-untyped]
+except ImportError:
     Image = None  # type: ignore[assignment]
 
 
