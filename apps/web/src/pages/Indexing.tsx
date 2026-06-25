@@ -9,6 +9,7 @@ import {
   FormField,
   Tabs,
   StatusDot,
+  RefId,
 } from "../components/ui/index.js";
 import type { Column, TabItem } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
@@ -97,7 +98,7 @@ const QUEUE_COLS: Column<QueueRow>[] = [
   {
     key: "id",
     header: "#",
-    render: (r) => <span className="mono" style={{ fontSize: 11, color: "var(--sil)" }}>{r.id}</span>,
+    render: (r) => <RefId value={r.id} className="mono" style={{ fontSize: 11, color: "var(--sil)" }} />,
     width: "50px",
   },
   {
@@ -330,7 +331,7 @@ export default function Indexing() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 14 }}>
           {/* Left: Document preview + QA quick-check */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <Card title={<span>Document Viewer <span style={{ color: "var(--sil)", fontWeight: 400, fontSize: 11 }}>{selectedDoc ? `#${selectedDoc.id}` : "— select from queue"}</span></span>}
+            <Card title={<span>Document Viewer <span style={{ color: "var(--sil)", fontWeight: 400, fontSize: 11 }}>{selectedDoc ? <RefId value={selectedDoc.id} /> : "— select from queue"}</span></span>}
               action={(() => {
                 const currentIdx = selectedDoc ? queue.findIndex((d) => d.id === selectedDoc.id) : -1;
                 const hasPrev = currentIdx > 0;
@@ -647,7 +648,7 @@ export default function Indexing() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ background: "var(--ink3)", borderRadius: 7, padding: "8px 12px", fontSize: 12, marginBottom: 6 }}>
                   <strong>{selectedDoc.title}</strong>
-                  <span style={{ color: "var(--sil)", fontSize: 11, marginLeft: 8 }}>#{selectedDoc.id} · {selectedDoc.branch}</span>
+                  <span style={{ color: "var(--sil)", fontSize: 11, marginLeft: 8 }}><RefId value={selectedDoc.id} /> · {selectedDoc.branch}</span>
                 </div>
                 {QA_ITEMS.map((item) => (
                   <label key={item} style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--mist)", cursor: "pointer", fontSize: 12 }}>

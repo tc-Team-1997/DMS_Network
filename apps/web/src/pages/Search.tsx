@@ -10,6 +10,7 @@ import {
   FormField,
   DonutChartCard,
   BarChartCard,
+  RefId,
 } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import {
@@ -177,7 +178,7 @@ function HitPanel({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <div>
           <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 2 }}>DOC ID</div>
-          <div style={{ fontSize: 12, fontFamily: "monospace" }}>{hit.doc_id}</div>
+          <RefId value={hit.doc_id} style={{ fontSize: 12 }} />
         </div>
         <div>
           <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 2 }}>TYPE</div>
@@ -381,9 +382,10 @@ export default function Search() {
       header: "Document ID",
       sortable: true,
       render: (row: Record<string, unknown>) => (
-        <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--gold2)" }}>
-          {row.doc_id as string}
-        </span>
+        <RefId
+          value={row.doc_id as string}
+          style={{ fontSize: 11, color: "var(--gold2)" }}
+        />
       ),
     },
     {

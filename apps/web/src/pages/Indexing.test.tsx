@@ -399,8 +399,13 @@ describe("Indexing screen", () => {
     // (the queue picker only shows when selectedDoc is null and queue.length > 0)
     // After pre-selection, the selected doc should appear in the viewer header
     await waitFor(() => {
-      // The viewer shows the selected doc ID
-      expect(screen.queryByText(new RegExp(DOC_ID_6))).not.toBeNull();
+      // The viewer shows the selected doc ID via <RefId>: a friendly short token
+      // (first-8 of the uuid) is the visible text, with the FULL uuid carried on
+      // the title/aria-label for hover + click-to-copy.
+      const short = DOC_ID_6.slice(0, 8);
+      const el = screen.getByText(`#${short}`);
+      expect(el).toBeInTheDocument();
+      expect(el).toHaveAttribute("title", DOC_ID_6);
     });
   });
 });

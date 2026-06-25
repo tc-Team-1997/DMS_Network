@@ -15,6 +15,8 @@ import {
   DonutChartCard,
   BarChartCard,
   LineChartCard,
+  RefId,
+  isUuid,
 } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import {
@@ -284,7 +286,8 @@ function AlertDetailPanel({
           <div style={{ background: "var(--ink3)", borderRadius: 6, padding: 10, fontSize: 11, fontFamily: "monospace", lineHeight: 1.6 }}>
             {Object.entries(meta).map(([k, v]) => (
               <div key={k}>
-                <span style={{ color: "var(--gold2)" }}>{k}</span>: {JSON.stringify(v)}
+                <span style={{ color: "var(--gold2)" }}>{k}</span>:{" "}
+                {isUuid(v) ? <RefId value={v} /> : JSON.stringify(v)}
               </div>
             ))}
           </div>

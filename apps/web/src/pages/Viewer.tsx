@@ -8,6 +8,7 @@ import {
   Modal,
   FormField,
   StatusDot,
+  RefId,
 } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { repositoryViewerApi } from "../api/repositoryViewerApi.js";
@@ -598,8 +599,11 @@ export default function Viewer() {
               <span style={{ fontSize: 11, color: "var(--B)", letterSpacing: 1, textTransform: "uppercase" }}>
                 Review Workflow
               </span>
-              <span style={{ fontSize: 12, color: "var(--mist)", fontFamily: "monospace" }} data-testid="wf-id">
-                {workflowId}
+              <span data-testid="wf-id">
+                <RefId
+                  value={workflowId}
+                  style={{ fontSize: 12, color: "var(--mist)" }}
+                />
               </span>
             </div>
             {doc?.review_flag && <Tag variant="amber">Review Flagged</Tag>}

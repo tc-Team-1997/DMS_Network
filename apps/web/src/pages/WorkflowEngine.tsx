@@ -22,6 +22,7 @@ import {
   Modal,
   FormField,
   BarChartCard,
+  RefId,
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import {
@@ -366,7 +367,9 @@ function WorkflowDetailPanel({
                   </Tag>
                 </td>
                 <td style={{ padding: "7px 8px", color: "var(--sil)" }}>
-                  {s.actor_id ? `User #${s.actor_id}` : "—"}
+                  {s.actor_id
+                    ? <span>User <RefId value={s.actor_id} /></span>
+                    : "—"}
                 </td>
               </tr>
             ))}

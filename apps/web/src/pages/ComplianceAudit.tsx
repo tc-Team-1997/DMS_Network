@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "../auth/AuthContext.js";
 import {
-  KpiCard, Card, DataTable, Tag, Tabs, DonutChartCard, BarChartCard,
+  KpiCard, Card, DataTable, Tag, Tabs, DonutChartCard, BarChartCard, RefId,
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { complianceAuditApi } from "../api/complianceAudit.js";
@@ -177,7 +177,7 @@ export function ComplianceAudit() {
       render: (r) => <Tag variant={actionTagVariant(r.action)}>{r.action}</Tag>,
     },
     { key: "entity", header: "Entity", width: 100, render: (r) => <span style={{ fontSize: 11, color: "var(--sil)" }}>{r.entity ?? "—"}</span> },
-    { key: "entity_id", header: "Entity ID", width: 100, render: (r) => <span className="mono" style={{ fontSize: 10, color: "var(--gold3)" }}>{r.entity_id ?? "—"}</span> },
+    { key: "entity_id", header: "Entity ID", width: 100, render: (r) => <RefId value={r.entity_id} className="mono" style={{ fontSize: 10, color: "var(--gold3)" }} /> },
     { key: "details", header: "Details", render: (r) => <span style={{ fontSize: 11, color: "var(--sil)" }}>{r.details ?? "—"}</span> },
     { key: "created_at", header: "Time", width: 140, sortable: true, render: (r) => <span style={{ fontSize: 11, color: "var(--sil)" }}>{r.created_at ? new Date(r.created_at).toLocaleString() : "—"}</span> },
   ];

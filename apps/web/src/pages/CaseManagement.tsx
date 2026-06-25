@@ -21,6 +21,7 @@ import {
   Modal,
   FormField,
   DonutChartCard,
+  RefId,
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import {
@@ -357,7 +358,7 @@ function CaseDetailPanel({
             ) : documents.map((d) => (
               <tr key={d.id} style={{ borderBottom: "1px solid var(--bd)" }}>
                 <td style={{ padding: "7px 8px" }}>
-                  <span className="mono" style={{ fontSize: 11, color: "var(--gold3)" }}>{d.doc_id}</span>
+                  <RefId value={d.doc_id} className="mono" style={{ fontSize: 11, color: "var(--gold3)" }} />
                 </td>
                 <td style={{ padding: "7px 8px", color: "var(--sil)" }}>{d.label ?? "—"}</td>
                 <td style={{ padding: "7px 8px", color: "var(--sil)" }}>

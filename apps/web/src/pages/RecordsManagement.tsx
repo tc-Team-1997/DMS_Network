@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthContext.js";
 import {
   KpiCard, Card, DataTable, Tag, StatusDot, Tabs, Modal, FormField,
-  BarChartCard,
+  BarChartCard, RefId,
   type Column,
 } from "../components/ui/index.js";
 import {
@@ -46,7 +46,14 @@ function buildDisposalColumns(
     {
       key: "doc_no",
       header: "Document",
-      render: (r) => <span style={{ color: "var(--gold3)", fontWeight: 500 }}>{String(r.doc_no ?? r.document_id)}</span>,
+      render: (r) => (
+        <RefId
+          value={String(r.document_id)}
+          label={r.doc_no != null ? String(r.doc_no) : undefined}
+          className="gold3"
+          style={{ color: "var(--gold3)", fontWeight: 500 }}
+        />
+      ),
       sortable: true,
     },
     {
@@ -496,7 +503,7 @@ export default function RecordsManagement() {
       >
         <div style={{ padding: "8px 0" }}>
           <div style={{ padding: "10px 12px", background: "rgba(224,82,82,.07)", border: "1px solid rgba(224,82,82,.2)", borderRadius: 6, fontSize: 12, color: "var(--R)", marginBottom: 14 }}>
-            This action permanently destroys document #{certConfirm}. A certified destruction record will be issued. This cannot be undone.
+            This action permanently destroys document <RefId value={certConfirm} />. A certified destruction record will be issued. This cannot be undone.
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button

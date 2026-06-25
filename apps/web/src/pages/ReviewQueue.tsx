@@ -40,6 +40,7 @@ import {
   StatusDot,
   Tabs,
   Modal,
+  RefId,
   type Column,
   type TagVariant,
 } from "../components/ui/index.js";
@@ -303,12 +304,9 @@ export default function ReviewQueue() {
       key: "doc_id",
       header: "Document",
       width: 140,
-      render: (r) =>
-        r.doc_id ? (
-          <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--sil)" }}>{r.doc_id}</span>
-        ) : (
-          <span style={{ fontSize: 11, color: "var(--sil)" }}>—</span>
-        ),
+      render: (r) => (
+        <RefId value={r.doc_id} style={{ fontSize: 11, color: "var(--sil)" }} />
+      ),
     },
     {
       key: "priority",
@@ -465,7 +463,7 @@ export default function ReviewQueue() {
 
               {[
                 { label: "Title",      value: selected.title },
-                { label: "Document",   value: selected.doc_id ?? "—" },
+                { label: "Document",   value: <RefId value={selected.doc_id} /> },
                 { label: "Branch",     value: selected.branch ?? "—" },
                 { label: "Stage",      value: selected.stage },
                 { label: "Assignee",   value: selected.assignee ?? "Unassigned" },

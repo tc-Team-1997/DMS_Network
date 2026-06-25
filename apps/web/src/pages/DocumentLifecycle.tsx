@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 import {
-  KpiCard, Card, DataTable, Tag, Tabs, BarChartCard,
+  KpiCard, Card, DataTable, Tag, Tabs, BarChartCard, RefId,
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { documentLifecycleApi } from "../api/documentLifecycle.js";
@@ -178,7 +178,7 @@ export function DocumentLifecycle() {
 
   /* ─── Doc browser columns ─── */
   const docCols: Column<DocRow>[] = [
-    { key: "doc_no", header: "Doc No", width: 130, sortable: true, render: (r) => <span className="mono" style={{ fontSize: 11, color: "var(--gold3)" }}>{r.doc_no ?? String(r.id)}</span> },
+    { key: "doc_no", header: "Doc No", width: 130, sortable: true, render: (r) => <RefId value={r.id} label={r.doc_no} className="mono" style={{ fontSize: 11, color: "var(--gold3)" }} /> },
     { key: "doc_type", header: "Type", sortable: true, render: (r) => <Tag variant="gold">{r.doc_type}</Tag> },
     { key: "status", header: "Status", width: 120, render: (r) => <Tag variant={docStatusVariant(r.status)}>{r.status}</Tag> },
     { key: "branch", header: "Branch", width: 120, render: (r) => <span style={{ color: "var(--B)", fontSize: 11 }}>{r.branch ?? "—"}</span> },
@@ -233,7 +233,7 @@ export function DocumentLifecycle() {
         <div className="g4" style={{ marginBottom: 18 }}>
           <KpiCard
             label="Document"
-            value={trace.doc_no ?? String(trace.document_id)}
+            value={<RefId value={trace.document_id} label={trace.doc_no} />}
             sub={<span style={{ color: "var(--sil)" }}>{trace.doc_type}</span>}
             variant="gold"
           />
@@ -309,7 +309,7 @@ export function DocumentLifecycle() {
           {!loading && trace && (
             <div className="g2">
               {/* stage timeline */}
-              <Card title={`Lifecycle Trace — ${trace.doc_no ?? trace.document_id}`}>
+              <Card title={<span>Lifecycle Trace — <RefId value={trace.document_id} label={trace.doc_no} /></span>}>
                 <div className="tl">
                   {trace.stages.map((stage: LifecycleStage) => (
                     <div key={stage.stage} className="tli">
@@ -357,14 +357,17 @@ export function DocumentLifecycle() {
                 <Card title="Document Info">
                   <div style={{ fontSize: 11, display: "flex", flexDirection: "column", gap: 5 }}>
                     {[
-                      { label: "Document ID", value: String(trace.document_id) },
+                      {
+                        label: "Document ID",
+                        value: <RefId value={trace.document_id} className="mono" style={{ color: "var(--gold3)" }} />,
+                      },
                       { label: "Doc Number", value: trace.doc_no ?? "—" },
                       { label: "Type", value: trace.doc_type },
                       { label: "Versions", value: String(trace.versions.length) },
                     ].map((kv) => (
                       <div key={kv.label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid rgba(15,23,42,.08)" }}>
                         <span style={{ color: "var(--sil)" }}>{kv.label}</span>
-                        <span className={kv.label === "Document ID" ? "mono" : ""} style={{ color: kv.label === "Document ID" ? "var(--gold3)" : "inherit" }}>{kv.value}</span>
+                        <span>{kv.value}</span>
                       </div>
                     ))}
                   </div>

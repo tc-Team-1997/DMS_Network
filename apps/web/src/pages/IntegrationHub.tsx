@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   KpiCard, Card, DataTable, Tag, StatusDot, Tabs, Modal, FormField,
-  LineChartCard, BarChartCard, DonutChartCard,
+  LineChartCard, BarChartCard, DonutChartCard, RefId,
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
@@ -158,7 +158,7 @@ export default function IntegrationHub() {
 
   /* Webhook columns */
   const webhookColumns: Column<HookRow>[] = [
-    { key: "id",      header: "#",   width: 50 },
+    { key: "id",      header: "#",   width: 50, render: (r) => <RefId value={String(r.id)} /> },
     { key: "url",     header: "URL", render: (r) => <code style={{ fontSize: 11 }}>{String(r.url)}</code> },
     { key: "events",  header: "Events", render: (r) => <span style={{ fontSize: 11 }}>{(r.events as string[]).join(", ")}</span> },
     { key: "auth_method", header: "Auth", render: (r) => <Tag variant={r.auth_method === "hmac" ? "green" : "amber"}>{String(r.auth_method).toUpperCase()}</Tag> },

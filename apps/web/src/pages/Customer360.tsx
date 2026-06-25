@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 import {
   KpiCard, Card, DataTable, Tag, StatusDot, Tabs,
-  DonutChartCard,
+  DonutChartCard, RefId,
   type Column,
 } from "../components/ui/index.js";
 import { fetchCustomerProfile, type CustomerProfile, type KycRequirement } from "../api/customer360.js";
@@ -85,7 +85,7 @@ const docColumns: Column<CustomerProfile["documents"][0] & Record<string, unknow
     ),
     sortable: true,
   },
-  { key: "doc_no", header: "Doc No.", render: (r) => r.doc_no ? <span className="mono" style={{ fontSize: 11 }}>{String(r.doc_no)}</span> : <span style={{ color: "var(--sil)" }}>—</span> },
+  { key: "doc_no", header: "Doc No.", render: (r) => r.doc_no ? <RefId value={String(r.doc_no)} className="mono" style={{ fontSize: 11 }} /> : <span style={{ color: "var(--sil)" }}>—</span> },
   {
     key: "status",
     header: "Status",
