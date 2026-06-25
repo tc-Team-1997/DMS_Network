@@ -10,6 +10,7 @@ import type { AppConfig } from "@zordms/config";
 import { loadAuthConfig, enabledProviders, type AuthConfig } from "./authConfig.js";
 import { createSsoClients, type SsoClients } from "./clients.js";
 import { mapAndIssue, type ExternalIdentity } from "./jit.js";
+import { LdapLoginBodySchema } from "../schemas.js";
 
 export interface SsoDeps {
   knex: Knex;
@@ -91,8 +92,15 @@ export function ssoRouter(): Router {
   r.post("/ldap/login", async (req, res) => {
     const { knex, config, authConfig, ssoClients } = deps(req);
     if (!authConfig.ldap.enabled) { res.status(404).json({ error: "provider_disabled" }); return; }
-    const { username, password } = (req.body ?? {}) as { username?: string; password?: string };
-    if (!username || !password) { res.status(400).json({ error: "invalid_request" }); return; }
+    const parsed = LdapLoginBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "validation_error",
+        issues: parsed.error.issues.map((i) => ({ path: i.path, message: i.message, code: i.code })),
+      });
+      return;
+    }
+    const { username, password } = parsed.data;
     try {
       const identity = await ssoClients.ldap.authenticate(authConfig.ldap, username, password);
       if (!identity) { res.status(401).json({ error: "invalid_credentials" }); return; }

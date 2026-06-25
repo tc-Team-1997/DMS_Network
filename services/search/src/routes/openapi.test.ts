@@ -29,9 +29,12 @@ describe("GET /openapi.json", () => {
     expect(res.body.openapi).toBe("3.1.0");
     const paths = Object.keys(res.body.paths);
     expect(paths).toContain("/search");
+    expect(paths).toContain("/facets");
+    expect(paths).toContain("/search/export.csv");
     expect(paths).toContain("/saved");
     expect(paths).toContain("/saved/{id}/run");
     expect(paths).toContain("/admin/reindex");
+    expect(paths).toContain("/health");
     // Auth schemes documented.
     expect(Object.keys(res.body.components.securitySchemes)).toEqual(
       expect.arrayContaining(["bearerAuth", "internalToken", "hmacSignature"]),
@@ -63,6 +66,19 @@ describe("zod boundary validation", () => {
       .post("/search")
       .set("Authorization", `Bearer ${token}`)
       .send({ mode: "regex" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+  });
+
+  it("POST /admin/reindex with a non-array docs body returns 400 validation_error", async () => {
+    const adminToken = signToken(
+      { sub: "00000000-0000-0000-0000-0000000000ad", username: "reindexer", permissions: ["admin:access"], roles: ["CDO"] },
+      "t",
+    );
+    const res = await request(app)
+      .post("/admin/reindex")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ docs: "not-an-array" });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("validation_error");
   });

@@ -61,6 +61,43 @@ export const UserIdParamsSchema = z
 export const LockUserBodySchema = z.object({}).openapi("LockUserRequest");
 
 // ---------------------------------------------------------------------------
+// SSO
+// ---------------------------------------------------------------------------
+
+// POST /auth/ldap/login { username, password }
+export const LdapLoginBodySchema = z
+  .object({
+    username: z.string().trim().min(1, "username is required"),
+    password: z.string().min(1, "password is required"),
+  })
+  .openapi("LdapLoginRequest");
+
+export type LdapLoginBody = z.infer<typeof LdapLoginBodySchema>;
+
+// GET /auth/oidc/callback?code=...&state=...
+export const OidcCallbackQuerySchema = z
+  .object({
+    code: z.string().trim().min(1, "code is required"),
+    state: z.string().trim().min(1, "state is required"),
+  })
+  .openapi("OidcCallbackQuery");
+
+export const AuthProviderSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(["ldap", "oidc", "saml"]),
+    label: z.string().optional(),
+  })
+  .openapi("AuthProvider");
+
+export const AuthConfigResponseSchema = z
+  .object({
+    local: z.boolean(),
+    providers: z.array(AuthProviderSchema),
+  })
+  .openapi("AuthConfigResponse");
+
+// ---------------------------------------------------------------------------
 // Authz
 // ---------------------------------------------------------------------------
 
@@ -120,3 +157,11 @@ export const AuthzCheckResponseSchema = z
     missing: z.array(z.string()),
   })
   .openapi("AuthzCheckResponse");
+
+// SSO LDAP login returns the same {token,user} shape as local login.
+export const SsoLoginResponseSchema = z
+  .object({
+    token: z.string(),
+    user: AuthUserSchema,
+  })
+  .openapi("SsoLoginResponse");

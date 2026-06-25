@@ -95,22 +95,29 @@ The web app reaches each backend through a Vite dev proxy at `/svc/<service>`
 
 ## API documentation (OpenAPI / Swagger)
 
-Every backend service publishes an **OpenAPI 3.1** contract. With the stack
-running (`./start.sh`), fetch a service's live spec — through the web proxy or
-on the service's own port — or open the committed spec file.
+Every backend service publishes an **OpenAPI 3.1** contract. The coverage is
+now **production-grade**: each Node service documents **every mounted route**
+(no undocumented endpoints, no phantom documented-but-unmounted ones — enforced
+by a route-coverage contract test), every documented response code carries a
+JSON/binary schema, and all request/response bodies are described. With the
+stack running (`./start.sh`), fetch a service's live spec — through the web
+proxy or on the service's own port — or open the committed spec file.
 
-| Service | Live spec (via web proxy) | Direct port | Committed spec file | Auth |
-| --- | --- | --- | --- | --- |
-| gateway | `…/svc/gateway/openapi.json` | `:4000/openapi.json` | `docs/superpowers/specs/openapi/gateway.json` | Bearer JWT |
-| core | `…/svc/core/openapi.json` (27 paths) | `:4001/openapi.json` | `…/openapi/core.json` | Bearer JWT · `x-internal-token` |
-| workflow | `…/svc/workflow/openapi.json` | `:4002/openapi.json` | `…/openapi/workflow.json` | Bearer JWT |
-| notify | `…/svc/notify/openapi.json` | `:4003/openapi.json` | `…/openapi/notify.json` | Bearer JWT |
-| search | `…/svc/search/openapi.json` | `:4004/openapi.json` | `…/openapi/search.json` | Bearer JWT |
-| integration | `…/svc/integrate/openapi.json` | `:4005/openapi.json` | `…/openapi/integration.json` | Bearer JWT · HMAC inbound · `x-internal-token` |
-| **ai** (FastAPI) | — | `:8000/openapi.json` | `…/openapi/ai.json` | Bearer JWT |
+| Service | Live spec (via web proxy) | Direct port | Committed spec file | Documented paths | Auth |
+| --- | --- | --- | --- | --- | --- |
+| gateway | `…/svc/gateway/openapi.json` | `:4000/openapi.json` | `docs/superpowers/specs/openapi/gateway.json` | 13 | Bearer JWT |
+| core | `…/svc/core/openapi.json` | `:4001/openapi.json` | `…/openapi/core.json` | 46 | Bearer JWT · `x-internal-token` |
+| workflow | `…/svc/workflow/openapi.json` | `:4002/openapi.json` | `…/openapi/workflow.json` | 11 | Bearer JWT |
+| notify | `…/svc/notify/openapi.json` | `:4003/openapi.json` | `…/openapi/notify.json` | 8 | Bearer JWT |
+| search | `…/svc/search/openapi.json` | `:4004/openapi.json` | `…/openapi/search.json` | 7 | Bearer JWT |
+| integration | `…/svc/integrate/openapi.json` | `:4005/openapi.json` | `…/openapi/integration.json` | 9 | Bearer JWT · HMAC inbound · `x-internal-token` |
+| **ai** (FastAPI) | — | `:8000/openapi.json` | `…/openapi/ai.json` | 11 | Bearer JWT |
 
-`…` = `http://localhost:5174` (web proxy) for the proxy column, and
-`http://localhost` for the direct-port column.
+Full per-service path coverage with boundary validation is now production-grade
+(**105 documented paths** across the seven services). `…` =
+`http://localhost:5174` (web proxy) for the proxy column, and `http://localhost`
+for the direct-port column. Regenerate the committed Node specs any time with
+each service's `scripts/gen-openapi.ts`.
 
 **Interactive docs (Swagger UI / ReDoc):**
 - The **AI service** (FastAPI) ships them out of the box:
@@ -119,9 +126,11 @@ on the service's own port — or open the committed spec file.
   (or the committed `docs/superpowers/specs/openapi/*.json`) into
   **https://editor.swagger.io** or **https://redocly.github.io/redoc/**.
 
-All mutating endpoints are **zod-validated** at the boundary (invalid bodies
-return `400 { error: "validation_error", issues: [...] }`). The integration
-service additionally documents the HMAC-signed inbound webhook contract and the
+All mutating endpoints are **zod-validated** at the boundary — invalid bodies,
+out-of-range values, malformed enums, and missing required fields all return
+`400 { error: "validation_error", issues: [...] }`, and these boundary cases are
+covered by per-service validation test suites. The integration service
+additionally documents the HMAC-signed inbound webhook contract and the
 `x-internal-token` service-to-service calls.
 
 ---
@@ -286,6 +295,45 @@ See `docs/superpowers/specs/`:
 - `2026-06-23-zordms-microservices-architecture-design.md` — system architecture
 - `2026-06-23-zordms-idp-design.md` — AI/IDP design
 - `openapi/*.json` — per-service OpenAPI 3.1 specs
+- `2026-06-25-api-quality-and-test-coverage.md` — OpenAPI coverage (before/after) + test inventory
+
+---
+
+## Testing & quality
+
+The system is covered by a layered automated test suite — fast unit/contract
+tests per package and service, Python tests for the AI/IDP service, and
+Playwright end-to-end specs (functional, deep-flow, and accessibility) that
+drive the real running stack.
+
+| Layer | Tool | Scope | Totals |
+| --- | --- | --- | --- |
+| Node unit / contract | Vitest | 12 workspace packages (`apps/web`, `packages/*`, the six Node services) — route handlers, repos, schemas, OpenAPI route-coverage + boundary-validation contracts, plus new micro unit tests (web API clients, capture/doc-type components, UI store) | **1081** tests / 152 files |
+| Python | pytest | `services/ai` (FastAPI) — OCR, classification, field inference, intent, LLM/Ollama adapters, search client (incl. new micro unit tests) | **257** tests |
+| E2E (functional) | Playwright | `smoke.spec.ts` against the live React app + microservices (login, dashboard, search, capture, AI copilot) | 32 tests |
+| E2E (deep-flow) | Playwright | `enterprise-flows.spec.ts` — viewer burn-in (stamp/redact), maker-checker workflow decision, capture→workflow handoff, and other cross-service journeys | 14 tests |
+| E2E (a11y) | Playwright + axe-core | `a11y.spec.ts` (WCAG 2.2 AA) + `a11y-aaa.spec.ts` (opt-in AAA, hit-target sizes) | 7 tests |
+
+Run them:
+
+```bash
+# Node unit/contract suites (turbo, all packages + services)
+pnpm -r build      # tests depend on a clean build
+pnpm -r test
+
+# Python AI/IDP service
+services/ai/.venv/bin/pytest services/ai -q
+
+# Playwright end-to-end (requires the stack running: ./start.sh)
+cd e2e && npx playwright test
+# focused: npx playwright test smoke.spec.ts enterprise-flows.spec.ts
+# report:  npx playwright show-report
+```
+
+> The Playwright e2e specs assume the full dev stack is up (`./start.sh`, web on
+> `:5174`, services on `:4000–:4005`, AI on `:8000`). The deep-flow specs are
+> data-aware: steps that need a specific document/workflow state `test.skip`
+> gracefully when the seedless local stack has no matching item.
 
 ---
 

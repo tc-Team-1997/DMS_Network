@@ -13,6 +13,10 @@ import {
   ValidationErrorSchema,
   ErrorSchema,
   AuthUserSchema,
+  LdapLoginBodySchema,
+  OidcCallbackQuerySchema,
+  AuthConfigResponseSchema,
+  SsoLoginResponseSchema,
 } from "./schemas.js";
 
 /**
@@ -49,6 +53,23 @@ export function buildOpenApiDocument(): Record<string, unknown> {
     name: "x-signature",
     description:
       "HMAC-SHA256 signature over the raw request body for inbound integration callbacks (verified alongside x-internal-token).",
+  });
+
+  // SSO token handoff: after a successful OIDC/SAML browser flow the gateway
+  // redirects back to the web app with the minted JWT in the URL fragment
+  // (#token=...). The SPA reads location.hash, stores the token as the bearer,
+  // and clears the hash so the token never hits server logs.
+  const ssoHandoff = registry.registerComponent("securitySchemes", "ssoHandoff", {
+    type: "oauth2",
+    description:
+      "Browser SSO handoff. GET /auth/{oidc,saml}/login redirects to the IdP; the callback redirects to <webAppUrl>/login#token=<JWT>. The SPA extracts the JWT and uses it as the bearerAuth credential thereafter.",
+    flows: {
+      authorizationCode: {
+        authorizationUrl: "/auth/oidc/login",
+        tokenUrl: "/auth/oidc/callback",
+        scopes: {},
+      },
+    },
   });
 
   const validationError = {
@@ -231,6 +252,142 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       },
       400: validationError,
       401: unauthorized,
+    },
+  });
+
+  const providerDisabled = {
+    description: "The requested SSO provider is disabled on this deployment.",
+    content: { "application/json": { schema: ErrorSchema } },
+  };
+
+  // /auth/config -----------------------------------------------------------
+  registry.registerPath({
+    method: "get",
+    path: "/auth/config",
+    summary: "Public SSO/login configuration",
+    description:
+      "Returns whether local login is enabled and the list of enabled SSO providers so the login UI can render the right buttons. No authentication required.",
+    tags: ["sso"],
+    responses: {
+      200: {
+        description: "Login configuration.",
+        content: { "application/json": { schema: AuthConfigResponseSchema } },
+      },
+    },
+  });
+
+  // /auth/ldap/login -------------------------------------------------------
+  registry.registerPath({
+    method: "post",
+    path: "/auth/ldap/login",
+    summary: "Authenticate against LDAP/AD and issue a JWT",
+    tags: ["sso"],
+    request: {
+      body: { content: { "application/json": { schema: LdapLoginBodySchema } } },
+    },
+    responses: {
+      200: {
+        description: "LDAP login succeeded; JWT issued.",
+        content: { "application/json": { schema: SsoLoginResponseSchema } },
+      },
+      400: validationError,
+      401: {
+        description: "Invalid LDAP credentials.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: providerDisabled,
+      500: {
+        description: "LDAP backend error.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  });
+
+  // /auth/oidc/login -------------------------------------------------------
+  registry.registerPath({
+    method: "get",
+    path: "/auth/oidc/login",
+    summary: "Begin the OIDC authorization-code flow",
+    description:
+      "Sets a short-lived signed transient cookie (state/nonce/PKCE verifier) and 302-redirects the browser to the IdP authorization endpoint.",
+    tags: ["sso"],
+    security: [{ [ssoHandoff.name]: [] }],
+    responses: {
+      302: { description: "Redirect to the IdP authorization URL." },
+      404: providerDisabled,
+      500: {
+        description: "Failed to build the OIDC authorization request.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  });
+
+  // /auth/oidc/callback ----------------------------------------------------
+  registry.registerPath({
+    method: "get",
+    path: "/auth/oidc/callback",
+    summary: "Complete the OIDC flow and hand off the JWT",
+    description:
+      "Verifies the transient cookie + state, exchanges the code, JIT-provisions the user and 302-redirects to <webAppUrl>/login#token=<JWT>.",
+    tags: ["sso"],
+    security: [{ [ssoHandoff.name]: [] }],
+    request: { query: OidcCallbackQuerySchema },
+    responses: {
+      302: { description: "Redirect to the web app with the JWT in the URL fragment." },
+      400: {
+        description: "Missing/expired transient or mismatched state.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      401: {
+        description: "Token exchange or assertion validation failed.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: providerDisabled,
+    },
+  });
+
+  // /auth/saml/login -------------------------------------------------------
+  registry.registerPath({
+    method: "get",
+    path: "/auth/saml/login",
+    summary: "Begin the SAML SP-initiated flow",
+    tags: ["sso"],
+    security: [{ [ssoHandoff.name]: [] }],
+    responses: {
+      302: { description: "Redirect to the IdP SSO URL." },
+      404: providerDisabled,
+      500: {
+        description: "Failed to build the SAML login URL.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  });
+
+  // /auth/saml/callback (ACS) ---------------------------------------------
+  registry.registerPath({
+    method: "post",
+    path: "/auth/saml/callback",
+    summary: "SAML assertion consumer service (ACS) and JWT handoff",
+    description:
+      "Consumes the IdP's application/x-www-form-urlencoded SAMLResponse, validates the assertion, JIT-provisions the user and 302-redirects to <webAppUrl>/login#token=<JWT>.",
+    tags: ["sso"],
+    security: [{ [ssoHandoff.name]: [] }],
+    request: {
+      body: {
+        content: {
+          "application/x-www-form-urlencoded": {
+            schema: z.object({ SAMLResponse: z.string(), RelayState: z.string().optional() }),
+          },
+        },
+      },
+    },
+    responses: {
+      302: { description: "Redirect to the web app with the JWT in the URL fragment." },
+      401: {
+        description: "SAML assertion validation failed.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+      404: providerDisabled,
     },
   });
 

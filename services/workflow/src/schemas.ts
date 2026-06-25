@@ -76,6 +76,52 @@ export const ListWorkflowsQuery = z
   .openapi("ListWorkflowsQuery");
 export type ListWorkflowsQuery = z.infer<typeof ListWorkflowsQuery>;
 
+// ---- Cases ----------------------------------------------------------------
+export const CaseTypeEnum = z
+  .enum(["KYC", "Loan", "Account", "AML"])
+  .openapi("CaseType");
+
+// POST /cases
+export const CreateCaseBody = z
+  .object({
+    case_type: CaseTypeEnum,
+    title: z.string().min(1).max(300),
+    assigned_to: z.string().min(1).optional(),
+    due_at: z.string().min(1).optional(),
+    template_id: z.string().min(1).optional(),
+    doc_confidence: z.number().min(0).max(1).optional(),
+    created_by: z.string().min(1).optional(),
+  })
+  .strict()
+  .openapi("CreateCaseBody");
+export type CreateCaseBody = z.infer<typeof CreateCaseBody>;
+
+// :id path param for case sub-routes
+export const CaseIdParam = z
+  .object({ id: z.string().min(1) })
+  .openapi("CaseIdParam");
+export type CaseIdParam = z.infer<typeof CaseIdParam>;
+
+// POST /cases/:id/documents
+export const AttachCaseDocumentBody = z
+  .object({
+    doc_id: z.string().min(1),
+    label: z.string().max(300).optional(),
+  })
+  .strict()
+  .openapi("AttachCaseDocumentBody");
+export type AttachCaseDocumentBody = z.infer<typeof AttachCaseDocumentBody>;
+
+// POST /cases/:id/resolve
+export const ResolveCaseBody = z
+  .object({
+    status: z.enum(["Resolved", "Rejected"]),
+    resolution: z.string().min(1).max(2000),
+  })
+  .strict()
+  .openapi("ResolveCaseBody");
+export type ResolveCaseBody = z.infer<typeof ResolveCaseBody>;
+
 // ---- Shared error response ------------------------------------------------
 export const ValidationErrorResponse = z
   .object({

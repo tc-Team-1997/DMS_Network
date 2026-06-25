@@ -32,9 +32,21 @@ describe("OpenAPI document", () => {
     expect(res.status).toBe(200);
     expect(res.body.openapi).toBe("3.1.0");
     const paths = Object.keys(res.body.paths);
-    for (const p of ["/alerts", "/alerts/{id}/read", "/alerts/{id}/escalate", "/rules", "/rules/{id}"]) {
+    for (const p of [
+      "/health",
+      "/openapi.json",
+      "/alerts",
+      "/alerts/stream",
+      "/alerts/{id}/read",
+      "/alerts/{id}/escalate",
+      "/rules",
+      "/rules/{id}",
+    ]) {
       expect(paths).toContain(p);
     }
+    // inbound cross-service security schemes documented
+    expect(res.body.components.securitySchemes.internalToken.name).toBe("x-internal-token");
+    expect(res.body.components.securitySchemes.hmacSignature.name).toBe("x-signature");
     // bearer JWT security scheme is documented
     expect(res.body.components.securitySchemes.bearerAuth.scheme).toBe("bearer");
     // request body for POST /rules references the zod-derived schema
@@ -64,6 +76,13 @@ describe("boundary validation", () => {
     const res = await request(app).patch("/rules/some-id")
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ channels: ["carrier-pigeon"] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+  });
+
+  it("GET /alerts with an invalid level query returns 400 validation_error", async () => {
+    const res = await request(app).get("/alerts?level=bogus")
+      .set("Authorization", `Bearer ${adminToken}`);
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("validation_error");
   });

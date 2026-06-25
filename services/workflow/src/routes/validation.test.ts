@@ -30,6 +30,15 @@ const actorToken = signToken(
   "t",
 );
 
+const caseToken = signToken(
+  {
+    sub: "01910000-0000-7000-0000-0000000000bb",
+    username: "case_mgr_v",
+    permissions: ["case:create", "case:manage"],
+  } as Parameters<typeof signToken>[0],
+  "t",
+);
+
 beforeAll(async () => {
   await knex.migrate.latest();
 });
@@ -74,6 +83,24 @@ describe("P10 zod boundary validation", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe("validation_error");
   });
+
+  it("POST /cases with an unknown case_type returns 400 validation_error", async () => {
+    const res = await request(app)
+      .post("/cases")
+      .set("Authorization", `Bearer ${caseToken}`)
+      .send({ case_type: "Mortgage", title: "x" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+  });
+
+  it("POST /cases/:id/resolve with an invalid status returns 400 validation_error", async () => {
+    const res = await request(app)
+      .post("/cases/some-id/resolve")
+      .set("Authorization", `Bearer ${caseToken}`)
+      .send({ status: "Bogus", resolution: "x" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+  });
 });
 
 describe("P10 OpenAPI document", () => {
@@ -82,10 +109,18 @@ describe("P10 OpenAPI document", () => {
     expect(res.status).toBe(200);
     expect(res.body.openapi).toBe("3.1.0");
     const paths = Object.keys(res.body.paths);
+    expect(paths).toContain("/health");
     expect(paths).toContain("/templates");
     expect(paths).toContain("/workflows");
+    expect(paths).toContain("/workflows/{id}");
     expect(paths).toContain("/workflows/{id}/claim");
     expect(paths).toContain("/workflows/{id}/act");
+    // cases coverage
+    expect(paths).toContain("/cases");
+    expect(paths).toContain("/cases/metrics");
+    expect(paths).toContain("/cases/{id}");
+    expect(paths).toContain("/cases/{id}/documents");
+    expect(paths).toContain("/cases/{id}/resolve");
     // auth scheme present: bearer JWT + internal token
     expect(res.body.components.securitySchemes.bearerAuth.scheme).toBe("bearer");
     expect(res.body.components.securitySchemes.internalToken.name).toBe(

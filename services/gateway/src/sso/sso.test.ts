@@ -93,6 +93,14 @@ describe("GET /auth/config", () => {
 });
 
 describe("provider disabled vs local login", () => {
+  it("returns 400 validation_error for an enabled LDAP route with a missing password", async () => {
+    const ac = loadAuthConfig({ AUTH_LDAP_ENABLED: "true" } as NodeJS.ProcessEnv);
+    const res = await request(appWith(ac)).post("/auth/ldap/login").send({ username: "x" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+    expect(Array.isArray(res.body.issues)).toBe(true);
+  });
+
   it("returns 404 provider_disabled for a disabled LDAP route", async () => {
     const res = await request(appWith(baseAuthConfig()))
       .post("/auth/ldap/login").send({ username: "x", password: "y" });

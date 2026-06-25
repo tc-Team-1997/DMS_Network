@@ -49,6 +49,23 @@ describe("P10 zod boundary validation", () => {
     expect(res.body.error).toBe("validation_error");
   });
 
+  it("GET /integration/logs with an out-of-range limit returns 400 validation_error", async () => {
+    const res = await request(app)
+      .get("/integration/logs?limit=9999")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+  });
+
+  it("PUT /integration/systems/:id/inbound-secret with a too-short secret returns 400 validation_error", async () => {
+    const res = await request(app)
+      .put("/integration/systems/cbs/inbound-secret")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ secret: "short" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+  });
+
   it("a correctly-signed inbound webhook with an invalid payload returns 400 validation_error", async () => {
     const before = events.emitted.length;
     // valid signature over the raw body, but missing required `cid`
@@ -81,10 +98,15 @@ describe("P10 OpenAPI document", () => {
     expect(res.status).toBe(200);
     expect(res.body.openapi).toBe("3.1.0");
     const paths = Object.keys(res.body.paths);
+    expect(paths).toContain("/health");
     expect(paths).toContain("/webhooks/cbs/customer-updated");
+    expect(paths).toContain("/webhooks/los/loan-application");
+    expect(paths).toContain("/webhooks/kyc/verification-result");
     expect(paths).toContain("/outbound");
     expect(paths).toContain("/outbound/test");
     expect(paths).toContain("/integration/logs");
+    expect(paths).toContain("/integration/systems");
+    expect(paths).toContain("/integration/systems/{id}/inbound-secret");
     const schemes = res.body.components.securitySchemes;
     expect(schemes.bearerAuth).toBeTruthy();
     expect(schemes.internalToken.name).toBe("x-internal-token");

@@ -5,8 +5,16 @@ import { writeAudit } from "../audit.js";
 import type { EventBus } from "../events.js";
 import { requireAuth, requirePermission, asyncHandler } from "@zordms/auth";
 import { newId } from "@zordms/db";
-
-const CASE_TYPES = ["KYC", "Loan", "Account", "AML"];
+import {
+  validate,
+  CreateCaseBody,
+  CaseIdParam,
+  AttachCaseDocumentBody,
+  ResolveCaseBody,
+  type CreateCaseBody as CreateCaseBodyT,
+  type AttachCaseDocumentBody as AttachCaseDocumentBodyT,
+  type ResolveCaseBody as ResolveCaseBodyT,
+} from "../schemas.js";
 
 // F15: shared unwrapId removed; using insert-then-refetch (F7) throughout.
 // F7: Insert-then-refetch for Oracle compatibility — no .returning("id").
@@ -92,25 +100,10 @@ export function casesRouter(): Router {
     "/",
     requireAuth,
     requirePermission("case:create"),
+    validate(CreateCaseBody, "body"),
     asyncHandler(async (req, res) => {
       const { knex, events } = req.app.locals.deps as { knex: Knex; events?: EventBus };
-      const body = req.body as {
-        case_type: string;
-        title: string;
-        assigned_to?: string;
-        due_at?: string;
-        template_id?: string;
-        doc_confidence?: number;
-        created_by?: string;
-      };
-      if (!CASE_TYPES.includes(body.case_type)) {
-        res.status(400).json({ error: "invalid_case_type" });
-        return;
-      }
-      if (!body.title) {
-        res.status(400).json({ error: "title_required" });
-        return;
-      }
+      const body = req.body as CreateCaseBodyT;
 
       const typeCount = Number(
         (
@@ -198,13 +191,11 @@ export function casesRouter(): Router {
     "/:id/documents",
     requireAuth,
     requirePermission("case:manage"),
+    validate(CaseIdParam, "params"),
+    validate(AttachCaseDocumentBody, "body"),
     asyncHandler(async (req, res) => {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const { doc_id, label } = req.body as { doc_id: string; label?: string };
-      if (!doc_id) {
-        res.status(400).json({ error: "doc_id_required" });
-        return;
-      }
+      const { doc_id, label } = req.body as AttachCaseDocumentBodyT;
       const caseId = req.params.id;
       const exists = await knex("cases").where({ id: caseId }).first();
       if (!exists) {
@@ -287,16 +278,11 @@ export function casesRouter(): Router {
     "/:id/resolve",
     requireAuth,
     requirePermission("case:manage"),
+    validate(CaseIdParam, "params"),
+    validate(ResolveCaseBody, "body"),
     asyncHandler(async (req, res) => {
       const { knex } = req.app.locals.deps as { knex: Knex };
-      const { status, resolution } = req.body as {
-        status: "Resolved" | "Rejected";
-        resolution: string;
-      };
-      if (!["Resolved", "Rejected"].includes(status)) {
-        res.status(400).json({ error: "invalid_status" });
-        return;
-      }
+      const { status, resolution } = req.body as ResolveCaseBodyT;
       const c = await knex("cases").where({ id: req.params.id }).first();
       if (!c) {
         res.status(404).json({ error: "not_found" });

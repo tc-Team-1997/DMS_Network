@@ -5,6 +5,11 @@
  * @asteasolutions/zod-to-openapi (OpenApiGeneratorV31), so the documented request
  * bodies stay in lock-step with what the service actually validates.
  *
+ * Every route mounted by `createApp` (see ../app.ts) is registered here with its
+ * path/method, params/query, request body, and realistic response codes + schemas.
+ * The contract test in ./openapi.test.ts asserts the documented path set EXACTLY
+ * matches the live router (no undocumented or phantom routes).
+ *
  * `buildOpenApiDocument()` returns the spec object; `writeOpenApiSpec(path)`
  * persists it to disk (used to regenerate docs/superpowers/specs/openapi/core.json).
  */
@@ -34,6 +39,24 @@ import {
   CustomerUpsertSchema,
   LoanIntakeSchema,
   ValidationErrorSchema,
+  ErrorResponseSchema,
+  DedupValidationErrorSchema,
+  MetadataValidationErrorSchema,
+  AuditQuerySchema,
+  JobsQuerySchema,
+  DocumentSchema,
+  FolderSchema,
+  FolderTreeNodeSchema,
+  VersionSchema,
+  AnnotationSchema,
+  DocTypeSchema,
+  DedupConfigStateSchema,
+  QualitySchema,
+  CatalogResultSchema,
+  LegalHoldSchema,
+  CustomerProfileSchema,
+  JobSchema,
+  HealthSchema,
 } from "./schemas.js";
 
 const idParam = z.string().openapi({ param: { name: "id", in: "path" }, example: "doc_123" });
@@ -42,25 +65,41 @@ const documentIdParam = z
   .openapi({ param: { name: "documentId", in: "path" }, example: "doc_123" });
 const codeParam = z.string().openapi({ param: { name: "code", in: "path" }, example: "BT_CID_4G" });
 const refParam = z.string().openapi({ param: { name: "ref", in: "path" }, example: "HOLD-2026-01" });
+const cidParam = z.string().openapi({ param: { name: "cid", in: "path" }, example: "10705001234" });
+const docIdParam = z
+  .string()
+  .openapi({ param: { name: "docId", in: "path" }, example: "doc_123" });
+const annIdParam = z.string().openapi({ param: { name: "id", in: "path" }, example: "ann_123" });
+const jobIdParam = z.string().openapi({ param: { name: "id", in: "path" }, example: "job_123" });
 
 const bearer = [{ bearerAuth: [] as string[] }];
 const internal = [{ internalToken: [] as string[] }];
 
-const validationErrorResponse = {
-  description: "Request failed boundary validation.",
-  content: { "application/json": { schema: ValidationErrorSchema } },
-};
+// ── Reusable response builders ───────────────────────────────────────────────
+function json(description: string, schema: z.ZodType, example?: unknown): RouteConfig["responses"][string] {
+  return {
+    description,
+    content: { "application/json": example !== undefined ? { schema, example } : { schema } },
+  };
+}
+
+const validationErrorResponse = json(
+  "Request failed boundary validation.",
+  ValidationErrorSchema,
+  { error: "validation_error", issues: [{ path: ["name"], message: "Expected string, received number", code: "invalid_type" }] },
+);
+const unauthorized = json("Missing/invalid credentials.", ErrorResponseSchema, { error: "unauthorized" });
+const forbidden = json("Caller lacks the required permission.", ErrorResponseSchema, { error: "forbidden" });
+const notFound = json("Resource not found.", ErrorResponseSchema, { error: "not_found" });
+const internalError = json("Unexpected server error.", ErrorResponseSchema, { error: "internal" });
+
+/** Generic empty-object 2xx (used only where the body is an opaque pass-through map). */
+function ok(description: string): RouteConfig["responses"][string] {
+  return json(description, z.object({}).passthrough().openapi("GenericOk"));
+}
 
 function jsonBody(schema: z.ZodType): RouteConfig["request"] {
   return { body: { content: { "application/json": { schema } } } };
-}
-
-/** Generic 2xx JSON ok response (responses are not the focus of P10 validation). */
-function ok(description: string): RouteConfig["responses"][string] {
-  return {
-    description,
-    content: { "application/json": { schema: z.object({}).passthrough().openapi("GenericOk") } },
-  };
 }
 
 function register(routes: RouteConfig[]): void {
@@ -68,19 +107,26 @@ function register(routes: RouteConfig[]): void {
 }
 
 register([
-  // ── Health / spec ──────────────────────────────────────────────────────────
+  // ── Meta ─────────────────────────────────────────────────────────────────
   {
     method: "get",
     path: "/health",
     tags: ["meta"],
     summary: "Liveness probe.",
-    responses: { 200: ok("Service is up.") },
+    responses: { 200: json("Service is up.", HealthSchema, { status: "ok", service: "core" }) },
   },
   {
     method: "get",
     path: "/openapi.json",
     tags: ["meta"],
-    summary: "This OpenAPI 3.1 document.",
+    summary: "This OpenAPI 3.1 document (JSON).",
+    responses: { 200: ok("The OpenAPI spec.") },
+  },
+  {
+    method: "get",
+    path: "/openapi",
+    tags: ["meta"],
+    summary: "This OpenAPI 3.1 document (raw, pretty-printed JSON).",
     responses: { 200: ok("The OpenAPI spec.") },
   },
 
@@ -92,7 +138,26 @@ register([
     security: bearer,
     summary: "Create a folder.",
     request: jsonBody(CreateFolderSchema),
-    responses: { 201: ok("Folder created."), 400: validationErrorResponse, 401: ok("Unauthorized.") },
+    responses: {
+      201: json("Folder created.", z.object({ folder: FolderSchema }), { folder: { id: "fld_1", name: "Customers" } }),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/folders",
+    tags: ["folders"],
+    security: bearer,
+    summary: "List the folder tree.",
+    responses: {
+      200: json("Folder tree.", z.object({ tree: z.array(FolderTreeNodeSchema) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -101,10 +166,122 @@ register([
     security: bearer,
     summary: "Move a folder under a new parent.",
     request: { params: z.object({ id: idParam }), ...jsonBody(MoveFolderSchema) },
-    responses: { 200: ok("Folder moved."), 400: validationErrorResponse },
+    responses: {
+      200: json("Folder moved.", z.object({ folder: FolderSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
   },
 
-  // ── Documents ──────────────────────────────────────────────────────────────
+  // ── Documents ────────────────────────────────────────────────────────────
+  {
+    method: "post",
+    path: "/documents",
+    tags: ["documents"],
+    security: bearer,
+    summary: "Capture a document (multipart upload).",
+    description: "multipart/form-data: `file` (required) plus optional `title`, `branch`, `sourceChannel`, `folderId`.",
+    request: {
+      body: {
+        content: {
+          "multipart/form-data": {
+            schema: z.object({
+              file: z.string().openapi({ type: "string", format: "binary" }),
+              title: z.string().optional(),
+              branch: z.string().optional(),
+              sourceChannel: z.string().optional(),
+              folderId: z.string().optional(),
+            }),
+          },
+        },
+      },
+    },
+    responses: {
+      201: json("Document captured.", z.object({ document: DocumentSchema })),
+      400: json("Missing file.", ErrorResponseSchema, { error: "file_required" }),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "post",
+    path: "/documents/bulk",
+    tags: ["documents"],
+    security: bearer,
+    summary: "Bulk-capture documents; enqueues async extraction per file.",
+    description: "multipart/form-data: `files[]` (up to 200) plus optional `branch`, `sourceChannel`, `folderId`.",
+    request: {
+      body: {
+        content: {
+          "multipart/form-data": {
+            schema: z.object({
+              files: z.array(z.string().openapi({ type: "string", format: "binary" })),
+              branch: z.string().optional(),
+              sourceChannel: z.string().optional(),
+              folderId: z.string().optional(),
+            }),
+          },
+        },
+      },
+    },
+    responses: {
+      202: json("Captured + queued.", z.object({
+        count: z.number(),
+        items: z.array(z.object({ docId: z.string(), jobId: z.string() })),
+        status: z.literal("queued"),
+      }), { count: 2, items: [{ docId: "doc_1", jobId: "job_1" }], status: "queued" }),
+      400: json("No files provided.", ErrorResponseSchema, { error: "files_required" }),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/documents",
+    tags: ["documents"],
+    security: bearer,
+    summary: "List documents visible to the caller's branch.",
+    responses: {
+      200: json("Documents.", z.object({ documents: z.array(DocumentSchema) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/documents/{id}",
+    tags: ["documents"],
+    security: bearer,
+    summary: "Fetch a single document.",
+    request: { params: z.object({ id: idParam }) },
+    responses: {
+      200: json("Document.", z.object({ document: DocumentSchema }), { document: { id: "doc_123", title: "KYC form", status: "Active" } }),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/documents/{id}/download",
+    tags: ["documents"],
+    security: bearer,
+    summary: "Download the current version bytes.",
+    request: { params: z.object({ id: idParam }) },
+    responses: {
+      200: { description: "File bytes.", content: { "application/octet-stream": { schema: { type: "string", format: "binary" } as unknown as z.ZodType } } },
+      401: unauthorized,
+      403: forbidden,
+      404: json("Document or version not found.", ErrorResponseSchema, { error: "no_version" }),
+      500: internalError,
+    },
+  },
   {
     method: "delete",
     path: "/documents/{id}",
@@ -112,7 +289,49 @@ register([
     security: bearer,
     summary: "Soft-delete a document (blocked under legal hold).",
     request: { params: z.object({ id: idParam }) },
-    responses: { 204: { description: "Deleted." }, 409: ok("Under legal hold.") },
+    responses: {
+      204: { description: "Deleted." },
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      409: json("Under an active legal hold.", ErrorResponseSchema, { error: "under_legal_hold" }),
+      500: internalError,
+    },
+  },
+  {
+    method: "post",
+    path: "/documents/{id}/versions",
+    tags: ["documents"],
+    security: bearer,
+    summary: "Add a new version (multipart upload).",
+    description: "multipart/form-data: `file` (required), optional `comment`.",
+    request: {
+      params: z.object({ id: idParam }),
+      body: { content: { "multipart/form-data": { schema: z.object({ file: z.string().openapi({ type: "string", format: "binary" }), comment: z.string().optional() }) } } },
+    },
+    responses: {
+      201: json("Version added.", z.object({ version: VersionSchema })),
+      400: json("Missing file.", ErrorResponseSchema, { error: "file_required" }),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/documents/{id}/versions",
+    tags: ["documents"],
+    security: bearer,
+    summary: "List document versions.",
+    request: { params: z.object({ id: idParam }) },
+    responses: {
+      200: json("Versions.", z.object({ versions: z.array(VersionSchema) })),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -121,7 +340,14 @@ register([
     security: bearer,
     summary: "Roll a document back to a prior version.",
     request: { params: z.object({ id: idParam }), ...jsonBody(RollbackSchema) },
-    responses: { 200: ok("Rolled back."), 400: validationErrorResponse },
+    responses: {
+      200: json("Rolled back.", z.object({ version: VersionSchema }), { version: { version_no: 2 } }),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -130,7 +356,14 @@ register([
     security: bearer,
     summary: "Burn a visible stamp into a new version.",
     request: { params: z.object({ id: idParam }), ...jsonBody(StampSchema) },
-    responses: { 201: ok("Stamped."), 400: validationErrorResponse },
+    responses: {
+      201: json("Stamped.", z.object({ version: VersionSchema, download: z.string() })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -139,7 +372,18 @@ register([
     security: bearer,
     summary: "Destructively redact regions into a new version.",
     request: { params: z.object({ id: idParam }), ...jsonBody(RedactSchema) },
-    responses: { 201: ok("Redacted."), 400: validationErrorResponse },
+    responses: {
+      201: json("Redacted.", z.object({
+        version: VersionSchema,
+        download: z.string(),
+        redaction: z.object({ rasterized: z.boolean(), guarantee: z.string() }),
+      })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "patch",
@@ -148,7 +392,14 @@ register([
     security: bearer,
     summary: "Correct document metadata.",
     request: { params: z.object({ id: idParam }), ...jsonBody(PatchDocumentSchema) },
-    responses: { 200: ok("Updated."), 400: validationErrorResponse },
+    responses: {
+      200: json("Updated.", z.object({ document: DocumentSchema, quality: QualitySchema, catalog: CatalogResultSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -157,7 +408,15 @@ register([
     security: bearer,
     summary: "Run AI extraction (sync, or async with { async: true }).",
     request: { params: z.object({ id: idParam }), ...jsonBody(ExtractSchema) },
-    responses: { 200: ok("Extracted."), 202: ok("Queued."), 400: validationErrorResponse },
+    responses: {
+      200: ok("Extracted (sync)."),
+      202: json("Queued (async).", z.object({ jobId: z.string(), status: z.string() }), { jobId: "job_1", status: "queued" }),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -166,10 +425,64 @@ register([
     security: bearer,
     summary: "Enqueue a durable async extraction job.",
     request: { params: z.object({ id: idParam }) },
-    responses: { 202: ok("Queued.") },
+    responses: {
+      202: json("Queued.", z.object({ jobId: z.string(), status: z.string() }), { jobId: "job_1", status: "queued" }),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
 
-  // ── Index / Catalog / Mapper ─────────────────────────────────────────────
+  // ── Annotations ────────────────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/documents/{documentId}/annotations",
+    tags: ["annotations"],
+    security: bearer,
+    summary: "List annotations on a document.",
+    request: { params: z.object({ documentId: documentIdParam }) },
+    responses: {
+      200: json("Annotations.", z.object({ annotations: z.array(AnnotationSchema) })),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
+  },
+  {
+    method: "post",
+    path: "/documents/{documentId}/annotations",
+    tags: ["annotations"],
+    security: bearer,
+    summary: "Create an annotation on a document.",
+    request: { params: z.object({ documentId: documentIdParam }), ...jsonBody(CreateAnnotationSchema) },
+    responses: {
+      201: json("Created.", z.object({ annotation: AnnotationSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
+  },
+  {
+    method: "delete",
+    path: "/documents/{documentId}/annotations/{id}",
+    tags: ["annotations"],
+    security: bearer,
+    summary: "Delete an annotation.",
+    request: { params: z.object({ documentId: documentIdParam, id: annIdParam }) },
+    responses: {
+      204: { description: "Deleted." },
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
+  },
+
+  // ── Pipeline: index / catalog / mapper ───────────────────────────────────
   {
     method: "post",
     path: "/index/{documentId}",
@@ -177,7 +490,15 @@ register([
     security: bearer,
     summary: "Index a document's typed metadata.",
     request: { params: z.object({ documentId: documentIdParam }), ...jsonBody(IndexSchema) },
-    responses: { 200: ok("Indexed."), 400: validationErrorResponse, 422: ok("Metadata invalid.") },
+    responses: {
+      200: json("Indexed.", z.object({ document: DocumentSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      422: json("Typed metadata invalid for the doc type.", MetadataValidationErrorSchema, { errors: ["cid_no is required"], missing: ["cid_no"] }),
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -186,7 +507,14 @@ register([
     security: bearer,
     summary: "Catalog/classify a document.",
     request: { params: z.object({ documentId: documentIdParam }), ...jsonBody(CatalogSchema) },
-    responses: { 200: ok("Cataloged."), 400: validationErrorResponse },
+    responses: {
+      200: json("Cataloged.", z.object({ result: CatalogResultSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -195,30 +523,50 @@ register([
     security: bearer,
     summary: "Auto-file a document into the directory tree.",
     request: { params: z.object({ documentId: documentIdParam }), ...jsonBody(MapperSchema) },
-    responses: { 200: ok("Filed."), 400: validationErrorResponse },
+    responses: {
+      200: json("Filed.", z.object({ path: z.string(), folderId: z.string(), acls: z.array(z.unknown()) }), { path: "/BoB/Customers", folderId: "fld_1", acls: [] }),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
 
-  // ── Annotations ──────────────────────────────────────────────────────────
+  // ── Dashboard ────────────────────────────────────────────────────────────
   {
-    method: "post",
-    path: "/documents/{documentId}/annotations",
-    tags: ["annotations"],
+    method: "get",
+    path: "/dashboard/summary",
+    tags: ["dashboard"],
     security: bearer,
-    summary: "Create an annotation on a document.",
-    request: { params: z.object({ documentId: documentIdParam }), ...jsonBody(CreateAnnotationSchema) },
-    responses: { 201: ok("Created."), 400: validationErrorResponse },
-  },
-  {
-    method: "delete",
-    path: "/documents/{documentId}/annotations/{id}",
-    tags: ["annotations"],
-    security: bearer,
-    summary: "Delete an annotation.",
-    request: { params: z.object({ documentId: documentIdParam, id: idParam }) },
-    responses: { 204: { description: "Deleted." }, 404: ok("Not found.") },
+    summary: "Dashboard summary counts.",
+    responses: {
+      200: json("Summary.", z.object({
+        totalDocuments: z.number(),
+        byCategory: z.record(z.string(), z.number()),
+        pendingReview: z.number(),
+        indexedToday: z.number(),
+      }), { totalDocuments: 42, byCategory: { KYC: 10 }, pendingReview: 3, indexedToday: 5 }),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
   },
 
   // ── Branches ─────────────────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/branches",
+    tags: ["branches"],
+    security: bearer,
+    summary: "List branches.",
+    responses: {
+      200: json("Branches.", z.object({ branches: z.array(z.record(z.string(), z.unknown())) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
   {
     method: "post",
     path: "/branches",
@@ -226,7 +574,26 @@ register([
     security: bearer,
     summary: "Create a branch.",
     request: jsonBody(CreateBranchSchema),
-    responses: { 201: ok("Created."), 400: validationErrorResponse },
+    responses: {
+      201: json("Created.", z.object({ branch: z.record(z.string(), z.unknown()) })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/branches/access",
+    tags: ["branches"],
+    security: bearer,
+    summary: "List cross-branch access policies.",
+    responses: {
+      200: json("Policies.", z.object({ policies: z.array(z.record(z.string(), z.unknown())) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -235,10 +602,58 @@ register([
     security: bearer,
     summary: "Set a cross-branch access policy.",
     request: jsonBody(AccessPolicySchema),
-    responses: { 201: ok("Set."), 400: validationErrorResponse },
+    responses: {
+      201: json("Set.", z.object({ policy: z.record(z.string(), z.unknown()) })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
   },
 
-  // ── Records / legal holds ────────────────────────────────────────────────
+  // ── Customers (Customer 360) ─────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/customers/{cid}",
+    tags: ["customers"],
+    security: bearer,
+    summary: "Customer 360 profile by CID.",
+    request: { params: z.object({ cid: cidParam }) },
+    responses: {
+      200: json("Profile.", z.object({ profile: CustomerProfileSchema })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+
+  // ── Records / legal holds / disposal ─────────────────────────────────────
+  {
+    method: "get",
+    path: "/records/file-plan",
+    tags: ["records"],
+    security: bearer,
+    summary: "List retention file-plan policies.",
+    responses: {
+      200: json("Policies.", z.object({ policies: z.array(z.record(z.string(), z.unknown())) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/records/holds",
+    tags: ["records"],
+    security: bearer,
+    summary: "List legal holds.",
+    responses: {
+      200: json("Holds.", z.object({ holds: z.array(LegalHoldSchema) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
   {
     method: "post",
     path: "/records/holds",
@@ -246,7 +661,13 @@ register([
     security: bearer,
     summary: "Place a legal hold.",
     request: jsonBody(PlaceHoldSchema),
-    responses: { 201: ok("Placed."), 400: validationErrorResponse },
+    responses: {
+      201: json("Placed.", z.object({ hold: LegalHoldSchema }), { hold: { ref: "HOLD-2026-01", scope: "cid:10705001234" } }),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -255,7 +676,25 @@ register([
     security: bearer,
     summary: "Release a legal hold.",
     request: { params: z.object({ ref: refParam }) },
-    responses: { 200: ok("Released.") },
+    responses: {
+      200: json("Released.", z.object({ hold: LegalHoldSchema })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/records/disposal/eligibility",
+    tags: ["records"],
+    security: bearer,
+    summary: "List documents eligible for disposal.",
+    responses: {
+      200: json("Candidates.", z.object({ candidates: z.array(z.record(z.string(), z.unknown())) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -264,21 +703,167 @@ register([
     security: bearer,
     summary: "Certify disposal of a document.",
     request: { params: z.object({ documentId: documentIdParam }) },
-    responses: { 201: ok("Certified."), 409: ok("Under legal hold / not eligible.") },
+    responses: {
+      201: ok("Certified."),
+      401: unauthorized,
+      403: forbidden,
+      409: json("Under legal hold / not eligible.", ErrorResponseSchema, { error: "under_legal_hold" }),
+      500: internalError,
+    },
   },
 
-  // ── Admin: dedup config ──────────────────────────────────────────────────
+  // ── Compliance ───────────────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/compliance/scorecard",
+    tags: ["compliance"],
+    security: bearer,
+    summary: "Compliance scorecard.",
+    responses: {
+      200: json("Scorecard.", z.object({ scorecard: z.record(z.string(), z.unknown()) })),
+      401: unauthorized,
+      403: forbidden,
+    },
+  },
+  {
+    method: "get",
+    path: "/compliance/matrix",
+    tags: ["compliance"],
+    security: bearer,
+    summary: "Regulatory matrix.",
+    responses: {
+      200: json("Matrix.", z.object({ matrix: z.array(z.record(z.string(), z.unknown())) })),
+      401: unauthorized,
+      403: forbidden,
+    },
+  },
+  {
+    method: "get",
+    path: "/compliance/audit",
+    tags: ["compliance"],
+    security: bearer,
+    summary: "Query the audit trail (filtered/paginated).",
+    request: { query: AuditQuerySchema },
+    responses: {
+      200: json("Audit rows.", z.object({ rows: z.array(z.record(z.string(), z.unknown())) })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/compliance/verify",
+    tags: ["compliance"],
+    security: bearer,
+    summary: "Verify the audit hash chain.",
+    responses: {
+      200: json("Verification.", z.object({ verification: z.record(z.string(), z.unknown()) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/lifecycle/{docId}",
+    tags: ["lifecycle"],
+    security: bearer,
+    summary: "Document lifecycle trace.",
+    request: { params: z.object({ docId: docIdParam }) },
+    responses: {
+      200: json("Trace.", z.object({ trace: z.record(z.string(), z.unknown()) })),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+    },
+  },
+
+  // ── Admin (sysadmin + dedup config) ──────────────────────────────────────
+  {
+    method: "get",
+    path: "/admin/health",
+    tags: ["admin"],
+    security: bearer,
+    summary: "Service-health posture.",
+    responses: {
+      200: json("Health.", z.object({ health: z.record(z.string(), z.unknown()) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/admin/dr",
+    tags: ["admin"],
+    security: bearer,
+    summary: "Disaster-recovery posture.",
+    responses: {
+      200: json("DR posture.", z.object({ dr: z.record(z.string(), z.unknown()) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/admin/schedules",
+    tags: ["admin"],
+    security: bearer,
+    summary: "Scheduled jobs.",
+    responses: {
+      200: json("Schedules.", z.object({ schedules: z.array(z.record(z.string(), z.unknown())) })),
+      401: unauthorized,
+      403: forbidden,
+    },
+  },
+  {
+    method: "get",
+    path: "/admin/dedup-config",
+    tags: ["admin"],
+    security: bearer,
+    summary: "Read dedup configuration.",
+    responses: {
+      200: json("Dedup config.", z.object({ dedupConfig: DedupConfigStateSchema })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
   {
     method: "put",
     path: "/admin/dedup-config",
     tags: ["admin"],
     security: bearer,
     summary: "Update dedup configuration.",
+    description: "Invalid values are rejected with 422 { errors: string[] } (NOT the 400 validation_error envelope).",
     request: jsonBody(DedupConfigSchema),
-    responses: { 200: ok("Updated."), 400: validationErrorResponse },
+    responses: {
+      200: json("Updated.", z.object({ dedupConfig: DedupConfigStateSchema })),
+      401: unauthorized,
+      403: forbidden,
+      422: json("Invalid dedup configuration.", DedupValidationErrorSchema, { errors: ["enabled must be boolean"] }),
+      500: internalError,
+    },
   },
 
   // ── Doc-type registry ────────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/doc-types",
+    tags: ["doc-types"],
+    security: bearer,
+    summary: "List the doc-type registry (+ observed-in-documents types).",
+    responses: {
+      200: json("Doc types.", z.object({ docTypes: z.array(DocTypeSchema), total: z.number() })),
+      401: unauthorized,
+      500: internalError,
+    },
+  },
   {
     method: "post",
     path: "/doc-types",
@@ -286,7 +871,14 @@ register([
     security: bearer,
     summary: "Create a custom doc type.",
     request: jsonBody(CreateDocTypeSchema),
-    responses: { 201: ok("Created."), 400: validationErrorResponse, 409: ok("Conflict.") },
+    responses: {
+      201: json("Created.", z.object({ docType: DocTypeSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      409: json("Doc type already exists.", ErrorResponseSchema, { error: "conflict" }),
+      500: internalError,
+    },
   },
   {
     method: "put",
@@ -295,7 +887,14 @@ register([
     security: bearer,
     summary: "Edit a doc type.",
     request: { params: z.object({ code: codeParam }), ...jsonBody(UpdateDocTypeSchema) },
-    responses: { 200: ok("Updated."), 400: validationErrorResponse, 404: ok("Not found.") },
+    responses: {
+      200: json("Updated.", z.object({ docType: DocTypeSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "delete",
@@ -304,7 +903,13 @@ register([
     security: bearer,
     summary: "Delete a custom doc type.",
     request: { params: z.object({ code: codeParam }) },
-    responses: { 200: ok("Deleted."), 403: ok("System type."), 404: ok("Not found.") },
+    responses: {
+      200: json("Deleted.", z.object({ deleted: z.boolean(), code: z.string() }), { deleted: true, code: "MY_TYPE" }),
+      401: unauthorized,
+      403: json("System doc type cannot be deleted.", ErrorResponseSchema, { error: "forbidden" }),
+      404: notFound,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -313,7 +918,14 @@ register([
     security: bearer,
     summary: "Persist an AI-suggested doc type.",
     request: jsonBody(FromSuggestionSchema),
-    responses: { 201: ok("Created."), 400: validationErrorResponse, 409: ok("Conflict.") },
+    responses: {
+      201: json("Created.", z.object({ docType: DocTypeSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      409: json("Doc type already exists.", ErrorResponseSchema, { error: "conflict" }),
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -322,7 +934,45 @@ register([
     security: bearer,
     summary: "Replace a doc type's field schema.",
     request: { params: z.object({ code: codeParam }), ...jsonBody(ApplyFieldsSchema) },
-    responses: { 200: ok("Applied."), 400: validationErrorResponse, 404: ok("Not found.") },
+    responses: {
+      200: json("Applied.", z.object({ docType: DocTypeSchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
+  },
+
+  // ── Jobs ─────────────────────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/jobs",
+    tags: ["jobs"],
+    security: bearer,
+    summary: "Job monitor: counts + recent jobs (filtered/paginated).",
+    request: { query: JobsQuerySchema },
+    responses: {
+      200: json("Jobs.", z.object({ counts: z.record(z.string(), z.number()), jobs: z.array(JobSchema) })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/jobs/{id}",
+    tags: ["jobs"],
+    security: bearer,
+    summary: "Poll a single job's status.",
+    request: { params: z.object({ id: jobIdParam }) },
+    responses: {
+      200: json("Job.", JobSchema, { id: "job_1", type: "extract", status: "succeeded" }),
+      401: unauthorized,
+      404: notFound,
+      500: internalError,
+    },
   },
 
   // ── Integration (internal, x-internal-token) ─────────────────────────────
@@ -333,7 +983,13 @@ register([
     security: internal,
     summary: "CBS customer upsert (internal).",
     request: jsonBody(CustomerUpsertSchema),
-    responses: { 200: ok("Updated."), 201: ok("Created."), 400: validationErrorResponse, 401: ok("Unauthorized.") },
+    responses: {
+      200: json("Updated.", z.object({ change: z.literal("updated"), cid: z.string() }), { change: "updated", cid: "10705001234" }),
+      201: json("Created.", z.object({ change: z.literal("created"), cid: z.string() }), { change: "created", cid: "10705001234" }),
+      400: validationErrorResponse,
+      401: unauthorized,
+      500: internalError,
+    },
   },
   {
     method: "post",
@@ -342,7 +998,13 @@ register([
     security: internal,
     summary: "LOS loan-intake upsert (internal).",
     request: jsonBody(LoanIntakeSchema),
-    responses: { 200: ok("Updated."), 201: ok("Created."), 400: validationErrorResponse, 401: ok("Unauthorized.") },
+    responses: {
+      200: json("Updated.", z.object({ change: z.literal("updated"), applicationId: z.string() }), { change: "updated", applicationId: "LOS-1001" }),
+      201: json("Created.", z.object({ change: z.literal("created"), applicationId: z.string() }), { change: "created", applicationId: "LOS-1001" }),
+      400: validationErrorResponse,
+      401: unauthorized,
+      500: internalError,
+    },
   },
 ]);
 
@@ -366,11 +1028,16 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       { name: "documents" },
       { name: "pipeline" },
       { name: "annotations" },
+      { name: "dashboard" },
       { name: "branches" },
+      { name: "customers" },
       { name: "records" },
+      { name: "compliance" },
+      { name: "lifecycle" },
       { name: "admin" },
       { name: "doc-types" },
       { name: "extraction" },
+      { name: "jobs" },
       { name: "integration" },
     ],
   }) as unknown as Record<string, unknown>;

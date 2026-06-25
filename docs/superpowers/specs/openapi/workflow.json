@@ -164,6 +164,93 @@
         "required": [
           "error"
         ]
+      },
+      "CaseType": {
+        "type": "string",
+        "enum": [
+          "KYC",
+          "Loan",
+          "Account",
+          "AML"
+        ]
+      },
+      "CreateCaseBody": {
+        "type": "object",
+        "properties": {
+          "case_type": {
+            "$ref": "#/components/schemas/CaseType"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "assigned_to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "due_at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "template_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "doc_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "created_by": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "case_type",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "AttachCaseDocumentBody": {
+        "type": "object",
+        "properties": {
+          "doc_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "doc_id"
+        ],
+        "additionalProperties": false
+      },
+      "ResolveCaseBody": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "Resolved",
+              "Rejected"
+            ]
+          },
+          "resolution": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "status",
+          "resolution"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -585,6 +672,380 @@
           },
           "500": {
             "description": "Authority service unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases": {
+      "post": {
+        "summary": "Open a case (optionally instantiating its workflow)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Case created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "case": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "case"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing case:create permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "case_ref or workflow_ref conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List cases (most recent first)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cases.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cases": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "cases"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/metrics": {
+      "get": {
+        "summary": "Aggregate case metrics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case metrics summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "number"
+                    },
+                    "open": {
+                      "type": "number"
+                    },
+                    "resolved": {
+                      "type": "number"
+                    },
+                    "by_type": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "avg_resolution_minutes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "open",
+                    "resolved",
+                    "by_type",
+                    "avg_resolution_minutes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{id}": {
+      "get": {
+        "summary": "Fetch a case bundle (case + documents + workflow)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case bundle."
+          },
+          "401": {
+            "description": "Missing/invalid JWT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{id}/documents": {
+      "post": {
+        "summary": "Attach a document to a case",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachCaseDocumentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document attached."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing case:manage permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Case not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{id}/resolve": {
+      "post": {
+        "summary": "Resolve or reject a case",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCaseBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated case."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid JWT.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing case:manage permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
             "content": {
               "application/json": {
                 "schema": {

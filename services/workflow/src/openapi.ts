@@ -12,6 +12,10 @@ import {
   QueueStatusEnum,
   ValidationErrorResponse,
   ErrorResponse,
+  CreateCaseBody,
+  AttachCaseDocumentBody,
+  ResolveCaseBody,
+  CaseTypeEnum,
 } from "./schemas.js";
 
 // ---------------------------------------------------------------------------
@@ -58,6 +62,10 @@ export function buildOpenApiDocument(): Record<string, unknown> {
   registry.register("ActBody", ActBody);
   registry.register("ValidationErrorResponse", ValidationErrorResponse);
   registry.register("ErrorResponse", ErrorResponse);
+  registry.register("CaseType", CaseTypeEnum);
+  registry.register("CreateCaseBody", CreateCaseBody);
+  registry.register("AttachCaseDocumentBody", AttachCaseDocumentBody);
+  registry.register("ResolveCaseBody", ResolveCaseBody);
 
   const jsonBody = (schema: z.ZodTypeAny) => ({
     content: { "application/json": { schema } },
@@ -194,6 +202,125 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       404: errResp("Not found."),
       409: errResp("Closed/inactive/no-pending."),
       500: errResp("Authority service unavailable."),
+    },
+  });
+
+  // --- POST /cases ---------------------------------------------------------
+  registry.registerPath({
+    method: "post",
+    path: "/cases",
+    summary: "Open a case (optionally instantiating its workflow)",
+    security: bearer,
+    request: { body: jsonBody(CreateCaseBody) },
+    responses: {
+      201: {
+        description: "Case created.",
+        content: {
+          "application/json": {
+            schema: z.object({ case: z.record(z.string(), z.unknown()) }),
+          },
+        },
+      },
+      400: validationErr,
+      401: errResp("Missing/invalid JWT."),
+      403: errResp("Missing case:create permission."),
+      409: errResp("case_ref or workflow_ref conflict."),
+    },
+  });
+
+  // --- GET /cases ----------------------------------------------------------
+  registry.registerPath({
+    method: "get",
+    path: "/cases",
+    summary: "List cases (most recent first)",
+    security: bearer,
+    responses: {
+      200: {
+        description: "Cases.",
+        content: {
+          "application/json": {
+            schema: z.object({ cases: z.array(z.record(z.string(), z.unknown())) }),
+          },
+        },
+      },
+      401: errResp("Missing/invalid JWT."),
+    },
+  });
+
+  // --- GET /cases/metrics --------------------------------------------------
+  registry.registerPath({
+    method: "get",
+    path: "/cases/metrics",
+    summary: "Aggregate case metrics",
+    security: bearer,
+    responses: {
+      200: {
+        description: "Case metrics summary.",
+        content: {
+          "application/json": {
+            schema: z.object({
+              total: z.number(),
+              open: z.number(),
+              resolved: z.number(),
+              by_type: z.record(z.string(), z.number()),
+              avg_resolution_minutes: z.number(),
+            }),
+          },
+        },
+      },
+      401: errResp("Missing/invalid JWT."),
+    },
+  });
+
+  // --- GET /cases/{id} -----------------------------------------------------
+  registry.registerPath({
+    method: "get",
+    path: "/cases/{id}",
+    summary: "Fetch a case bundle (case + documents + workflow)",
+    security: bearer,
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: { description: "Case bundle." },
+      401: errResp("Missing/invalid JWT."),
+      404: errResp("Not found."),
+    },
+  });
+
+  // --- POST /cases/{id}/documents ------------------------------------------
+  registry.registerPath({
+    method: "post",
+    path: "/cases/{id}/documents",
+    summary: "Attach a document to a case",
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string() }),
+      body: jsonBody(AttachCaseDocumentBody),
+    },
+    responses: {
+      201: { description: "Document attached." },
+      400: validationErr,
+      401: errResp("Missing/invalid JWT."),
+      403: errResp("Missing case:manage permission."),
+      404: errResp("Case not found."),
+    },
+  });
+
+  // --- POST /cases/{id}/resolve --------------------------------------------
+  registry.registerPath({
+    method: "post",
+    path: "/cases/{id}/resolve",
+    summary: "Resolve or reject a case",
+    security: bearer,
+    request: {
+      params: z.object({ id: z.string() }),
+      body: jsonBody(ResolveCaseBody),
+    },
+    responses: {
+      200: { description: "Updated case." },
+      400: validationErr,
+      401: errResp("Missing/invalid JWT."),
+      403: errResp("Missing case:manage permission."),
+      404: errResp("Not found."),
     },
   });
 

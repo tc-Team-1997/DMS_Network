@@ -28,10 +28,22 @@
       "name": "annotations"
     },
     {
+      "name": "dashboard"
+    },
+    {
       "name": "branches"
     },
     {
+      "name": "customers"
+    },
+    {
       "name": "records"
+    },
+    {
+      "name": "compliance"
+    },
+    {
+      "name": "lifecycle"
     },
     {
       "name": "admin"
@@ -41,6 +53,9 @@
     },
     {
       "name": "extraction"
+    },
+    {
+      "name": "jobs"
     },
     {
       "name": "integration"
@@ -694,6 +709,616 @@
           "issues"
         ]
       },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "not_found"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": {}
+      },
+      "DedupValidationError": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "enabled must be boolean"
+            ]
+          }
+        },
+        "required": [
+          "errors"
+        ]
+      },
+      "MetadataValidationError": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": {}
+      },
+      "AuditQuery": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "entity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "actor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1000
+          }
+        }
+      },
+      "JobsQuery": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "dead"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 200
+          }
+        }
+      },
+      "Document": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "doc_123"
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "doc_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "catalog_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Active"
+          },
+          "branch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "doc_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "folder_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "review_flag": {
+            "type": "boolean"
+          },
+          "retention_years": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "destruction_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ingest_timestamp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": {}
+      },
+      "Folder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "fld_123"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": {}
+      },
+      "FolderTreeNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "children": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": {}
+      },
+      "DocumentVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version_no": {
+            "type": "number",
+            "example": 2
+          },
+          "mime_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "file_hash_sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "storage_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_no"
+        ],
+        "additionalProperties": {}
+      },
+      "Annotation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "document_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "page": {
+            "type": "number"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "additionalProperties": {}
+      },
+      "DocType": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "BT_CID_4G"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jurisdiction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issuer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mandatoryFields": {
+            "type": "array",
+            "items": {}
+          },
+          "optionalFields": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "code",
+          "system"
+        ],
+        "additionalProperties": {}
+      },
+      "DedupConfigState": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "matchBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string"
+          },
+          "fuzzyThreshold": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": {}
+      },
+      "Quality": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "number",
+            "example": 0.92
+          },
+          "completeness": {
+            "type": "number"
+          },
+          "mandatoryMissing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidence": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "score"
+        ],
+        "additionalProperties": {}
+      },
+      "CatalogResult": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "route": {
+            "type": "string",
+            "example": "AUTO_FILE"
+          },
+          "mandatoryOk": {
+            "type": "boolean"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "retentionYears": {
+            "type": "number"
+          },
+          "reviewFlag": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": {}
+      },
+      "LegalHold": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "example": "HOLD-2026-01"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "placed_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "released_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "scope"
+        ],
+        "additionalProperties": {}
+      },
+      "CustomerProfile": {
+        "type": "object",
+        "properties": {
+          "cid": {
+            "type": "string"
+          },
+          "master": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "additionalProperties": {}
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "example": "extract"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "dead"
+            ]
+          },
+          "attempts": {
+            "type": "number"
+          },
+          "maxAttempts": {
+            "type": "number"
+          },
+          "result": {},
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "availableAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status"
+        ],
+        "additionalProperties": {}
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          },
+          "service": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": {}
+      },
       "GenericOk": {
         "type": "object",
         "properties": {},
@@ -715,7 +1340,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/Health"
+                },
+                "example": {
+                  "status": "ok",
+                  "service": "core"
                 }
               }
             }
@@ -728,7 +1357,27 @@
         "tags": [
           "meta"
         ],
-        "summary": "This OpenAPI 3.1 document.",
+        "summary": "This OpenAPI 3.1 document (JSON).",
+        "responses": {
+          "200": {
+            "description": "The OpenAPI spec.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericOk"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "This OpenAPI 3.1 document (raw, pretty-printed JSON).",
         "responses": {
           "200": {
             "description": "The OpenAPI spec.",
@@ -769,7 +1418,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "folder": {
+                      "$ref": "#/components/schemas/Folder"
+                    }
+                  },
+                  "required": [
+                    "folder"
+                  ]
+                },
+                "example": {
+                  "folder": {
+                    "id": "fld_1",
+                    "name": "Customers"
+                  }
                 }
               }
             }
@@ -780,16 +1443,130 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized.",
+            "description": "Missing/invalid credentials.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "folders"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the folder tree.",
+        "responses": {
+          "200": {
+            "description": "Folder tree.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tree": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FolderTreeNode"
+                      }
+                    }
+                  },
+                  "required": [
+                    "tree"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -834,7 +1611,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "folder": {
+                      "$ref": "#/components/schemas/Folder"
+                    }
+                  },
+                  "required": [
+                    "folder"
+                  ]
                 }
               }
             }
@@ -845,6 +1630,398 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Capture a document (multipart upload).",
+        "description": "multipart/form-data: `file` (required) plus optional `title`, `branch`, `sourceChannel`, `folderId`.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "branch": {
+                    "type": "string"
+                  },
+                  "sourceChannel": {
+                    "type": "string"
+                  },
+                  "folderId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document captured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": [
+                    "document"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "file_required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List documents visible to the caller's branch.",
+        "responses": {
+          "200": {
+            "description": "Documents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Document"
+                      }
+                    }
+                  },
+                  "required": [
+                    "documents"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/bulk": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Bulk-capture documents; enqueues async extraction per file.",
+        "description": "multipart/form-data: `files[]` (up to 200) plus optional `branch`, `sourceChannel`, `folderId`.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  },
+                  "branch": {
+                    "type": "string"
+                  },
+                  "sourceChannel": {
+                    "type": "string"
+                  },
+                  "folderId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "files"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Captured + queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "number"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "docId": {
+                            "type": "string"
+                          },
+                          "jobId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "docId",
+                          "jobId"
+                        ]
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "count",
+                    "items",
+                    "status"
+                  ]
+                },
+                "example": {
+                  "count": 2,
+                  "items": [
+                    {
+                      "docId": "doc_1",
+                      "jobId": "job_1"
+                    }
+                  ],
+                  "status": "queued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No files provided.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "files_required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -853,6 +2030,107 @@
       }
     },
     "/documents/{id}": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Fetch a single document.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": [
+                    "document"
+                  ]
+                },
+                "example": {
+                  "document": {
+                    "id": "doc_123",
+                    "title": "KYC form",
+                    "status": "Active"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "documents"
@@ -878,12 +2156,67 @@
           "204": {
             "description": "Deleted."
           },
-          "409": {
-            "description": "Under legal hold.",
+          "401": {
+            "description": "Missing/invalid credentials.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Under an active legal hold.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "under_legal_hold"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -926,7 +2259,23 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    },
+                    "quality": {
+                      "$ref": "#/components/schemas/Quality"
+                    },
+                    "catalog": {
+                      "$ref": "#/components/schemas/CatalogResult"
+                    }
+                  },
+                  "required": [
+                    "document",
+                    "quality",
+                    "catalog"
+                  ]
                 }
               }
             }
@@ -937,6 +2286,387 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{id}/download": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Download the current version bytes.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File bytes.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document or version not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "no_version"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{id}/versions": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a new version (multipart upload).",
+        "description": "multipart/form-data: `file` (required), optional `comment`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "comment": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Version added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "$ref": "#/components/schemas/DocumentVersion"
+                    }
+                  },
+                  "required": [
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "file_required"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List document versions.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocumentVersion"
+                      }
+                    }
+                  },
+                  "required": [
+                    "versions"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -981,7 +2711,20 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "$ref": "#/components/schemas/DocumentVersion"
+                    }
+                  },
+                  "required": [
+                    "version"
+                  ]
+                },
+                "example": {
+                  "version": {
+                    "version_no": 2
+                  }
                 }
               }
             }
@@ -992,6 +2735,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1036,7 +2843,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "$ref": "#/components/schemas/DocumentVersion"
+                    },
+                    "download": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "download"
+                  ]
                 }
               }
             }
@@ -1047,6 +2866,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1091,7 +2974,35 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "$ref": "#/components/schemas/DocumentVersion"
+                    },
+                    "download": {
+                      "type": "string"
+                    },
+                    "redaction": {
+                      "type": "object",
+                      "properties": {
+                        "rasterized": {
+                          "type": "boolean"
+                        },
+                        "guarantee": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "rasterized",
+                        "guarantee"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "download",
+                    "redaction"
+                  ]
                 }
               }
             }
@@ -1102,6 +3013,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1143,7 +3118,7 @@
         },
         "responses": {
           "200": {
-            "description": "Extracted.",
+            "description": "Extracted (sync).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1153,11 +3128,27 @@
             }
           },
           "202": {
-            "description": "Queued.",
+            "description": "Queued (async).",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "jobId",
+                    "status"
+                  ]
+                },
+                "example": {
+                  "jobId": "job_1",
+                  "status": "queued"
                 }
               }
             }
@@ -1168,6 +3159,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1204,7 +3259,389 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "jobId",
+                    "status"
+                  ]
+                },
+                "example": {
+                  "jobId": "job_1",
+                  "status": "queued"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{documentId}/annotations": {
+      "get": {
+        "tags": [
+          "annotations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List annotations on a document.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "documentId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "annotations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Annotation"
+                      }
+                    }
+                  },
+                  "required": [
+                    "annotations"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "annotations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create an annotation on a document.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "documentId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAnnotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "annotation": {
+                      "$ref": "#/components/schemas/Annotation"
+                    }
+                  },
+                  "required": [
+                    "annotation"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{documentId}/annotations/{id}": {
+      "delete": {
+        "tags": [
+          "annotations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete an annotation.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "documentId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "ann_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1249,7 +3686,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "$ref": "#/components/schemas/Document"
+                    }
+                  },
+                  "required": [
+                    "document"
+                  ]
                 }
               }
             }
@@ -1260,16 +3705,88 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
                 }
               }
             }
           },
           "422": {
-            "description": "Metadata invalid.",
+            "description": "Typed metadata invalid for the doc type.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/MetadataValidationError"
+                },
+                "example": {
+                  "errors": [
+                    "cid_no is required"
+                  ],
+                  "missing": [
+                    "cid_no"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1314,7 +3831,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/CatalogResult"
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
                 }
               }
             }
@@ -1325,6 +3850,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1369,7 +3958,29 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "folderId": {
+                      "type": "string"
+                    },
+                    "acls": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "folderId",
+                    "acls"
+                  ]
+                },
+                "example": {
+                  "path": "/BoB/Customers",
+                  "folderId": "fld_1",
+                  "acls": []
                 }
               }
             }
@@ -1380,109 +3991,165 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/documents/{documentId}/annotations": {
-      "post": {
-        "tags": [
-          "annotations"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Create an annotation on a document.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "example": "doc_123"
-            },
-            "required": true,
-            "name": "documentId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAnnotation"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
                 }
               }
             }
           },
-          "400": {
-            "description": "Request failed boundary validation.",
+          "401": {
+            "description": "Missing/invalid credentials.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/documents/{documentId}/annotations/{id}": {
-      "delete": {
-        "tags": [
-          "annotations"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Delete an annotation.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "example": "doc_123"
-            },
-            "required": true,
-            "name": "documentId",
-            "in": "path"
           },
-          {
-            "schema": {
-              "type": "string",
-              "example": "doc_123"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Deleted."
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Not found.",
+            "description": "Resource not found.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/summary": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Dashboard summary counts.",
+        "responses": {
+          "200": {
+            "description": "Summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalDocuments": {
+                      "type": "number"
+                    },
+                    "byCategory": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "pendingReview": {
+                      "type": "number"
+                    },
+                    "indexedToday": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "totalDocuments",
+                    "byCategory",
+                    "pendingReview",
+                    "indexedToday"
+                  ]
+                },
+                "example": {
+                  "totalDocuments": 42,
+                  "byCategory": {
+                    "KYC": 10
+                  },
+                  "pendingReview": 3,
+                  "indexedToday": 5
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1491,6 +4158,80 @@
       }
     },
     "/branches": {
+      "get": {
+        "tags": [
+          "branches"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List branches.",
+        "responses": {
+          "200": {
+            "description": "Branches.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "branches": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "branches"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "branches"
@@ -1516,7 +4257,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "branch": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "branch"
+                  ]
                 }
               }
             }
@@ -1527,6 +4277,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1535,6 +4336,80 @@
       }
     },
     "/branches/access": {
+      "get": {
+        "tags": [
+          "branches"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List cross-branch access policies.",
+        "responses": {
+          "200": {
+            "description": "Policies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "policies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "policies"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "branches"
@@ -1560,7 +4435,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ]
                 }
               }
             }
@@ -1571,6 +4455,216 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers/{cid}": {
+      "get": {
+        "tags": [
+          "customers"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Customer 360 profile by CID.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "10705001234"
+            },
+            "required": true,
+            "name": "cid",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "profile": {
+                      "$ref": "#/components/schemas/CustomerProfile"
+                    }
+                  },
+                  "required": [
+                    "profile"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/records/file-plan": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List retention file-plan policies.",
+        "responses": {
+          "200": {
+            "description": "Policies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "policies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "policies"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1579,6 +4673,79 @@
       }
     },
     "/records/holds": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List legal holds.",
+        "responses": {
+          "200": {
+            "description": "Holds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "holds": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LegalHold"
+                      }
+                    }
+                  },
+                  "required": [
+                    "holds"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "records"
@@ -1604,7 +4771,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "hold": {
+                      "$ref": "#/components/schemas/LegalHold"
+                    }
+                  },
+                  "required": [
+                    "hold"
+                  ]
+                },
+                "example": {
+                  "hold": {
+                    "ref": "HOLD-2026-01",
+                    "scope": "cid:10705001234"
+                  }
                 }
               }
             }
@@ -1615,6 +4796,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1650,7 +4882,130 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "hold": {
+                      "$ref": "#/components/schemas/LegalHold"
+                    }
+                  },
+                  "required": [
+                    "hold"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/records/disposal/eligibility": {
+      "get": {
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List documents eligible for disposal.",
+        "responses": {
+          "200": {
+            "description": "Candidates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "candidates"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1691,12 +5046,680 @@
               }
             }
           },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Under legal hold / not eligible.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "under_legal_hold"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compliance/scorecard": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Compliance scorecard.",
+        "responses": {
+          "200": {
+            "description": "Scorecard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scorecard": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "scorecard"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compliance/matrix": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Regulatory matrix.",
+        "responses": {
+          "200": {
+            "description": "Matrix.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "matrix": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "matrix"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compliance/audit": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Query the audit trail (filtered/paginated).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "action",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "entity",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "actor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compliance/verify": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Verify the audit hash chain.",
+        "responses": {
+          "200": {
+            "description": "Verification.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verification": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "verification"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lifecycle/{docId}": {
+      "get": {
+        "tags": [
+          "lifecycle"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Document lifecycle trace.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "docId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trace": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "trace"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/health": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Service-health posture.",
+        "responses": {
+          "200": {
+            "description": "Health.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "health": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "health"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/dr": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Disaster-recovery posture.",
+        "responses": {
+          "200": {
+            "description": "DR posture.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dr": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "dr"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/schedules": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Scheduled jobs.",
+        "responses": {
+          "200": {
+            "description": "Schedules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schedules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "schedules"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
                 }
               }
             }
@@ -1705,6 +5728,76 @@
       }
     },
     "/admin/dedup-config": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read dedup configuration.",
+        "responses": {
+          "200": {
+            "description": "Dedup config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dedupConfig": {
+                      "$ref": "#/components/schemas/DedupConfigState"
+                    }
+                  },
+                  "required": [
+                    "dedupConfig"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "admin"
@@ -1715,6 +5808,7 @@
           }
         ],
         "summary": "Update dedup configuration.",
+        "description": "Invalid values are rejected with 422 { errors: string[] } (NOT the 400 validation_error envelope).",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1730,17 +5824,69 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "dedupConfig": {
+                      "$ref": "#/components/schemas/DedupConfigState"
+                    }
+                  },
+                  "required": [
+                    "dedupConfig"
+                  ]
                 }
               }
             }
           },
-          "400": {
-            "description": "Request failed boundary validation.",
+          "401": {
+            "description": "Missing/invalid credentials.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid dedup configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DedupValidationError"
+                },
+                "example": {
+                  "errors": [
+                    "enabled must be boolean"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1749,6 +5895,70 @@
       }
     },
     "/doc-types": {
+      "get": {
+        "tags": [
+          "doc-types"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the doc-type registry (+ observed-in-documents types).",
+        "responses": {
+          "200": {
+            "description": "Doc types.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "docTypes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocType"
+                      }
+                    },
+                    "total": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "docTypes",
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "doc-types"
@@ -1774,7 +5984,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "docType": {
+                      "$ref": "#/components/schemas/DocType"
+                    }
+                  },
+                  "required": [
+                    "docType"
+                  ]
                 }
               }
             }
@@ -1785,16 +6003,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
                 }
               }
             }
           },
           "409": {
-            "description": "Conflict.",
+            "description": "Doc type already exists.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "conflict"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1839,7 +6111,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "docType": {
+                      "$ref": "#/components/schemas/DocType"
+                    }
+                  },
+                  "required": [
+                    "docType"
+                  ]
                 }
               }
             }
@@ -1850,16 +6130,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
                 }
               }
             }
           },
           "404": {
-            "description": "Not found.",
+            "description": "Resource not found.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1893,27 +6227,75 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "deleted",
+                    "code"
+                  ]
+                },
+                "example": {
+                  "deleted": true,
+                  "code": "MY_TYPE"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
                 }
               }
             }
           },
           "403": {
-            "description": "System type.",
+            "description": "System doc type cannot be deleted.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
                 }
               }
             }
           },
           "404": {
-            "description": "Not found.",
+            "description": "Resource not found.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -1947,7 +6329,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "docType": {
+                      "$ref": "#/components/schemas/DocType"
+                    }
+                  },
+                  "required": [
+                    "docType"
+                  ]
                 }
               }
             }
@@ -1958,16 +6348,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
                 }
               }
             }
           },
           "409": {
-            "description": "Conflict.",
+            "description": "Doc type already exists.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "conflict"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -2012,7 +6456,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "docType": {
+                      "$ref": "#/components/schemas/DocType"
+                    }
+                  },
+                  "required": [
+                    "docType"
+                  ]
                 }
               }
             }
@@ -2023,16 +6475,290 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
                 }
               }
             }
           },
           "404": {
-            "description": "Not found.",
+            "description": "Resource not found.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Job monitor: counts + recent jobs (filtered/paginated).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "succeeded",
+                "failed",
+                "dead"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jobs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "counts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    }
+                  },
+                  "required": [
+                    "counts",
+                    "jobs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Poll a single job's status.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                },
+                "example": {
+                  "id": "job_1",
+                  "type": "extract",
+                  "status": "succeeded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -2066,7 +6792,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "change": {
+                      "type": "string",
+                      "enum": [
+                        "updated"
+                      ]
+                    },
+                    "cid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "change",
+                    "cid"
+                  ]
+                },
+                "example": {
+                  "change": "updated",
+                  "cid": "10705001234"
                 }
               }
             }
@@ -2076,7 +6821,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "change": {
+                      "type": "string",
+                      "enum": [
+                        "created"
+                      ]
+                    },
+                    "cid": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "change",
+                    "cid"
+                  ]
+                },
+                "example": {
+                  "change": "created",
+                  "cid": "10705001234"
                 }
               }
             }
@@ -2087,16 +6851,44 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized.",
+            "description": "Missing/invalid credentials.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }
@@ -2130,7 +6922,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "change": {
+                      "type": "string",
+                      "enum": [
+                        "updated"
+                      ]
+                    },
+                    "applicationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "change",
+                    "applicationId"
+                  ]
+                },
+                "example": {
+                  "change": "updated",
+                  "applicationId": "LOS-1001"
                 }
               }
             }
@@ -2140,7 +6951,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "type": "object",
+                  "properties": {
+                    "change": {
+                      "type": "string",
+                      "enum": [
+                        "created"
+                      ]
+                    },
+                    "applicationId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "change",
+                    "applicationId"
+                  ]
+                },
+                "example": {
+                  "change": "created",
+                  "applicationId": "LOS-1001"
                 }
               }
             }
@@ -2151,16 +6981,44 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized.",
+            "description": "Missing/invalid credentials.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GenericOk"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
                 }
               }
             }

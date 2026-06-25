@@ -34,6 +34,17 @@
         "in": "header",
         "name": "x-signature",
         "description": "HMAC-SHA256 signature over the raw request body for inbound integration callbacks (verified alongside x-internal-token)."
+      },
+      "ssoHandoff": {
+        "type": "oauth2",
+        "description": "Browser SSO handoff. GET /auth/{oidc,saml}/login redirects to the IdP; the callback redirects to <webAppUrl>/login#token=<JWT>. The SPA extracts the JWT and uses it as the bearerAuth credential thereafter.",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "/auth/oidc/login",
+            "tokenUrl": "/auth/oidc/callback",
+            "scopes": {}
+          }
+        }
       }
     },
     "schemas": {
@@ -255,6 +266,79 @@
         "required": [
           "userId",
           "permissions"
+        ]
+      },
+      "AuthConfigResponse": {
+        "type": "object",
+        "properties": {
+          "local": {
+            "type": "boolean"
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthProvider"
+            }
+          }
+        },
+        "required": [
+          "local",
+          "providers"
+        ]
+      },
+      "AuthProvider": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ldap",
+              "oidc",
+              "saml"
+            ]
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type"
+        ]
+      },
+      "SsoLoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ]
+      },
+      "LdapLoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "username",
+          "password"
         ]
       }
     },
@@ -735,6 +819,301 @@
           },
           "401": {
             "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/config": {
+      "get": {
+        "summary": "Public SSO/login configuration",
+        "description": "Returns whether local login is enabled and the list of enabled SSO providers so the login UI can render the right buttons. No authentication required.",
+        "tags": [
+          "sso"
+        ],
+        "responses": {
+          "200": {
+            "description": "Login configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/ldap/login": {
+      "post": {
+        "summary": "Authenticate against LDAP/AD and issue a JWT",
+        "tags": [
+          "sso"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LdapLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "LDAP login succeeded; JWT issued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SsoLoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid LDAP credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested SSO provider is disabled on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "LDAP backend error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oidc/login": {
+      "get": {
+        "summary": "Begin the OIDC authorization-code flow",
+        "description": "Sets a short-lived signed transient cookie (state/nonce/PKCE verifier) and 302-redirects the browser to the IdP authorization endpoint.",
+        "tags": [
+          "sso"
+        ],
+        "security": [
+          {
+            "ssoHandoff": []
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the IdP authorization URL."
+          },
+          "404": {
+            "description": "The requested SSO provider is disabled on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to build the OIDC authorization request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oidc/callback": {
+      "get": {
+        "summary": "Complete the OIDC flow and hand off the JWT",
+        "description": "Verifies the transient cookie + state, exchanges the code, JIT-provisions the user and 302-redirects to <webAppUrl>/login#token=<JWT>.",
+        "tags": [
+          "sso"
+        ],
+        "security": [
+          {
+            "ssoHandoff": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "code",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "state",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the web app with the JWT in the URL fragment."
+          },
+          "400": {
+            "description": "Missing/expired transient or mismatched state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token exchange or assertion validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested SSO provider is disabled on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/saml/login": {
+      "get": {
+        "summary": "Begin the SAML SP-initiated flow",
+        "tags": [
+          "sso"
+        ],
+        "security": [
+          {
+            "ssoHandoff": []
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the IdP SSO URL."
+          },
+          "404": {
+            "description": "The requested SSO provider is disabled on this deployment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to build the SAML login URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/saml/callback": {
+      "post": {
+        "summary": "SAML assertion consumer service (ACS) and JWT handoff",
+        "description": "Consumes the IdP's application/x-www-form-urlencoded SAMLResponse, validates the assertion, JIT-provisions the user and 302-redirects to <webAppUrl>/login#token=<JWT>.",
+        "tags": [
+          "sso"
+        ],
+        "security": [
+          {
+            "ssoHandoff": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "SAMLResponse": {
+                    "type": "string"
+                  },
+                  "RelayState": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "SAMLResponse"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {
+            "description": "Redirect to the web app with the JWT in the URL fragment."
+          },
+          "401": {
+            "description": "SAML assertion validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested SSO provider is disabled on this deployment.",
             "content": {
               "application/json": {
                 "schema": {

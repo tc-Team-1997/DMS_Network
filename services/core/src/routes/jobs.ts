@@ -9,21 +9,20 @@ import { Router } from "express";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
 import { getJob, listJobs, jobCounts, type JobStatus } from "../queue/index.js";
-
-const STATUSES: JobStatus[] = ["queued", "running", "succeeded", "failed", "dead"];
+import { validateQuery } from "../openapi/validate.js";
+import { JobsQuerySchema } from "../openapi/schemas.js";
 
 export function jobsRouter(): Router {
   const r = Router();
   r.use(requireAuth);
 
   // Admin monitor: counts + recent jobs (optionally filtered). RBAC: admin:access.
-  r.get("/", requirePermission("admin:access"), async (req, res) => {
+  r.get("/", requirePermission("admin:access"), validateQuery(JobsQuerySchema), async (req, res) => {
     const deps = req.app.locals.deps as CoreDeps;
-    const status = typeof req.query.status === "string" && STATUSES.includes(req.query.status as JobStatus)
-      ? (req.query.status as JobStatus)
-      : undefined;
-    const type = typeof req.query.type === "string" ? req.query.type : undefined;
-    const limit = req.query.limit ? Math.min(Number(req.query.limit) || 50, 200) : 50;
+    const q = (req as any).validatedQuery as { status?: JobStatus; type?: string; limit?: number };
+    const status = q.status;
+    const type = q.type;
+    const limit = q.limit ? Math.min(q.limit, 200) : 50;
 
     const [counts, jobs] = await Promise.all([
       jobCounts(deps.knex),

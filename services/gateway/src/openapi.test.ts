@@ -42,15 +42,26 @@ describe("OpenAPI document", () => {
     expect(res.body.openapi).toBe("3.1.0");
     const paths = Object.keys(res.body.paths);
     expect(paths).toContain("/auth/login");
+    expect(paths).toContain("/auth/me");
     expect(paths).toContain("/users");
     expect(paths).toContain("/users/{id}/roles");
     expect(paths).toContain("/users/{id}/lock");
     expect(paths).toContain("/authz/check");
+    expect(paths).toContain("/health");
+    // SSO routes
+    expect(paths).toContain("/auth/config");
+    expect(paths).toContain("/auth/ldap/login");
+    expect(paths).toContain("/auth/oidc/login");
+    expect(paths).toContain("/auth/oidc/callback");
+    expect(paths).toContain("/auth/saml/login");
+    expect(paths).toContain("/auth/saml/callback");
     // bearer JWT security scheme present
     expect(res.body.components.securitySchemes.bearerAuth.scheme).toBe("bearer");
     expect(res.body.components.securitySchemes.bearerAuth.bearerFormat).toBe("JWT");
     // internal token scheme present for service-to-service / inbound
     expect(res.body.components.securitySchemes.internalToken.name).toBe("x-internal-token");
+    // SSO token-handoff scheme documented
+    expect(res.body.components.securitySchemes.ssoHandoff.type).toBe("oauth2");
   });
 
   it("GET /openapi returns the same raw spec", async () => {

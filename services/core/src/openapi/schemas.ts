@@ -360,3 +360,269 @@ export const ValidationErrorSchema = registry.register(
     })
     .openapi("ValidationError"),
 );
+
+// Generic { error } envelope used by non-validation failures (401/403/404/409/500).
+export const ErrorResponseSchema = registry.register(
+  "ErrorResponse",
+  z
+    .object({
+      error: z.string().openapi({ example: "not_found" }),
+      detail: z.string().optional(),
+    })
+    .passthrough()
+    .openapi("ErrorResponse"),
+);
+
+// The dedup-config endpoints reject malformed input with 422 { errors: string[] }
+// (NOT the 400 validation_error envelope) — documented as its own component so we
+// don't misrepresent that route's contract.
+export const DedupValidationErrorSchema = registry.register(
+  "DedupValidationError",
+  z
+    .object({ errors: z.array(z.string()).openapi({ example: ["enabled must be boolean"] }) })
+    .openapi("DedupValidationError"),
+);
+
+// The metadata pipeline (POST /index/{documentId}) rejects invalid typed metadata
+// with 422 { errors, missing } — distinct from boundary 400 validation_error.
+export const MetadataValidationErrorSchema = registry.register(
+  "MetadataValidationError",
+  z
+    .object({
+      errors: z.array(z.string()).optional(),
+      missing: z.array(z.string()).optional(),
+    })
+    .passthrough()
+    .openapi("MetadataValidationError"),
+);
+
+// ── Query-parameter schemas ──────────────────────────────────────────────────
+// Audit-trail filter/pagination (GET /compliance/audit).
+export const AuditQuerySchema = registry.register(
+  "AuditQuery",
+  z
+    .object({
+      action: z.string().min(1).optional(),
+      entity: z.string().min(1).optional(),
+      actor: z.string().min(1).optional(),
+      limit: z.coerce.number().int().positive().max(1000).optional(),
+    })
+    .openapi("AuditQuery"),
+);
+
+// Job monitor filter/pagination (GET /jobs).
+export const JobStatusEnum = z.enum(["queued", "running", "succeeded", "failed", "dead"]);
+export const JobsQuerySchema = registry.register(
+  "JobsQuery",
+  z
+    .object({
+      status: JobStatusEnum.optional(),
+      type: z.string().min(1).optional(),
+      limit: z.coerce.number().int().positive().max(200).optional(),
+    })
+    .openapi("JobsQuery"),
+);
+
+// ── Entity component schemas (response bodies) ───────────────────────────────
+// These describe the SHAPE of persisted entities returned by the read/mutating
+// routes. They are intentionally permissive (`.passthrough()`) so they document
+// the meaningful fields without over-constraining DB-projected rows.
+
+export const DocumentSchema = registry.register(
+  "Document",
+  z
+    .object({
+      id: z.string().openapi({ example: "doc_123" }),
+      title: z.string().nullable().optional(),
+      doc_type: z.string().nullable().optional(),
+      catalog_category: z.string().nullable().optional(),
+      status: z.string().nullable().optional().openapi({ example: "Active" }),
+      branch: z.string().nullable().optional(),
+      cid: z.string().nullable().optional(),
+      doc_no: z.string().nullable().optional(),
+      folder_id: z.string().nullable().optional(),
+      confidence: z.number().nullable().optional(),
+      review_flag: z.boolean().optional(),
+      retention_years: z.number().nullable().optional(),
+      destruction_date: z.string().nullable().optional(),
+      ingest_timestamp: z.string().nullable().optional(),
+      metadata: z.string().nullable().optional(),
+    })
+    .passthrough()
+    .openapi("Document"),
+);
+
+export const FolderSchema = registry.register(
+  "Folder",
+  z
+    .object({
+      id: z.string().openapi({ example: "fld_123" }),
+      name: z.string(),
+      parent_id: z.string().nullable().optional(),
+      path: z.string().optional(),
+      domain: z.string().nullable().optional(),
+      created_by: z.string().nullable().optional(),
+    })
+    .passthrough()
+    .openapi("Folder"),
+);
+
+export const FolderTreeNodeSchema = registry.register(
+  "FolderTreeNode",
+  z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      children: z.array(z.unknown()).optional(),
+    })
+    .passthrough()
+    .openapi("FolderTreeNode"),
+);
+
+export const VersionSchema = registry.register(
+  "DocumentVersion",
+  z
+    .object({
+      id: z.string().optional(),
+      version_no: z.number().openapi({ example: 2 }),
+      mime_type: z.string().nullable().optional(),
+      file_hash_sha256: z.string().nullable().optional(),
+      created_by: z.string().nullable().optional(),
+      comment: z.string().nullable().optional(),
+      storage_key: z.string().optional(),
+    })
+    .passthrough()
+    .openapi("DocumentVersion"),
+);
+
+export const AnnotationSchema = registry.register(
+  "Annotation",
+  z
+    .object({
+      id: z.string(),
+      document_id: z.string().optional(),
+      kind: z.string(),
+      page: z.number().optional(),
+      x: z.number(),
+      y: z.number(),
+      width: z.number(),
+      height: z.number(),
+      content: z.string().nullable().optional(),
+      color: z.string().nullable().optional(),
+      created_by: z.string().nullable().optional(),
+    })
+    .passthrough()
+    .openapi("Annotation"),
+);
+
+export const DocTypeSchema = registry.register(
+  "DocType",
+  z
+    .object({
+      code: z.string().openapi({ example: "BT_CID_4G" }),
+      description: z.string().nullable().optional(),
+      jurisdiction: z.string().nullable().optional(),
+      issuer: z.string().nullable().optional(),
+      category: z.string().nullable().optional(),
+      system: z.boolean(),
+      created_at: z.string().nullable().optional(),
+      updated_at: z.string().nullable().optional(),
+      mandatoryFields: z.array(z.unknown()).optional(),
+      optionalFields: z.array(z.unknown()).optional(),
+    })
+    .passthrough()
+    .openapi("DocType"),
+);
+
+export const DedupConfigStateSchema = registry.register(
+  "DedupConfigState",
+  z
+    .object({
+      enabled: z.boolean().optional(),
+      matchBy: z.array(z.string()).optional(),
+      action: z.string().optional(),
+      fuzzyThreshold: z.number().optional(),
+    })
+    .passthrough()
+    .openapi("DedupConfigState"),
+);
+
+export const QualitySchema = registry.register(
+  "Quality",
+  z
+    .object({
+      score: z.number().openapi({ example: 0.92 }),
+      completeness: z.number().optional(),
+      mandatoryMissing: z.array(z.string()).optional(),
+      confidence: z.number().optional(),
+    })
+    .passthrough()
+    .openapi("Quality"),
+);
+
+export const CatalogResultSchema = registry.register(
+  "CatalogResult",
+  z
+    .object({
+      category: z.string().nullable().optional(),
+      route: z.string().optional().openapi({ example: "AUTO_FILE" }),
+      mandatoryOk: z.boolean().optional(),
+      missing: z.array(z.string()).optional(),
+      retentionYears: z.number().optional(),
+      reviewFlag: z.boolean().optional(),
+    })
+    .passthrough()
+    .openapi("CatalogResult"),
+);
+
+export const LegalHoldSchema = registry.register(
+  "LegalHold",
+  z
+    .object({
+      ref: z.string().openapi({ example: "HOLD-2026-01" }),
+      scope: z.string(),
+      placed_by: z.string().nullable().optional(),
+      released_at: z.string().nullable().optional(),
+      status: z.string().optional(),
+    })
+    .passthrough()
+    .openapi("LegalHold"),
+);
+
+export const CustomerProfileSchema = registry.register(
+  "CustomerProfile",
+  z
+    .object({
+      cid: z.string().optional(),
+      master: z.record(z.string(), z.unknown()).nullable().optional(),
+    })
+    .passthrough()
+    .openapi("CustomerProfile"),
+);
+
+export const JobSchema = registry.register(
+  "Job",
+  z
+    .object({
+      id: z.string(),
+      type: z.string().openapi({ example: "extract" }),
+      status: JobStatusEnum,
+      attempts: z.number().optional(),
+      maxAttempts: z.number().optional(),
+      result: z.unknown().nullable().optional(),
+      last_error: z.string().nullable().optional(),
+      availableAt: z.string().nullable().optional(),
+      createdAt: z.string().nullable().optional(),
+      updatedAt: z.string().nullable().optional(),
+    })
+    .passthrough()
+    .openapi("Job"),
+);
+
+export const HealthSchema = registry.register(
+  "Health",
+  z
+    .object({ status: z.string().openapi({ example: "ok" }), service: z.string().optional() })
+    .passthrough()
+    .openapi("Health"),
+);

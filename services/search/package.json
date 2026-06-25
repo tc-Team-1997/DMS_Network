@@ -8,6 +8,7 @@
     "dev": "DB_CLIENT=sqlite3 tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run",
+    "gen-openapi": "tsx scripts/gen-openapi.ts",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
