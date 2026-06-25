@@ -59,6 +59,8 @@ const PERMISSIONS: Array<[string, string]> = [
   // Integration
   ["integration:read", "View integrations"],
   ["integration:manage", "Manage integrations"],
+  // Document-type registry administration
+  ["doctype:write", "Manage document types and per-type metadata field schemas"],
 ];
 
 const ALL = PERMISSIONS.map(([k]) => k);
@@ -71,6 +73,7 @@ const ROLES: Record<string, string[]> = {
   Supervisor: [
     "user:create", "user:update", "user:read", "role:assign",
     "security:read", "admin:access", "admin:read", "integration:manage",
+    "doctype:write",
     ...READS,
   ],
   // Maker — capture / index / submit.
