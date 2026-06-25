@@ -11,7 +11,7 @@ export function dashboardRouter(): Router {
       const { knex } = req.app.locals.deps as CoreDeps;
       const viewer = makeViewer(req);
       const base = () => {
-        const q = knex("documents").where({ status: "Active" });
+        const q = knex("documents").whereNot({ status: "Deleted" });
         // I1: fail-closed — users without crossbranch:read AND without a branch see nothing
         if (!viewer.canCrossBranch) {
           if (!viewer.branch) q.andWhere({ id: -1 }); // matches nothing

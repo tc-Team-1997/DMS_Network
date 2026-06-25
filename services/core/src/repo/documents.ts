@@ -99,7 +99,7 @@ export async function listDocuments(
 ): Promise<DocumentRecord[]> {
   // I1: fail-closed — users without crossbranch:read AND without a branch see nothing
   if (!viewer.canCrossBranch && !viewer.branch) return [];
-  const q = knex("documents").where({ status: "Active" });
+  const q = knex("documents").whereNot({ status: "Deleted" });
   if (!viewer.canCrossBranch) q.andWhere({ branch: viewer.branch });
   return (await q.orderBy("id", "desc")).map(normalizeDoc) as DocumentRecord[];
 }
@@ -110,7 +110,7 @@ export async function getDocument(
   viewer?: { branch?: string; canCrossBranch: boolean },
 ): Promise<DocumentRecord | undefined> {
   // C1: branch-aware fetch; fail-closed when viewer has no branch and no crossbranch:read
-  const q = knex("documents").where({ id, status: "Active" });
+  const q = knex("documents").where({ id }).whereNot({ status: "Deleted" });
   if (viewer) {
     if (!viewer.canCrossBranch) {
       if (!viewer.branch) return undefined; // no branch, no access
