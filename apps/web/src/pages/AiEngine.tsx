@@ -1,924 +1,718 @@
 /**
- * AiEngine — ZorDMS v4.2 AI Processing Engine screen.
+ * AiEngine — ZorDMS Copilot Chat screen.
  *
- * Shows:
- *  - KPI row: queue size, processed today, avg confidence, manual review count
- *  - Two-panel layout:
- *    Left:  File upload → classify + extract panel (result overlay)
- *    Right: AI engine status card + throughput line chart + doc-type donut
- *  - Extracted fields table with per-field confidence bars
- *  - Classification result banner + action buttons
- *  - RBAC: upload actions gated on "ai:write" permission (read-only for "ai:read")
+ * A genuine RAG-powered AI assistant over the document corpus.
+ * - Left rail: conversation list + "New Chat" button (component state only).
+ * - Main:      chat thread with user/assistant bubbles, citation chips, intent tags.
+ * - Suggested prompts shown when the thread is empty.
+ * - Bottom:    textarea (Enter = send, Shift+Enter = newline), send button, loading state.
+ * - RBAC gate: ai:read permission required.
  */
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext.js";
-import {
-  classifyDoc,
-  processDoc,
-  ocrDoc,
-  getAiHealth,
-  getAiStats,
-  bandFor,
-  derivethroughputSeries,
-  type ClassifyResult,
-  type ProcessResult,
-  type AiHealthStatus,
-  type AiStats,
-  type ThroughputPoint,
-} from "../api/aiEngine.js";
-import { ConfidenceBadge } from "../components/ai/ConfidenceBadge.js";
-import {
-  KpiCard,
-  Card,
-  Tag,
-  StatusDot,
-  Tabs,
-  LineChartCard,
-} from "../components/ui/index.js";
+import { askCopilot, type ChatTurn, type CopilotAskResponse } from "../api/aiCopilot.js";
+import { CitationChip } from "../components/ai/CitationChip.js";
 
+/* ─── Types ─── */
 
-const DOC_TYPE_LABELS: Record<string, string> = {
-  BT_CID_4G:           "Bhutan CID 4G",
-  BT_CITIZENSHIP:      "Bhutan Citizenship Certificate",
-  BT_PASSPORT:         "Bhutan Passport",
-  FOREIGN_PASSPORT:    "Foreign Passport",
-  IN_PAN:              "Indian PAN Card",
-  IN_AADHAAR:          "Indian Aadhaar",
-  BOB_ACCOUNT_FORM:    "BoB Account Opening Form",
-  BOB_LOAN_APPLICATION:"BoB Loan Application",
-  BOB_INVOICE:         "BoB Invoice",
-  PURCHASE_ORDER:      "Purchase Order",
-  SAR_REPORT:          "Suspicious Activity Report",
-  CTR:                 "Cash Transaction Report",
-  EMPLOYMENT_CONTRACT: "Employment Contract",
-  BOARD_RESOLUTION:    "Board Resolution",
-  RMA_INSPECTION:      "RMA Inspection Report",
-  RAA_AUDIT_REPORT:    "RAA Audit Report",
-  GENERAL_LETTER:      "General Letter",
-  UNKNOWN:             "Unknown / Unclassified",
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  response?: CopilotAskResponse;
+  error?: string;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+}
+
+/* ─── Constants ─── */
+
+const SUGGESTED_PROMPTS = [
+  "Which documents are expiring in the next 30 days?",
+  "Summarise the latest KYC submissions",
+  "What customer records are missing a CID?",
+  "Compare retention policies across document types",
+];
+
+const INTENT_LABEL: Record<string, string> = {
+  search:    "Search",
+  summarize: "Summarize",
+  navigate:  "Navigate",
+  qa:        "Q&A",
 };
 
-type TabKey = "upload" | "results" | "status";
+const INTENT_COLOR: Record<string, string> = {
+  search:    "#2563eb",
+  summarize: "#7c3aed",
+  navigate:  "#059669",
+  qa:        "#d97706",
+};
 
-interface FieldRow {
-  label: string;
-  value: string;
-  confidence: number;
+function makeId() {
+  return Math.random().toString(36).slice(2, 10);
 }
 
-function fieldConfColor(c: number) {
-  if (c >= 0.92) return "var(--G)";
-  if (c >= 0.85) return "var(--B)";
-  if (c >= 0.70) return "var(--W)";
-  return "var(--R)";
+function newConversation(): Conversation {
+  return {
+    id: makeId(),
+    title: "New chat",
+    messages: [],
+    createdAt: Date.now(),
+  };
 }
 
-function flattenMetadata(meta: Record<string, unknown> | null): FieldRow[] {
-  if (!meta) return [];
-  // "confidence" and "doc_type" are document-level; "review_flag" is routing metadata.
-  // Per-field confidence is not available from the backend extraction schema, so we
-  // do not surface a per-field confidence bar (all fields would show the identical
-  // document-level value, which would be misleading — see I-4).
-  const SKIP = new Set(["doc_type", "review_flag", "confidence"]);
-  return Object.entries(meta)
-    .filter(([k, v]) => !SKIP.has(k) && v !== null && v !== undefined)
-    .map(([k, v]) => ({
-      label: k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-      value: typeof v === "object" ? JSON.stringify(v) : String(v),
-      // confidence placeholder — not used for per-field bars; kept for FieldRow interface compatibility.
-      confidence: 0,
-    }));
+/* ─── Sub-components ─── */
+
+function IntentTag({ intent }: { intent: string }) {
+  const label = INTENT_LABEL[intent] ?? intent;
+  const color = INTENT_COLOR[intent] ?? "#6b7280";
+  return (
+    <span
+      data-testid="intent-tag"
+      style={{
+        display: "inline-block",
+        padding: "1px 7px",
+        borderRadius: 10,
+        fontSize: 10,
+        fontWeight: 600,
+        color,
+        background: color + "18",
+        border: `1px solid ${color}30`,
+        letterSpacing: 0.3,
+        textTransform: "uppercase",
+      }}
+    >
+      {label}
+    </span>
+  );
 }
+
+function UserBubble({ msg }: { msg: Message }) {
+  return (
+    <div
+      data-testid="user-bubble"
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        marginBottom: 16,
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "72%",
+          background: "#2563eb",
+          color: "#fff",
+          borderRadius: "16px 16px 4px 16px",
+          padding: "10px 14px",
+          fontSize: 13.5,
+          lineHeight: 1.6,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+        }}
+      >
+        {msg.content}
+      </div>
+    </div>
+  );
+}
+
+function AssistantBubble({ msg }: { msg: Message }) {
+  const resp = msg.response;
+
+  return (
+    <div
+      data-testid="assistant-bubble"
+      style={{
+        display: "flex",
+        justifyContent: "flex-start",
+        marginBottom: 20,
+        gap: 10,
+      }}
+    >
+      {/* Avatar */}
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          marginTop: 2,
+        }}
+      >
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2}>
+          <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+        </svg>
+      </div>
+
+      <div style={{ flex: 1, maxWidth: "78%" }}>
+        {/* Answer text */}
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: "4px 16px 16px 16px",
+            padding: "12px 16px",
+            fontSize: 13.5,
+            lineHeight: 1.7,
+            color: "#111827",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {msg.error ? (
+            <span style={{ color: "#dc2626" }}>{msg.error}</span>
+          ) : (
+            msg.content
+          )}
+        </div>
+
+        {/* Intent tag + citations row */}
+        {resp && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              marginTop: 8,
+              alignItems: "center",
+            }}
+          >
+            <IntentTag intent={resp.intent} />
+            {resp.citations.map((c) => (
+              <CitationChip key={c.doc_id} citation={c} />
+            ))}
+            <span
+              style={{
+                fontSize: 10,
+                color: "#9ca3af",
+                marginLeft: "auto",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {resp.model}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main component ─── */
 
 export default function AiEngine() {
   const { user } = useAuth();
-  const canWrite = user?.permissions.includes("ai:write") ?? false;
+  const canRead = user?.permissions.includes("ai:read") ?? false;
 
-  const [tab, setTab] = useState<TabKey>("upload");
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([newConversation()]);
+  const [activeId, setActiveId] = useState<string>(() => conversations[0].id);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
 
-  const [classifyResult, setClassifyResult] = useState<ClassifyResult | null>(null);
-  const [processResult, setProcessResult] = useState<ProcessResult | null>(null);
-  const [ocrText, setOcrText] = useState<string>("");
-  const [health, setHealth] = useState<AiHealthStatus | null>(null);
-  const [healthError, setHealthError] = useState(false);
-  const [stats, setStats] = useState<AiStats | null>(null);
-  const [throughput, setThroughput] = useState<ThroughputPoint[]>([]);
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const fileRef = useRef<HTMLInputElement>(null);
+  const activeConv = conversations.find((c) => c.id === activeId) ?? conversations[0];
 
-  /* ── Fetch health and stats on mount ── */
+  /* Scroll to bottom when messages change */
   useEffect(() => {
-    getAiHealth()
-      .then((h) => { setHealth(h); setHealthError(false); })
-      .catch(() => { setHealth({ status: "unknown", service: "ai-idp", mode: "unknown" }); setHealthError(true); });
-    getAiStats()
-      .then((s) => {
-        setStats(s);
-        setThroughput(derivethroughputSeries(s));
-      })
-      .catch(() => { /* stats unavailable — charts show empty state */ });
-  }, []);
-
-  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] ?? null;
-    setFile(f);
-    setClassifyResult(null);
-    setProcessResult(null);
-    setError(null);
-    setOcrText("");
-  }, []);
-
-  const handleClassify = useCallback(async () => {
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await classifyDoc(file, ocrText);
-      setClassifyResult(result);
-      setTab("results");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Classification failed");
-    } finally {
-      setBusy(false);
+    if (threadRef.current) {
+      threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [file, ocrText]);
+  }, [activeConv?.messages.length, sending]);
 
-  const handleProcess = useCallback(async () => {
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const docId = `DOC-${Date.now()}`;
-      const result = await processDoc(file, docId, ocrText);
-      setProcessResult(result);
-      setClassifyResult({
-        doc_type: result.handoff.doc_type,
-        confidence: result.handoff.confidence,
-        signals: [],
+  /* Create a new conversation */
+  const handleNewChat = useCallback(() => {
+    const c = newConversation();
+    setConversations((prev) => [c, ...prev]);
+    setActiveId(c.id);
+    setInput("");
+  }, []);
+
+  /* Send a question */
+  const handleSend = useCallback(
+    async (question: string) => {
+      const q = question.trim();
+      if (!q || sending) return;
+
+      const userMsgId = makeId();
+      const assistantMsgId = makeId();
+
+      // Append user message immediately
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id !== activeId) return c;
+          const title = c.messages.length === 0 ? q.slice(0, 50) : c.title;
+          return {
+            ...c,
+            title,
+            messages: [
+              ...c.messages,
+              { id: userMsgId, role: "user" as const, content: q },
+            ],
+          };
+        }),
+      );
+      setInput("");
+      setSending(true);
+
+      // Build history from current conversation turns
+      const historyTurns: ChatTurn[] = activeConv.messages.flatMap((m): ChatTurn[] => {
+        if (m.role === "user") return [{ role: "user", content: m.content }];
+        if (m.role === "assistant") return [{ role: "assistant", content: m.content }];
+        return [];
       });
-      setTab("results");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Processing failed");
-    } finally {
-      setBusy(false);
-    }
-  }, [file, ocrText]);
 
-  const handleOcr = useCallback(async () => {
-    if (!file) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await ocrDoc(file);
-      setOcrText(res.text);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "OCR failed");
-    } finally {
-      setBusy(false);
-    }
-  }, [file]);
+      try {
+        const resp = await askCopilot(q, historyTurns);
+        setConversations((prev) =>
+          prev.map((c) => {
+            if (c.id !== activeId) return c;
+            return {
+              ...c,
+              messages: [
+                ...c.messages,
+                {
+                  id: assistantMsgId,
+                  role: "assistant" as const,
+                  content: resp.answer,
+                  response: resp,
+                },
+              ],
+            };
+          }),
+        );
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Request failed";
+        setConversations((prev) =>
+          prev.map((c) => {
+            if (c.id !== activeId) return c;
+            return {
+              ...c,
+              messages: [
+                ...c.messages,
+                {
+                  id: assistantMsgId,
+                  role: "assistant" as const,
+                  content: "",
+                  error: `Error: ${errorMsg}`,
+                },
+              ],
+            };
+          }),
+        );
+      } finally {
+        setSending(false);
+        textareaRef.current?.focus();
+      }
+    },
+    [activeId, activeConv.messages, sending],
+  );
 
-  const handleReset = useCallback(() => {
-    setFile(null);
-    setClassifyResult(null);
-    setProcessResult(null);
-    setOcrText("");
-    setError(null);
-    if (fileRef.current) fileRef.current.value = "";
-  }, []);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend(input);
+      }
+    },
+    [handleSend, input],
+  );
 
-  /* ── Derived display values ── */
-  const handoff = processResult?.handoff ?? null;
-  const decision = processResult?.decision ?? null;
-  const meta = handoff?.metadata ?? null;
-  const fields = flattenMetadata(meta);
-  const docTypeLabel = classifyResult
-    ? (DOC_TYPE_LABELS[classifyResult.doc_type] ?? classifyResult.doc_type)
-    : "";
-  const bandInfo = classifyResult ? bandFor(classifyResult.confidence) : null;
-
-  const modeTag = healthError
-    ? <Tag variant="amber"><span data-testid="health-unreachable">Service Unreachable</span></Tag>
-    : health?.mode === "cpu_degraded"
-    ? <Tag variant="amber">CPU Degraded Mode</Tag>
-    : <Tag variant="green">GPU Mode · Healthy</Tag>;
+  if (!canRead) {
+    return (
+      <div className="fade-up" style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+        <p>You need <code>ai:read</code> permission to access the AI Copilot.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="fade-up">
-      {/* ── Page header ── */}
-      <div className="page-header">
-        <div>
-          <h2 className="serif">AI Processing Engine</h2>
-          <p>Granite 3.2 Vision · Qwen2.5-VL · Two-Stage IDP · Constrained JSON · 600+ pages/hr</p>
-        </div>
-        <div className="phr" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Tag variant="gold">vLLM v0.6</Tag>
-          {modeTag}
-          <StatusDot color="green" pulse />
-        </div>
-      </div>
-
-      {/* ── KPI row (live stats when available, dashes while loading) ── */}
-      <div className="g4" style={{ marginBottom: 16 }}>
-        <KpiCard
-          label="AI Queue Size"
-          value={stats ? stats.queue_size.toLocaleString() : "—"}
-          sub="Est. 4 min to clear"
-          variant="blue"
-        />
-        <KpiCard
-          label="Processed Today"
-          value={stats ? stats.processed_today.toLocaleString() : "—"}
-          sub={stats ? `Avg ${(stats.avg_processing_ms / 1000).toFixed(1)} s / page · P95 ≤ 5s` : "Avg — s / page"}
-          variant="green"
-        />
-        <KpiCard
-          label="Avg Confidence"
-          value={stats ? `${(stats.avg_confidence * 100).toFixed(1)}%` : "—"}
-          sub="Threshold: 85% (§6.4)"
-          variant="gold"
-        />
-        <KpiCard
-          label="Manual Review"
-          value={stats ? stats.manual_review_count : "—"}
-          sub="Conf < 85% or invalid extract"
-          variant="red"
-        />
-      </div>
-
-      {/* ── Tabs ── */}
-      <Tabs
-        items={[
-          { key: "upload", label: "Document Upload & Process" },
-          { key: "results", label: classifyResult ? `Results — ${docTypeLabel}` : "Results" },
-          { key: "status", label: "Engine Status & Analytics" },
-        ]}
-        active={tab}
-        onChange={(k) => setTab(k as TabKey)}
-      />
-
-      {/* ════════════════════════════════════ UPLOAD TAB ═══════════════════════════════ */}
-      {tab === "upload" && (
-        <div className="g2" style={{ marginTop: 16 }}>
-          {/* Left: Upload panel */}
-          <Card title="Document Upload — AI / IDP Pipeline">
-            {/* Drop zone */}
+    <div
+      className="fade-up"
+      style={{
+        display: "flex",
+        height: "calc(100vh - 64px)",
+        background: "#f9fafb",
+        overflow: "hidden",
+      }}
+    >
+      {/* ── Left rail ── */}
+      <aside
+        data-testid="chat-rail"
+        style={{
+          width: 240,
+          background: "#fff",
+          borderRight: "1px solid #e5e7eb",
+          display: "flex",
+          flexDirection: "column",
+          flexShrink: 0,
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "16px 14px 12px",
+            borderBottom: "1px solid #f3f4f6",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <div
               style={{
-                background: "rgba(184,145,42,.04)",
-                border: "2px dashed rgba(184,145,42,.25)",
-                borderRadius: 10,
-                padding: "28px 20px",
-                textAlign: "center",
-                marginBottom: 16,
-                cursor: "pointer",
-                transition: "border-color .15s",
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-              onClick={() => fileRef.current?.click()}
             >
-              <svg
-                width={32}
-                height={32}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--gold2)"
-                strokeWidth={1.5}
-                style={{ marginBottom: 10 }}
-              >
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="12" y1="18" x2="12" y2="12" />
-                <line x1="9" y1="15" x2="15" y2="15" />
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2}>
+                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
               </svg>
-              <div style={{ fontSize: 13, color: "var(--mist)", marginBottom: 4 }}>
-                {file ? file.name : "Drop document here or click to browse"}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--sil)" }}>
-                PDF, PNG, JPG, TIFF — max 50 MB per page
-              </div>
-              <input
-                ref={fileRef}
-                type="file"
-                aria-label="document"
-                accept=".pdf,.png,.jpg,.jpeg,.tiff,.tif"
-                style={{ display: "none" }}
-                onChange={handleFile}
-              />
             </div>
-
-            {/* OCR Text (optional hint) */}
-            {file && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, color: "var(--sil)", marginBottom: 6 }}>
-                  OCR pre-text hint (optional — accelerates pre-screen)
-                </div>
-                <textarea
-                  className="field"
-                  rows={3}
-                  placeholder="Paste any known text from the document (MRZ, header, CID number…)"
-                  value={ocrText}
-                  onChange={(e) => setOcrText(e.target.value)}
-                  style={{ width: "100%", resize: "vertical", fontSize: 11, fontFamily: "monospace" }}
-                />
-                <button
-                  className="btn bs"
-                  style={{ fontSize: 11, marginTop: 4 }}
-                  onClick={handleOcr}
-                  disabled={busy || !file}
-                >
-                  Run OCR (Tesseract fallback)
-                </button>
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                className="btn bok"
-                style={{ flex: 1 }}
-                onClick={handleProcess}
-                disabled={!file || busy || !canWrite}
-                aria-label="process document"
-              >
-                {busy ? "Processing…" : "Process (Full IDP Pipeline)"}
-              </button>
-              <button
-                className="btn bs"
-                onClick={handleClassify}
-                disabled={!file || busy || !canWrite}
-              >
-                Classify Only
-              </button>
-              {(classifyResult || processResult) && (
-                <button className="btn bx" onClick={handleReset} disabled={busy}>
-                  Reset
-                </button>
-              )}
-            </div>
-
-            {!canWrite && (
-              <div
-                style={{
-                  marginTop: 10,
-                  padding: "8px 12px",
-                  background: "rgba(58,159,208,.08)",
-                  borderRadius: 7,
-                  fontSize: 11,
-                  color: "var(--sil)",
-                }}
-              >
-                Read-only view — upload requires <code>ai:write</code> permission.
-              </div>
-            )}
-
-            {error && (
-              <div
-                style={{
-                  marginTop: 12,
-                  padding: "10px 14px",
-                  background: "rgba(224,82,82,.1)",
-                  border: "1px solid rgba(224,82,82,.25)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color: "var(--R)",
-                }}
-              >
-                {error}
-              </div>
-            )}
-          </Card>
-
-          {/* Right: Pipeline diagram */}
-          <Card title="IDP Pipeline — Stage Overview">
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {[
-                { stage: "Stage 0", name: "Pre-screen", detail: "MRZ/ID-regex signals → proposed type", color: "var(--sil)" },
-                { stage: "Stage 1", name: "Classify", detail: "Granite 3.2 Vision 2B — P95 ≤ 700 ms/page", color: "var(--B)" },
-                { stage: "Route",   name: "Confidence Band", detail: "§6.4: ≥0.92 Auto · ≥0.85 Verified · ≥0.70 Supervisor · ≥0.50 Human · <0.50 Reject", color: "var(--gold2)" },
-                { stage: "Stage 2", name: "Extract", detail: "Qwen2.5-VL 7B — constrained JSON — Pydantic v2 — P95 ≤ 5 s/page", color: "var(--G)" },
-                { stage: "Stage 3", name: "Validate", detail: "Per-type field rules · ISO dates · regex · cross-field checks", color: "var(--P)" },
-                { stage: "Stage 4", name: "Catalog Hand-off", detail: "Typed payload → Core DMS · directory mapping · alert tiers", color: "var(--W)" },
-              ].map((s, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 12,
-                    padding: "10px 12px",
-                    background: "var(--gr)",
-                    borderRadius: 8,
-                    borderLeft: `3px solid ${s.color}`,
-                  }}
-                >
-                  <div style={{ minWidth: 54 }}>
-                    <span style={{ fontSize: 9, color: s.color, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
-                      {s.stage}
-                    </span>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--mist)" }}>{s.name}</div>
-                    <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 2 }}>{s.detail}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {[
-                { label: "CID Classify", target: "≥ 95%", color: "var(--G)" },
-                { label: "Field Accuracy", target: "≥ 90%", color: "var(--G)" },
-                { label: "Human Review Rate", target: "≤ 8%", color: "var(--W)" },
-                { label: "End-to-end P95", target: "≤ 8 s", color: "var(--B)" },
-              ].map((m) => (
-                <div
-                  key={m.label}
-                  style={{
-                    flex: 1,
-                    minWidth: 110,
-                    padding: "8px 10px",
-                    background: "var(--ink3)",
-                    borderRadius: 8,
-                    border: "1px solid var(--bd)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 9, color: "var(--sil)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
-                    {m.label}
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: m.color, fontFamily: "Cormorant Garamond, serif" }}>
-                    {m.target}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+            <span style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>ZorDMS Copilot</span>
+          </div>
+          <button
+            data-testid="new-chat-btn"
+            onClick={handleNewChat}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 10px",
+              background: "#2563eb",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            New Chat
+          </button>
         </div>
-      )}
 
-      {/* ═════════════════════════════════ RESULTS TAB ═════════════════════════════════ */}
-      {tab === "results" && (
-        <div style={{ marginTop: 16 }}>
-          {!classifyResult && !processResult ? (
-            <Card>
-              <div style={{ textAlign: "center", padding: "32px 0", color: "var(--sil)", fontSize: 13 }}>
-                No results yet — upload and process a document first.
-              </div>
-            </Card>
-          ) : (
-            <div className="g2">
-              {/* Left column: extraction overlay + classification result */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {/* Document AI extraction overlay */}
-                <Card
-                  title={
-                    <span>
-                      Document · AI Extraction Overlay{" "}
-                      {classifyResult && (
-                        <Tag variant="blue">{docTypeLabel}</Tag>
-                      )}
-                    </span>
-                  }
+        {/* Conversation list */}
+        <div
+          data-testid="conversation-list"
+          style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}
+        >
+          {conversations.map((c) => (
+            <button
+              key={c.id}
+              data-testid="conversation-item"
+              onClick={() => setActiveId(c.id)}
+              style={{
+                width: "100%",
+                display: "block",
+                textAlign: "left",
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "none",
+                background: c.id === activeId ? "#eff6ff" : "transparent",
+                color: c.id === activeId ? "#1d4ed8" : "#374151",
+                fontSize: 12,
+                cursor: "pointer",
+                marginBottom: 2,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontWeight: c.id === activeId ? 600 : 400,
+              }}
+            >
+              {c.title}
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* ── Main chat area ── */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header bar */}
+        <div
+          style={{
+            padding: "12px 24px",
+            background: "#fff",
+            borderBottom: "1px solid #e5e7eb",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <div>
+            <h2
+              style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#111827" }}
+              data-testid="copilot-heading"
+            >
+              AI Copilot
+            </h2>
+            <p style={{ margin: 0, fontSize: 11, color: "#6b7280" }}>
+              Grounded answers over the ZorDMS document corpus · every claim carries a citation
+            </p>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+            <span
+              style={{
+                fontSize: 10,
+                padding: "2px 8px",
+                borderRadius: 10,
+                background: "#dcfce7",
+                color: "#16a34a",
+                fontWeight: 600,
+                border: "1px solid #bbf7d0",
+              }}
+            >
+              RAG · Live
+            </span>
+          </div>
+        </div>
+
+        {/* Thread */}
+        <div
+          ref={threadRef}
+          data-testid="chat-thread"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "24px 32px",
+          }}
+        >
+          {activeConv.messages.length === 0 ? (
+            /* Suggested prompts shown when the thread is empty */
+            <div data-testid="suggested-prompts" style={{ maxWidth: 560, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 28 }}>
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 14px",
+                  }}
                 >
-                  {classifyResult && (
-                    <div
-                      style={{
-                        background: "var(--gr)",
-                        border: "1px solid var(--bd)",
-                        borderRadius: 8,
-                        padding: 16,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 8,
-                          color: "var(--gold)",
-                          letterSpacing: "1.5px",
-                          textTransform: "uppercase",
-                          marginBottom: 10,
-                        }}
-                      >
-                        {docTypeLabel}
-                      </div>
-
-                      {/* File name + signals */}
-                      <div style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
-                        <div
-                          style={{
-                            width: 56,
-                            height: 76,
-                            background: "rgba(184,145,42,.08)",
-                            border: "2px solid rgba(46,204,138,.4)",
-                            borderRadius: 4,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth={1.5}>
-                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                            <polyline points="14 2 14 8 20 8" />
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 9, color: "var(--sil)", marginBottom: 2 }}>FILE</div>
-                          <div
-                            style={{
-                              background: "rgba(184,145,42,.15)",
-                              border: "1px solid rgba(184,145,42,.3)",
-                              borderRadius: 3,
-                              padding: "3px 8px",
-                              fontSize: 12,
-                              marginBottom: 8,
-                            }}
-                          >
-                            {file?.name ?? "Processed document"}
-                          </div>
-                          {classifyResult.signals.length > 0 && (
-                            <div>
-                              <div style={{ fontSize: 9, color: "var(--sil)", marginBottom: 4 }}>CLASSIFICATION SIGNALS</div>
-                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                {classifyResult.signals.slice(0, 6).map((s, i) => (
-                                  <span
-                                    key={i}
-                                    style={{
-                                      fontSize: 9,
-                                      background: "rgba(58,159,208,.12)",
-                                      border: "1px solid rgba(58,159,208,.2)",
-                                      borderRadius: 4,
-                                      padding: "2px 6px",
-                                      color: "var(--B)",
-                                    }}
-                                  >
-                                    {s}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* MRZ display for passport types */}
-                      {(classifyResult.doc_type === "BT_PASSPORT" || classifyResult.doc_type === "FOREIGN_PASSPORT") &&
-                        ocrText && (
-                          <div
-                            style={{
-                              background: "var(--ink4)",
-                              border: "1px solid var(--bd)",
-                              borderRadius: 4,
-                              padding: 7,
-                              fontFamily: "JetBrains Mono, monospace",
-                              fontSize: 8.5,
-                              color: "var(--mist)",
-                              letterSpacing: 1,
-                              marginTop: 8,
-                            }}
-                          >
-                            {ocrText.split("\n").slice(0, 2).join("\n")}
-                          </div>
-                        )}
-                    </div>
-                  )}
-                </Card>
-
-                {/* Classification result banner */}
-                {classifyResult && bandInfo && (
-                  <Card title="Classification Result">
-                    <div
-                      style={{
-                        background: "rgba(184,145,42,.05)",
-                        border: "1px solid rgba(184,145,42,.2)",
-                        borderRadius: 8,
-                        padding: 12,
-                        marginBottom: 12,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="var(--gold3)" strokeWidth={2}>
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                      </svg>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gold3)" }}>
-                          {docTypeLabel} · {(classifyResult.confidence * 100).toFixed(1)}% confidence
-                        </div>
-                        <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 2 }}>
-                          Band: {bandInfo.label}
-                          {decision && ` · Action: ${decision.action.replace(/_/g, " ")}`}
-                          {decision?.sla_hours != null && ` · SLA: ${decision.sla_hours}h`}
-                        </div>
-                      </div>
-                      <div style={{ marginLeft: "auto" }}>
-                        <ConfidenceBadge confidence={classifyResult.confidence} />
-                      </div>
-                    </div>
-
-                    {/* Route decision info */}
-                    {decision && (
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            padding: "3px 8px",
-                            borderRadius: 6,
-                            background: "var(--gr)",
-                            color: "var(--sil)",
-                          }}
-                        >
-                          Catalog: <strong style={{ color: "var(--mist)" }}>{decision.catalog_assignment}</strong>
-                        </span>
-                        {decision.review_required && (
-                          <Tag variant="amber">Routed to Review Queue</Tag>
-                        )}
-                        {!decision.review_required && (
-                          <Tag variant="green">Auto-Approved</Tag>
-                        )}
-                        {processResult?.review_item_id != null && (
-                          <span style={{ fontSize: 10, color: "var(--sil)", padding: "3px 8px", background: "var(--gr)", borderRadius: 6 }}>
-                            Review #<strong style={{ color: "var(--W)" }}>{processResult.review_item_id}</strong>
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {actionNotice && (
-                      <div
-                        data-testid="action-notice"
-                        style={{
-                          marginBottom: 8,
-                          padding: "8px 12px",
-                          background: "rgba(58,159,208,.1)",
-                          border: "1px solid rgba(58,159,208,.25)",
-                          borderRadius: 7,
-                          fontSize: 11,
-                          color: "var(--B)",
-                        }}
-                      >
-                        {actionNotice}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        className="btn bok"
-                        style={{ flex: 1 }}
-                        disabled={!canWrite}
-                        onClick={() => setActionNotice("Accept & Index: indexing pipeline not yet connected — contact your administrator.")}
-                        aria-label="accept and index"
-                      >
-                        Accept &amp; Index
-                      </button>
-                      <button
-                        className="btn bs"
-                        disabled={!canWrite}
-                        onClick={() => setActionNotice("Edit Fields: field-edit UI not yet implemented in this release.")}
-                        aria-label="edit fields"
-                      >
-                        Edit Fields
-                      </button>
-                      <button className="btn bx" onClick={handleReset} aria-label="reprocess">
-                        Reprocess
-                      </button>
-                      <button
-                        className="btn bw"
-                        disabled={!canWrite}
-                        onClick={() => setActionNotice("Flag: flagging API not yet connected — item will be routed to review queue automatically.")}
-                        aria-label="flag"
-                      >
-                        Flag
-                      </button>
-                    </div>
-                  </Card>
-                )}
+                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={1.8}>
+                    <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+                  </svg>
+                </div>
+                <h3 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 700, color: "#111827" }}>
+                  How can I help you?
+                </h3>
+                <p style={{ margin: 0, fontSize: 12.5, color: "#6b7280" }}>
+                  Ask anything about your documents — I'll ground every answer with citations.
+                </p>
               </div>
 
-              {/* Right column: extracted fields + review notice */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {/* Extracted fields */}
-                <Card
-                  title={
-                    <span>
-                      Extracted Fields{" "}
-                      {classifyResult && (
-                        <Tag variant="gold">
-                          {(classifyResult.confidence * 100).toFixed(1)}% Classification Confidence
-                        </Tag>
-                      )}
-                    </span>
-                  }
-                >
-                  {fields.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {fields.map((f, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "7px 10px",
-                            background: "var(--gr)",
-                            borderRadius: 6,
-                          }}
-                        >
-                          <div style={{ width: 100, fontSize: 10, color: "var(--sil)", flexShrink: 0 }}>
-                            {f.label}
-                          </div>
-                          <div style={{ flex: 1, fontSize: 12, color: "var(--mist)", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {f.value}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sil)", fontSize: 12 }}>
-                      {classifyResult
-                        ? "Run full pipeline (Process) to extract structured fields."
-                        : "No extraction data yet."}
-                    </div>
-                  )}
-                </Card>
-
-                {/* Review routing notice */}
-                {handoff?.review_required && (
-                  <div
-                    data-testid="review-notice"
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {SUGGESTED_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    data-testid="suggested-prompt-card"
+                    onClick={() => handleSend(prompt)}
                     style={{
-                      padding: "12px 16px",
-                      background: "rgba(240,160,48,.08)",
-                      border: "1px solid rgba(240,160,48,.25)",
-                      borderRadius: 8,
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "12px 14px",
+                      background: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 10,
+                      fontSize: 12.5,
+                      color: "#374151",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s, box-shadow 0.15s",
+                      lineHeight: 1.5,
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#2563eb";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 0 2px #eff6ff";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "#e5e7eb";
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "";
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--W)", marginBottom: 4 }}>
-                      Routed to Human-Review Queue
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--sil)" }}>
-                      Confidence below threshold or extraction validation failed. A reviewer will
-                      claim and resolve this document within the assigned SLA
-                      {decision?.sla_hours != null ? ` (${decision.sla_hours}h)` : ""}.
-                    </div>
-                    {processResult?.review_item_id != null && (
-                      <div style={{ marginTop: 8, fontSize: 11 }}>
-                        Review item:{" "}
-                        <strong style={{ color: "var(--W)" }}>#{processResult.review_item_id}</strong>
-                      </div>
-                    )}
-                  </div>
-                )}
+                    {prompt}
+                  </button>
+                ))}
               </div>
+            </div>
+          ) : (
+            <div style={{ maxWidth: 720, margin: "0 auto" }}>
+              {activeConv.messages.map((msg) =>
+                msg.role === "user" ? (
+                  <UserBubble key={msg.id} msg={msg} />
+                ) : (
+                  <AssistantBubble key={msg.id} msg={msg} />
+                ),
+              )}
+              {sending && (
+                <div
+                  data-testid="loading-indicator"
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2}>
+                      <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
+                    </svg>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "#9ca3af",
+                          animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
 
-      {/* ═════════════════════════════════ STATUS TAB ══════════════════════════════════ */}
-      {tab === "status" && (
-        <div className="g2" style={{ marginTop: 16 }}>
-          {/* Left: throughput chart (derived from /stats) + live metrics */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {throughput.length > 0 ? (
-              <LineChartCard
-                title="Throughput — Pages Processed per Hour (API-derived)"
-                data={throughput}
-                xKey="time"
-                lines={[{ key: "pages", color: "var(--gold2)", name: "Pages/hr" }]}
-                height={200}
+        {/* Input area */}
+        <div
+          style={{
+            padding: "16px 32px 20px",
+            background: "#fff",
+            borderTop: "1px solid #e5e7eb",
+          }}
+        >
+          <div style={{ maxWidth: 720, margin: "0 auto" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-end",
+                background: "#f9fafb",
+                border: "1px solid #e5e7eb",
+                borderRadius: 12,
+                padding: "8px 12px 8px 16px",
+                transition: "border-color 0.15s, box-shadow 0.15s",
+              }}
+            >
+              <textarea
+                ref={textareaRef}
+                data-testid="chat-input"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a question about your documents… (Enter to send, Shift+Enter for newline)"
+                rows={1}
+                disabled={sending}
+                style={{
+                  flex: 1,
+                  border: "none",
+                  background: "transparent",
+                  resize: "none",
+                  outline: "none",
+                  fontSize: 13.5,
+                  color: "#111827",
+                  lineHeight: 1.6,
+                  fontFamily: "inherit",
+                  minHeight: 24,
+                  maxHeight: 120,
+                  overflowY: "auto",
+                }}
               />
-            ) : (
-              <Card title="Throughput — Pages Processed per Hour">
-                <div style={{ textAlign: "center", padding: "40px 0", color: "var(--sil)", fontSize: 12 }}>
-                  {stats === null ? "Loading throughput data…" : "Throughput data unavailable."}
-                </div>
-              </Card>
-            )}
-
-            {/* Live metrics summary (all from AiStats API) */}
-            <Card title="Live Metrics (from /stats)">
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {stats ? [
-                  { label: "Processed Today",    value: stats.processed_today.toLocaleString() + " pages" },
-                  { label: "Queue Size",          value: stats.queue_size.toLocaleString() + " items" },
-                  { label: "Avg Confidence",      value: (stats.avg_confidence * 100).toFixed(1) + "%" },
-                  { label: "Manual Review Count", value: stats.manual_review_count.toLocaleString() + " items" },
-                  { label: "Throughput / hr",     value: stats.throughput_per_hour.toLocaleString() + " pages" },
-                  { label: "Avg Processing",      value: (stats.avg_processing_ms / 1000).toFixed(2) + " s" },
-                ].map(({ label, value }) => (
-                  <div
-                    key={label}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "6px 10px",
-                      background: "var(--gr)",
-                      borderRadius: 6,
-                    }}
-                  >
-                    <span style={{ fontSize: 11, color: "var(--sil)" }}>{label}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--mist)" }}>{value}</span>
-                  </div>
-                )) : (
-                  <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sil)", fontSize: 12 }}>
-                    Loading metrics…
-                  </div>
+              <button
+                data-testid="send-btn"
+                onClick={() => handleSend(input)}
+                disabled={!input.trim() || sending}
+                aria-label="send message"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 34,
+                  height: 34,
+                  borderRadius: 8,
+                  border: "none",
+                  background: input.trim() && !sending ? "#2563eb" : "#e5e7eb",
+                  color: input.trim() && !sending ? "#fff" : "#9ca3af",
+                  cursor: input.trim() && !sending ? "pointer" : "not-allowed",
+                  flexShrink: 0,
+                  transition: "background 0.15s",
+                }}
+              >
+                {sending ? (
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <circle cx={12} cy={12} r={10} />
+                    <line x1={12} y1={8} x2={12} y2={12} />
+                    <line x1={12} y1={16} x2={12} y2={16} />
+                  </svg>
+                ) : (
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <line x1={22} y1={2} x2={11} y2={13} />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
                 )}
-              </div>
-            </Card>
-          </div>
+              </button>
+            </div>
 
-          {/* Right: engine status details */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Card title="AI Engine Status">
-              <div style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 7 }}>
-                {[
-                  { label: "Service",          value: health?.service ?? "ai-idp" },
-                  { label: "Mode",             value: health?.mode ?? "gpu", tag: health?.mode === "cpu_degraded" ? <Tag variant="amber">CPU Degraded</Tag> : <Tag variant="green">GPU</Tag> },
-                  { label: "Classifier",       tag: <Tag variant="gold">Granite 3.2 Vision 2B · INT4/AWQ</Tag> },
-                  { label: "Extractor",        tag: <Tag variant="gold">Qwen2.5-VL 7B · Q4/GPTQ</Tag> },
-                  { label: "Inference Server", tag: <Tag variant="blue">vLLM OpenAI-compatible · constrained JSON</Tag> },
-                  { label: "Constrained JSON", tag: <Tag variant="blue">guided_json decoding · Pydantic v2 validation</Tag> },
-                  { label: "OCR Fallback",     tag: <Tag variant="purple">Tesseract (pytesseract)</Tag> },
-                  { label: "Pre-screen",       tag: <Tag variant="green">MRZ + ID-regex · 18 doc types</Tag> },
-                  { label: "DB Backend",       tag: <Tag variant="gold">PostgreSQL · Oracle 19c switchable</Tag> },
-                ].map(({ label, value, tag }) => (
-                  <div
-                    key={label}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "6px 0",
-                      borderBottom: "1px solid var(--bd)",
-                    }}
-                  >
-                    <span style={{ color: "var(--sil)" }}>{label}</span>
-                    {tag ?? <span style={{ color: "var(--mist)" }}>{value}</span>}
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* SLO summary — measured values derived from AiStats; targets from IDP §7.3 */}
-            <Card title="Performance SLOs (IDP §7.3)">
-              {stats ? (() => {
-                const classifierMs = stats.classifier_p95_ms;
-                const extractorMs  = stats.extractor_p95_ms;
-                // e2e P95 ≈ avg_processing_ms × 1.35 (P95 headroom) — exact P95 not separately exposed
-                const e2eMs        = stats.avg_processing_ms * 1.35;
-                const reviewRate   = stats.processed_today > 0
-                  ? (stats.manual_review_count / stats.processed_today) * 100
-                  : 0;
-
-                const rows = [
-                  { slo: "Classifier P95",    target: "≤ 700 ms/page",  current: `${classifierMs} ms`,                     ok: classifierMs <= 700 },
-                  { slo: "Extractor P95",     target: "≤ 5 s/page",     current: `${(extractorMs / 1000).toFixed(1)} s`,   ok: extractorMs <= 5000 },
-                  { slo: "End-to-end P95",    target: "≤ 8 s/page",     current: `${(e2eMs / 1000).toFixed(1)} s`,         ok: e2eMs <= 8000 },
-                  { slo: "Batch throughput",  target: "≥ 600 pages/hr", current: `${stats.throughput_per_hour}/hr`,         ok: stats.throughput_per_hour >= 600 },
-                  { slo: "Avg Confidence",    target: "≥ 85%",          current: `${(stats.avg_confidence * 100).toFixed(1)}%`, ok: stats.avg_confidence >= 0.85 },
-                  { slo: "Human Review Rate", target: "≤ 8%",           current: `${reviewRate.toFixed(1)}%`,               ok: reviewRate <= 8 },
-                ];
-
-                return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {rows.map((r) => (
-                      <div
-                        key={r.slo}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "7px 10px",
-                          background: "var(--gr)",
-                          borderRadius: 6,
-                        }}
-                      >
-                        <StatusDot color={r.ok ? "green" : "red"} />
-                        <div style={{ flex: 1, fontSize: 11 }}>
-                          <div style={{ color: "var(--mist)" }}>{r.slo}</div>
-                          <div style={{ fontSize: 10, color: "var(--sil)" }}>Target: {r.target}</div>
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: r.ok ? "var(--G)" : "var(--R)" }}>
-                          {r.current}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })() : (
-                <div style={{ textAlign: "center", padding: "24px 0", color: "var(--sil)", fontSize: 12 }}>
-                  Loading SLO data…
-                </div>
-              )}
-            </Card>
+            {/* Footer note */}
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                data-testid="grounded-note"
+                style={{ fontSize: 10.5, color: "#9ca3af" }}
+              >
+                Grounded answers only — every claim carries a citation
+              </span>
+              <span style={{ fontSize: 10.5, color: "#9ca3af" }}>
+                ZorDMS Copilot · RAG Agent
+              </span>
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

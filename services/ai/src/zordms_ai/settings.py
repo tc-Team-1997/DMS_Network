@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     # Shared secret for HS256 JWT verification (must match gateway JWT_SECRET)
     jwt_secret: str = "change-me-in-production"
 
+    # Copilot / RAG settings
+    search_url: str = "http://localhost:4004"
+    anthropic_api_key: str = ""
+    openai_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5"
+    openai_model: str = "gpt-4o-mini"
+
     @property
     def is_degraded(self) -> bool:
         return self.inference_mode == "cpu_degraded"

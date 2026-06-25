@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from zordms_ai.api.copilot import copilot_router
 from zordms_ai.api.idp import idp_router
 from zordms_ai.api.ocr import ocr_router
 from zordms_ai.api.review import review_router
@@ -48,4 +49,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ocr_router)
     app.include_router(idp_router)
     app.include_router(review_router)
+    app.include_router(copilot_router)
     return app

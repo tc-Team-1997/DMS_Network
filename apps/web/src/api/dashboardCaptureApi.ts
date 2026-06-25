@@ -56,6 +56,9 @@ export const dashboardCaptureApi = {
   dashboardSummary: (): Promise<DashboardSummary> =>
     http.get<DashboardSummary>(`${SVC.core}/dashboard/summary`),
 
+  dashboardSummaryWithParams: (qs: string): Promise<DashboardSummary> =>
+    http.get<DashboardSummary>(`${SVC.core}/dashboard/summary?${qs}`),
+
   // Capture / Documents
   listDocuments: (params?: { status?: string; branch?: string }): Promise<{ documents: DocumentRecord[] }> => {
     const qs = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
