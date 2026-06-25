@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import { signBody } from "./hmac.js";
 
 export interface DispatchReport { delivered: number; failed: number; attempts: number; }
@@ -44,7 +45,7 @@ export async function dispatchEvent(deps: DispatchDeps, event: string, payload: 
     }
 
     await knex("integration_logs").insert({
-      system: "outbound", endpoint: event, method: "POST",
+      id: newId(), system: "outbound", endpoint: event, method: "POST",
       status: lastStatus, latency_ms: 0, direction: "outbound",
       success: ok, error: ok ? null : `delivery_failed_after_${attempt - 1}_attempts`,
     });

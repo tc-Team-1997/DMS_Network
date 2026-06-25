@@ -13,7 +13,7 @@ export function annotationsRouter(): Router {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       // C4: ensure the document belongs to the caller's branch before listing annotations
-      const doc = await getDocument(knex, Number(req.params.documentId), makeViewer(req));
+      const doc = await getDocument(knex, req.params.documentId, makeViewer(req));
       if (!doc) { res.status(404).json({ error: "not_found" }); return; }
       res.json({ annotations: await listAnnotations(knex, doc.id) });
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
@@ -24,7 +24,7 @@ export function annotationsRouter(): Router {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       // C4: branch-check the document before allowing annotation creation
-      const doc = await getDocument(knex, Number(req.params.documentId), makeViewer(req));
+      const doc = await getDocument(knex, req.params.documentId, makeViewer(req));
       if (!doc) { res.status(404).json({ error: "not_found" }); return; }
       const annotation = await createAnnotation(knex, doc.id, {
         kind: req.body.kind,
@@ -46,10 +46,10 @@ export function annotationsRouter(): Router {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       // C4: branch-check the parent document first
-      const doc = await getDocument(knex, Number(req.params.documentId), makeViewer(req));
+      const doc = await getDocument(knex, req.params.documentId, makeViewer(req));
       if (!doc) { res.status(404).json({ error: "not_found" }); return; }
       // C4: pass documentId so only annotations owned by this document can be deleted
-      const deleted = await deleteAnnotation(knex, Number(req.params.id), doc.id);
+      const deleted = await deleteAnnotation(knex, req.params.id, doc.id);
       if (!deleted) { res.status(404).json({ error: "not_found" }); return; }
       res.status(204).end();
     } catch (e: any) { res.status(500).json({ error: "internal" }); }

@@ -2,8 +2,8 @@ import type { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema.createTable("folders", (t) => {
-    t.increments("id").primary();
-    t.integer("parent_id").references("id").inTable("folders").onDelete("CASCADE");
+    t.string("id", 36).notNullable().primary();
+    t.string("parent_id", 36).references("id").inTable("folders").onDelete("CASCADE");
     t.string("name", 200).notNullable();
     t.string("path", 1000).notNullable();
     t.string("domain", 80);
@@ -14,8 +14,8 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("documents", (t) => {
-    t.increments("id").primary();
-    t.integer("folder_id").references("id").inTable("folders").onDelete("SET NULL");
+    t.string("id", 36).notNullable().primary();
+    t.string("folder_id", 36).references("id").inTable("folders").onDelete("SET NULL");
     t.string("title", 300).notNullable();
     t.string("original_filename", 300);
     t.string("mime_type", 150);
@@ -43,8 +43,8 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("document_versions", (t) => {
-    t.increments("id").primary();
-    t.integer("document_id").notNullable().references("id").inTable("documents").onDelete("CASCADE");
+    t.string("id", 36).notNullable().primary();
+    t.string("document_id", 36).notNullable().references("id").inTable("documents").onDelete("CASCADE");
     t.integer("version_no").notNullable();
     t.string("storage_key", 255).notNullable();
     t.string("file_hash_sha256", 64).notNullable();
@@ -58,8 +58,8 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("annotations", (t) => {
-    t.increments("id").primary();
-    t.integer("document_id").notNullable().references("id").inTable("documents").onDelete("CASCADE");
+    t.string("id", 36).notNullable().primary();
+    t.string("document_id", 36).notNullable().references("id").inTable("documents").onDelete("CASCADE");
     t.integer("page").notNullable().defaultTo(1);
     t.string("kind", 20).notNullable();
     t.float("x").notNullable().defaultTo(0);
@@ -74,8 +74,8 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("folder_acls", (t) => {
-    t.increments("id").primary();
-    t.integer("folder_id").notNullable().references("id").inTable("folders").onDelete("CASCADE");
+    t.string("id", 36).notNullable().primary();
+    t.string("folder_id", 36).notNullable().references("id").inTable("folders").onDelete("CASCADE");
     t.string("role", 80).notNullable();
     t.string("access", 20).notNullable();
     t.boolean("inherited").notNullable().defaultTo(false);

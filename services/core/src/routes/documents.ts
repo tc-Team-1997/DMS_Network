@@ -29,7 +29,7 @@ export function documentsRouter(): Router {
         branch,
         ingestUserId: req.authUser!.username,
         sourceChannel: req.body.sourceChannel,
-        folderId: req.body.folderId ? Number(req.body.folderId) : null,
+        folderId: req.body.folderId ? String(req.body.folderId) : null,
       });
       res.status(201).json({ document });
     } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
@@ -48,7 +48,7 @@ export function documentsRouter(): Router {
   r.get("/:id", requirePermission("document:read"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
-      const document = await getDocument(knex, Number(req.params.id), makeViewer(req));
+      const document = await getDocument(knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       res.json({ document });
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
@@ -58,7 +58,7 @@ export function documentsRouter(): Router {
   r.get("/:id/download", requirePermission("document:read"), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
-      const document = await getDocument(deps.knex, Number(req.params.id), makeViewer(req));
+      const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       const v = await currentVersion(deps.knex, document.id);
       if (!v) { res.status(404).json({ error: "no_version" }); return; }
@@ -75,7 +75,7 @@ export function documentsRouter(): Router {
   r.delete("/:id", requirePermission("document:delete"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
-      const document = await getDocument(knex, Number(req.params.id), makeViewer(req));
+      const document = await getDocument(knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       await softDeleteDocument(knex, document.id);
       res.status(204).end();
@@ -86,7 +86,7 @@ export function documentsRouter(): Router {
   r.post("/:id/versions", requirePermission("document:index"), upload.single("file"), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
-      const document = await getDocument(deps.knex, Number(req.params.id), makeViewer(req));
+      const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       if (!req.file) { res.status(400).json({ error: "file_required" }); return; }
       const version = await addVersion(deps, document.id, {
@@ -104,7 +104,7 @@ export function documentsRouter(): Router {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
       // verify caller can see this document
-      const document = await getDocument(knex, Number(req.params.id), makeViewer(req));
+      const document = await getDocument(knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       res.json({ versions: await listVersions(knex, document.id) });
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
@@ -114,7 +114,7 @@ export function documentsRouter(): Router {
   r.post("/:id/rollback", requirePermission("document:index"), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
-      const document = await getDocument(deps.knex, Number(req.params.id), makeViewer(req));
+      const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       const version = await rollback(deps, document.id, Number(req.body.version));
       res.json({ version });
@@ -126,7 +126,7 @@ export function documentsRouter(): Router {
   r.patch("/:id", requirePermission("document:index"), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
-      const document = await getDocument(deps.knex, Number(req.params.id), makeViewer(req));
+      const document = await getDocument(deps.knex, req.params.id, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
 
       const body = req.body as {
@@ -134,7 +134,7 @@ export function documentsRouter(): Router {
         catalog_category?: string;
         cid?: string;
         doc_no?: string;
-        folder_id?: number | null;
+        folder_id?: string | null;
         metadata?: Record<string, unknown>;
       };
 

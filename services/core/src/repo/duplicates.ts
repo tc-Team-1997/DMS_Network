@@ -12,7 +12,7 @@
 import type { Knex } from "knex";
 
 export interface DuplicateResult {
-  id: number;
+  id: string;
   title: string;
   doc_type: string | null;
   branch: string | null;
@@ -21,7 +21,7 @@ export interface DuplicateResult {
 }
 
 export interface DuplicateFinderInput {
-  docId: number;
+  docId: string;
   fileHashSha256: string;
   cid?: string | null;
   docNo?: string | null;
@@ -36,7 +36,7 @@ export async function findDuplicates(
 ): Promise<DuplicateResult[]> {
   const matchBy = input.matchBy ?? ["hash", "cid", "doc_no"];
   const results: DuplicateResult[] = [];
-  const seen = new Set<number>();
+  const seen = new Set<string>();
 
   // ── Hash match ────────────────────────────────────────────────────────────
   if (matchBy.includes("hash") && input.fileHashSha256) {

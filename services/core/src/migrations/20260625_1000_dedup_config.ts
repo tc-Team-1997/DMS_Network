@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 /**
  * Migration: dedup_config table
@@ -10,7 +11,7 @@ export async function up(knex: Knex): Promise<void> {
   const exists = await knex.schema.hasTable("dedup_config");
   if (!exists) {
     await knex.schema.createTable("dedup_config", (t) => {
-      t.increments("id").primary();
+      t.string("id", 36).notNullable().primary();
       t.boolean("enabled").notNullable().defaultTo(true);
       // JSON array of match strategies: ["hash","cid","doc_no"]
       t.text("match_by").notNullable().defaultTo('["hash","cid"]');
@@ -23,6 +24,7 @@ export async function up(knex: Knex): Promise<void> {
 
     // Seed the single default row
     await knex("dedup_config").insert({
+      id: newId(),
       enabled: true,
       match_by: JSON.stringify(["hash", "cid"]),
       action: "flag",

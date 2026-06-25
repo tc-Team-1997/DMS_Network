@@ -4,7 +4,7 @@ export async function up(knex: Knex): Promise<void> {
   // Create RBAC tables if they don't exist (for standalone notify service usage)
   if (!(await knex.schema.hasTable("users"))) {
     await knex.schema.createTable("users", (t) => {
-      t.increments("id").primary();
+      t.string("id", 36).notNullable().primary();
       t.string("username", 100).notNullable().unique();
       t.string("password_hash", 255).notNullable();
       t.string("full_name", 200);
@@ -21,7 +21,7 @@ export async function up(knex: Knex): Promise<void> {
 
   if (!(await knex.schema.hasTable("roles"))) {
     await knex.schema.createTable("roles", (t) => {
-      t.increments("id").primary();
+      t.string("id", 36).notNullable().primary();
       t.string("name", 80).notNullable().unique();
       t.string("description", 255);
       t.boolean("system").notNullable().defaultTo(false);
@@ -30,7 +30,7 @@ export async function up(knex: Knex): Promise<void> {
 
   if (!(await knex.schema.hasTable("permissions"))) {
     await knex.schema.createTable("permissions", (t) => {
-      t.increments("id").primary();
+      t.string("id", 36).notNullable().primary();
       t.string("key", 120).notNullable().unique();
       t.string("description", 255);
     });
@@ -38,22 +38,22 @@ export async function up(knex: Knex): Promise<void> {
 
   if (!(await knex.schema.hasTable("role_permissions"))) {
     await knex.schema.createTable("role_permissions", (t) => {
-      t.integer("role_id").notNullable().references("id").inTable("roles").onDelete("CASCADE");
-      t.integer("permission_id").notNullable().references("id").inTable("permissions").onDelete("CASCADE");
+      t.string("role_id", 36).notNullable().references("id").inTable("roles").onDelete("CASCADE");
+      t.string("permission_id", 36).notNullable().references("id").inTable("permissions").onDelete("CASCADE");
       t.primary(["role_id", "permission_id"]);
     });
   }
 
   if (!(await knex.schema.hasTable("user_roles"))) {
     await knex.schema.createTable("user_roles", (t) => {
-      t.integer("user_id").notNullable().references("id").inTable("users").onDelete("CASCADE");
-      t.integer("role_id").notNullable().references("id").inTable("roles").onDelete("CASCADE");
+      t.string("user_id", 36).notNullable().references("id").inTable("users").onDelete("CASCADE");
+      t.string("role_id", 36).notNullable().references("id").inTable("roles").onDelete("CASCADE");
       t.primary(["user_id", "role_id"]);
     });
   }
 
   await knex.schema.createTable("alert_rules", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("name", 160).notNullable();
     t.string("trigger", 80).notNullable();
     t.text("params_json").notNullable().defaultTo("{}");
@@ -66,20 +66,20 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("alerts", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("level", 20).notNullable().defaultTo("info");
     t.string("title", 240).notNullable();
     t.text("meta").notNullable().defaultTo("{}");
     t.boolean("is_read").notNullable().defaultTo(false);
-    t.integer("rule_id").references("id").inTable("alert_rules").onDelete("SET NULL");
+    t.string("rule_id", 36).references("id").inTable("alert_rules").onDelete("SET NULL");
     t.string("branch", 120);
     t.timestamp("created_at").defaultTo(knex.fn.now());
   });
 
   await knex.schema.createTable("notifications", (t) => {
-    t.increments("id").primary();
-    t.integer("alert_id").references("id").inTable("alerts").onDelete("CASCADE");
-    t.integer("user_id");
+    t.string("id", 36).notNullable().primary();
+    t.string("alert_id", 36).references("id").inTable("alerts").onDelete("CASCADE");
+    t.string("user_id", 36);
     t.string("channel", 30).notNullable();
     t.string("recipient", 240).notNullable();
     t.string("subject", 240);
@@ -91,7 +91,7 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("alert_schedule", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("doc_id", 80).notNullable();
     t.string("tier", 10).notNullable();
     t.date("fire_date").notNullable();

@@ -49,7 +49,7 @@ export function recordsRouter(): Router {
   r.post("/disposal/:documentId/certify", requirePermission("document:delete"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
-      const result = await certifiedDisposal(knex, Number(req.params.documentId), req.authUser!.username);
+      const result = await certifiedDisposal(knex, req.params.documentId, req.authUser!.username);
       res.status(201).json(result);
     } catch (err: any) {
       res.status(409).json({ error: String(err.message ?? err) });

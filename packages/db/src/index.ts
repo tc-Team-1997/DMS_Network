@@ -3,6 +3,7 @@ import { loadConfig, type AppConfig } from "@zordms/config";
 import { buildKnexConfig } from "./knexConfig.js";
 
 export { buildKnexConfig };
+export { newId } from "./id.js";
 
 let instance: Knex | undefined;
 

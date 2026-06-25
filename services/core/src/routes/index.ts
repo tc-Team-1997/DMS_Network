@@ -14,7 +14,7 @@ export function indexRouter(): Router {
       const deps = req.app.locals.deps as CoreDeps;
       const viewer = makeViewer(req);
       // C1: pass viewer so branch-isolation is enforced
-      const document = await getDocument(deps.knex, Number(req.params.documentId), viewer);
+      const document = await getDocument(deps.knex, req.params.documentId, viewer);
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
 
       const body = req.body;

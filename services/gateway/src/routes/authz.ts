@@ -27,17 +27,16 @@ export function authzRouter(): Router {
       res.status(401).json({ error: "unauthorized" }); return;
     }
 
-    // Fix 3: validate input — userId must be a positive number, permissions must be array of strings
+    // Validate input — userId must be a non-empty string, permissions must be array of strings
     const { userId, permissions } = req.body as { userId: unknown; permissions: unknown };
-    const uid = Number(userId);
-    if (!Number.isInteger(uid) || uid <= 0) {
-      res.status(400).json({ error: "userId must be a positive integer" }); return;
+    if (typeof userId !== "string" || userId.trim() === "") {
+      res.status(400).json({ error: "userId must be a non-empty string" }); return;
     }
     if (!Array.isArray(permissions) || permissions.some((p) => typeof p !== "string")) {
       res.status(400).json({ error: "permissions must be an array of strings" }); return;
     }
 
-    const authz = await resolveUserAuthz(knex, uid);
+    const authz = await resolveUserAuthz(knex, userId as any);
     const missing = permissions.filter((p) => !authz.permissions.includes(p));
     res.json({ allowed: canAll(authz, permissions), missing });
   });

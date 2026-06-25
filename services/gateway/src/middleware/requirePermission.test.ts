@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import express from "express";
 import request from "supertest";
 import knexLib from "knex";
-import { buildKnexConfig } from "@zordms/db";
+import { buildKnexConfig, newId } from "@zordms/db";
 import { signToken } from "@zordms/auth";
 import { requireAuth } from "./requireAuth.js";
 import { requirePermission } from "./requirePermission.js";
@@ -24,12 +24,13 @@ beforeAll(async () => {
 
   // Fix 8: create a Viewer user (no user:create permission) for the 403 test
   const viewerRole = await knex("roles").where({ name: "Viewer" }).first();
-  const [uid] = await knex("users").insert({
+  const viewerId = newId();
+  await knex("users").insert({
+    id: viewerId,
     username: "viewer_perm_test",
     password_hash: "x",
     status: "Active",
-  }).returning("id");
-  const viewerId = typeof uid === "object" ? (uid as any).id : uid;
+  });
   await knex("user_roles").insert({ user_id: viewerId, role_id: viewerRole.id });
   viewerToken = signToken({ sub: viewerId, username: "viewer_perm_test" }, "t");
 });

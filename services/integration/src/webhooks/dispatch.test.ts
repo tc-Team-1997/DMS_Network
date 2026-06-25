@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { buildServiceKnex } from "@zordms/db";
+import { buildServiceKnex, newId } from "@zordms/db";
 import { dispatchEvent } from "./dispatch.js";
 import { verifySignature } from "./hmac.js";
 
@@ -10,7 +10,7 @@ const knex = buildServiceKnex({ migrationsDir, db });
 beforeAll(async () => {
   await knex.migrate.latest();
   await knex("outbound_webhooks").insert({
-    url: "http://consumer.local/hook", events: "cbs.customer.updated,kyc.result",
+    id: newId(), url: "http://consumer.local/hook", events: "cbs.customer.updated,kyc.result",
     auth_method: "hmac", secret: "out_secret", enabled: true,
   });
 });

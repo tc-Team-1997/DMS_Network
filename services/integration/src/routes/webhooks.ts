@@ -1,5 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import type { EventSink } from "../events/sink.js";
 import { verifySignature } from "../webhooks/hmac.js";
 
@@ -25,7 +26,7 @@ async function handle(req: Request, res: Response, hook: Hook): Promise<void> {
 
   if (!secret || !verifySignature(raw, secret, header)) {
     await knex("integration_logs").insert({
-      system: hook.system, endpoint: hook.event, method: "POST",
+      id: newId(), system: hook.system, endpoint: hook.event, method: "POST",
       status: 401, latency_ms: 0, direction: "inbound", success: false, error: "bad_signature",
     });
     res.status(401).json({ error: "invalid_signature" });
@@ -36,7 +37,7 @@ async function handle(req: Request, res: Response, hook: Hook): Promise<void> {
   await events?.emit(hook.event, req.body);
   // durable hand-off record (Workflow/Notify also read the event bus in production)
   await knex("integration_logs").insert({
-    system: hook.system, endpoint: hook.event, method: "POST",
+    id: newId(), system: hook.system, endpoint: hook.event, method: "POST",
     status: 202, latency_ms: 0, direction: "inbound", success: true,
   });
   res.status(202).json({ accepted: true, event: hook.event });

@@ -2,7 +2,7 @@ import type { ChannelKey } from "../channels/types.js";
 import type { DomainEvent } from "../bus/types.js";
 
 export interface AlertRule {
-  id: number;
+  id: string;
   name: string;
   trigger: string;
   params: Record<string, unknown>;
@@ -66,7 +66,7 @@ export function evaluateRule(rule: AlertRule, event: DomainEvent): RuleDecision 
 }
 
 export function parseRule(row: {
-  id: number; name: string; trigger: string; params_json: string; channels: string;
+  id: string; name: string; trigger: string; params_json: string; channels: string;
   escalation_target: string | null; scope: string | null; enabled: number | boolean;
 }): AlertRule {
   return {

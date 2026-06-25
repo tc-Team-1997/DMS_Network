@@ -1,5 +1,6 @@
 import type { Knex } from "knex";
 import { hashPassword } from "@zordms/auth";
+import { newId } from "@zordms/db";
 
 // New permissions introduced by the Core DMS service
 const CORE_PERMISSIONS: Array<[string, string]> = [
@@ -42,13 +43,13 @@ export async function seed(knex: Knex): Promise<void> {
   // This seed is idempotent
   for (const [key, description] of CORE_PERMISSIONS) {
     const exists = await knex("permissions").where({ key }).first();
-    if (!exists) await knex("permissions").insert({ key, description });
+    if (!exists) await knex("permissions").insert({ id: newId(), key, description });
   }
 
   for (const [name, perms] of Object.entries(ROLES)) {
     let role = await knex("roles").where({ name }).first();
     if (!role) {
-      await knex("roles").insert({ name, description: `${name} role`, system: true });
+      await knex("roles").insert({ id: newId(), name, description: `${name} role`, system: true });
       role = await knex("roles").where({ name }).first();
     }
     for (const key of perms) {
@@ -64,7 +65,9 @@ export async function seed(knex: Knex): Promise<void> {
   const userCount = Number((await knex("users").count<{ c: number }[]>("id as c"))[0].c);
   if (userCount === 0) {
     const password_hash = await hashPassword("admin123");
+    const adminId = newId();
     await knex("users").insert({
+      id: adminId,
       username: "admin",
       password_hash,
       full_name: "System Administrator",

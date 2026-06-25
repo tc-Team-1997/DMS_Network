@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import { buildServiceKnex } from "@zordms/db";
+import { buildServiceKnex, newId } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
 import { signToken } from "@zordms/auth";
 import { createApp } from "../app.js";
@@ -17,8 +17,8 @@ beforeAll(async () => {
   const admin = await knex("users").where({ username: "admin" }).first();
   adminToken = signToken({ sub: admin.id, username: "admin", roles: ["CDO"], permissions: ["integration:read", "integration:manage"] }, "t");
   await knex("integration_logs").insert([
-    { system: "cbs", endpoint: "customer.lookup", method: "CALL", status: 200, latency_ms: 12, direction: "outbound", success: true },
-    { system: "los", endpoint: "loan.status", method: "CALL", status: 503, latency_ms: 30, direction: "outbound", success: false, error: "http_503" },
+    { id: newId(), system: "cbs", endpoint: "customer.lookup", method: "CALL", status: 200, latency_ms: 12, direction: "outbound", success: true },
+    { id: newId(), system: "los", endpoint: "loan.status", method: "CALL", status: 503, latency_ms: 30, direction: "outbound", success: false, error: "http_503" },
   ]);
 });
 afterAll(async () => { await knex.destroy(); });

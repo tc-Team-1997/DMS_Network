@@ -32,10 +32,10 @@ beforeAll(async () => {
   adminToken = signToken({ sub: admin.id, username: "admin", permissions: ALL_PERMISSIONS, roles: ["CDO"] }, "t");
 
   // a Viewer scoped to Thimphu (no crossbranch:read) — claims-based, no DB user lookup needed
-  viewerThimphuToken = signToken({ sub: 100, username: "viewerT", permissions: ["document:read"], roles: ["Viewer"], branch: "Thimphu" }, "t");
+  viewerThimphuToken = signToken({ sub: "019400000000700000000000001", username: "viewerT", permissions: ["document:read"], roles: ["Viewer"], branch: "Thimphu" }, "t");
 
   // IMPORTANT-2 / CRITICAL-1: a Viewer with NO branch assigned (branch = null/undefined)
-  nullBranchViewerToken = signToken({ sub: 101, username: "viewerNoBranch", permissions: ["document:read"], roles: ["Viewer"] }, "t");
+  nullBranchViewerToken = signToken({ sub: "019400000000700000000000002", username: "viewerNoBranch", permissions: ["document:read"], roles: ["Viewer"] }, "t");
 
   await backend.index({ doc_id: "D1", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Thimphu", status: "indexed", risk_band: "low", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });
   await backend.index({ doc_id: "D2", ocr_text: "Loan Dorji", metadata_text: "", doc_type: "BOB_LOAN_APPLICATION", branch: "Paro", status: "indexed", risk_band: "high", legal_hold: false, expiry_status: "none", uploaded_by: "m", indexed_at: "2026-06-23T00:00:00Z" });

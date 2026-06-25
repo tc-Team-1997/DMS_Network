@@ -33,7 +33,7 @@ const ROLE_PERMS: Record<string, string[]> = {
 };
 
 /** Mint a claims-bearing token for a role+branch combination. */
-function mintToken(opts: { sub: number; username: string; role: string; branch?: string }): string {
+function mintToken(opts: { sub: string; username: string; role: string; branch?: string }): string {
   return signToken({
     sub: opts.sub,
     username: opts.username,
@@ -44,7 +44,7 @@ function mintToken(opts: { sub: number; username: string; role: string; branch?:
 }
 
 // Upload a document as a specific user to a specific branch
-async function uploadDoc(token: string, branch: string, filename = "test.png"): Promise<number> {
+async function uploadDoc(token: string, branch: string, filename = "test.png"): Promise<string> {
   const res = await request(h.app).post("/documents")
     .set("Authorization", `Bearer ${token}`)
     .field("title", "Test Doc")
@@ -59,7 +59,7 @@ async function uploadDoc(token: string, branch: string, filename = "test.png"): 
 describe("C1: branch-scoped single-document IDOR prevention", () => {
   it("user from branch Paro cannot GET a document owned by branch Thimphu", async () => {
     const adminToken = await h.tokenFor("admin");
-    const paroToken = mintToken({ sub: 900, username: "c1_paro_viewer", role: "Viewer", branch: "Paro" });
+    const paroToken = mintToken({ sub: "900", username: "c1_paro_viewer", role: "Viewer", branch: "Paro" });
 
     const id = await uploadDoc(adminToken, "Thimphu");
     // Ensure the document is tagged to Thimphu
@@ -73,7 +73,7 @@ describe("C1: branch-scoped single-document IDOR prevention", () => {
 
   it("user from branch Paro cannot download a document owned by branch Thimphu", async () => {
     const adminToken = await h.tokenFor("admin");
-    const paroToken = mintToken({ sub: 901, username: "c1_paro_viewer2", role: "Viewer", branch: "Paro" });
+    const paroToken = mintToken({ sub: "901", username: "c1_paro_viewer2", role: "Viewer", branch: "Paro" });
 
     const id = await uploadDoc(adminToken, "Thimphu");
     await h.knex("documents").where({ id }).update({ branch: "Thimphu" });
@@ -87,14 +87,14 @@ describe("C1: branch-scoped single-document IDOR prevention", () => {
     const adminToken = await h.tokenFor("admin");
     // Maker has document:read + document:delete (we add delete for this test), but NOT crossbranch:read
     const paroMakerToken = mintToken({
-      sub: 902,
+      sub: "902",
       username: "c1_paro_maker_del",
       role: "Maker",
       branch: "Paro",
     });
     // Augment with document:delete inline — Maker role doesn't have it by default; use custom perms
     const paroMakerWithDeleteToken = signToken({
-      sub: 902,
+      sub: "902",
       username: "c1_paro_maker_del",
       permissions: [...ROLE_PERMS.Maker, "document:delete"],
       roles: ["Maker"],
@@ -112,7 +112,7 @@ describe("C1: branch-scoped single-document IDOR prevention", () => {
 
   it("crossbranch:read user CAN see any branch's document", async () => {
     const adminToken = await h.tokenFor("admin");
-    const auditorToken = mintToken({ sub: 903, username: "c1_auditor", role: "Auditor", branch: "Paro" });
+    const auditorToken = mintToken({ sub: "903", username: "c1_auditor", role: "Auditor", branch: "Paro" });
 
     const id = await uploadDoc(adminToken, "Thimphu");
     await h.knex("documents").where({ id }).update({ branch: "Thimphu" });
@@ -128,7 +128,7 @@ describe("C1: branch-scoped single-document IDOR prevention", () => {
 describe("C2: branch spoofing prevention on document capture", () => {
   it("a Maker user cannot set a different branch via req.body", async () => {
     // Maker has document:capture but NOT crossbranch:read; branch=Thimphu in token
-    const makerToken = mintToken({ sub: 910, username: "c2_maker", role: "Maker", branch: "Thimphu" });
+    const makerToken = mintToken({ sub: "910", username: "c2_maker", role: "Maker", branch: "Thimphu" });
 
     const res = await request(h.app).post("/documents")
       .set("Authorization", `Bearer ${makerToken}`)
@@ -143,7 +143,7 @@ describe("C2: branch spoofing prevention on document capture", () => {
 
   it("a user with crossbranch:read but no document:capture gets 403", async () => {
     // Auditor has crossbranch:read but NOT document:capture
-    const auditorToken = mintToken({ sub: 911, username: "c2_auditor", role: "Auditor", branch: "Thimphu" });
+    const auditorToken = mintToken({ sub: "911", username: "c2_auditor", role: "Auditor", branch: "Thimphu" });
 
     const res = await request(h.app).post("/documents")
       .set("Authorization", `Bearer ${auditorToken}`)
@@ -216,7 +216,7 @@ describe("C4: annotation delete IDOR prevention", () => {
 
   it("user from branch Paro cannot list annotations on a Thimphu document", async () => {
     const adminToken = await h.tokenFor("admin");
-    const paroToken = mintToken({ sub: 920, username: "c4_paro_viewer", role: "Viewer", branch: "Paro" });
+    const paroToken = mintToken({ sub: "920", username: "c4_paro_viewer", role: "Viewer", branch: "Paro" });
 
     const docId = await uploadDoc(adminToken, "Thimphu");
     await h.knex("documents").where({ id: docId }).update({ branch: "Thimphu" });
@@ -260,7 +260,7 @@ describe("I1: listDocuments fail-closed for branchless user without crossbranch:
   it("user with no branch and no crossbranch:read sees zero documents", async () => {
     // Mint a token with Viewer permissions but no branch claim
     const token = signToken({
-      sub: 930,
+      sub: "930",
       username: "i1_branchless",
       permissions: ROLE_PERMS.Viewer,
       roles: ["Viewer"],

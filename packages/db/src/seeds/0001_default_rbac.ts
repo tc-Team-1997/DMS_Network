@@ -1,5 +1,6 @@
 import type { Knex } from "knex";
 import bcrypt from "bcryptjs";
+import { newId } from "../id.js";
 
 // Canonical permission catalog — the UNION of every permission the app checks
 // (React route gates + screen action guards + backend requirePermission calls).
@@ -109,38 +110,49 @@ const ROLES: Record<string, string[]> = {
 };
 
 export async function seed(knex: Knex): Promise<void> {
-  // permissions
+  // permissions — upsert by key, generating UUIDs for new rows
+  const permIdMap: Record<string, string> = {};
   for (const [key, description] of PERMISSIONS) {
     const exists = await knex("permissions").where({ key }).first();
-    if (!exists) await knex("permissions").insert({ key, description });
+    if (exists) {
+      permIdMap[key] = exists.id;
+    } else {
+      const id = newId();
+      await knex("permissions").insert({ id, key, description });
+      permIdMap[key] = id;
+    }
   }
-  // roles + role_permissions
+
+  // roles + role_permissions — upsert by name, generating UUIDs for new rows
   for (const [name, perms] of Object.entries(ROLES)) {
     let role = await knex("roles").where({ name }).first();
     if (!role) {
-      await knex("roles").insert({ name, description: `${name} role`, system: true });
+      const id = newId();
+      await knex("roles").insert({ id, name, description: `${name} role`, system: true });
       role = await knex("roles").where({ name }).first();
     }
     for (const key of perms) {
-      const perm = await knex("permissions").where({ key }).first();
-      if (perm) {
-        const link = await knex("role_permissions").where({ role_id: role.id, permission_id: perm.id }).first();
-        if (!link) await knex("role_permissions").insert({ role_id: role.id, permission_id: perm.id });
+      const permId = permIdMap[key];
+      if (permId) {
+        const link = await knex("role_permissions").where({ role_id: role.id, permission_id: permId }).first();
+        if (!link) await knex("role_permissions").insert({ role_id: role.id, permission_id: permId });
       }
     }
   }
+
   // bootstrap admin only if no users
   const userCount = Number((await knex("users").count<{ c: number }[]>("id as c"))[0].c);
   if (userCount === 0) {
+    const adminId = newId();
     await knex("users").insert({
+      id: adminId,
       username: "admin",
       password_hash: bcrypt.hashSync("admin123", 10),
       full_name: "System Administrator",
       status: "Active",
       created_by: "system",
     });
-    const adminUser = await knex("users").where({ username: "admin" }).first();
     const cdo = await knex("roles").where({ name: "CDO" }).first();
-    await knex("user_roles").insert({ user_id: adminUser.id, role_id: cdo.id });
+    await knex("user_roles").insert({ user_id: adminId, role_id: cdo.id });
   }
 }

@@ -33,7 +33,7 @@ afterEach(() => {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function upload(token: string, fileContent: Buffer, branch = "Thimphu"): Promise<number> {
+async function upload(token: string, fileContent: Buffer, branch = "Thimphu"): Promise<string> {
   const res = await request(h.app)
     .post("/documents")
     .set("Authorization", `Bearer ${token}`)
@@ -41,15 +41,14 @@ async function upload(token: string, fileContent: Buffer, branch = "Thimphu"): P
     .field("branch", branch)
     .attach("file", fileContent, "test.pdf");
   expect(res.status).toBe(201);
-  return res.body.document.id;
+  return res.body.document.id as string;
 }
 
 async function makeViewerToken(h: Awaited<ReturnType<typeof makeTestApp>>, username: string): Promise<string> {
+  const { newId } = await import("@zordms/db");
   const viewerRole = await h.knex("roles").where({ name: "Viewer" }).first();
-  const inserted = await h.knex("users")
-    .insert({ username, password_hash: "x", status: "Active", branch: "Thimphu" })
-    .returning("id");
-  const vid = typeof inserted[0] === "object" ? (inserted[0] as any).id : inserted[0];
+  const vid = newId();
+  await h.knex("users").insert({ id: vid, username, password_hash: "x", status: "Active", branch: "Thimphu" });
   await h.knex("user_roles").insert({ user_id: vid, role_id: viewerRole.id });
   return h.tokenFor(username);
 }
@@ -591,7 +590,7 @@ describe("PATCH /documents/:id metadata correction", () => {
   it("returns 404 for non-existent document", async () => {
     const token = await h.tokenFor("admin");
     const res = await request(h.app)
-      .patch("/documents/999999")
+      .patch("/documents/018f4e3a-0000-7000-0000-000000000000")
       .set("Authorization", `Bearer ${token}`)
       .send({ doc_type: "BT_CID_4G" });
     expect(res.status).toBe(404);
@@ -599,7 +598,7 @@ describe("PATCH /documents/:id metadata correction", () => {
 
   it("returns 401 without auth", async () => {
     const res = await request(h.app)
-      .patch("/documents/1")
+      .patch("/documents/018f4e3a-0000-7000-0000-000000000001")
       .send({ doc_type: "BT_CID_4G" });
     expect(res.status).toBe(401);
   });

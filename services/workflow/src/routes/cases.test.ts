@@ -25,7 +25,7 @@ const app = createApp({ knex, config, events });
 // F1: All sensitive routes require authentication and the right permission.
 const managerToken = signToken(
   {
-    sub: 1,
+    sub: "01910000-0000-7000-0000-000000000001",
     username: "manager1",
     permissions: ["case:create", "case:manage", "workflow:act"],
   } as Parameters<typeof signToken>[0],
@@ -40,8 +40,8 @@ afterAll(async () => {
 });
 
 describe("case management", () => {
-  let caseId = 0;
-  let templateId = 0;
+  let caseId = "";
+  let templateId = "";
 
   it("F1: 401 without a token on POST /cases", async () => {
     const res = await request(app).post("/cases").send({ case_type: "KYC", title: "test" });
@@ -50,7 +50,7 @@ describe("case management", () => {
 
   it("F1: 403 without case:create permission on POST /cases", async () => {
     const noPermToken = signToken(
-      { sub: 5, username: "noperm", permissions: [] } as Parameters<typeof signToken>[0],
+      { sub: "01910000-0000-7000-0000-000000000005", username: "noperm", permissions: [] } as Parameters<typeof signToken>[0],
       "t",
     );
     const res = await request(app)
@@ -86,6 +86,8 @@ describe("case management", () => {
     expect(res.body.case.case_ref).toMatch(/^CASE-KYC-/);
     expect(res.body.case.workflow_id).toBeTruthy();
     caseId = res.body.case.id;
+    expect(typeof caseId).toBe("string");
+    expect(caseId.length).toBe(36);
     expect(events.events.some((e) => e.event === "case.created")).toBe(true);
   });
 

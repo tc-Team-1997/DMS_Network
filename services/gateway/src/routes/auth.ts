@@ -34,7 +34,8 @@ export function authRouter(): Router {
         }
       }
 
-      const authz = await resolveUserAuthz(knex, user.id);
+      // user.id is now a UUID string; cast to any to satisfy the legacy number signature in resolveUserAuthz
+      const authz = await resolveUserAuthz(knex, user.id as any);
       // Embed RBAC claims so downstream microservices can authorize from the
       // token without their own user DB (the gateway re-checks status on its
       // own routes; downstream services trust the gateway-issued claims).

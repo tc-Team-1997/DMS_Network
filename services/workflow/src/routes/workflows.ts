@@ -6,6 +6,7 @@ import { writeAudit } from "../audit.js";
 import type { EventBus } from "../events.js";
 import type { AuthorityClient } from "../authority.js";
 import { requireAuth, requirePermission, asyncHandler } from "@zordms/auth";
+import { newId } from "@zordms/db";
 
 // F7: Insert-then-refetch pattern for Oracle compatibility.
 // Returns the inserted row by querying on the unique column after insert.
@@ -52,11 +53,12 @@ export function workflowRouter(): Router {
         res.status(400).json({ error: String((e as Error).message) });
         return;
       }
+      const templateId = newId();
       // F7: insert-then-refetch instead of .returning("id")
       const template = await insertAndFetch(
         knex,
         "workflow_templates",
-        { name, doc_type, steps_json, active: true },
+        { id: templateId, name, doc_type, steps_json, active: true },
         "name",
         name,
       );
@@ -72,7 +74,7 @@ export function workflowRouter(): Router {
       const { knex } = req.app.locals.deps as { knex: Knex };
       const templates = await knex("workflow_templates")
         .where({ active: true })
-        .orderBy("id", "desc");
+        .orderBy("created_at", "desc");
       // F12: normalize boolean active field
       res.json({ templates: templates.map(normalizeTemplate) });
     }),
@@ -94,7 +96,7 @@ export function workflowsRouter(): Router {
       const body = req.body as {
         title: string;
         doc_id?: string;
-        template_id: number;
+        template_id: string;
         priority?: string;
         assigned_to?: string;
         doc_confidence?: number;
@@ -135,6 +137,7 @@ export function workflowsRouter(): Router {
         (await knex("workflows").count<{ c: number }[]>("id as c"))[0].c,
       );
       const refCode = `WF-${count + 1}`;
+      const workflowId = newId();
 
       // F7: insert-then-refetch for Oracle compatibility.
       let workflow: Record<string, unknown>;
@@ -143,6 +146,7 @@ export function workflowsRouter(): Router {
           knex,
           "workflows",
           {
+            id: workflowId,
             ref_code: refCode,
             title: body.title,
             doc_id: body.doc_id,
@@ -167,14 +171,13 @@ export function workflowsRouter(): Router {
         throw e;
       }
 
-      const workflowId = (workflow as { id: number }).id;
-
       for (let i = 0; i < steps.length; i++) {
         const s = steps[i];
         const dueAt = s.sla_minutes
           ? new Date(now + s.sla_minutes * 60_000).toISOString()
           : null;
         await knex("workflow_steps").insert({
+          id: newId(),
           workflow_id: workflowId,
           seq: i + 1,
           name: s.name,
@@ -191,7 +194,7 @@ export function workflowsRouter(): Router {
         actor_username: req.authUser?.username,
         action: "WORKFLOW_CREATE",
         entity: "workflow",
-        entity_id: String(workflowId),
+        entity_id: workflowId,
         details: refCode,
       });
       await events?.emit("workflow.created", {

@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 /**
  * Seed: populate doc_type_registry with the canonical IDP types.
@@ -53,7 +54,7 @@ export async function seed(knex: Knex): Promise<void> {
   for (const row of REGISTRY_ROWS) {
     const exists = await knex("doc_type_registry").where({ code: row.code }).first();
     if (!exists) {
-      await knex("doc_type_registry").insert(row);
+      await knex("doc_type_registry").insert({ id: newId(), ...row });
     }
   }
 }

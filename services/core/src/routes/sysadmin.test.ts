@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import { makeTestApp } from "../testutil.js";
+import { newId } from "@zordms/db";
 
 const h = await makeTestApp();
 afterAll(async () => { await h.cleanup(); });
@@ -23,8 +24,8 @@ describe("sysadmin routes", () => {
 
   it("forbids a Viewer (no admin:access)", async () => {
     const viewerRole = await h.knex("roles").where({ name: "Viewer" }).first();
-    const inserted = await h.knex("users").insert({ username: "viewer_admin", password_hash: "x", status: "Active" }).returning("id");
-    const vid = typeof inserted[0] === "object" ? (inserted[0] as any).id : inserted[0];
+    const vid = newId();
+    await h.knex("users").insert({ id: vid, username: "viewer_admin", password_hash: "x", status: "Active" });
     await h.knex("user_roles").insert({ user_id: vid, role_id: viewerRole.id });
     const viewerToken = await h.tokenFor("viewer_admin");
     expect((await request(h.app).get("/admin/health").set("Authorization", `Bearer ${viewerToken}`)).status).toBe(403);

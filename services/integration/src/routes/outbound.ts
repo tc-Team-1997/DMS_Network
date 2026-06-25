@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
+import { newId } from "@zordms/db";
 import { dispatchEvent } from "../webhooks/dispatch.js";
 
 export function outboundRouter(): Router {
@@ -26,13 +27,13 @@ export function outboundRouter(): Router {
         return;
       }
 
-      // Insert and then refetch id for Oracle compatibility (no .returning("id")).
+      // Generate a UUIDv7 primary key and insert the webhook row explicitly.
+      const id = newId();
       await knex("outbound_webhooks").insert({
-        url, events: events.join(","), auth_method: auth_method ?? "hmac",
+        id, url, events: events.join(","), auth_method: auth_method ?? "hmac",
         secret: secret ?? null, enabled: true,
       });
-      const created = await knex("outbound_webhooks").where({ url }).orderBy("id", "desc").first();
-      res.status(201).json({ webhook: { id: created.id, url, events, auth_method: auth_method ?? "hmac" } });
+      res.status(201).json({ webhook: { id, url, events, auth_method: auth_method ?? "hmac" } });
     } catch (err) { next(err); }
   });
 

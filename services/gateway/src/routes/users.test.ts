@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import knexLib from "knex";
-import { buildKnexConfig } from "@zordms/db";
+import { buildKnexConfig, newId } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
 import { signToken } from "@zordms/auth";
 import { createApp } from "../app.js";
@@ -31,8 +31,8 @@ describe("supervisor user provisioning", () => {
   });
 
   it("forbids creation without user:create permission", async () => {
-    const viewer = await knex("users").insert({ username: "v1", password_hash: "x", status: "Active" }).returning("id");
-    const vid = typeof viewer[0] === "object" ? (viewer[0] as any).id : viewer[0];
+    const vid = newId();
+    await knex("users").insert({ id: vid, username: "v1", password_hash: "x", status: "Active" });
     const viewerRole = await knex("roles").where({ name: "Viewer" }).first();
     await knex("user_roles").insert({ user_id: vid, role_id: viewerRole.id });
     const vToken = signToken({ sub: vid, username: "v1" }, "t");

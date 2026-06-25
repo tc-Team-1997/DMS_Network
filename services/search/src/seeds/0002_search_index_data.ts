@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import { buildTokensForDoc } from "../query/tokenize.js";
 import type { SearchDoc } from "@zordms/types";
 
@@ -636,7 +637,7 @@ export async function seed(knex: Knex): Promise<void> {
   );
 
   if (existingCount === 0) {
-    const rows = SEARCH_DOCS.map(buildRow);
+    const rows = SEARCH_DOCS.map((d) => ({ id: newId(), ...buildRow(d) }));
     // Insert in batches of 10 (SQLite has row-count limits per statement)
     for (let i = 0; i < rows.length; i += 10) {
       await knex("search_index").insert(rows.slice(i, i + 10));
@@ -653,6 +654,7 @@ export async function seed(knex: Knex): Promise<void> {
       .first();
     if (!exists) {
       await knex("saved_searches").insert({
+        id: newId(),
         user_id: admin.id,
         name: tmpl.name,
         query_json: tmpl.query_json,

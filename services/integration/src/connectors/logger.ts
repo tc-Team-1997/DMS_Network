@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import type { Connector } from "./types.js";
 import type { ConnectorResult } from "@zordms/types";
 
@@ -16,6 +17,7 @@ export function withLogging(inner: Connector, knex: Knex): Connector {
       }
       const latency = Date.now() - start;
       await knex("integration_logs").insert({
+        id: newId(),
         system: inner.system,
         endpoint: op,
         method: "CALL",

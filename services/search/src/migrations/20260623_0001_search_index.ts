@@ -2,7 +2,7 @@ import type { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema.createTable("search_index", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("doc_id", 120).notNullable().unique();
     t.text("ocr_text");
     t.text("metadata_text");
@@ -21,8 +21,8 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("saved_searches", (t) => {
-    t.increments("id").primary();
-    t.integer("user_id").notNullable();
+    t.string("id", 36).notNullable().primary();
+    t.string("user_id", 36).notNullable();
     t.string("name", 200).notNullable();
     t.text("query_json").notNullable();
     t.string("visibility", 20).notNullable().defaultTo("private");

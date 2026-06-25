@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import type { EventBus } from "../bus/types.js";
 import { computeExpiryMilestones } from "../engine/expiryTiers.js";
 
@@ -20,7 +21,7 @@ export async function runExpiryScan(
 
       const dueToday = m.fireDate === today;
       if (!existing) {
-        await knex("alert_schedule").insert({ doc_id: doc.docId, tier: m.tier, fire_date: m.fireDate, fired: dueToday });
+        await knex("alert_schedule").insert({ id: newId(), doc_id: doc.docId, tier: m.tier, fire_date: m.fireDate, fired: dueToday });
       } else if (dueToday) {
         await knex("alert_schedule").where({ id: existing.id }).update({ fired: true });
       }

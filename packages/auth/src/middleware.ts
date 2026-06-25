@@ -15,7 +15,7 @@ import { can } from "./rbac.js";
 // ---------------------------------------------------------------------------
 
 export interface AuthUser {
-  id: number;
+  id: string;
   username: string;
   roles: string[];
   permissions: string[];
@@ -90,7 +90,7 @@ export const requireAuth: RequestHandler = (
     }
 
     req.authUser = {
-      id: Number(decoded.sub),
+      id: String(decoded.sub),
       username: String(decoded.username),
       roles: decoded.roles ?? [],
       permissions: decoded.permissions ?? [],

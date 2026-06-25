@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import { buildServiceKnex } from "@zordms/db";
+import { buildServiceKnex, newId } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
 import { signToken } from "@zordms/auth";
 import { createApp } from "../app.js";
@@ -13,7 +13,7 @@ const knex = buildServiceKnex({ migrationsDir, seedsDir, db });
 const backend = new SqlSearchBackend(knex);
 const app = createApp({ knex, config: loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv), backend });
 let adminToken = "";
-let adminId = 0;
+let adminId = "";
 
 // CDO has all permissions including crossbranch:read
 const ALL_PERMISSIONS = [
@@ -35,7 +35,7 @@ beforeAll(async () => {
 afterAll(async () => { await knex.destroy(); });
 
 describe("saved searches", () => {
-  let savedId = 0;
+  let savedId = "";
 
   it("creates a private saved search", async () => {
     const res = await request(app).post("/saved").set("Authorization", `Bearer ${adminToken}`).send({
@@ -47,8 +47,9 @@ describe("saved searches", () => {
   });
 
   it("lists the caller's own + public saved searches", async () => {
-    await knex("saved_searches").insert({ user_id: 999, name: "Shared", query_json: JSON.stringify({ text: "x", mode: "fulltext" }), visibility: "public" });
-    await knex("saved_searches").insert({ user_id: 999, name: "Hidden", query_json: JSON.stringify({ text: "x", mode: "fulltext" }), visibility: "private" });
+    const otherId = newId();
+    await knex("saved_searches").insert({ id: newId(), user_id: otherId, name: "Shared", query_json: JSON.stringify({ text: "x", mode: "fulltext" }), visibility: "public" });
+    await knex("saved_searches").insert({ id: newId(), user_id: otherId, name: "Hidden", query_json: JSON.stringify({ text: "x", mode: "fulltext" }), visibility: "private" });
     const res = await request(app).get("/saved").set("Authorization", `Bearer ${adminToken}`);
     const names = res.body.saved.map((s: any) => s.name);
     expect(names).toContain("My loans");
@@ -64,8 +65,9 @@ describe("saved searches", () => {
   });
 
   it("404s when running a private search owned by someone else", async () => {
-    const [otherId] = await knex("saved_searches").insert({ user_id: 999, name: "Private other", query_json: JSON.stringify({ text: "x", mode: "fulltext" }), visibility: "private" }).returning("id");
-    const id = typeof otherId === "object" ? (otherId as any).id : otherId;
-    expect((await request(app).post(`/saved/${id}/run`).set("Authorization", `Bearer ${adminToken}`)).status).toBe(404);
+    const otherId = newId();
+    const privateId = newId();
+    await knex("saved_searches").insert({ id: privateId, user_id: otherId, name: "Private other", query_json: JSON.stringify({ text: "x", mode: "fulltext" }), visibility: "private" });
+    expect((await request(app).post(`/saved/${privateId}/run`).set("Authorization", `Bearer ${adminToken}`)).status).toBe(404);
   });
 });

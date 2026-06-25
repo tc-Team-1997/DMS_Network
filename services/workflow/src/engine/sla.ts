@@ -1,6 +1,6 @@
 export interface SlaStep {
-  id: number;
-  workflow_id: number;
+  id: string;
+  workflow_id: string;
   status: string;
   due_at: string | null;
 }

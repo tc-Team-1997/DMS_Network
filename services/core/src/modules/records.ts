@@ -1,6 +1,7 @@
 import type { Knex } from "knex";
 import { randomUUID } from "node:crypto";
 import type { RetentionPolicy, LegalHold, DisposalCandidate } from "@zordms/types";
+import { newId } from "@zordms/db";
 
 export async function listFilePlan(knex: Knex): Promise<RetentionPolicy[]> {
   return knex<RetentionPolicy>("retention_policies").select("*").orderBy("doc_class");
@@ -28,7 +29,7 @@ export async function placeLegalHold(
   const countRow = await scopeToQuery(knex, input.scope).count("id as c");
   const docCount = Number((countRow as any)[0].c);
   await knex("legal_holds").insert({
-    ref: input.ref, scope: input.scope, status: "Active", doc_count: docCount, placed_by: input.placed_by ?? null,
+    id: newId(), ref: input.ref, scope: input.scope, status: "Active", doc_count: docCount, placed_by: input.placed_by ?? null,
   });
   return knex<LegalHold>("legal_holds").where({ ref: input.ref }).first() as Promise<LegalHold>;
 }
@@ -39,7 +40,7 @@ export async function releaseLegalHold(knex: Knex, ref: string): Promise<LegalHo
 }
 
 /** Returns true if any Active hold covers this document. */
-async function documentOnHold(knex: Knex, documentId: number): Promise<boolean> {
+async function documentOnHold(knex: Knex, documentId: string): Promise<boolean> {
   const holds = await knex("legal_holds").where({ status: "Active" }).select("scope");
   if (holds.length === 0) return false;
   const doc = await knex("documents").where({ id: documentId }).first();
@@ -80,18 +81,18 @@ export async function disposalEligibility(knex: Knex): Promise<DisposalCandidate
 }
 
 export async function certifiedDisposal(
-  knex: Knex, documentId: number, actor: string,
+  knex: Knex, documentId: string, actor: string,
 ): Promise<{ certificate: string }> {
   if (await documentOnHold(knex, documentId)) {
     throw new Error(`refused: document ${documentId} is covered by an active legal_hold`);
   }
   const certificate = `DISPOSAL-${randomUUID()}`;
   await knex("disposal_queue").insert({
-    document_id: documentId, disposed: true, disposed_at: knex.fn.now(), certificate,
+    id: newId(), document_id: documentId, disposed: true, disposed_at: knex.fn.now(), certificate,
   });
   await knex("documents").where({ id: documentId }).update({ status: "Disposed" });
   await knex("audit_log").insert({
-    actor_username: actor, action: "DISPOSAL_CERTIFIED", entity: "document",
+    id: newId(), actor_username: actor, action: "DISPOSAL_CERTIFIED", entity: "document",
     entity_id: String(documentId), details: certificate,
   });
   return { certificate };

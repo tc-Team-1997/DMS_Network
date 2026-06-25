@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import { makeTestApp } from "../testutil.js";
+import { newId } from "@zordms/db";
 
 const h = await makeTestApp();
 afterAll(async () => { await h.cleanup(); });
@@ -18,8 +19,8 @@ describe("branch network routes", () => {
 
   it("forbids adding a branch without admin:access (Viewer role)", async () => {
     const viewerRole = await h.knex("roles").where({ name: "Viewer" }).first();
-    const inserted = await h.knex("users").insert({ username: "viewer_br", password_hash: "x", status: "Active" }).returning("id");
-    const vid = typeof inserted[0] === "object" ? (inserted[0] as any).id : inserted[0];
+    const vid = newId();
+    await h.knex("users").insert({ id: vid, username: "viewer_br", password_hash: "x", status: "Active" });
     await h.knex("user_roles").insert({ user_id: vid, role_id: viewerRole.id });
     const viewerToken = await h.tokenFor("viewer_br");
 

@@ -1,5 +1,6 @@
 import type { Knex } from "knex";
 import { hashPassword } from "@zordms/auth";
+import { newId } from "@zordms/db";
 
 const BASE_PERMISSIONS: Array<[string, string]> = [
   ["user:create", "Create users"],
@@ -339,14 +340,14 @@ export async function seed(knex: Knex): Promise<void> {
   // permissions (idempotent — guard on natural key `key`)
   for (const [key, description] of BASE_PERMISSIONS) {
     const exists = await knex("permissions").where({ key }).first();
-    if (!exists) await knex("permissions").insert({ key, description });
+    if (!exists) await knex("permissions").insert({ id: newId(), key, description });
   }
 
   // roles + role_permissions (idempotent — guard on `name`)
   for (const [name, perms] of Object.entries(ROLES)) {
     let role = await knex("roles").where({ name }).first();
     if (!role) {
-      await knex("roles").insert({ name, description: `${name} role`, system: true });
+      await knex("roles").insert({ id: newId(), name, description: `${name} role`, system: true });
       role = await knex("roles").where({ name }).first();
     }
     for (const key of perms) {
@@ -362,6 +363,7 @@ export async function seed(knex: Knex): Promise<void> {
   const userCount = Number((await knex("users").count<{ c: number }[]>("id as c"))[0].c);
   if (userCount === 0) {
     await knex("users").insert({
+      id: newId(),
       username: "admin",
       password_hash: await hashPassword("admin123"),
       full_name: "System Administrator",
@@ -383,6 +385,7 @@ export async function seed(knex: Knex): Promise<void> {
     const exists = await knex("integration_config").where({ system: s.system }).first();
     if (!exists) {
       await knex("integration_config").insert({
+        id: newId(),
         system: s.system,
         base_url: s.base_url,
         auth_type: s.auth_type,
@@ -395,7 +398,7 @@ export async function seed(knex: Knex): Promise<void> {
   // (logs accumulate at runtime; we never want to duplicate these fixtures).
   const logCount = Number((await knex("integration_logs").count<{ c: number }[]>("id as c"))[0].c);
   if (logCount === 0) {
-    await knex("integration_logs").insert(SEED_LOGS);
+    await knex("integration_logs").insert(SEED_LOGS.map((log) => ({ id: newId(), ...log })));
   }
 
   // outbound_webhooks — guard on `url` natural key (one row per target URL).
@@ -403,6 +406,7 @@ export async function seed(knex: Knex): Promise<void> {
     const exists = await knex("outbound_webhooks").where({ url: wh.url }).first();
     if (!exists) {
       await knex("outbound_webhooks").insert({
+        id: newId(),
         url: wh.url,
         events: wh.events,
         auth_method: wh.auth_method,

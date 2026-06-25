@@ -10,6 +10,12 @@ import {
   type AuthUser,
 } from "./middleware.js";
 
+// Realistic UUIDv7 strings for test users
+const ALICE_ID = "018f4e3a-1b2c-7d4e-8f5a-6b7c8d9e0f1a";
+const BOB_ID   = "018f4e3a-1b2c-7d4e-8f5a-000000000002";
+const CAROL_ID = "018f4e3a-1b2c-7d4e-8f5a-000000000003";
+const USER_ID  = "018f4e3a-1b2c-7d4e-8f5a-000000000001";
+
 // ---------------------------------------------------------------------------
 // Minimal mocks for Express req / res / next
 // ---------------------------------------------------------------------------
@@ -50,7 +56,7 @@ const SECRET = "test-secret";
 describe("requireAuth", () => {
   it("sets req.authUser from a valid JWT with permissions", () => {
     const token = signToken(
-      { sub: 42, username: "alice", permissions: ["x"], roles: ["viewer"] },
+      { sub: ALICE_ID, username: "alice", permissions: ["x"], roles: ["viewer"] },
       SECRET,
     );
     const req = makeReq({
@@ -63,7 +69,7 @@ describe("requireAuth", () => {
 
     expect(next).toHaveBeenCalledOnce();
     expect(req.authUser).toBeDefined();
-    expect(req.authUser?.id).toBe(42);
+    expect(req.authUser?.id).toBe(ALICE_ID);
     expect(req.authUser?.username).toBe("alice");
     expect(req.authUser?.permissions).toEqual(["x"]);
     expect(req.authUser?.roles).toEqual(["viewer"]);
@@ -82,7 +88,7 @@ describe("requireAuth", () => {
   });
 
   it("returns 401 when token is signed with wrong secret", () => {
-    const token = signToken({ sub: 1, username: "bob" }, "wrong-secret");
+    const token = signToken({ sub: BOB_ID, username: "bob" }, "wrong-secret");
     const req = makeReq({
       headers: { authorization: `Bearer ${token}` },
     });
@@ -110,7 +116,7 @@ describe("requireAuth", () => {
 
   it("populates branch and region from claims", () => {
     const token = signToken(
-      { sub: 5, username: "carol", branch: "HQ", region: "NORTH" },
+      { sub: CAROL_ID, username: "carol", branch: "HQ", region: "NORTH" },
       SECRET,
     );
     const req = makeReq({ headers: { authorization: `Bearer ${token}` } });
@@ -131,7 +137,7 @@ describe("requireAuth", () => {
 describe("requirePermission", () => {
   function makeAuthedReq(permissions: string[]): Request {
     const authUser: AuthUser = {
-      id: 1,
+      id: USER_ID,
       username: "alice",
       roles: [],
       permissions,
@@ -233,7 +239,7 @@ describe("makeViewer", () => {
   it("returns branch from authUser and canCrossBranch true when perm present", () => {
     const req = makeReq({
       authUser: {
-        id: 1,
+        id: USER_ID,
         username: "u",
         roles: [],
         permissions: ["crossbranch:read"],
@@ -249,7 +255,7 @@ describe("makeViewer", () => {
   it("returns canCrossBranch false when perm absent", () => {
     const req = makeReq({
       authUser: {
-        id: 1,
+        id: USER_ID,
         username: "u",
         roles: [],
         permissions: ["docs:read"],

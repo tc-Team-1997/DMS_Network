@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 // bcrypt hash of "admin123" with salt rounds=10 (pre-computed to avoid bcryptjs dep in tests)
 const ADMIN_PASSWORD_HASH = "$2b$10$3euPcmQFCiblsZeEu5s7p.9OVHgeHh/e3LkYBo1mW.jemjA6EsrRC";
@@ -35,13 +36,13 @@ export async function seed(knex: Knex): Promise<void> {
   // permissions
   for (const [key, description] of PERMISSIONS) {
     const exists = await knex("permissions").where({ key }).first();
-    if (!exists) await knex("permissions").insert({ key, description });
+    if (!exists) await knex("permissions").insert({ id: newId(), key, description });
   }
   // roles + role_permissions
   for (const [name, perms] of Object.entries(ROLES)) {
     let role = await knex("roles").where({ name }).first();
     if (!role) {
-      await knex("roles").insert({ name, description: `${name} role`, system: true });
+      await knex("roles").insert({ id: newId(), name, description: `${name} role`, system: true });
       role = await knex("roles").where({ name }).first();
     }
     for (const key of perms) {
@@ -55,7 +56,9 @@ export async function seed(knex: Knex): Promise<void> {
   // bootstrap admin only if no users
   const userCount = Number((await knex("users").count<{ c: number }[]>("id as c"))[0].c);
   if (userCount === 0) {
+    const adminId = newId();
     await knex("users").insert({
+      id: adminId,
       username: "admin",
       password_hash: ADMIN_PASSWORD_HASH,
       full_name: "System Administrator",

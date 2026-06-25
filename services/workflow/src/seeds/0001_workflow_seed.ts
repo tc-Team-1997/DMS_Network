@@ -6,6 +6,7 @@
  * The seed is safe to run multiple times — re-seeding on boot will not duplicate rows.
  */
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -14,12 +15,12 @@ import type { Knex } from "knex";
 async function upsertTemplate(
   knex: Knex,
   row: { name: string; doc_type: string; steps_json: string; active: boolean },
-): Promise<number> {
+): Promise<string> {
   const existing = await knex("workflow_templates").where({ name: row.name }).first();
-  if (existing) return existing.id as number;
-  await knex("workflow_templates").insert(row);
-  const inserted = await knex("workflow_templates").where({ name: row.name }).first();
-  return (inserted as { id: number }).id;
+  if (existing) return existing.id as string;
+  const id = newId();
+  await knex("workflow_templates").insert({ id, ...row });
+  return id;
 }
 
 async function upsertWorkflow(
@@ -28,7 +29,7 @@ async function upsertWorkflow(
     ref_code: string;
     title: string;
     doc_id?: string;
-    template_id: number;
+    template_id: string;
     stage: string;
     priority: string;
     status: string;
@@ -37,12 +38,12 @@ async function upsertWorkflow(
     created_by?: string;
     created_at?: string;
   },
-): Promise<number> {
+): Promise<string> {
   const existing = await knex("workflows").where({ ref_code: row.ref_code }).first();
-  if (existing) return existing.id as number;
-  await knex("workflows").insert(row);
-  const inserted = await knex("workflows").where({ ref_code: row.ref_code }).first();
-  return (inserted as { id: number }).id;
+  if (existing) return existing.id as string;
+  const id = newId();
+  await knex("workflows").insert({ id, ...row });
+  return id;
 }
 
 async function upsertCase(
@@ -54,23 +55,23 @@ async function upsertCase(
     status: string;
     assigned_to?: string;
     due_at?: string;
-    workflow_id?: number;
+    workflow_id?: string;
     resolution?: string;
     created_by?: string;
     created_at?: string;
     resolved_at?: string;
   },
-): Promise<number> {
+): Promise<string> {
   const existing = await knex("cases").where({ case_ref: row.case_ref }).first();
-  if (existing) return existing.id as number;
-  await knex("cases").insert(row);
-  const inserted = await knex("cases").where({ case_ref: row.case_ref }).first();
-  return (inserted as { id: number }).id;
+  if (existing) return existing.id as string;
+  const id = newId();
+  await knex("cases").insert({ id, ...row });
+  return id;
 }
 
 async function addWorkflowStepsIfAbsent(
   knex: Knex,
-  workflowId: number,
+  workflowId: string,
   steps: Array<{
     seq: number;
     name: string;
@@ -79,7 +80,7 @@ async function addWorkflowStepsIfAbsent(
     status: string;
     sla_minutes?: number;
     due_at?: string;
-    actor_id?: number;
+    actor_id?: string;
     acted_at?: string;
   }>,
 ): Promise<void> {
@@ -87,6 +88,7 @@ async function addWorkflowStepsIfAbsent(
   if (existing) return; // already seeded
   for (const s of steps) {
     await knex("workflow_steps").insert({
+      id: newId(),
       workflow_id: workflowId,
       seq: s.seq,
       name: s.name,
@@ -262,7 +264,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 480,
       due_at: daysFromNow(-4),
-      actor_id: 1,
       acted_at: daysFromNow(-4),
     },
     {
@@ -307,7 +308,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 720,
       due_at: daysFromNow(-6),
-      actor_id: 1,
       acted_at: daysFromNow(-6),
     },
     {
@@ -318,7 +318,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 480,
       due_at: daysFromNow(-4),
-      actor_id: 2,
       acted_at: daysFromNow(-3),
     },
     {
@@ -355,7 +354,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 480,
       due_at: daysFromNow(-14),
-      actor_id: 1,
       acted_at: daysFromNow(-14),
     },
     {
@@ -366,7 +364,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 240,
       due_at: daysFromNow(-13),
-      actor_id: 2,
       acted_at: daysFromNow(-13),
     },
     {
@@ -377,7 +374,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 120,
       due_at: daysFromNow(-12),
-      actor_id: 3,
       acted_at: daysFromNow(-12),
     },
   ]);
@@ -405,7 +401,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 720,
       due_at: daysFromNow(-9),
-      actor_id: 1,
       acted_at: daysFromNow(-9),
     },
     {
@@ -416,7 +411,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Rejected",
       sla_minutes: 480,
       due_at: daysFromNow(-8),
-      actor_id: 2,
       acted_at: daysFromNow(-8),
     },
     {
@@ -528,7 +522,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 720,
       due_at: daysFromNow(-5),
-      actor_id: 1,
       acted_at: daysFromNow(-5),
     },
     {
@@ -539,7 +532,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 480,
       due_at: daysFromNow(-3),
-      actor_id: 2,
       acted_at: daysFromNow(-3),
     },
     {
@@ -610,7 +602,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 720,
       due_at: daysFromNow(-31),
-      actor_id: 1,
       acted_at: daysFromNow(-31),
     },
     {
@@ -621,7 +612,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 480,
       due_at: daysFromNow(-30),
-      actor_id: 2,
       acted_at: daysFromNow(-30),
     },
     {
@@ -632,7 +622,6 @@ export async function seed(knex: Knex): Promise<void> {
       status: "Approved",
       sla_minutes: 240,
       due_at: daysFromNow(-29),
-      actor_id: 3,
       acted_at: daysFromNow(-29),
     },
   ]);
@@ -758,6 +747,7 @@ export async function seed(knex: Knex): Promise<void> {
 
   if (!auditExists) {
     await knex("workflow_audit").insert({
+      id: newId(),
       actor_id: null,
       actor_username: "system",
       action: "SEED_INIT",
@@ -770,42 +760,47 @@ export async function seed(knex: Knex): Promise<void> {
     // Representative audit trail for the two approved workflows
     await knex("workflow_audit").insert([
       {
+        id: newId(),
         actor_username: "maker.sonam",
         action: "WORKFLOW_CREATE",
         entity: "workflow",
-        entity_id: String(wf04Id),
+        entity_id: wf04Id,
         details: "WF-SEED-04",
         created_at: daysFromNow(-15),
       },
       {
+        id: newId(),
         actor_username: "maker.sonam",
         action: "WORKFLOW_APPROVE",
         entity: "workflow",
-        entity_id: String(wf04Id),
+        entity_id: wf04Id,
         details: "Maker Review approved",
         created_at: daysFromNow(-14),
       },
       {
+        id: newId(),
         actor_username: "checker.kinley",
         action: "WORKFLOW_APPROVE",
         entity: "workflow",
-        entity_id: String(wf04Id),
+        entity_id: wf04Id,
         details: "Checker Approval approved",
         created_at: daysFromNow(-13),
       },
       {
+        id: newId(),
         actor_username: "manager.rinzin",
         action: "WORKFLOW_APPROVE",
         entity: "workflow",
-        entity_id: String(wf04Id),
+        entity_id: wf04Id,
         details: "Manager Sign-off approved — account activated",
         created_at: daysFromNow(-12),
       },
       {
+        id: newId(),
         actor_username: "checker.kinley",
         action: "WORKFLOW_REJECT",
         entity: "workflow",
-        entity_id: String(wf05Id),
+        entity_id: wf05Id,
         details: "Missing income proof — loan rejected",
         created_at: daysFromNow(-8),
       },

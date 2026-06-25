@@ -20,10 +20,14 @@ const db = {
 const knex = buildServiceKnex({ migrationsDir, db });
 const events = createRecordingBus();
 
-// Authority stub: allows actor 1 (checker), denies actor 2 (viewer).
+// UUID strings for the two actors used in this test suite.
+const CHECKER_ID = "01910000-0000-7000-0000-000000000001";
+const VIEWER_ID  = "01910000-0000-7000-0000-000000000002";
+
+// Authority stub: allows checker (CHECKER_ID), denies viewer (VIEWER_ID).
 const authority: AuthorityClient = {
   async check(userId, permissions) {
-    if (userId === 1) return { allowed: true, missing: [] };
+    if (userId === CHECKER_ID) return { allowed: true, missing: [] };
     return { allowed: false, missing: permissions };
   },
 };
@@ -33,23 +37,23 @@ const app = createApp({ knex, config, authority, events });
 
 // F2/F14: Tokens are signed with permissions embedded; actor identity comes
 // from the verified JWT (req.authUser.id) — NOT from request body.
-// userId=1 → allowed by authority stub above.
-// userId=2 → denied by authority stub.
+// userId=CHECKER_ID → allowed by authority stub above.
+// userId=VIEWER_ID → denied by authority stub.
 const checkerToken = signToken(
-  { sub: 1, username: "checker1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
+  { sub: CHECKER_ID, username: "checker1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
   "t",
 );
 const viewerToken = signToken(
-  { sub: 2, username: "viewer1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
+  { sub: VIEWER_ID, username: "viewer1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
   "t",
 );
 
-async function makeWorkflow(): Promise<number> {
+async function makeWorkflow(): Promise<string> {
   const tpl = await request(app)
     .post("/templates")
     .set("Authorization", `Bearer ${checkerToken}`)
     .send({
-      name: "T",
+      name: `T-${Date.now()}-${Math.random()}`,
       steps_json: JSON.stringify([
         { name: "Maker", required_permissions: ["workflow:act"] },
         { name: "Checker", required_permissions: ["document:approve"] },
@@ -59,7 +63,7 @@ async function makeWorkflow(): Promise<number> {
     .post("/workflows")
     .set("Authorization", `Bearer ${checkerToken}`)
     .send({ title: "W", template_id: tpl.body.template.id, doc_confidence: 0.99 });
-  return wf.body.workflow.id;
+  return wf.body.workflow.id as string;
 }
 
 beforeAll(async () => {
@@ -76,9 +80,9 @@ describe("POST /workflows/:id/act", () => {
     expect(res.status).toBe(401);
   });
 
-  it("F2: actor identity comes from JWT (not body) — viewer denied because authority stub rejects userId=2", async () => {
+  it("F2: actor identity comes from JWT (not body) — viewer denied because authority stub rejects VIEWER_ID", async () => {
     const id = await makeWorkflow();
-    // viewerToken has sub=2 which authority stub denies
+    // viewerToken has sub=VIEWER_ID which authority stub denies
     const res = await request(app)
       .post(`/workflows/${id}/act`)
       .set("Authorization", `Bearer ${viewerToken}`)
@@ -91,7 +95,7 @@ describe("POST /workflows/:id/act", () => {
 
   it("403 when the gateway denies authority (no state change)", async () => {
     const id = await makeWorkflow();
-    // viewerToken → sub=2 → authority stub denies
+    // viewerToken → sub=VIEWER_ID → authority stub denies
     const res = await request(app)
       .post(`/workflows/${id}/act`)
       .set("Authorization", `Bearer ${viewerToken}`)
@@ -112,7 +116,7 @@ describe("POST /workflows/:id/act", () => {
     expect(res.body.workflow.stage).toBe("Checker"); // advanced to step 2
     const step1 = await knex("workflow_steps").where({ workflow_id: id, seq: 1 }).first();
     expect(step1.status).toBe("Approved");
-    expect(step1.actor_id).toBe(1); // actor from JWT sub=1
+    expect(step1.actor_id).toBe(CHECKER_ID); // actor from JWT sub=CHECKER_ID
     expect(events.events.some((e) => e.event === "workflow.approved")).toBe(true);
   });
 

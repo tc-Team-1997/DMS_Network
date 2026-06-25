@@ -9,7 +9,7 @@ import type { Knex } from "knex";
 export async function up(knex: Knex): Promise<void> {
   // ── doc_type_registry ──────────────────────────────────────────────────────
   await knex.schema.createTable("doc_type_registry", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("code", 80).notNullable().unique();
     t.string("description", 255).notNullable();
     t.string("jurisdiction", 20).notNullable().defaultTo("ANY");

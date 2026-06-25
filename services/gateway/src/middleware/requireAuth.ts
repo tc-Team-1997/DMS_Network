@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { verifyToken, resolveUserAuthz } from "@zordms/auth";
-import type { AuthUser } from "@zordms/types";
+import type { AuthUser } from "@zordms/auth";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -16,7 +16,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const payload = verifyToken(token, config.jwtSecret);
     const user = await knex("users").where({ id: payload.sub }).first();
     if (!user || user.status !== "Active") { res.status(401).json({ error: "unauthorized" }); return; }
-    const authz = await resolveUserAuthz(knex, user.id);
+    // user.id is now a UUID string; cast to any to satisfy the legacy number signature in resolveUserAuthz
+    const authz = await resolveUserAuthz(knex, user.id as any);
     req.authUser = { id: user.id, username: user.username, roles: authz.roles, permissions: authz.permissions, branch: user.branch, region: user.region };
     next();
   } catch {

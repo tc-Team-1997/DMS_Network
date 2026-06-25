@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import knexLib from "knex";
-import { buildKnexConfig } from "@zordms/db";
+import { buildKnexConfig, newId } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
 import { hashPassword } from "@zordms/auth";
 import { createApp } from "../app.js";
@@ -37,12 +37,13 @@ describe("POST /auth/login", () => {
   // Fix 1: locked account oracle test
   it("returns 403 for a locked user with CORRECT password (no oracle leak)", async () => {
     // Insert a locked user with a known password
-    const [uid] = await knex("users").insert({
+    const lockedId = newId();
+    await knex("users").insert({
+      id: lockedId,
       username: "locked_user",
       password_hash: await hashPassword("correct_password"),
       status: "Locked",
-    }).returning("id");
-    const lockedId = typeof uid === "object" ? (uid as any).id : uid;
+    });
 
     // Correct password + locked → 403 account_locked
     const res = await request(app).post("/auth/login").send({ username: "locked_user", password: "correct_password" });
@@ -61,14 +62,15 @@ describe("POST /auth/login", () => {
 
   // Fix 5: null mfa_secret guard
   it("returns 401 mfa_required when mfa_enabled but mfa_secret is null", async () => {
-    const [uid] = await knex("users").insert({
+    const mfaId = newId();
+    await knex("users").insert({
+      id: mfaId,
       username: "mfa_no_secret",
       password_hash: await hashPassword("pw123456"),
       status: "Active",
       mfa_enabled: 1,
       mfa_secret: null,
-    }).returning("id");
-    const mfaId = typeof uid === "object" ? (uid as any).id : uid;
+    });
 
     const res = await request(app).post("/auth/login").send({ username: "mfa_no_secret", password: "pw123456" });
     expect(res.status).toBe(401);

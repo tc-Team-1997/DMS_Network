@@ -32,7 +32,7 @@ export function foldersRouter(): Router {
   r.post("/:id/move", requirePermission("folder:create"), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     try {
-      const folder = await moveFolder(knex, Number(req.params.id), Number(req.body.parentId));
+      const folder = await moveFolder(knex, req.params.id, String(req.body.parentId));
       res.json({ folder });
     } catch (e: any) {
       res.status(400).json({ error: String(e.message ?? e) });

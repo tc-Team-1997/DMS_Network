@@ -1,11 +1,12 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 type Acl = { role: string; access: "read" | "write" | "delete" };
 type EffectiveAcl = Acl & { inherited: boolean };
 
 export async function setFolderAcls(
   knex: Knex,
-  folderId: number,
+  folderId: string,
   acls: Acl[],
   inherited: boolean,
 ): Promise<void> {
@@ -14,13 +15,13 @@ export async function setFolderAcls(
       .where({ folder_id: folderId, role: a.role, access: a.access })
       .first();
     if (!exists) {
-      await knex("folder_acls").insert({ folder_id: folderId, role: a.role, access: a.access, inherited });
+      await knex("folder_acls").insert({ id: newId(), folder_id: folderId, role: a.role, access: a.access, inherited });
     }
   }
 }
 
-async function ancestorIds(knex: Knex, folderId: number): Promise<number[]> {
-  const ids: number[] = [];
+async function ancestorIds(knex: Knex, folderId: string): Promise<string[]> {
+  const ids: string[] = [];
   let current = await knex("folders").where({ id: folderId }).first();
   while (current?.parent_id != null) {
     ids.push(current.parent_id);
@@ -29,7 +30,7 @@ async function ancestorIds(knex: Knex, folderId: number): Promise<number[]> {
   return ids;
 }
 
-export async function effectiveAcls(knex: Knex, folderId: number): Promise<EffectiveAcl[]> {
+export async function effectiveAcls(knex: Knex, folderId: string): Promise<EffectiveAcl[]> {
   const own = (await knex("folder_acls").where({ folder_id: folderId })) as Array<Acl & { inherited: boolean }>;
   const ancestors = await ancestorIds(knex, folderId);
   const inheritedRows = ancestors.length

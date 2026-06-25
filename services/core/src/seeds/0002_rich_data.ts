@@ -6,6 +6,7 @@
  * Folder paths follow the /BoB/ root convention used by createFolder() in repo/folders.ts.
  */
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -16,7 +17,7 @@ function sha256(n: number): string {
   return (base + "0".repeat(64)).slice(0, 64);
 }
 
-function storageKey(docId: number, ver: number): string {
+function storageKey(docId: string, ver: number): string {
   return `docs/${docId}/v${ver}/file.pdf`;
 }
 
@@ -1411,7 +1412,7 @@ export async function seed(knex: Knex): Promise<void> {
   // ── 1. Branches ────────────────────────────────────────────────────────────
   for (const b of BRANCHES) {
     const ex = await knex("branches").where({ code: b.code }).first();
-    if (!ex) await knex("branches").insert({ ...b });
+    if (!ex) await knex("branches").insert({ id: newId(), ...b });
   }
 
   // ── 2. Branch access ───────────────────────────────────────────────────────
@@ -1419,7 +1420,7 @@ export async function seed(knex: Knex): Promise<void> {
     const ex = await knex("branch_access")
       .where({ source_branch: ba.source_branch, target_branch: ba.target_branch })
       .first();
-    if (!ex) await knex("branch_access").insert(ba);
+    if (!ex) await knex("branch_access").insert({ id: newId(), ...ba });
   }
 
   // ── 3. Extra users ─────────────────────────────────────────────────────────
@@ -1428,7 +1429,9 @@ export async function seed(knex: Knex): Promise<void> {
     const ex = await knex("users").where({ username: u.username }).first();
     if (!ex) {
       const password_hash = await hashPassword("Bhutan@1234");
+      const userId = newId();
       await knex("users").insert({
+        id: userId,
         username: u.username,
         full_name: u.full_name,
         email: u.email,
@@ -1450,20 +1453,18 @@ export async function seed(knex: Knex): Promise<void> {
   }
 
   // ── 4. Folder tree ────────────────────────────────────────────────────────
-  async function ensureFolder(spec: FolderSpec, parentId?: number): Promise<number> {
+  async function ensureFolder(spec: FolderSpec, parentId?: string): Promise<string> {
     const ex = await knex("folders").where({ path: spec.path }).first();
-    if (ex) return ex.id as number;
-    const inserted = await knex("folders").insert({
+    if (ex) return ex.id as string;
+    const id = newId();
+    await knex("folders").insert({
+      id,
       name: spec.name,
       path: spec.path,
       domain: spec.domain ?? null,
       parent_id: parentId ?? null,
       created_by: "admin",
     });
-    // SQLite returns array of ids; Postgres returns array of objects via .returning()
-    const id: number = Array.isArray(inserted)
-      ? (typeof inserted[0] === "object" ? (inserted[0] as { id: number }).id : (inserted[0] as number))
-      : (inserted as unknown as number);
     if (spec.children) {
       for (const child of spec.children) {
         await ensureFolder(child, id);
@@ -1478,13 +1479,13 @@ export async function seed(knex: Knex): Promise<void> {
   // ── 5. Retention policies ─────────────────────────────────────────────────
   for (const rp of RETENTION_POLICIES) {
     const ex = await knex("retention_policies").where({ doc_class: rp.doc_class }).first();
-    if (!ex) await knex("retention_policies").insert(rp);
+    if (!ex) await knex("retention_policies").insert({ id: newId(), ...rp });
   }
 
   // ── 6. Legal holds ────────────────────────────────────────────────────────
   for (const lh of LEGAL_HOLDS) {
     const ex = await knex("legal_holds").where({ ref: lh.ref }).first();
-    if (!ex) await knex("legal_holds").insert(lh);
+    if (!ex) await knex("legal_holds").insert({ id: newId(), ...lh });
   }
 
   // ── 7. Documents ──────────────────────────────────────────────────────────
@@ -1498,7 +1499,9 @@ export async function seed(knex: Knex): Promise<void> {
     const ex = await knex("documents").where({ doc_no: d.doc_no }).first();
     if (ex) continue;
 
-    const inserted = await knex("documents").insert({
+    const docId = newId();
+    await knex("documents").insert({
+      id: docId,
       folder_id,
       title: d.title,
       original_filename: d.original_filename,
@@ -1524,9 +1527,6 @@ export async function seed(knex: Knex): Promise<void> {
       doc_no: d.doc_no,
       ingest_timestamp: new Date(),
     });
-    const docId: number = Array.isArray(inserted)
-      ? (typeof inserted[0] === "object" ? (inserted[0] as { id: number }).id : (inserted[0] as number))
-      : (inserted as unknown as number);
 
     // document_versions v1
     const vEx = await knex("document_versions")
@@ -1534,6 +1534,7 @@ export async function seed(knex: Knex): Promise<void> {
       .first();
     if (!vEx) {
       await knex("document_versions").insert({
+        id: newId(),
         document_id: docId,
         version_no: 1,
         storage_key: storageKey(docId, 1),
@@ -1551,6 +1552,7 @@ export async function seed(knex: Knex): Promise<void> {
       .first();
     if (!vAliasEx) {
       await knex("versions").insert({
+        id: newId(),
         document_id: docId,
         version_no: 1,
         file_hash_sha256: sha256(docIdx),
@@ -1567,6 +1569,7 @@ export async function seed(knex: Knex): Promise<void> {
       .first();
     if (!v2Ex) {
       await knex("document_versions").insert({
+        id: newId(),
         document_id: passportDorji.id,
         version_no: 2,
         storage_key: storageKey(passportDorji.id, 2),
@@ -1577,6 +1580,7 @@ export async function seed(knex: Knex): Promise<void> {
         comment: "Re-scanned with higher resolution for clarity",
       });
       await knex("versions").insert({
+        id: newId(),
         document_id: passportDorji.id,
         version_no: 2,
         file_hash_sha256: sha256(9001),
@@ -1595,6 +1599,7 @@ export async function seed(knex: Knex): Promise<void> {
       .first();
     if (!v2Ex) {
       await knex("document_versions").insert({
+        id: newId(),
         document_id: loanDorji.id,
         version_no: 2,
         storage_key: storageKey(loanDorji.id, 2),
@@ -1605,6 +1610,7 @@ export async function seed(knex: Knex): Promise<void> {
         comment: "Appended collateral valuation addendum",
       });
       await knex("versions").insert({
+        id: newId(),
         document_id: loanDorji.id,
         version_no: 2,
         file_hash_sha256: sha256(9002),
@@ -1624,6 +1630,7 @@ export async function seed(knex: Knex): Promise<void> {
     if (!annEx) {
       await knex("annotations").insert([
         {
+          id: newId(),
           document_id: passportDorji.id,
           page: 1,
           kind: "highlight",
@@ -1633,6 +1640,7 @@ export async function seed(knex: Knex): Promise<void> {
           created_by: "pema.lhamo",
         },
         {
+          id: newId(),
           document_id: passportDorji.id,
           page: 1,
           kind: "redact",
@@ -1642,6 +1650,7 @@ export async function seed(knex: Knex): Promise<void> {
           created_by: "admin",
         },
         {
+          id: newId(),
           document_id: passportDorji.id,
           page: 1,
           kind: "stamp",
@@ -1662,6 +1671,7 @@ export async function seed(knex: Knex): Promise<void> {
     if (!annEx) {
       await knex("annotations").insert([
         {
+          id: newId(),
           document_id: loanSonam.id,
           page: 1,
           kind: "comment",
@@ -1682,6 +1692,7 @@ export async function seed(knex: Knex): Promise<void> {
       .first();
     if (!dispEx) {
       await knex("disposal_queue").insert({
+        id: newId(),
         document_id: archivedPassport.id,
         destruction_date: archivedPassport.destruction_date,
         disposed: false,
@@ -1696,6 +1707,7 @@ export async function seed(knex: Knex): Promise<void> {
       .first();
     if (!dispEx) {
       await knex("disposal_queue").insert({
+        id: newId(),
         document_id: closedLoan2018.id,
         destruction_date: dateStr(daysFrom(TODAY, 365 * 2)),
         disposed: false,
@@ -1716,6 +1728,7 @@ export async function seed(knex: Knex): Promise<void> {
         .first();
       if (!aclEx) {
         await knex("folder_acls").insert({
+          id: newId(),
           folder_id: kycFolder.id,
           role,
           access,
@@ -1735,6 +1748,7 @@ export async function seed(knex: Knex): Promise<void> {
         .first();
       if (!aclEx) {
         await knex("folder_acls").insert({
+          id: newId(),
           folder_id: complianceFolder.id,
           role,
           access,

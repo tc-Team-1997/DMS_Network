@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import type { ChannelRegistry } from "../channels/registry.js";
 import type { DeliveryResult } from "../channels/types.js";
 import type { RealtimeHub } from "../realtime/hub.js";
@@ -9,27 +10,24 @@ export interface AlertDeps { knex: Knex; registry: ChannelRegistry; hub: Realtim
 
 export interface RaiseInput {
   decision: RuleDecision;
-  ruleId?: number;
+  ruleId?: string;
   branch?: string;
   meta?: Record<string, unknown>;
 }
 
-export async function raiseAlert(deps: AlertDeps, input: RaiseInput): Promise<{ alertId: number; results: DeliveryResult[] }> {
+export async function raiseAlert(deps: AlertDeps, input: RaiseInput): Promise<{ alertId: string; results: DeliveryResult[] }> {
   const { knex, registry, hub, bus } = deps;
   const { decision } = input;
 
-  const inserted = await knex("alerts").insert({
+  const alertId = newId();
+  await knex("alerts").insert({
+    id: alertId,
     level: decision.level,
     title: decision.title,
     meta: JSON.stringify(input.meta ?? {}),
     rule_id: input.ruleId ?? null,
     branch: input.branch ?? null,
-  }).returning("id");
-
-  // Handle both PostgreSQL returning (array of objects) and SQLite (array of numbers)
-  const alertId = Array.isArray(inserted)
-    ? (typeof inserted[0] === "object" && inserted[0] !== null ? (inserted[0] as { id: number }).id : inserted[0] as number)
-    : inserted as unknown as number;
+  });
 
   const results: DeliveryResult[] = [];
   for (const recipient of decision.recipients) {
@@ -42,6 +40,7 @@ export async function raiseAlert(deps: AlertDeps, input: RaiseInput): Promise<{ 
     for (const d of delivered) {
       results.push(d);
       await knex("notifications").insert({
+        id: newId(),
         alert_id: alertId,
         user_id: null,
         channel: d.channel,

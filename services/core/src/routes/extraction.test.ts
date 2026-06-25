@@ -31,7 +31,7 @@ afterEach(() => {
 
 // ── Helper: upload a document ──────────────────────────────────────────────────
 
-async function upload(token: string, branch = "Thimphu"): Promise<number> {
+async function upload(token: string, branch = "Thimphu"): Promise<string> {
   const res = await request(h.app)
     .post("/documents")
     .set("Authorization", `Bearer ${token}`)
@@ -39,7 +39,7 @@ async function upload(token: string, branch = "Thimphu"): Promise<number> {
     .field("branch", branch)
     .attach("file", Buffer.from("mock-file-bytes"), "cid.png");
   expect(res.status).toBe(201);
-  return res.body.document.id;
+  return res.body.document.id as string;
 }
 
 // ── GET /doc-types ─────────────────────────────────────────────────────────────
@@ -95,10 +95,9 @@ describe("POST /documents/:id/extract", () => {
 
     // Create a Viewer user (document:read only — no document:index)
     const viewerRole = await h.knex("roles").where({ name: "Viewer" }).first();
-    const ins = await h.knex("users")
-      .insert({ username: "viewer_extr", password_hash: "x", status: "Active", branch: "Thimphu" })
-      .returning("id");
-    const vid = typeof ins[0] === "object" ? (ins[0] as any).id : ins[0];
+    const { newId } = await import("@zordms/db");
+    const vid = newId();
+    await h.knex("users").insert({ id: vid, username: "viewer_extr", password_hash: "x", status: "Active", branch: "Thimphu" });
     await h.knex("user_roles").insert({ user_id: vid, role_id: viewerRole.id });
     const vToken = await h.tokenFor("viewer_extr");
 
@@ -114,7 +113,7 @@ describe("POST /documents/:id/extract", () => {
     mockExtract.mockResolvedValue({ data: null, errors: [], partial: false });
 
     const res = await request(h.app)
-      .post("/documents/999999/extract")
+      .post("/documents/018f4e3a-0000-7000-0000-000000000000/extract")
       .set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);
   });

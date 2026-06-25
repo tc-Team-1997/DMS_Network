@@ -47,12 +47,12 @@ describe("POST /authz/check", () => {
     expect(res.body.error).toBe("unauthorized");
   });
 
-  // Fix 3: input validation — bad userId → 400
-  it("returns 400 when userId is not a positive integer", async () => {
+  // userId must be a non-empty string (UUIDs are strings now)
+  it("returns 400 when userId is missing/null", async () => {
     const res = await request(app)
       .post("/authz/check")
       .set("x-internal-token", "test-internal-token")
-      .send({ userId: "not-a-number", permissions: ["document:approve"] });
+      .send({ permissions: ["document:approve"] });
     expect(res.status).toBe(400);
   });
 

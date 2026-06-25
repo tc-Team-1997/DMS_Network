@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import { buildServiceKnex } from "@zordms/db";
+import { buildServiceKnex, newId } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
 import { signToken } from "@zordms/auth";
 import { createApp } from "../app.js";
@@ -33,6 +33,7 @@ beforeAll(async () => {
   // Create a user with only integration:read (no integration:manage).
   // No DB role setup needed — permissions are embedded in the JWT claims.
   await knex("users").insert({
+    id: newId(),
     username: "auditor_defect",
     password_hash: "x",
     full_name: "Auditor",
@@ -176,7 +177,8 @@ describe("F4 — input validation on POST /outbound", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({ url: "http://valid.local/hook", events: ["cbs.customer.updated"], auth_method: "hmac", secret: "s99" });
     expect(res.status).toBe(201);
-    expect(typeof res.body.webhook.id).toBe("number");
+    expect(typeof res.body.webhook.id).toBe("string");
+    expect(res.body.webhook.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(res.body.webhook.url).toBe("http://valid.local/hook");
   });
 });
@@ -226,6 +228,7 @@ describe("F5 — POST /outbound/test coverage", () => {
   it("fires dispatch and returns delivery report with all required fields (injected fetch)", async () => {
     // Register a webhook for the test event.
     await knex("outbound_webhooks").insert({
+      id: newId(),
       url: "http://hook.local/kyc-sink",
       events: "kyc.result",
       auth_method: "none",

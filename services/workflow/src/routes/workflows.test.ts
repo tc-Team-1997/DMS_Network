@@ -25,7 +25,7 @@ const app = createApp({ knex, config, events });
 // signToken types only accept {sub, username} but jwt.sign passes through
 // all payload fields — the permissions claim is read by requireAuth.
 const actorToken = signToken(
-  { sub: 1, username: "maker1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
+  { sub: "01910000-0000-7000-0000-000000000001", username: "maker1", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
   "t",
 );
 
@@ -33,7 +33,7 @@ beforeAll(async () => { await knex.migrate.latest(); });
 afterAll(async () => { await knex.destroy(); });
 
 describe("workflow CRUD + instantiation", () => {
-  let templateId = 0;
+  let templateId = "";
 
   it("F1: 401 without a token on POST /templates", async () => {
     const res = await request(app).post("/templates").send({
@@ -45,7 +45,7 @@ describe("workflow CRUD + instantiation", () => {
 
   it("F1: 403 without the workflow:act permission on POST /templates", async () => {
     const readonlyToken = signToken(
-      { sub: 99, username: "readonly", permissions: [] } as Parameters<typeof signToken>[0],
+      { sub: "01910000-0000-7000-0000-000000000099", username: "readonly", permissions: [] } as Parameters<typeof signToken>[0],
       "t",
     );
     const res = await request(app)
@@ -74,7 +74,8 @@ describe("workflow CRUD + instantiation", () => {
       });
     expect(res.status).toBe(201);
     templateId = res.body.template.id;
-    expect(templateId).toBeGreaterThan(0);
+    expect(typeof templateId).toBe("string");
+    expect(templateId.length).toBe(36);
     // F12: active should be a boolean true, not integer 1
     expect(res.body.template.active).toBe(true);
   });
@@ -114,6 +115,8 @@ describe("workflow CRUD + instantiation", () => {
       .set("Authorization", `Bearer ${actorToken}`);
     expect(list.body.workflows.length).toBeGreaterThan(0);
     const id = list.body.workflows[0].id;
+    expect(typeof id).toBe("string");
+    expect(id.length).toBe(36);
     const one = await request(app)
       .get(`/workflows/${id}`)
       .set("Authorization", `Bearer ${actorToken}`);

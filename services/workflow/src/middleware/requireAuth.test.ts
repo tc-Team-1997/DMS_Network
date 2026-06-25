@@ -21,7 +21,7 @@ app.locals.deps = { config: { jwtSecret: SECRET } };
 app.get(
   "/protected",
   requireAuth,
-  (_req, res) => res.json({ userId: (_req as typeof _req & { authUser?: { id: number } }).authUser?.id }),
+  (_req, res) => res.json({ userId: (_req as typeof _req & { authUser?: { id: string } }).authUser?.id }),
 );
 app.get(
   "/guarded",
@@ -29,6 +29,9 @@ app.get(
   requirePermission("workflow:act"),
   (_req, res) => res.json({ ok: true }),
 );
+
+// A UUID string used as the sub in these tests
+const ALICE_ID = "01910000-0000-7000-0000-000000000042";
 
 describe("requireAuth middleware (F1/F14)", () => {
   it("returns 401 when no Authorization header is present", async () => {
@@ -45,17 +48,17 @@ describe("requireAuth middleware (F1/F14)", () => {
   });
 
   it("returns 200 and populates req.authUser for a valid token", async () => {
-    const token = signToken({ sub: 42, username: "alice" }, SECRET);
+    const token = signToken({ sub: ALICE_ID, username: "alice" }, SECRET);
     const res = await request(app)
       .get("/protected")
       .set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.userId).toBe(42);
+    expect(res.body.userId).toBe(ALICE_ID);
   });
 
   it("populates req.authUser.permissions from the JWT permissions claim", async () => {
     const token = signToken(
-      { sub: 7, username: "bob", permissions: ["workflow:act", "case:read"] } as Parameters<typeof signToken>[0],
+      { sub: "01910000-0000-7000-0000-000000000007", username: "bob", permissions: ["workflow:act", "case:read"] } as Parameters<typeof signToken>[0],
       SECRET,
     );
     const app2 = express();
@@ -74,7 +77,7 @@ describe("requireAuth middleware (F1/F14)", () => {
 
   it("returns 403 when authenticated user lacks the required permission", async () => {
     const token = signToken(
-      { sub: 9, username: "charlie", permissions: [] } as Parameters<typeof signToken>[0],
+      { sub: "01910000-0000-7000-0000-000000000009", username: "charlie", permissions: [] } as Parameters<typeof signToken>[0],
       SECRET,
     );
     const res = await request(app)
@@ -86,7 +89,7 @@ describe("requireAuth middleware (F1/F14)", () => {
 
   it("returns 200 when authenticated user has the required permission", async () => {
     const token = signToken(
-      { sub: 10, username: "dana", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
+      { sub: "01910000-0000-7000-0000-000000000010", username: "dana", permissions: ["workflow:act"] } as Parameters<typeof signToken>[0],
       SECRET,
     );
     const res = await request(app)

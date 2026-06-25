@@ -42,7 +42,8 @@ describe("raiseAlert", () => {
       },
     );
 
-    expect(out.alertId).toBeGreaterThan(0);
+    expect(typeof out.alertId).toBe("string");
+    expect(out.alertId.length).toBe(36);
     const alert = await knex("alerts").where({ id: out.alertId }).first();
     expect(alert.level).toBe("critical");
     expect(alert.title).toBe("CID expiring in 5 day(s)");

@@ -1,4 +1,5 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import type { SearchBackend } from "./SearchBackend.js";
 import type { SearchDoc, SearchQuery, SearchResults, SearchScope, SearchHit } from "@zordms/types";
 import { buildTokensForDoc } from "../query/tokenize.js";
@@ -27,7 +28,7 @@ export class SqlSearchBackend implements SearchBackend {
   async index(doc: SearchDoc): Promise<void> {
     const row = this.rowFor(doc);
     await this.knex("search_index").where({ doc_id: row.doc_id }).del();
-    await this.knex("search_index").insert(row);
+    await this.knex("search_index").insert({ id: newId(), ...row });
   }
 
   async bulkIndex(docs: SearchDoc[]): Promise<void> {

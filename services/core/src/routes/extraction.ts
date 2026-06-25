@@ -31,33 +31,31 @@ import { mapExtractedToDocument } from "../ai/field_mapper.js";
 import { buildNewTypeSuggestion } from "../ai/suggest_type.js";
 import { EVENTS } from "../events/index.js";
 import { findDuplicates, getDedupConfig } from "../repo/duplicates.js";
+import { newId } from "@zordms/db";
 import type { Knex } from "knex";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function idOf(inserted: unknown): number {
-  const x = (inserted as unknown[])[0];
-  return typeof x === "object" && x !== null ? (x as { id: number }).id : (x as number);
-}
-
-async function ensureFolderChain(knex: Knex, path: string, createdBy: string): Promise<number> {
+async function ensureFolderChain(knex: Knex, path: string, createdBy: string): Promise<string> {
   const clean = path.replace(/\/+$/, "");
   const segments = clean.split("/").filter(Boolean).slice(1); // drop "BoB"
-  let parentId: number | null = null;
+  let parentId: string | null = null;
   let currentPath = "/BoB";
-  let leafId = 0;
+  let leafId = "";
   for (const seg of segments) {
     currentPath = `${currentPath}/${seg}`;
     let folder = await knex("folders").where({ path: currentPath }).first();
     if (!folder) {
-      const inserted = await knex("folders").insert({
+      const id = newId();
+      await knex("folders").insert({
+        id,
         name: seg,
         parent_id: parentId,
         path: currentPath,
         domain: domainForPath(currentPath),
         created_by: createdBy,
-      }).returning("id");
-      folder = { id: idOf(inserted) };
+      });
+      folder = { id };
     }
     parentId = folder.id;
     leafId = folder.id;
@@ -83,8 +81,8 @@ function extractBearerToken(authHeader: string | undefined): string {
  */
 async function appendVersionToExisting(
   knex: Knex,
-  originalDocId: number,
-  dupeDoc: { id: number; file_hash_sha256: string; current_version: number; file_size_bytes: number },
+  originalDocId: string,
+  dupeDoc: { id: string; file_hash_sha256: string; current_version: number; file_size_bytes: number },
   storageKey: string,
   createdBy: string,
 ): Promise<void> {
@@ -101,6 +99,7 @@ async function appendVersionToExisting(
     const nextVer = Number(maxRow[0]?.m ?? 0) + 1;
 
     await tx("document_versions").insert({
+      id: newId(),
       document_id: originalDocId,
       version_no: nextVer,
       storage_key: storageKey,
@@ -130,7 +129,7 @@ export function extractionRouter(): Router {
    */
   r.post("/:id/extract", requirePermission("document:index"), async (req, res) => {
     const deps = req.app.locals.deps as CoreDeps;
-    const docId = Number(req.params.id);
+    const docId = req.params.id;
     const viewer = makeViewer(req);
     const bearer = extractBearerToken(req.headers.authorization);
     const callerUsername = req.authUser!.username;
@@ -197,7 +196,7 @@ export function extractionRouter(): Router {
 
       // ── 7. Auto-map folder ─────────────────────────────────────────────────
       const folderPath = resolvePath(classifyResult.doc_type, fields);
-      let folderId: number | null = null;
+      let folderId: string | null = null;
       let mapPath: string | null = folderPath;
       let mapAcls: unknown[] = [];
       try {

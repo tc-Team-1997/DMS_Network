@@ -6,31 +6,29 @@ import { resolvePath, defaultAcls, domainForPath } from "../mapper/directory.js"
 import { ROOT_PATH } from "../repo/folders.js";
 import { setFolderAcls, effectiveAcls } from "../repo/acls.js";
 import { getDocument } from "../repo/documents.js";
-
-function idOf(inserted: unknown): number {
-  const x = (inserted as unknown[])[0];
-  return typeof x === "object" && x !== null ? (x as { id: number }).id : (x as number);
-}
+import { newId } from "@zordms/db";
 
 // Ensures every segment of `path` (relative to /BoB) exists; returns the leaf folder id.
-async function ensureFolderChain(knex: Knex, path: string, createdBy: string): Promise<number> {
+async function ensureFolderChain(knex: Knex, path: string, createdBy: string): Promise<string> {
   const clean = path.replace(/\/+$/, ""); // strip trailing slash
   const segments = clean.split("/").filter(Boolean).slice(1); // drop "BoB"
-  let parentId: number | null = null;
+  let parentId: string | null = null;
   let currentPath = ROOT_PATH;
-  let leafId = 0;
+  let leafId = "";
   for (const seg of segments) {
     currentPath = `${currentPath}/${seg}`;
     let folder = await knex("folders").where({ path: currentPath }).first();
     if (!folder) {
-      const inserted = await knex("folders").insert({
+      const id = newId();
+      await knex("folders").insert({
+        id,
         name: seg,
         parent_id: parentId,
         path: currentPath,
         domain: domainForPath(currentPath),
         created_by: createdBy,
-      }).returning("id");
-      folder = { id: idOf(inserted) };
+      });
+      folder = { id };
     }
     parentId = folder.id;
     leafId = folder.id;
@@ -46,7 +44,7 @@ export function mapperRouter(): Router {
     try {
       const deps = req.app.locals.deps as CoreDeps;
       // C1: pass viewer so branch-isolation is enforced
-      const document = await getDocument(deps.knex, Number(req.params.documentId), makeViewer(req));
+      const document = await getDocument(deps.knex, req.params.documentId, makeViewer(req));
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
 
       const path = resolvePath(req.body.docType, req.body.fields ?? {});

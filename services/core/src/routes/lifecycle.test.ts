@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import { makeTestApp } from "../testutil.js";
+import { newId } from "@zordms/db";
 
 const h = await makeTestApp();
 afterAll(async () => { await h.cleanup(); });
@@ -8,11 +9,12 @@ afterAll(async () => { await h.cleanup(); });
 describe("GET /lifecycle/:docId", () => {
   it("returns the lifecycle trace for a document", async () => {
     const token = await h.tokenFor("admin");
-    const ins = await h.knex("documents").insert({
+    const docId = newId();
+    await h.knex("documents").insert({
+      id: docId,
       title: "LifecycleDoc", doc_no: "L9", doc_type: "LETTER", cid: "7", branch: "THI001",
       file_hash_sha256: "z", status: "Indexed", source_channel: "UPLOAD", page_count: 1, file_size_bytes: 0, current_version: 1,
-    }).returning("id");
-    const docId = typeof ins[0] === "object" ? (ins[0] as any).id : ins[0];
+    });
 
     const res = await request(h.app).get(`/lifecycle/${docId}`).set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
@@ -22,11 +24,11 @@ describe("GET /lifecycle/:docId", () => {
 
   it("returns 404 for a non-existent document", async () => {
     const token = await h.tokenFor("admin");
-    const res = await request(h.app).get("/lifecycle/999999").set("Authorization", `Bearer ${token}`);
+    const res = await request(h.app).get("/lifecycle/018f4e3a-0000-7000-0000-000000000000").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);
   });
 
   it("401 without a token", async () => {
-    expect((await request(h.app).get("/lifecycle/1")).status).toBe(401);
+    expect((await request(h.app).get("/lifecycle/018f4e3a-0000-7000-0000-000000000001")).status).toBe(401);
   });
 });

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { SaveSearchRequest, SearchQuery } from "@zordms/types";
 import { isSearchQuery } from "@zordms/types";
@@ -16,10 +17,10 @@ export function savedRouter(): Router {
       const body = req.body as SaveSearchRequest;
       if (!body?.name || !body?.query) { res.status(400).json({ error: "invalid_saved_search" }); return; }
       const visibility = body.visibility === "public" ? "public" : "private";
-      const [id] = await knex("saved_searches").insert({
-        user_id: req.authUser!.id, name: body.name, query_json: JSON.stringify(body.query), visibility,
-      }).returning("id");
-      const savedId = typeof id === "object" ? (id as any).id : id;
+      const savedId = newId();
+      await knex("saved_searches").insert({
+        id: savedId, user_id: req.authUser!.id, name: body.name, query_json: JSON.stringify(body.query), visibility,
+      });
       res.status(201).json({ id: savedId, user_id: req.authUser!.id, name: body.name, query_json: body.query, visibility });
     } catch (err) { next(err); }
   });

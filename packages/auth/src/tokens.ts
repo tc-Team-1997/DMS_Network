@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 
 export interface TokenPayload {
-  sub: number;
+  sub: string;
   username: string;
   // Optional RBAC claims embedded by the gateway at login so that downstream
   // microservices can authorize from the token without a shared user DB.
@@ -24,5 +24,5 @@ export function verifyToken(token: string, secret: string): TokenPayload {
   if (decoded.sub == null || decoded.username == null) {
     throw new Error("invalid token payload: missing fields");
   }
-  return { sub: Number(decoded.sub), username: String(decoded.username) };
+  return { sub: String(decoded.sub), username: String(decoded.username) };
 }

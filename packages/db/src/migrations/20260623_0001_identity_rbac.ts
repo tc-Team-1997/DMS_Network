@@ -2,7 +2,7 @@ import type { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema.createTable("users", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("username", 100).notNullable().unique();
     t.string("password_hash", 255).notNullable();
     t.string("full_name", 200);
@@ -17,33 +17,33 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("roles", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("name", 80).notNullable().unique();
     t.string("description", 255);
     t.boolean("system").notNullable().defaultTo(false);
   });
 
   await knex.schema.createTable("permissions", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("key", 120).notNullable().unique(); // resource:action
     t.string("description", 255);
   });
 
   await knex.schema.createTable("role_permissions", (t) => {
-    t.integer("role_id").notNullable().references("id").inTable("roles").onDelete("CASCADE");
-    t.integer("permission_id").notNullable().references("id").inTable("permissions").onDelete("CASCADE");
+    t.string("role_id", 36).notNullable().references("id").inTable("roles").onDelete("CASCADE");
+    t.string("permission_id", 36).notNullable().references("id").inTable("permissions").onDelete("CASCADE");
     t.primary(["role_id", "permission_id"]);
   });
 
   await knex.schema.createTable("user_roles", (t) => {
-    t.integer("user_id").notNullable().references("id").inTable("users").onDelete("CASCADE");
-    t.integer("role_id").notNullable().references("id").inTable("roles").onDelete("CASCADE");
+    t.string("user_id", 36).notNullable().references("id").inTable("users").onDelete("CASCADE");
+    t.string("role_id", 36).notNullable().references("id").inTable("roles").onDelete("CASCADE");
     t.primary(["user_id", "role_id"]);
   });
 
   await knex.schema.createTable("audit_log", (t) => {
-    t.increments("id").primary();
-    t.integer("actor_id");
+    t.string("id", 36).notNullable().primary();
+    t.string("actor_id", 36);
     t.string("actor_username", 100);
     t.string("action", 80).notNullable();
     t.string("entity", 80);

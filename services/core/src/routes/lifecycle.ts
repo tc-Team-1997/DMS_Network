@@ -9,7 +9,7 @@ export function lifecycleRouter(): Router {
   r.get("/:docId", requirePermission("document:read"), async (req, res) => {
     try {
       const { knex } = req.app.locals.deps as CoreDeps;
-      res.json({ trace: await buildLifecycleTrace(knex, Number(req.params.docId)) });
+      res.json({ trace: await buildLifecycleTrace(knex, req.params.docId) });
     } catch (err: any) {
       res.status(404).json({ error: String(err.message ?? err) });
     }

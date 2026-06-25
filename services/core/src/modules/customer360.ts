@@ -1,5 +1,6 @@
 import type { Knex } from "knex";
 import type { CustomerProfile, KycRequirement } from "@zordms/types";
+import { newId } from "@zordms/db";
 
 // CBE-style KYC requirement set
 const REQUIREMENTS: Array<{ key: string; label: string; accepts: string[] }> = [
@@ -45,6 +46,7 @@ export async function buildCustomerProfile(knex: Knex, cid: string): Promise<Cus
   // Auto-escalation hook
   if (kyc.escalated) {
     await knex("audit_log").insert({
+      id: newId(),
       action: "KYC_ESCALATION", entity: "customer", entity_id: cid,
       details: `KYC completeness ${(kyc.completeness * 100).toFixed(0)}% — below 50% threshold`,
     });

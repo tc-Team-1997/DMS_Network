@@ -19,7 +19,7 @@ const STATUS_RANK: Record<string, number> = {
   Disposed: 4,  // disposal
 };
 
-export async function buildLifecycleTrace(knex: Knex, docId: number): Promise<LifecycleTrace> {
+export async function buildLifecycleTrace(knex: Knex, docId: string): Promise<LifecycleTrace> {
   const doc = await knex("documents").where({ id: docId }).first();
   if (!doc) throw new Error(`document ${docId} not found`);
 
@@ -69,7 +69,7 @@ export async function buildLifecycleTrace(knex: Knex, docId: number): Promise<Li
   }
 
   return {
-    document_id: docId, doc_no: doc.doc_no ?? undefined, doc_type: doc.doc_type ?? "",
+    document_id: docId as unknown as number, doc_no: doc.doc_no ?? undefined, doc_type: doc.doc_type ?? "",
     stages, versions, funnel: funnelCounts,
   };
 }

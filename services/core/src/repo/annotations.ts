@@ -1,10 +1,11 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 export type AnnotationKind = "note" | "highlight" | "redaction" | "stamp";
 
 export interface Annotation {
-  id: number;
-  document_id: number;
+  id: string;
+  document_id: string;
   page: number;
   kind: AnnotationKind;
   x: number;
@@ -19,14 +20,9 @@ export interface Annotation {
 
 const KINDS: AnnotationKind[] = ["note", "highlight", "redaction", "stamp"];
 
-function idOf(inserted: unknown): number {
-  const x = (inserted as unknown[])[0];
-  return typeof x === "object" && x !== null ? (x as { id: number }).id : (x as number);
-}
-
 export async function createAnnotation(
   knex: Knex,
-  docId: number,
+  docId: string,
   args: {
     kind: AnnotationKind;
     page: number;
@@ -40,7 +36,9 @@ export async function createAnnotation(
   },
 ): Promise<Annotation> {
   if (!KINDS.includes(args.kind)) throw new Error(`invalid_kind:${args.kind}`);
-  const inserted = await knex("annotations").insert({
+  const id = newId();
+  await knex("annotations").insert({
+    id,
     document_id: docId,
     kind: args.kind,
     page: args.page,
@@ -51,16 +49,15 @@ export async function createAnnotation(
     content: args.content ?? null,
     color: args.color ?? null,
     created_by: args.createdBy ?? null,
-  }).returning("id");
-  const id = idOf(inserted);
+  });
   return (await knex("annotations").where({ id }).first()) as Annotation;
 }
 
-export async function listAnnotations(knex: Knex, docId: number): Promise<Annotation[]> {
+export async function listAnnotations(knex: Knex, docId: string): Promise<Annotation[]> {
   return (await knex("annotations").where({ document_id: docId }).orderBy("id")) as Annotation[];
 }
 
-export async function deleteAnnotation(knex: Knex, id: number, documentId: number): Promise<boolean> {
+export async function deleteAnnotation(knex: Knex, id: string, documentId: string): Promise<boolean> {
   // C4: enforce document_id ownership to prevent cross-document IDOR
   const deleted = await knex("annotations").where({ id, document_id: documentId }).del();
   return deleted > 0;

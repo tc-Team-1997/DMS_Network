@@ -4,7 +4,7 @@ export interface AuthorityDecision {
 }
 
 export interface AuthorityClient {
-  check(userId: number, permissions: string[]): Promise<AuthorityDecision>;
+  check(userId: string, permissions: string[]): Promise<AuthorityDecision>;
 }
 
 export interface AuthorityOptions {

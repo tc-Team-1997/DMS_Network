@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import { buildServiceKnex } from "@zordms/db";
+import { buildServiceKnex, newId } from "@zordms/db";
 import { loadConfig } from "@zordms/config";
 import { signToken } from "@zordms/auth";
 import { ChannelRegistry } from "../channels/registry.js";
@@ -31,8 +31,8 @@ beforeAll(async () => {
   const admin = await knex("users").where({ username: "admin" }).first();
   adminToken = signToken({ sub: admin.id, username: "admin", roles: ["CDO"], permissions: CDO_PERMISSIONS, branch: "HQ" }, "t");
   await knex("alerts").insert([
-    { level: "critical", title: "Expiry A", meta: "{}", is_read: false },
-    { level: "info", title: "Info B", meta: "{}", is_read: false },
+    { id: newId(), level: "critical", title: "Expiry A", meta: "{}", is_read: false },
+    { id: newId(), level: "info", title: "Info B", meta: "{}", is_read: false },
   ]);
 });
 afterAll(async () => { await knex.destroy(); });

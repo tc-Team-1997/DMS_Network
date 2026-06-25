@@ -31,7 +31,7 @@ beforeAll(async () => {
   adminToken = signToken({ sub: admin.id, username: "admin", permissions: ALL_PERMISSIONS, roles: ["CDO"] }, "t");
 
   // IMPORTANT-4: a non-admin Viewer — has document:read but NOT admin:access (claims-based)
-  viewerToken = signToken({ sub: 200, username: "viewerReindex", permissions: ["document:read"], roles: ["Viewer"], branch: "Thimphu" }, "t");
+  viewerToken = signToken({ sub: "019400000000700000000000003", username: "viewerReindex", permissions: ["document:read"], roles: ["Viewer"], branch: "Thimphu" }, "t");
 });
 afterAll(async () => { await knex.destroy(); });
 

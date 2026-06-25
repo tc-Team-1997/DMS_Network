@@ -1,5 +1,6 @@
 import type { Knex } from "knex";
 import { hashPassword } from "@zordms/auth";
+import { newId } from "@zordms/db";
 
 const PERMISSIONS: Array<[string, string]> = [
   ["user:create", "Create users"],
@@ -303,14 +304,14 @@ export async function seed(knex: Knex): Promise<void> {
   // permissions (idempotent)
   for (const [key, description] of PERMISSIONS) {
     const exists = await knex("permissions").where({ key }).first();
-    if (!exists) await knex("permissions").insert({ key, description });
+    if (!exists) await knex("permissions").insert({ id: newId(), key, description });
   }
 
   // roles + role_permissions (idempotent)
   for (const [name, perms] of Object.entries(ROLES)) {
     let role = await knex("roles").where({ name }).first();
     if (!role) {
-      await knex("roles").insert({ name, description: `${name} role`, system: true });
+      await knex("roles").insert({ id: newId(), name, description: `${name} role`, system: true });
       role = await knex("roles").where({ name }).first();
     }
     for (const key of perms) {
@@ -326,7 +327,9 @@ export async function seed(knex: Knex): Promise<void> {
   const userCount = Number((await knex("users").count<{ c: number }[]>("id as c"))[0].c);
   if (userCount === 0) {
     const password_hash = await hashPassword("admin123");
+    const adminId = newId();
     await knex("users").insert({
+      id: adminId,
       username: "admin",
       password_hash,
       full_name: "System Administrator",
@@ -343,12 +346,12 @@ export async function seed(knex: Knex): Promise<void> {
   // alert rules — idempotent on `name` (natural key)
   for (const rule of SAMPLE_RULES) {
     const exists = await knex("alert_rules").where({ name: rule.name }).first();
-    if (!exists) await knex("alert_rules").insert(rule);
+    if (!exists) await knex("alert_rules").insert({ id: newId(), ...rule });
   }
 
   // alerts — seed only when table is empty (tests insert their own rows)
   const alertCount = Number((await knex("alerts").count<{ c: number }[]>("id as c"))[0].c);
   if (alertCount === 0) {
-    for (const alert of SAMPLE_ALERTS) await knex("alerts").insert(alert);
+    for (const alert of SAMPLE_ALERTS) await knex("alerts").insert({ id: newId(), ...alert });
   }
 }

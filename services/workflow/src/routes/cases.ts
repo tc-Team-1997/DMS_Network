@@ -4,6 +4,7 @@ import { compileTemplate } from "../engine/compileTemplate.js";
 import { writeAudit } from "../audit.js";
 import type { EventBus } from "../events.js";
 import { requireAuth, requirePermission, asyncHandler } from "@zordms/auth";
+import { newId } from "@zordms/db";
 
 const CASE_TYPES = ["KYC", "Loan", "Account", "AML"];
 
@@ -24,11 +25,11 @@ async function insertAndFetch<T extends Record<string, unknown>>(
 
 async function instantiateWorkflow(
   knex: Knex,
-  templateId: number,
+  templateId: string,
   title: string,
-  createdByUserId?: number,
+  createdByUserId?: string,
   createdByUsername?: string,
-): Promise<number | null> {
+): Promise<string | null> {
   const tpl = await knex("workflow_templates").where({ id: templateId }).first();
   if (!tpl) return null;
   const steps = compileTemplate(tpl.steps_json);
@@ -38,11 +39,13 @@ async function instantiateWorkflow(
     (await knex("workflows").count<{ c: number }[]>("id as c"))[0].c,
   );
   const refCode = `WF-${count + 1}`;
+  const wfId = newId();
   // F7: insert-then-refetch
-  const wf = await insertAndFetch<{ id: number }>(
+  await insertAndFetch<{ id: string }>(
     knex,
     "workflows",
     {
+      id: wfId,
       ref_code: refCode,
       title,
       template_id: templateId,
@@ -57,10 +60,10 @@ async function instantiateWorkflow(
     "ref_code",
     refCode,
   );
-  const wfId = wf.id;
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     await knex("workflow_steps").insert({
+      id: newId(),
       workflow_id: wfId,
       seq: i + 1,
       name: s.name,
@@ -96,7 +99,7 @@ export function casesRouter(): Router {
         title: string;
         assigned_to?: string;
         due_at?: string;
-        template_id?: number;
+        template_id?: string;
         doc_confidence?: number;
         created_by?: string;
       };
@@ -122,7 +125,7 @@ export function casesRouter(): Router {
       const actorId = req.authUser?.id;
       const actorUsername = req.authUser?.username;
 
-      let workflowId: number | null = null;
+      let workflowId: string | null = null;
       if (body.template_id) {
         try {
           workflowId = await instantiateWorkflow(
@@ -142,6 +145,7 @@ export function casesRouter(): Router {
         }
       }
 
+      const caseId = newId();
       // F7: insert-then-refetch
       let created: Record<string, unknown>;
       try {
@@ -149,6 +153,7 @@ export function casesRouter(): Router {
           knex,
           "cases",
           {
+            id: caseId,
             case_ref: caseRef,
             case_type: body.case_type,
             title: body.title,
@@ -175,11 +180,11 @@ export function casesRouter(): Router {
         actor_username: actorUsername,
         action: "CASE_CREATE",
         entity: "case",
-        entity_id: String((created as { id: number }).id),
+        entity_id: String((created as { id: string }).id),
         details: caseRef,
       });
       await events?.emit("case.created", {
-        id: (created as { id: number }).id,
+        id: (created as { id: string }).id,
         case_ref: caseRef,
         case_type: body.case_type,
       });
@@ -200,20 +205,22 @@ export function casesRouter(): Router {
         res.status(400).json({ error: "doc_id_required" });
         return;
       }
-      const exists = await knex("cases").where({ id: req.params.id }).first();
+      const caseId = req.params.id;
+      const exists = await knex("cases").where({ id: caseId }).first();
       if (!exists) {
         res.status(404).json({ error: "case_not_found" });
         return;
       }
-      // F7: insert-then-refetch (use composite key since doc_id+case_id is unique enough)
+      const docId = newId();
       await knex("case_documents").insert({
-        case_id: Number(req.params.id),
+        id: docId,
+        case_id: caseId,
         doc_id,
         label,
       });
       const doc = await knex("case_documents")
-        .where({ case_id: Number(req.params.id), doc_id })
-        .orderBy("id", "desc")
+        .where({ case_id: caseId, doc_id })
+        .orderBy("attached_at", "desc")
         .first();
       res.status(201).json({ document: doc });
     }),

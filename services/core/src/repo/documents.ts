@@ -1,12 +1,13 @@
 import type { Knex } from "knex";
 import type { StorageBackend } from "../storage/index.js";
 import { type EventBus, EVENTS } from "../events/index.js";
+import { newId } from "@zordms/db";
 
 export interface CaptureDeps { knex: Knex; storage: StorageBackend; events: EventBus; }
 
 export interface DocumentRecord {
-  id: number;
-  folder_id?: number | null;
+  id: string;
+  folder_id?: string | null;
   title: string;
   original_filename?: string;
   mime_type?: string;
@@ -35,8 +36,8 @@ export interface DocumentRecord {
 }
 
 export interface DocumentVersion {
-  id: number;
-  document_id: number;
+  id: string;
+  document_id: string;
   version_no: number;
   storage_key: string;
   file_hash_sha256: string;
@@ -45,11 +46,6 @@ export interface DocumentVersion {
   created_by?: string;
   comment?: string;
   created_at?: string;
-}
-
-function idOf(inserted: unknown): number {
-  const x = (inserted as unknown[])[0];
-  return typeof x === "object" && x !== null ? (x as { id: number }).id : (x as number);
 }
 
 export async function captureDocument(
@@ -62,11 +58,13 @@ export async function captureDocument(
     branch?: string;
     ingestUserId?: string;
     sourceChannel?: string;
-    folderId?: number | null;
+    folderId?: string | null;
   },
 ): Promise<DocumentRecord> {
   const stored = await deps.storage.put(args.buffer);
-  const insertedDoc = await deps.knex("documents").insert({
+  const docId = newId();
+  await deps.knex("documents").insert({
+    id: docId,
     folder_id: args.folderId ?? null,
     title: args.title,
     original_filename: args.filename,
@@ -79,10 +77,10 @@ export async function captureDocument(
     file_size_bytes: stored.size,
     branch: args.branch ?? null,
     status: "Active",
-  }).returning("id");
-  const docId = idOf(insertedDoc);
+  });
 
   await deps.knex("document_versions").insert({
+    id: newId(),
     document_id: docId,
     version_no: 1,
     storage_key: stored.key,
@@ -110,7 +108,7 @@ export async function listDocuments(
 
 export async function getDocument(
   knex: Knex,
-  id: number,
+  id: string,
   viewer?: { branch?: string; canCrossBranch: boolean },
 ): Promise<DocumentRecord | undefined> {
   // C1: branch-aware fetch; fail-closed when viewer has no branch and no crossbranch:read
@@ -130,11 +128,11 @@ function normalizeDoc(row: Record<string, unknown>): DocumentRecord {
   return { ...row, review_flag: Boolean(row.review_flag) } as DocumentRecord;
 }
 
-export async function softDeleteDocument(knex: Knex, id: number): Promise<void> {
+export async function softDeleteDocument(knex: Knex, id: string): Promise<void> {
   await knex("documents").where({ id }).update({ status: "Deleted" });
 }
 
-export async function currentVersion(knex: Knex, id: number): Promise<DocumentVersion | undefined> {
+export async function currentVersion(knex: Knex, id: string): Promise<DocumentVersion | undefined> {
   const doc = await knex("documents").where({ id }).first();
   if (!doc) return undefined;
   return (await knex("document_versions").where({ document_id: id, version_no: doc.current_version }).first()) as DocumentVersion | undefined;

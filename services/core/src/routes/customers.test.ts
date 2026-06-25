@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import { makeTestApp } from "../testutil.js";
+import { newId } from "@zordms/db";
 
 const h = await makeTestApp();
 afterAll(async () => { await h.cleanup(); });
@@ -9,6 +10,7 @@ describe("GET /customers/:cid", () => {
   it("returns a 360 profile with kyc scoring", async () => {
     const token = await h.tokenFor("admin");
     await h.knex("documents").insert({
+      id: newId(),
       title: "CID Doc", doc_no: "D9", doc_type: "BT_CID_4G", cid: "20098765432",
       branch: "PAR002", file_hash_sha256: "hx", status: "Active",
       source_channel: "UPLOAD", page_count: 1, file_size_bytes: 0, current_version: 1,

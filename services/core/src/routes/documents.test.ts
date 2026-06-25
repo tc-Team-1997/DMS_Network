@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import { makeTestApp } from "../testutil.js";
+import { newId } from "@zordms/db";
 
 const h = await makeTestApp();
 afterAll(async () => { await h.cleanup(); });
@@ -14,6 +15,8 @@ describe("documents routes", () => {
       .attach("file", Buffer.from("file-bytes-here"), "cid.png");
     expect(up.status).toBe(201);
     const id = up.body.document.id;
+    expect(typeof id).toBe("string");
+    expect(id).toHaveLength(36);
     expect(up.body.document.file_hash_sha256).toHaveLength(64);
 
     const list = await request(h.app).get("/documents").set("Authorization", `Bearer ${token}`);
@@ -41,8 +44,8 @@ describe("documents routes", () => {
 
     // create a Viewer user (document:read but not document:delete)
     const viewerRole = await h.knex("roles").where({ name: "Viewer" }).first();
-    const inserted = await h.knex("users").insert({ username: "v_del", password_hash: "x", status: "Active", branch: "Thimphu" }).returning("id");
-    const vid = typeof inserted[0] === "object" ? (inserted[0] as any).id : inserted[0];
+    const vid = newId();
+    await h.knex("users").insert({ id: vid, username: "v_del", password_hash: "x", status: "Active", branch: "Thimphu" });
     await h.knex("user_roles").insert({ user_id: vid, role_id: viewerRole.id });
     const vToken = await h.tokenFor("v_del");
 

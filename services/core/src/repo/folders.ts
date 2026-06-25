@@ -1,10 +1,11 @@
 import type { Knex } from "knex";
+import { newId } from "@zordms/db";
 
 export const ROOT_PATH = "/BoB";
 
 export interface FolderNode {
-  id: number;
-  parent_id?: number | null;
+  id: string;
+  parent_id?: string | null;
   name: string;
   path: string;
   domain?: string;
@@ -13,15 +14,10 @@ export interface FolderNode {
   children: FolderNode[];
 }
 
-function idOf(inserted: unknown): number {
-  const x = (inserted as unknown[])[0];
-  return typeof x === "object" && x !== null ? (x as { id: number }).id : (x as number);
-}
-
 export async function createFolder(
   knex: Knex,
-  args: { name: string; parentId?: number | null; domain?: string; createdBy?: string },
-): Promise<{ id: number; parent_id?: number | null; name: string; path: string; domain?: string; created_by?: string; created_at?: string }> {
+  args: { name: string; parentId?: string | null; domain?: string; createdBy?: string },
+): Promise<{ id: string; parent_id?: string | null; name: string; path: string; domain?: string; created_by?: string; created_at?: string }> {
   let path = `${ROOT_PATH}/${args.name}`;
   if (args.parentId != null) {
     const parent = await knex("folders").where({ id: args.parentId }).first();
@@ -31,17 +27,18 @@ export async function createFolder(
   const existing = await knex("folders").where({ path }).first();
   if (existing) throw new Error(`duplicate_path:${path}`);
 
-  const inserted = await knex("folders").insert({
+  const id = newId();
+  await knex("folders").insert({
+    id,
     name: args.name, parent_id: args.parentId ?? null, path,
     domain: args.domain ?? null, created_by: args.createdBy ?? null,
-  }).returning("id");
-  const id = idOf(inserted);
+  });
   return knex("folders").where({ id }).first();
 }
 
 export async function listTree(knex: Knex): Promise<FolderNode[]> {
   const rows = (await knex("folders").select("*").orderBy("path")) as FolderNode[];
-  const byId = new Map<number, FolderNode>();
+  const byId = new Map<string, FolderNode>();
   for (const r of rows) byId.set(r.id, { ...r, children: [] });
   const roots: FolderNode[] = [];
   for (const node of byId.values()) {
@@ -56,9 +53,9 @@ export async function listTree(knex: Knex): Promise<FolderNode[]> {
 
 export async function moveFolder(
   knex: Knex,
-  id: number,
-  newParentId: number,
-): Promise<{ id: number; parent_id?: number | null; name: string; path: string }> {
+  id: string,
+  newParentId: string,
+): Promise<{ id: string; parent_id?: string | null; name: string; path: string }> {
   const node = await knex("folders").where({ id }).first();
   if (!node) throw new Error("not_found");
   const parent = await knex("folders").where({ id: newParentId }).first();

@@ -1,7 +1,7 @@
 import type { Knex } from "knex";
 import type { Recipient } from "../engine/ruleEngine.js";
 
-export interface ResolvedRecipient { channel: "email" | "sms"; address: string; userId?: number; }
+export interface ResolvedRecipient { channel: "email" | "sms"; address: string; userId?: string; }
 
 export async function resolveEscalationRecipients(recipients: Recipient[], deps: { knex: Knex }): Promise<ResolvedRecipient[]> {
   const out: ResolvedRecipient[] = [];

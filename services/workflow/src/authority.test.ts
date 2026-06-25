@@ -13,7 +13,7 @@ describe("authority client", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    const res = await client.check(7, ["document:approve", "workflow:act"]);
+    const res = await client.check("01910000-0000-7000-0000-000000000007", ["document:approve", "workflow:act"]);
 
     expect(res.allowed).toBe(true);
     expect(res.missing).toEqual([]);
@@ -21,7 +21,7 @@ describe("authority client", () => {
       "http://gw:4000/authz/check",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ userId: 7, permissions: ["document:approve", "workflow:act"] }),
+        body: JSON.stringify({ userId: "01910000-0000-7000-0000-000000000007", permissions: ["document:approve", "workflow:act"] }),
       }),
     );
   });
@@ -36,7 +36,7 @@ describe("authority client", () => {
       gatewayUrl: "http://gw:4000",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    const res = await client.check(9, ["document:approve"]);
+    const res = await client.check("01910000-0000-7000-0000-000000000009", ["document:approve"]);
     expect(res.allowed).toBe(false);
     expect(res.missing).toEqual(["document:approve"]);
   });
@@ -51,7 +51,7 @@ describe("authority client", () => {
       gatewayUrl: "http://gw:4000",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    await expect(client.check(1, ["workflow:act"])).rejects.toThrow(/authz_check_failed/);
+    await expect(client.check("01910000-0000-7000-0000-000000000001", ["workflow:act"])).rejects.toThrow(/authz_check_failed/);
   });
 
   it("F3: sends x-internal-token header when internalServiceToken is configured", async () => {
@@ -66,7 +66,7 @@ describe("authority client", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    await client.check(1, ["workflow:act"]);
+    await client.check("01910000-0000-7000-0000-000000000001", ["workflow:act"]);
 
     const callArgs = fetchImpl.mock.calls[0][1] as { headers: Record<string, string> };
     expect(callArgs.headers["x-internal-token"]).toBe("supersecret");
@@ -84,7 +84,7 @@ describe("authority client", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    await client.check(1, ["workflow:act"]);
+    await client.check("01910000-0000-7000-0000-000000000001", ["workflow:act"]);
 
     const callArgs = fetchImpl.mock.calls[0][1] as { headers: Record<string, string> };
     expect(callArgs.headers["x-internal-token"]).toBeUndefined();

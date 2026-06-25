@@ -19,7 +19,7 @@ export async function up(knex: Knex): Promise<void> {
 
   // Branch network
   await knex.schema.createTable("branches", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("code", 40).notNullable().unique();
     t.string("name", 200).notNullable();
     t.string("region", 120);
@@ -29,7 +29,7 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("branch_access", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("source_branch", 40).notNullable();
     t.string("target_branch", 40).notNullable();
     t.string("policy", 10).notNullable().defaultTo("read");
@@ -39,7 +39,7 @@ export async function up(knex: Knex): Promise<void> {
 
   // Records management
   await knex.schema.createTable("retention_policies", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("doc_class", 120).notNullable().unique();
     t.integer("retention_years").notNullable().defaultTo(7);
     t.string("trigger", 60).notNullable().defaultTo("ingest");
@@ -47,7 +47,7 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("legal_holds", (t) => {
-    t.increments("id").primary();
+    t.string("id", 36).notNullable().primary();
     t.string("ref", 80).notNullable().unique();
     t.string("scope", 200).notNullable();
     t.string("status", 20).notNullable().defaultTo("Active");
@@ -58,8 +58,8 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.createTable("disposal_queue", (t) => {
-    t.increments("id").primary();
-    t.integer("document_id").notNullable();
+    t.string("id", 36).notNullable().primary();
+    t.string("document_id", 36).notNullable();
     t.date("destruction_date");
     t.boolean("disposed").notNullable().defaultTo(false);
     t.timestamp("disposed_at");
@@ -68,8 +68,8 @@ export async function up(knex: Knex): Promise<void> {
 
   // Versions table (lightweight alias separate from document_versions for lifecycle/test use)
   await knex.schema.createTable("versions", (t) => {
-    t.increments("id").primary();
-    t.integer("document_id").notNullable();
+    t.string("id", 36).notNullable().primary();
+    t.string("document_id", 36).notNullable();
     t.integer("version_no").notNullable().defaultTo(1);
     t.string("file_hash_sha256", 64).notNullable();
     t.string("created_by", 100);

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
+import { newId } from "@zordms/db";
 import { resolveEscalationRecipients } from "../services/escalation.js";
 import type { ChannelRegistry } from "../channels/registry.js";
 
@@ -35,6 +36,7 @@ export function alertsRouter(): Router {
     for (const rcpt of recipients) {
       const [d] = await registry.dispatch(["email"], { recipient: rcpt.address, subject: `Escalated: ${alert.title}`, body: alert.title });
       await knex("notifications").insert({
+        id: newId(),
         alert_id: alert.id, user_id: rcpt.userId ?? null, channel: "email",
         recipient: rcpt.address, subject: `Escalated: ${alert.title}`, body: alert.title,
         status: d.status, error: d.error ?? null,

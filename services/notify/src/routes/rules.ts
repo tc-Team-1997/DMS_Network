@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
+import { newId } from "@zordms/db";
 import { parseRule } from "../engine/ruleEngine.js";
 
 export function rulesRouter(): Router {
@@ -17,16 +18,15 @@ export function rulesRouter(): Router {
     const { knex } = req.app.locals.deps as { knex: Knex };
     const b = req.body as { name: string; trigger: string; params?: object; channels?: string[]; escalationTarget?: string; scope?: string };
     if (!b.name || !b.trigger) { res.status(400).json({ error: "name_and_trigger_required" }); return; }
-    const inserted = await knex("alert_rules").insert({
+    const id = newId();
+    await knex("alert_rules").insert({
+      id,
       name: b.name, trigger: b.trigger,
       params_json: JSON.stringify(b.params ?? {}),
       channels: JSON.stringify(b.channels ?? []),
       escalation_target: b.escalationTarget ?? null, scope: b.scope ?? null,
       enabled: true, created_by: req.authUser?.username ?? "system",
-    }).returning("id");
-    const id = Array.isArray(inserted)
-      ? (typeof inserted[0] === "object" && inserted[0] !== null ? (inserted[0] as { id: number }).id : inserted[0] as number)
-      : inserted;
+    });
     res.status(201).json({ id });
   });
 

@@ -44,11 +44,11 @@ function canonical(row: Record<string, unknown>): string {
 }
 
 export async function verifyAuditChain(knex: Knex): Promise<ChainVerification> {
-  const rows = await knex("audit_log").select("*").orderBy("id", "asc");
+  const rows = await knex("audit_log").select("*").orderBy("created_at", "asc");
   let prev = "";
   let brokenAt: number | null = null;
   for (let i = 0; i < rows.length; i++) {
-    if (rows[i].id == null || Number.isNaN(Number(rows[i].id))) { brokenAt = i; break; }
+    if (rows[i].id == null) { brokenAt = i; break; }
     const digest = createHash("sha256").update(prev + "|" + canonical(rows[i])).digest("hex");
     prev = digest;
   }
