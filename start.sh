@@ -19,6 +19,10 @@ cd "$ROOT"
 LOGDIR="$ROOT/.devlogs"
 mkdir -p "$LOGDIR"
 
+# Shared secrets so every service (incl. the Python AI) verifies the gateway JWT.
+export JWT_SECRET="${JWT_SECRET:-change-me-in-prod}"
+export INTERNAL_SERVICE_TOKEN="${INTERNAL_SERVICE_TOKEN:-change-me-internal}"
+
 # 1) Free the ports (idempotent start / restart).
 bash "$ROOT/stop.sh"
 
@@ -40,7 +44,7 @@ start_node web         @zordms/web
 # 3) Optional Python AI service (only if its venv has been set up).
 if [ -x "$ROOT/services/ai/.venv/bin/uvicorn" ]; then
   echo "  -> ai (python)"
-  ( cd "$ROOT/services/ai" && exec .venv/bin/uvicorn app.main:app --port 8000 ) > "$LOGDIR/ai.log" 2>&1 &
+  ( cd "$ROOT/services/ai" && exec env SEARCH_URL="http://localhost:4004" .venv/bin/uvicorn zordms_ai.app:create_app --factory --port 8000 ) > "$LOGDIR/ai.log" 2>&1 &
 else
   echo "  -> ai (python)  [skipped — run: cd services/ai && python3 -m venv .venv && .venv/bin/pip install -e '.[dev]']"
 fi

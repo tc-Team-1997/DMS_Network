@@ -39,7 +39,11 @@ def require_auth(
     token = credentials.credentials
     secret: str = request.app.state.settings.jwt_secret
     try:
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        # The gateway issues a numeric `sub` (the user id); PyJWT >=2.10
+        # otherwise rejects it ("Subject must be a string").
+        payload = jwt.decode(
+            token, secret, algorithms=["HS256"], options={"verify_sub": False}
+        )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
