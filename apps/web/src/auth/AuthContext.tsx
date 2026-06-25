@@ -5,6 +5,10 @@ import { api, getToken, setToken, clearToken } from "../api/client.js";
 interface AuthState {
   user: AuthUser | null;
   login: (username: string, password: string, totp?: string) => Promise<void>;
+  /** Adopt a JWT minted elsewhere (SSO redirect handoff, or an LDAP login that
+   *  returns the same internal JWT). The user is rebuilt from the token claims,
+   *  exactly like a page-refresh session restore. */
+  loginWithToken: (token: string, user?: AuthUser | null) => void;
   logout: () => void;
 }
 
@@ -42,9 +46,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(res.user);
   }, []);
 
+  const loginWithToken = useCallback((token: string, providedUser?: AuthUser | null) => {
+    setToken(token);
+    // Prefer an explicit user (e.g. LDAP returns `{ token, user }`); otherwise
+    // derive it from the JWT claims so an OIDC/SAML fragment handoff works.
+    setUser(providedUser ?? userFromToken(token));
+  }, []);
+
   const logout = useCallback(() => { clearToken(); setUser(null); }, []);
 
-  return <Ctx.Provider value={{ user, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, login, loginWithToken, logout }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthState {

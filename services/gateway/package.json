@@ -12,12 +12,15 @@
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.5.0",
+    "@node-saml/node-saml": "^5.1.0",
     "@zordms/auth": "workspace:*",
     "@zordms/config": "workspace:*",
     "@zordms/db": "workspace:*",
     "@zordms/types": "workspace:*",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "ldap-authentication": "^4.0.4",
+    "openid-client": "^6.8.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {

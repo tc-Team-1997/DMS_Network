@@ -1,44 +1,17 @@
-const passport = require('passport');
-const db = require('../db');
+// DEPRECATED — replaced by the enterprise SSO implementation in the gateway.
+//
+// Enterprise SSO (LDAP/AD, OIDC, SAML 2.0) now lives in the TypeScript gateway
+// at services/gateway/src/sso/*. It is purely env-gated (AUTH_LDAP_ENABLED /
+// AUTH_OIDC_ENABLED / AUTH_SAML_ENABLED), mints the SAME internal JWT as local
+// login (claims from resolveUserAuthz), and JIT-provisions local users. See
+// services/gateway/src/sso/index.ts and GET /auth/config.
+//
+// This passport-based stub remained only so the legacy monolith (server.js)
+// could boot; it no longer wires any SSO. configure(app) is now an inert no-op.
 
-function configure(app) {
-  const entryPoint = process.env.SAML_ENTRY_POINT;
-  const issuer = process.env.SAML_ISSUER || 'zordms';
-  const cert = process.env.SAML_IDP_CERT;
-
-  if (!entryPoint || !cert) {
-    console.log('[saml] not configured (set SAML_ENTRY_POINT and SAML_IDP_CERT to enable)');
-    return false;
-  }
-
-  const { Strategy: SamlStrategy } = require('passport-saml');
-  passport.use(new SamlStrategy({
-    path: '/sso/saml/callback',
-    entryPoint,
-    issuer,
-    cert
-  }, (profile, done) => {
-    const email = profile.email || profile.nameID;
-    let user = db.prepare('SELECT * FROM users WHERE username=? OR email=?').get(email, email);
-    if (!user) {
-      db.prepare('INSERT INTO users (username, password, full_name, email, role, branch) VALUES (?,?,?,?,?,?)')
-        .run(email, 'SSO-NOLOGIN', profile.displayName || email, email, 'Viewer', profile.branch || null);
-      user = db.prepare('SELECT * FROM users WHERE username=?').get(email);
-    }
-    done(null, user);
-  }));
-
-  passport.serializeUser((u, d) => d(null, u.id));
-  passport.deserializeUser((id, d) => d(null, db.prepare('SELECT * FROM users WHERE id=?').get(id)));
-
-  app.use(passport.initialize());
-  app.get('/sso/saml', passport.authenticate('saml', { session: false }));
-  app.post('/sso/saml/callback', passport.authenticate('saml', { session: false, failureRedirect: '/login' }), (req, res) => {
-    req.session.user = { id: req.user.id, username: req.user.username, full_name: req.user.full_name, role: req.user.role, branch: req.user.branch };
-    res.redirect('/');
-  });
-  console.log('[saml] SSO enabled at /sso/saml');
-  return true;
+function configure() {
+  console.log("[saml] legacy SAML stub disabled — use the gateway SSO (services/gateway/src/sso, AUTH_SAML_ENABLED)");
+  return false;
 }
 
 module.exports = { configure };

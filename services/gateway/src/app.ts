@@ -5,6 +5,7 @@ import type { AppConfig } from "@zordms/config";
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
 import { authzRouter } from "./routes/authz.js";
+import { ssoRouter } from "./sso/index.js";
 import { buildOpenApiDocument } from "./openapi.js";
 
 export interface AppDeps { knex: Knex; config: AppConfig; }
@@ -14,8 +15,14 @@ export function createApp(deps: AppDeps): Express {
   // Fix 7: restrict CORS to configured origin (env CORS_ORIGIN or dev default)
   app.use(cors({ origin: deps.config.corsOrigin }));
   app.use(express.json());
+  // SAML ACS posts an application/x-www-form-urlencoded SAMLResponse.
+  app.use(express.urlencoded({ extended: false }));
   app.locals.deps = deps;
 
+  // SSO routes mount under /auth alongside local login. The SSO router owns
+  // /auth/config plus the per-provider login/callback routes; disabled providers
+  // self-guard with 404 { error: "provider_disabled" } and never authenticate.
+  app.use("/auth", ssoRouter());
   app.use("/auth", authRouter());
   app.use("/users", usersRouter());
   app.use("/authz", authzRouter());
