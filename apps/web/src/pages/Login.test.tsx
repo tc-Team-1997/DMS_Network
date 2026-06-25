@@ -1,14 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../auth/AuthContext.js";
 import { Login } from "./Login.js";
 
 describe("Login", () => {
+  beforeEach(() => localStorage.clear());
+
   it("renders split-screen with carousel and signs in", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true, json: async () => ({ token: "t", user: { id: 1, username: "admin", roles: ["CDO"], permissions: [] } }),
     }) as any;
-    render(<AuthProvider><Login /></AuthProvider>);
+    render(<MemoryRouter><AuthProvider><Login /></AuthProvider></MemoryRouter>);
     expect(screen.getByRole("heading", { name: /Sign in/i })).toBeInTheDocument();
     expect(screen.getByText(/Capture, classify, index\./i)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Username/i), { target: { value: "admin" } });

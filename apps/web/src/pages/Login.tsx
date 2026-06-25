@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type CSSProperties } from "react";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 import { Carousel, type Slide } from "../components/Carousel.js";
 
@@ -14,7 +15,8 @@ const labelStyle: CSSProperties = { display: "block", fontSize: 12.5, fontWeight
 const inputStyle: CSSProperties = { display: "block", width: "100%", padding: "11px 13px", border: "1px solid #e2e8f0", borderRadius: 9, background: "#fff", color: "#0f172a", fontSize: 14, outline: "none", boxSizing: "border-box" };
 
 export function Login() {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
@@ -27,11 +29,15 @@ export function Login() {
     setBusy(true); setError("");
     try {
       await login(username, password, mfa ? totp : undefined);
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
       if (err?.body?.mfaRequired) { setMfa(true); setError("Enter your authenticator code."); }
       else setError("Invalid credentials.");
     } finally { setBusy(false); }
   }
+
+  // Already signed in (e.g. visiting /login with a live session) → go to the app.
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: "100vh" }}>
