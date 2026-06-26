@@ -292,8 +292,8 @@ export default function Indexing() {
 
   return (
     <div className="fade-up">
-      {/* ── Page Header ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
+      {/* ── Page Header — title hidden (shell renders the section title); keeps actions ── */}
+      <div className="page-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
         <div>
           <h2 className="serif" style={{ fontSize: 24, fontWeight: 700, color: "var(--gold3)", lineHeight: 1 }}>
             Indexing & QA

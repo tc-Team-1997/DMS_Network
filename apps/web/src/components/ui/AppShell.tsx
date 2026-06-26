@@ -29,7 +29,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Intelligence",
     items: [
-      { label: "Executive Dashboard", path: "/dashboard",   icon: <LayoutDashboard size={15} />, permission: "dashboard:read" },
+      { label: "Dashboard",           path: "/dashboard",   icon: <LayoutDashboard size={15} />, permission: "dashboard:read" },
       { label: "Customer 360°",       path: "/customer360", icon: <User size={15} />,            permission: "customer:read" },
     ],
   },

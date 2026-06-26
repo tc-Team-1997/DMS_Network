@@ -48,7 +48,7 @@ test.describe("Web UI", () => {
     // Breadcrumb reflects the current screen (group › label).
     const crumb = page.locator(".topbar-breadcrumb");
     await expect(crumb).toBeVisible();
-    await expect(crumb).toContainText("Executive Dashboard");
+    await expect(crumb).toContainText("Dashboard");
   });
 
   test("RefId id tokens render on the search results", async ({ page }) => {

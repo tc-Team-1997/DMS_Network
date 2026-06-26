@@ -945,8 +945,9 @@ export default function Capture() {
 
   return (
     <div className="fade-up" style={{ paddingBottom: 80 }}>
-      {/* ── Page Header ── */}
+      {/* ── Page Header — title hidden (shell renders the section title); keeps actions ── */}
       <div
+        className="page-header"
         style={{
           display: "flex",
           alignItems: "flex-start",

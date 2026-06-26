@@ -12,6 +12,7 @@ import {
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { useUrlState } from "../hooks/useUrlState.js";
 import { dashboardCaptureApi, type DashboardSummary, type DocumentRecord } from "../api/dashboardCaptureApi.js";
 
 /* ─── Time Period Control ─── */
@@ -347,26 +348,32 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Time period control state
-  const [periodState, setPeriodState] = useState<PeriodState>({
-    period: "month",
-    from: defaultFrom("month"),
-    to: todayStr(),
-  });
+  // Time period control state — backed by URL params so the selected range is
+  // shareable/bookmarkable and deep-links (?period=&from=&to=) are honoured.
+  const [urlState, setUrlState] = useUrlState({ period: "month", from: "", to: "" });
+  const validPeriod: TimePeriod = (["day", "month", "quarter", "year"] as const).includes(urlState.period as TimePeriod)
+    ? (urlState.period as TimePeriod)
+    : "month";
+  const periodState: PeriodState = {
+    period: validPeriod,
+    from: urlState.from || defaultFrom(validPeriod),
+    to: urlState.to || todayStr(),
+  };
+  const setPeriodState = useCallback(
+    (v: PeriodState) => setUrlState({ period: v.period, from: v.from, to: v.to }),
+    [setUrlState],
+  );
 
   // Drill-down panel state
   const [drillDown, setDrillDown] = useState<"category" | "branch" | null>(null);
 
+  const { period: pPeriod, from: pFrom, to: pTo } = periodState;
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       // Pass period/range as query params — backend may ignore them for now
-      const summaryParams = new URLSearchParams({
-        period: periodState.period,
-        from: periodState.from,
-        to: periodState.to,
-      });
+      const summaryParams = new URLSearchParams({ period: pPeriod, from: pFrom, to: pTo });
       const [s, docsResp] = await Promise.all([
         dashboardCaptureApi.dashboardSummaryWithParams(summaryParams.toString()),
         dashboardCaptureApi.listDocuments().catch(() => ({ documents: [] })),
@@ -379,7 +386,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [periodState]);
+  }, [pPeriod, pFrom, pTo]);
 
   useEffect(() => {
     load();

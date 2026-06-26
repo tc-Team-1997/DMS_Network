@@ -550,12 +550,12 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .section-title { margin: 0 0 18px; }
 .section-title h1 {
   margin: 0;
-  font-family: var(--brand-font);
-  font-size: 22px;
-  font-weight: 700;
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 500;
   letter-spacing: .2px;
   color: var(--gold3);
-  line-height: 1.15;
+  line-height: 1.2;
 }
 .section-title p {
   margin: 4px 0 0;
