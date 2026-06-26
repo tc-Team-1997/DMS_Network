@@ -12,6 +12,7 @@ import {
 } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { NotAuthorised } from "../components/NotAuthorised.js";
+import { DocumentPreview } from "../components/DocumentPreview.js";
 import { repositoryViewerApi } from "../api/repositoryViewerApi.js";
 import type { DocumentRecord, Annotation, DocumentVersion, RedactionRegion } from "../api/repositoryViewerApi.js";
 import { actOnWorkflow } from "../api/reviewQueueApi.js";
@@ -826,9 +827,9 @@ export default function Viewer() {
                 Loading document…
               </div>
             ) : doc ? (
-              <div style={{ maxWidth: 480, margin: "0 auto", position: "relative" }}>
-                {/* Document header mockup */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ position: "relative" }}>
+                {/* Doc header strip */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <div style={{ fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "var(--gold)" }}>
                     ZORDMS · {doc.doc_type ?? "DOCUMENT RECORD"}
                   </div>
@@ -839,82 +840,32 @@ export default function Viewer() {
                       borderRadius: 4,
                       padding: "2px 8px",
                       fontSize: 9,
-                      color: doc.status === "Active" ? "var(--G)" : "var(--W)",
+                      color: doc.status === "Active" ? "var(--Gtx)" : "var(--Wtx)",
                     }}
                   >
                     {doc.status.toUpperCase()}
                   </div>
                 </div>
 
-                {/* Title */}
-                <div style={{ height: 12, background: "rgba(15,23,42,.12)", borderRadius: 2, marginBottom: 8, width: "80%" }} />
+                {/* REAL document preview (PDF/image via authenticated blob fetch) */}
+                <DocumentPreview
+                  docId={doc.id}
+                  mimeType={doc.mime_type}
+                  fileName={doc.original_filename ?? doc.title}
+                  height={460}
+                />
 
-                {/* Content lines */}
-                {[100, 70, 90, 55, 85].map((w, i) => (
-                  <div key={i} style={{ height: 9, background: "rgba(15,23,42,.07)", borderRadius: 2, marginBottom: 7, width: `${w}%` }} />
-                ))}
-
-                {/* Highlight overlay example */}
-                {annotations.filter((a) => a.page === currentPage && a.kind === "highlight").length > 0 && (
-                  <div style={{ padding: 10, background: "rgba(240,220,60,.06)", borderLeft: "3px solid #e8d020", borderRadius: "0 6px 6px 0", marginBottom: 12 }}>
-                    <div style={{ fontSize: 9, color: "#e8d020", marginBottom: 4, letterSpacing: 1 }}>HIGHLIGHTED — REVIEWER NOTE</div>
-                    <div style={{ height: 8, background: "rgba(240,220,60,.2)", borderRadius: 2, marginBottom: 5 }} />
-                    <div style={{ height: 8, background: "rgba(240,220,60,.12)", borderRadius: 2, width: "70%" }} />
-                  </div>
-                )}
-
-                {/* More content */}
-                {[80, 65, 95].map((w, i) => (
-                  <div key={i} style={{ height: 9, background: "rgba(15,23,42,.07)", borderRadius: 2, marginBottom: 7, width: `${w}%` }} />
-                ))}
-
-                {/* Redaction overlay example */}
-                {annotations.filter((a) => a.page === currentPage && a.kind === "redaction").length > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                    <div style={{ fontSize: 10, color: "var(--sil)" }}>REDACTED:</div>
-                    <div style={{ height: 12, width: 160, background: "#1a1a1a", borderRadius: 2 }} />
-                  </div>
-                )}
-
-                {/* Stamp overlay */}
-                {annotations.filter((a) => a.page === currentPage && a.kind === "stamp").map((a) => (
-                  <div
-                    key={a.id}
-                    style={{
-                      display: "inline-block",
-                      background: "var(--PT)",
-                      border: "1px solid rgba(155,111,224,.4)",
-                      borderRadius: 6,
-                      padding: "4px 10px",
-                      fontSize: 9,
-                      color: "var(--P)",
-                      fontWeight: 700,
-                      letterSpacing: 1,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {a.content ?? "CONFIDENTIAL"}
-                  </div>
-                ))}
-
-                {/* Digital signature mockup */}
-                <div style={{ marginTop: 24, padding: 14, border: "1px dashed rgba(46,204,138,.4)", borderRadius: 8, display: "flex", alignItems: "center", gap: 12 }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--G)" strokeWidth="2">
+                {/* eIDAS signature caption (kept as a verified-status footer) */}
+                <div style={{ marginTop: 12, padding: 10, border: "1px dashed rgba(46,204,138,.4)", borderRadius: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--Gtx)" strokeWidth="2">
                     <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                   </svg>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--G)" }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--Gtx)" }}>
                       Digitally Signed · {user?.username ?? "System"} · eIDAS
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--sil)" }}>
-                      ZorDMS-2024 · ✓ Valid
-                    </div>
+                    <div style={{ fontSize: 10, color: "var(--sil)" }}>ZorDMS-2024 · ✓ Valid</div>
                   </div>
-                </div>
-
-                {/* Page indicator */}
-                <div style={{ position: "absolute", top: -20, right: 0, fontSize: 10, color: "var(--sil)" }}>
-                  Page {currentPage} of {totalPages}
                 </div>
               </div>
             ) : (

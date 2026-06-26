@@ -11,6 +11,8 @@ export { StatusDot }       from "./StatusDot.js";
 export { Tabs }            from "./Tabs.js";
 export { Modal }           from "./Modal.js";
 export { FormField }       from "./FormField.js";
+export { SearchableSelect } from "./SearchableSelect.js";
+export type { SelectOption, SearchableSelectProps } from "./SearchableSelect.js";
 export { LineChartCard, BarChartCard, DonutChartCard, Heatmap } from "./charts.js";
 export type { KpiCardProps, KpiVariant }          from "./KpiCard.js";
 export type { CardProps }                          from "./Card.js";

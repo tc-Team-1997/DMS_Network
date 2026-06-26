@@ -18,6 +18,31 @@ interface AuthState {
 
 const Ctx = createContext<AuthState | undefined>(undefined);
 
+/** Where to send the user after they re-authenticate (set when the session
+ *  expires mid-flow). Login reads + clears it. */
+const RETURN_PATH_KEY = "zordms_return_path";
+
+function rememberReturnPath(): void {
+  try {
+    const here = window.location.pathname + window.location.search;
+    // Never bounce back to login/root.
+    if (here && !here.startsWith("/login") && here !== "/") {
+      sessionStorage.setItem(RETURN_PATH_KEY, here);
+    }
+  } catch { /* ignore storage errors */ }
+}
+
+/** Read + clear the saved return path (called by the Login screen). */
+export function takeReturnPath(): string | null {
+  try {
+    const v = sessionStorage.getItem(RETURN_PATH_KEY);
+    if (v) sessionStorage.removeItem(RETURN_PATH_KEY);
+    return v;
+  } catch {
+    return null;
+  }
+}
+
 /** Decode JWT claims (no verification — display only). */
 function decodeClaims(token: string): Record<string, unknown> | null {
   try {
@@ -60,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const expiryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const expireSession = useCallback(() => {
+    rememberReturnPath();
     clearToken();
     setUser(null);
     setSessionExpired(true);
@@ -78,7 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Listen for the global 401 signal broadcast by the API layer.
   useEffect(() => {
-    const onExpired = () => { setUser(null); setSessionExpired(true); };
+    const onExpired = () => {
+      // Remember where the user was so re-login can land them back there.
+      rememberReturnPath();
+      setUser(null);
+      setSessionExpired(true);
+    };
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);

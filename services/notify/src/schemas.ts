@@ -44,7 +44,11 @@ export const EscalateBodySchema = z
       .string()
       .trim()
       .min(1, "target is required")
-      .openapi({ description: "Role name to escalate the alert to." }),
+      .openapi({ description: "Role name or username to escalate the alert to." }),
+    kind: z
+      .enum(["role", "user"])
+      .optional()
+      .openapi({ description: "Whether `target` is a role (default) or a specific username." }),
   })
   .openapi("EscalateBody");
 

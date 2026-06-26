@@ -81,6 +81,29 @@ const NAV_GROUPS: NavGroup[] = [
 const PATH_INDEX: Record<string, { group: string; label: string }> = {};
 for (const g of NAV_GROUPS) for (const it of g.items) PATH_INDEX[it.path] = { group: g.label, label: it.label };
 
+/* Optional one-line subtitle under each section title. */
+const SECTION_SUBTITLES: Record<string, string> = {
+  "/customer360":          "Unified customer profile, documents and risk across all branches",
+  "/capture":              "Multi-channel ingestion · OCR · AI classification",
+  "/indexing":             "Index, validate and quality-check captured documents",
+  "/ai-engine":            "Ask the document copilot · OCR · NLP classification",
+  "/case-management":      "Cases, linked documents and collaborative review",
+  "/repository":           "Hierarchical cabinets · version control · secure archival",
+  "/records-management":   "Retention schedules, legal holds and disposition",
+  "/document-lifecycle":   "Capture → review → approve → archive → dispose",
+  "/search":               "Full-text, boolean, fuzzy & semantic AI search",
+  "/viewer":               "Annotation · redaction · e-signature · stamp · versions",
+  "/workflow-engine":      "Configurable maker–checker approval chains",
+  "/review-queue":         "Human-in-the-loop review and approval queue",
+  "/compliance-audit":     "Immutable audit trail and compliance reporting",
+  "/alerts":               "Real-time compliance alerts and expiry notifications",
+  "/integration-hub":      "Connectors, webhooks and external system sync",
+  "/security":             "Roles, permissions and access control",
+  "/users":                "User accounts, roles and provisioning",
+  "/system-administration":"Service health, backups, dedup and document types",
+  "/branch-network":       "Branch performance and document distribution",
+};
+
 /** "admin" → "Admin", "dorji.wangchuk" → "Dorji Wangchuk" */
 function properCase(s: string): string {
   return s
@@ -208,6 +231,17 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* ── Main content ── */}
         <main className="main-content fade-up">
+          {/* Section title — shown on every screen EXCEPT the Executive
+              Dashboard (which has its own KPI hero). Uses the nav label so it
+              stays in sync with the sidebar / breadcrumb. */}
+          {crumb && location.pathname !== "/dashboard" && (
+            <div className="section-title">
+              <h1>{crumb.label}</h1>
+              {SECTION_SUBTITLES[location.pathname] && (
+                <p>{SECTION_SUBTITLES[location.pathname]}</p>
+              )}
+            </div>
+          )}
           {children}
         </main>
       </div>

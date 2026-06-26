@@ -36,8 +36,8 @@ export function alertsRouter(): Router {
     // Otherwise parse with zod for a typed, trimmed value.
     const parsed = EscalateBodySchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: "target_required" }); return; }
-    const { target } = parsed.data as EscalateBody;
-    const recipients = await resolveEscalationRecipients([{ kind: "role", value: target }], { knex });
+    const { target, kind } = parsed.data as EscalateBody;
+    const recipients = await resolveEscalationRecipients([{ kind: kind ?? "role", value: target }], { knex });
     for (const rcpt of recipients) {
       const [d] = await registry.dispatch(["email"], { recipient: rcpt.address, subject: `Escalated: ${alert.title}`, body: alert.title });
       await knex("notifications").insert({

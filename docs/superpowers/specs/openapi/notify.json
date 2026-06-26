@@ -286,7 +286,15 @@
           "target": {
             "type": "string",
             "minLength": 1,
-            "description": "Role name to escalate the alert to."
+            "description": "Role name or username to escalate the alert to."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "role",
+              "user"
+            ],
+            "description": "Whether `target` is a role (default) or a specific username."
           }
         },
         "required": [

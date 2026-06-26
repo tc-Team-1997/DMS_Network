@@ -34,6 +34,21 @@ describe("seeded admin email (P1)", () => {
     expect(admin).toBeTruthy();
     expect(admin!.email).toBe("admin@bobl.bt");
   });
+
+  it("GET /users attaches each user's role names", async () => {
+    const res = await request(app).get("/users").set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    const admin = (res.body.users as Array<{ username: string; roles?: string[] }>).find((u) => u.username === "admin");
+    expect(admin!.roles).toContain("CDO");
+  });
+
+  it("GET /users/roles lists role names for assignment pickers", async () => {
+    const res = await request(app).get("/users/roles").set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    const names = (res.body.roles as Array<{ name: string }>).map((r) => r.name);
+    expect(names).toContain("CDO");
+    expect(names).toContain("Supervisor");
+  });
 });
 
 describe("supervisor user provisioning", () => {

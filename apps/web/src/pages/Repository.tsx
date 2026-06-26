@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { SVC } from "../config.js";
+import { DocumentPreview } from "../components/DocumentPreview.js";
 import { useUrlState } from "../hooks/useUrlState.js";
 import {
   KpiCard,
@@ -130,36 +130,15 @@ function PreviewPanel({ doc, versions, onViewInViewer, canDelete, onDelete }: Pr
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 11 }}>
-      <div
-        style={{
-          height: 140,
-          background: "var(--gr)",
-          border: "1px dashed var(--bd)",
-          borderRadius: 7,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--sil)",
-          fontSize: 11,
-          marginBottom: 8,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {doc.mime_type?.startsWith("image/") ? (
-          <img
-            src={`${SVC.core}/documents/${doc.id}/download`}
-            alt={doc.title}
-            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-          />
-        ) : (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>
-              {doc.mime_type?.includes("pdf") ? "📄" : doc.mime_type?.includes("image") ? "🖼" : "📁"}
-            </div>
-            <div style={{ fontSize: 10, color: "var(--sil)" }}>{doc.original_filename ?? doc.title}</div>
-          </div>
-        )}
+      <div style={{ marginBottom: 8 }}>
+        {/* Real preview (auth-fetched blob) for the selected document. */}
+        <DocumentPreview
+          docId={doc.id}
+          mimeType={doc.mime_type}
+          fileName={doc.original_filename ?? doc.title}
+          height={200}
+          compact
+        />
       </div>
 
       {[

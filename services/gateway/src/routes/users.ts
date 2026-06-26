@@ -27,7 +27,23 @@ export function usersRouter(): Router {
   r.get("/", requirePermission("user:read"), async (req, res) => {
     const { knex } = req.app.locals.deps as { knex: Knex };
     const users = await knex("users").select("id", "username", "full_name", "email", "branch", "region", "status", "mfa_enabled");
-    res.json({ users });
+    // Attach each user's role names so pickers can assign to a person directly.
+    const links = await knex("user_roles as ur").join("roles as ro", "ro.id", "ur.role_id").select("ur.user_id as user_id", "ro.name as role");
+    const rolesByUser = new Map<string, string[]>();
+    for (const l of links as Array<{ user_id: string; role: string }>) {
+      const arr = rolesByUser.get(l.user_id) ?? [];
+      arr.push(l.role);
+      rolesByUser.set(l.user_id, arr);
+    }
+    res.json({ users: (users as Array<{ id: string }>).map((u) => ({ ...u, roles: rolesByUser.get(u.id) ?? [] })) });
+  });
+
+  // List all role names (for assignment / escalation pickers). Read-only, no
+  // sensitive data — gated on user:read like the user list.
+  r.get("/roles", requirePermission("user:read"), async (req, res) => {
+    const { knex } = req.app.locals.deps as { knex: Knex };
+    const rows = await knex("roles").select("name", "description").orderBy("name");
+    res.json({ roles: rows });
   });
 
   r.post("/", requirePermission("user:create"), validate(CreateUserBodySchema), async (req, res) => {

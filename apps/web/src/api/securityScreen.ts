@@ -41,6 +41,10 @@ export const securityApi = {
   getUsers: () =>
     http.get<{ users: UserRow[] }>(`${BASE}/users`),
 
+  /** All role names (for assignment / escalation pickers). */
+  listRoles: () =>
+    http.get<{ roles: Array<{ name: string; description?: string | null }> }>(`${BASE}/users/roles`),
+
   createUser: (payload: CreateUserPayload) =>
     http.post<{ user: UserRow }>(`${BASE}/users`, payload),
 

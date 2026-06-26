@@ -23,8 +23,10 @@ import {
   FormField,
   BarChartCard,
   RefId,
+  SearchableSelect,
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
+import { useAssigneeOptions } from "../hooks/useAssigneeOptions.js";
 import {
   listWorkflows,
   getWorkflow,
@@ -113,6 +115,8 @@ function NewWorkflowModal({
   templates: TemplateRow[];
   onCreated: () => void;
 }) {
+  const { options: assigneeOptions } = useAssigneeOptions(open);
+  const peopleOptions = assigneeOptions.filter((o) => o.value.startsWith("user:"));
   const [form, setForm] = useState<NewWorkflowForm>({
     title: "", template_id: "", priority: "Normal", assigned_to: "", doc_id: "",
   });
@@ -169,12 +173,18 @@ function NewWorkflowModal({
         >
           {["Low", "Normal", "High", "Urgent"].map((p) => <option key={p}>{p}</option>)}
         </FormField>
-        <FormField
-          label="Assign To (username)"
-          placeholder="e.g. checker1"
-          value={form.assigned_to}
-          onChange={(e) => setForm({ ...form, assigned_to: (e.target as HTMLInputElement).value })}
-        />
+        <div>
+          <label style={{ display: "block", fontSize: 10.5, color: "var(--sil)", marginBottom: 6 }}>
+            Assign To (person)
+          </label>
+          <SearchableSelect
+            ariaLabel="Assign workflow to a person"
+            placeholder="Search people…"
+            options={peopleOptions}
+            value={form.assigned_to ? `user:${form.assigned_to}` : null}
+            onChange={(v) => setForm({ ...form, assigned_to: v ? v.replace(/^user:/, "") : "" })}
+          />
+        </div>
         <FormField
           label="Document ID (optional)"
           placeholder="e.g. DOC-20240429-001"

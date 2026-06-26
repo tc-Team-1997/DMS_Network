@@ -17,7 +17,10 @@ import {
   LineChartCard,
   RefId,
   isUuid,
+  SearchableSelect,
 } from "../components/ui/index.js";
+import type { SelectOption } from "../components/ui/index.js";
+import { useAssigneeOptions, parseAssignee } from "../hooks/useAssigneeOptions.js";
 import { useAuth } from "../auth/AuthContext.js";
 import {
   notifyApi,
@@ -105,12 +108,14 @@ function AlertRuleForm({
   onCancel,
   saving,
   templates,
+  roleOptions,
 }: {
   initial?: RuleFormState;
   onSave: (form: RuleFormState) => void;
   onCancel: () => void;
   saving: boolean;
   templates: TemplateOption[];
+  roleOptions: SelectOption[];
 }) {
   const [form, setForm] = useState<RuleFormState>(initial ?? EMPTY_RULE);
   const [paramsError, setParamsError] = useState("");
@@ -189,13 +194,21 @@ function AlertRuleForm({
         ))}
       </FormField>
 
-      <FormField
-        label="Escalation Target Role (optional)"
-        placeholder="Supervisor, CDO…"
-        value={form.escalationTarget}
-        onChange={(e) => setForm({ ...form, escalationTarget: (e.target as HTMLInputElement).value })}
-        hint="RBAC role name — this role's members receive escalation emails"
-      />
+      <div>
+        <label style={{ display: "block", fontSize: 10.5, color: "var(--sil)", marginBottom: 6 }}>
+          Escalation Target Role (optional)
+        </label>
+        <SearchableSelect
+          ariaLabel="Escalation target role"
+          placeholder="Search roles…"
+          options={roleOptions}
+          value={form.escalationTarget ? `role:${form.escalationTarget}` : null}
+          onChange={(v) => setForm({ ...form, escalationTarget: v ? v.replace(/^role:/, "") : "" })}
+        />
+        <div style={{ fontSize: 10, color: "var(--sil)", marginTop: 3 }}>
+          This role's active members receive escalation emails.
+        </div>
+      </div>
 
       <FormField
         label="Scope (optional)"
@@ -237,14 +250,16 @@ function AlertDetailPanel({
   onMarkRead,
   onEscalate,
   canManage,
+  assigneeOptions,
 }: {
   alert: Alert;
   onClose: () => void;
   onMarkRead: (id: string) => void;
-  onEscalate: (id: string, target: string) => void;
+  onEscalate: (id: string, target: string, kind: "role" | "user") => void;
   canManage: boolean;
+  assigneeOptions: SelectOption[];
 }) {
-  const [escTarget, setEscTarget] = useState("");
+  const [escValue, setEscValue] = useState<string | null>(null);
   const [escalating, setEscalating] = useState(false);
   let meta: Record<string, unknown> = {};
   try {
@@ -252,9 +267,10 @@ function AlertDetailPanel({
   } catch {}
 
   async function handleEscalate() {
-    if (!escTarget.trim()) return;
+    const parsed = parseAssignee(escValue);
+    if (!parsed) return;
     setEscalating(true);
-    try { await onEscalate(alert.id, escTarget); } finally { setEscalating(false); }
+    try { await onEscalate(alert.id, parsed.value, parsed.kind); } finally { setEscalating(false); }
   }
 
   return (
@@ -324,19 +340,21 @@ function AlertDetailPanel({
 
         {canManage && (
           <div>
-            <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 6 }}>ESCALATE TO ROLE</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <input
-                className="field"
-                style={{ flex: 1 }}
-                placeholder="Supervisor, CDO…"
-                value={escTarget}
-                onChange={(e) => setEscTarget(e.target.value)}
-              />
+            <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 6 }}>ESCALATE TO ROLE OR PERSON</div>
+            <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <SearchableSelect
+                  ariaLabel="Escalation target"
+                  placeholder="Search role or person…"
+                  options={assigneeOptions}
+                  value={escValue}
+                  onChange={(v) => setEscValue(v)}
+                />
+              </div>
               <button
                 className="btn bw"
                 onClick={handleEscalate}
-                disabled={escalating || !escTarget.trim()}
+                disabled={escalating || !escValue}
                 style={{ flexShrink: 0 }}
                 aria-label="Escalate alert"
               >
@@ -357,6 +375,11 @@ export default function Alerts() {
   const canView       = user?.permissions.includes("alert:read") ?? false;
   const canManage     = user?.permissions.includes("alert:manage") ?? false;
   const canManageRule = user?.permissions.includes("alert_rule:manage") ?? false;
+
+  // Roles + people for the escalation pickers; roles-only subset for rule forms.
+  // Only fetched for users who can actually escalate / manage rules.
+  const { options: assigneeOptions } = useAssigneeOptions(canManage || canManageRule);
+  const roleOptions = assigneeOptions.filter((o) => o.value.startsWith("role:"));
 
   // Data
   const [alerts,    setAlerts]    = useState<Alert[]>([]);
@@ -471,8 +494,8 @@ export default function Alerts() {
     setAlerts((prev) => prev.map((a) => ({ ...a, is_read: true })));
   }
 
-  async function handleEscalate(id: string, target: string) {
-    await notifyApi.escalate(id, target);
+  async function handleEscalate(id: string, target: string, kind: "role" | "user") {
+    await notifyApi.escalate(id, target, kind);
     await loadAlerts();
   }
 
@@ -1038,6 +1061,7 @@ export default function Alerts() {
           onMarkRead={handleMarkRead}
           onEscalate={handleEscalate}
           canManage={canManage}
+          assigneeOptions={assigneeOptions}
         />
       )}
 
@@ -1066,6 +1090,7 @@ export default function Alerts() {
           onCancel={() => { setShowRuleModal(false); setEditingRule(null); }}
           saving={ruleSaving}
           templates={templates}
+          roleOptions={roleOptions}
         />
       </Modal>
     </div>

@@ -543,5 +543,22 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .topbar-breadcrumb { display: flex; align-items: center; gap: 7px; color: rgba(255,255,255,.55); font-size: 12.5px; padding: 0 6px 0 14px; white-space: nowrap; }
 .topbar-breadcrumb b { color: #fff; font-weight: 600; }
 .exit-ic:hover { color: #ff6b6b !important; background: rgba(255,107,107,.12) !important; }
-/* Page titles are replaced by the topbar breadcrumb */
+/* Per-page .page-header blocks are superseded by the shell's section title. */
 .page-header h2, .page-header p { display: none; }
+
+/* Section title — rendered by AppShell on every screen except the dashboard. */
+.section-title { margin: 0 0 18px; }
+.section-title h1 {
+  margin: 0;
+  font-family: var(--brand-font);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  color: var(--gold3);
+  line-height: 1.15;
+}
+.section-title p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--sil);
+}

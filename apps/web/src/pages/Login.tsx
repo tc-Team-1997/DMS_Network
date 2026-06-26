@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type CSSProperties } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext.js";
+import { useAuth, takeReturnPath } from "../auth/AuthContext.js";
 import { Carousel, type Slide } from "../components/Carousel.js";
 import { fetchAuthConfig, ldapLogin, type SsoProvider } from "../api/authConfig.js";
 import { readHandoffToken, clearHandoffHash } from "../auth/ssoHandoff.js";
@@ -39,7 +39,7 @@ export function Login() {
     if (token) {
       loginWithToken(token);
       clearHandoffHash();
-      navigate("/dashboard", { replace: true });
+      navigate(takeReturnPath() ?? "/dashboard", { replace: true });
     }
   }, [loginWithToken, navigate]);
 
@@ -53,6 +53,12 @@ export function Login() {
     return () => { live = false; };
   }, []);
 
+  // After a successful sign-in, return the user to where the session expired
+  // (saved by AuthContext), else the dashboard.
+  function postLoginDest(): string {
+    return takeReturnPath() ?? "/dashboard";
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setError("");
@@ -64,7 +70,7 @@ export function Login() {
       } else {
         await login(username, password, mfa ? totp : undefined);
       }
-      navigate("/dashboard", { replace: true });
+      navigate(postLoginDest(), { replace: true });
     } catch (err: any) {
       if (err?.body?.mfaRequired) { setMfa(true); setError("Enter your authenticator code."); }
       else if (ldapProvider) setError(`${ldapProvider.displayName} sign-in failed.`);

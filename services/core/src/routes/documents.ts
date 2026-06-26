@@ -107,7 +107,9 @@ export function documentsRouter(): Router {
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
-  // GET /:id/download — download (document:read) — C1 + C5: branch-scoped + safe filename
+  // GET /:id/download — serve the raw file (document:read) — C1 + C5: branch-scoped
+  // + safe filename. `?inline=1` serves Content-Disposition: inline so browsers
+  // (and the web viewer's blob fetch) can preview PDFs/images in place.
   r.get("/:id/download", requirePermission("document:read"), async (req, res) => {
     try {
       const deps = req.app.locals.deps as CoreDeps;
@@ -115,11 +117,19 @@ export function documentsRouter(): Router {
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       const v = await currentVersion(deps.knex, document.id);
       if (!v) { res.status(404).json({ error: "no_version" }); return; }
-      const buf = await deps.storage.get(v.storage_key);
+      let buf: Buffer;
+      try {
+        buf = await deps.storage.get(v.storage_key);
+      } catch {
+        // Stored file missing on disk (e.g. metadata-only seed doc) → 404, not 500.
+        res.status(404).json({ error: "file_unavailable" });
+        return;
+      }
       res.setHeader("Content-Type", v.mime_type ?? "application/octet-stream");
       // C5: strip characters that can inject into Content-Disposition header
       const safeName = (document.original_filename ?? "document").replace(/["\r\n\\]/g, "_");
-      res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+      const disposition = req.query.inline === "1" ? "inline" : "attachment";
+      res.setHeader("Content-Disposition", `${disposition}; filename="${safeName}"`);
       res.send(buf);
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });

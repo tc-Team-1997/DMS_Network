@@ -3,7 +3,7 @@
  * Uses /svc/core proxy path (-> http://localhost:4001).
  */
 import { http, SVC } from "./http.js";
-import { getToken } from "./client.js";
+import { getToken, handleUnauthorized } from "./client.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -133,6 +133,25 @@ export const repositoryViewerApi = {
 
   getDocument: (id: string): Promise<{ document: DocumentRecord }> =>
     http.get(`${SVC.core}/documents/${id}`),
+
+  /**
+   * Fetch the raw document file (with the auth header) and return a blob object
+   * URL + mime type. `<img>`/`<iframe>` can't send an Authorization header, so
+   * we fetch here and hand them a same-origin blob: URL. Caller must
+   * URL.revokeObjectURL() when done. Throws { status } on 401/403/404.
+   */
+  fetchFileObjectUrl: async (id: string): Promise<{ url: string; mime: string }> => {
+    const headers: Record<string, string> = {};
+    const token = getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${SVC.core}/documents/${id}/download?inline=1`, { headers });
+    if (!res.ok) {
+      if (res.status === 401) handleUnauthorized(res.status, `${SVC.core}/documents/${id}/download`);
+      throw Object.assign(new Error(`file_fetch_failed`), { status: res.status });
+    }
+    const blob = await res.blob();
+    return { url: URL.createObjectURL(blob), mime: blob.type || res.headers.get("content-type") || "application/octet-stream" };
+  },
 
   deleteDocument: (id: string): Promise<void> =>
     http.delete(`${SVC.core}/documents/${id}`),

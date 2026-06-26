@@ -59,9 +59,9 @@ export const notifyApi = {
   markRead: (id: string) =>
     http.post<{ ok: boolean }>(`${BASE}/alerts/${id}/read`),
 
-  /** POST /alerts/:id/escalate */
-  escalate: (id: string, target: string) =>
-    http.post<{ escalatedTo: string }>(`${BASE}/alerts/${id}/escalate`, { target }),
+  /** POST /alerts/:id/escalate — to a role (default) or a specific user. */
+  escalate: (id: string, target: string, kind: "role" | "user" = "role") =>
+    http.post<{ escalatedTo: number }>(`${BASE}/alerts/${id}/escalate`, { target, kind }),
 
   /** GET /rules */
   listRules: () =>
