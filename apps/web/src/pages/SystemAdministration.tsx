@@ -13,6 +13,7 @@ import type {
 } from "../api/systemAdministration.js";
 import { useUrlState } from "../hooks/useUrlState.js";
 import { DocTypesPanel } from "../components/doctypes/DocTypesPanel.js";
+import { EmailTemplatesPanel } from "../components/emailtemplates/EmailTemplatesPanel.js";
 import { listJobs } from "../api/jobsApi.js";
 import type { JobStatus, MonitorJob } from "../api/jobsApi.js";
 
@@ -40,6 +41,7 @@ const TABS = [
   { key: "queue", label: "Processing Queue" },
   { key: "dedup", label: "Duplicate Detection" },
   { key: "doctypes", label: "Document Types" },
+  { key: "emailtemplates", label: "Email Templates" },
 ];
 
 type HealthRow = ServiceHealth & { _key: string };
@@ -71,6 +73,9 @@ export function SystemAdministration() {
   // `doctype:write` (P5) gates create/edit/delete of document types; CDO has all perms.
   const canWriteDocTypes = Boolean(
     user?.permissions.includes("doctype:write") || user?.permissions.includes("admin:access"),
+  );
+  const canWriteEmailTemplates = Boolean(
+    user?.permissions.includes("email_template:manage") || user?.permissions.includes("admin:access"),
   );
 
   /* ─── Pattern 2: URL-driven tab selection ─── */
@@ -900,6 +905,11 @@ export function SystemAdministration() {
       {/* ═══ DOCUMENT TYPES TAB ═══ */}
       {tab === "doctypes" && (
         <DocTypesPanel canWrite={canWriteDocTypes} />
+      )}
+
+      {/* ═══ EMAIL TEMPLATES TAB ═══ */}
+      {tab === "emailtemplates" && (
+        <EmailTemplatesPanel canWrite={canWriteEmailTemplates} />
       )}
     </div>
   );

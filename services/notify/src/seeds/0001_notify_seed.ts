@@ -21,17 +21,81 @@ const PERMISSIONS: Array<[string, string]> = [
   ["alert:read", "View alerts and notifications"],
   ["alert:manage", "Mark-read / escalate alerts"],
   ["alert_rule:manage", "Create and edit alert rules"],
+  ["email_template:read", "View email templates"],
+  ["email_template:manage", "Create and edit email templates"],
 ];
 
 const ROLES: Record<string, string[]> = {
   CDO: PERMISSIONS.map(([k]) => k), // full
-  Supervisor: ["user:create", "user:update", "user:read", "role:assign", "document:read", "admin:access", "alert:read", "alert:manage", "alert_rule:manage"],
+  Supervisor: ["user:create", "user:update", "user:read", "role:assign", "document:read", "admin:access", "alert:read", "alert:manage", "alert_rule:manage", "email_template:read", "email_template:manage"],
   Maker: ["document:capture", "document:index", "document:read", "workflow:act", "alert:read"],
   Checker: ["document:approve", "document:reject", "document:read", "workflow:act", "alert:read"],
   Indexer: ["document:index", "document:read", "alert:read"],
   Viewer: ["document:read", "alert:read"],
   Auditor: ["document:read", "compliance:read", "crossbranch:read", "alert:read"],
 };
+
+// ── Email templates ──────────────────────────────────────────────────────────
+// Admin-curated, formatted email bodies with {{merge tags}}. Idempotent on `key`.
+// {{doc.link}} / {{workflow.link}} expand to absolute app deep-links at send time.
+const SAMPLE_TEMPLATES: Array<{
+  key: string;
+  name: string;
+  category: string;
+  description: string;
+  subject_template: string;
+  html_body_template: string;
+  text_body_template: string;
+}> = [
+  {
+    key: "kyc_expiry",
+    name: "KYC / ID Document Expiry",
+    category: "Compliance",
+    description: "Notify a reviewer that a customer KYC/ID document is nearing expiry.",
+    subject_template: "Action required: {{doc.title}} expiring",
+    html_body_template:
+      `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#0f172a">
+  <div style="background:#0b1830;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
+    <strong style="font-size:16px">ZorDMS — Compliance Alert</strong>
+  </div>
+  <div style="border:1px solid #e2e8f0;border-top:none;padding:22px;border-radius:0 0 10px 10px">
+    <p>Hello {{recipient.name}},</p>
+    <p><strong>{{alert.title}}</strong></p>
+    <p>The document <strong>{{doc.title}}</strong> ({{branch}}) requires your review before it expires.</p>
+    <p style="margin:26px 0">
+      <a href="{{doc.link}}" style="background:#b8912a;color:#241a06;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700;display:inline-block">Open document in ZorDMS</a>
+    </p>
+    <p style="color:#64748b;font-size:12px">Sent {{date}} · This is an automated ZorDMS notification.</p>
+  </div>
+</div>`,
+    text_body_template:
+      `Hello {{recipient.name}},\n\n{{alert.title}}\n\nThe document "{{doc.title}}" ({{branch}}) requires your review before it expires.\n\nOpen it: {{doc.link}}\n\nSent {{date}} — automated ZorDMS notification.`,
+  },
+  {
+    key: "workflow_escalation",
+    name: "Workflow Escalation",
+    category: "Workflow",
+    description: "Escalate an overdue workflow decision to a reviewer or role.",
+    subject_template: "Escalated for review: {{alert.title}}",
+    html_body_template:
+      `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#0f172a">
+  <div style="background:#0b1830;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
+    <strong style="font-size:16px">ZorDMS — Workflow Escalation</strong>
+  </div>
+  <div style="border:1px solid #e2e8f0;border-top:none;padding:22px;border-radius:0 0 10px 10px">
+    <p>Hello {{recipient.name}},</p>
+    <p>A workflow has been escalated to you: <strong>{{alert.title}}</strong>.</p>
+    <p>Document: <strong>{{doc.title}}</strong> · Branch: {{branch}}</p>
+    <p style="margin:26px 0">
+      <a href="{{workflow.link}}" style="background:#3a9fd0;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700;display:inline-block">Review &amp; decide</a>
+    </p>
+    <p style="color:#64748b;font-size:12px">Sent {{date}} · This is an automated ZorDMS notification.</p>
+  </div>
+</div>`,
+    text_body_template:
+      `Hello {{recipient.name}},\n\nA workflow has been escalated to you: {{alert.title}}.\nDocument: {{doc.title}} · Branch: {{branch}}\n\nReview & decide: {{workflow.link}}\n\nSent {{date}} — automated ZorDMS notification.`,
+  },
+];
 
 // ── Alert rules ──────────────────────────────────────────────────────────────
 // Each rule has a unique `name` used as the idempotency key.
@@ -387,5 +451,15 @@ export async function seed(knex: Knex): Promise<void> {
   const alertCount = Number((await knex("alerts").count<{ c: number }[]>("id as c"))[0].c);
   if (alertCount === 0) {
     for (const alert of SAMPLE_ALERTS) await knex("alerts").insert({ id: newId(), ...alert });
+  }
+
+  // email templates — idempotent on `key`
+  if (await knex.schema.hasTable("email_templates")) {
+    for (const tpl of SAMPLE_TEMPLATES) {
+      const exists = await knex("email_templates").where({ key: tpl.key }).first();
+      if (!exists) {
+        await knex("email_templates").insert({ id: newId(), enabled: true, created_by: "system", ...tpl });
+      }
+    }
   }
 }

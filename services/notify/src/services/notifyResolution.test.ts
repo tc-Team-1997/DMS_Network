@@ -116,8 +116,11 @@ describe("raiseAlert dispatches REAL email addresses via EmailAdapter", () => {
     expect(toAddrs).not.toContain("Checker");
     // Deduped: checker.one@bob.bt appears once despite two member rows.
     expect(toAddrs.filter((t) => t === "checker.one@bob.bt").length).toBe(1);
-    // The skipped (no-email) member produced no email send.
-    expect(toAddrs.length).toBe(2);
+    // The skipped (no-email) member produced no email send. Scope the count to
+    // this test's own @bob.bt checkers so it is independent of seeded staff
+    // Checkers (the notify seed also seeds a real Checker with an email).
+    const testCheckers = toAddrs.filter((t) => t.endsWith("@bob.bt"));
+    expect(testCheckers.length).toBe(2);
 
     // Persisted notification rows carry the resolved address + the owning userId.
     const rows = await knex("notifications").where({ alert_id: out.alertId, channel: "email" });

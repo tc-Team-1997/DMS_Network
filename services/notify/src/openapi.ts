@@ -27,6 +27,11 @@ import {
   OkSchema,
   AlertSchema,
   RuleSchema,
+  EmailTemplateSchema,
+  CreateEmailTemplateBodySchema,
+  UpdateEmailTemplateBodySchema,
+  PreviewEmailTemplateBodySchema,
+  TestSendEmailTemplateBodySchema,
 } from "./schemas.js";
 
 export function buildOpenApiDocument(): Record<string, unknown> {
@@ -65,6 +70,11 @@ export function buildOpenApiDocument(): Record<string, unknown> {
   registry.register("CreateRuleBody", CreateRuleBodySchema);
   registry.register("UpdateRuleBody", UpdateRuleBodySchema);
   registry.register("EscalateBody", EscalateBodySchema);
+  registry.register("EmailTemplate", EmailTemplateSchema);
+  registry.register("CreateEmailTemplateBody", CreateEmailTemplateBodySchema);
+  registry.register("UpdateEmailTemplateBody", UpdateEmailTemplateBodySchema);
+  registry.register("PreviewEmailTemplateBody", PreviewEmailTemplateBodySchema);
+  registry.register("TestSendEmailTemplateBody", TestSendEmailTemplateBodySchema);
 
   const security = [{ bearerAuth: [] as string[] }];
   const jsonContent = (schema: z.ZodType) => ({ "application/json": { schema } });
@@ -216,6 +226,65 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       401: unauthorized,
       403: forbidden,
       404: notFound,
+    },
+  });
+
+  // --- Email templates ---------------------------------------------------
+  registry.registerPath({
+    method: "get", path: "/templates", tags: ["templates"],
+    summary: "List email templates", security,
+    responses: {
+      200: { description: "Template list", content: jsonContent(z.object({ templates: z.array(EmailTemplateSchema) })) },
+      401: unauthorized, 403: forbidden,
+    },
+  });
+  registry.registerPath({
+    method: "get", path: "/templates/tags", tags: ["templates"],
+    summary: "Merge-tag catalog for the editor palette", security,
+    responses: {
+      200: { description: "Tag catalog", content: jsonContent(z.object({ tags: z.array(z.object({ tag: z.string(), label: z.string(), example: z.string() })) })) },
+      401: unauthorized, 403: forbidden,
+    },
+  });
+  registry.registerPath({
+    method: "post", path: "/templates", tags: ["templates"],
+    summary: "Create an email template", security,
+    request: { body: { required: true, content: jsonContent(CreateEmailTemplateBodySchema) } },
+    responses: {
+      201: { description: "Created", content: jsonContent(z.object({ id: z.string() })) },
+      400: validationResponse, 401: unauthorized, 403: forbidden,
+      409: { description: "key already exists", content: jsonContent(ErrorSchema) },
+    },
+  });
+  registry.registerPath({
+    method: "patch", path: "/templates/{id}", tags: ["templates"],
+    summary: "Update an email template", security,
+    request: { params: IdParamSchema, body: { required: true, content: jsonContent(UpdateEmailTemplateBodySchema) } },
+    responses: { 200: { description: "Updated", content: jsonContent(OkSchema) }, 400: validationResponse, 401: unauthorized, 403: forbidden, 404: notFound },
+  });
+  registry.registerPath({
+    method: "delete", path: "/templates/{id}", tags: ["templates"],
+    summary: "Delete an email template", security,
+    request: { params: IdParamSchema },
+    responses: { 200: { description: "Deleted", content: jsonContent(OkSchema) }, 401: unauthorized, 403: forbidden, 404: notFound },
+  });
+  registry.registerPath({
+    method: "post", path: "/templates/{id}/preview", tags: ["templates"],
+    summary: "Render a template with sample/supplied context (no send)", security,
+    request: { params: IdParamSchema, body: { required: false, content: jsonContent(PreviewEmailTemplateBodySchema) } },
+    responses: {
+      200: { description: "Rendered email", content: jsonContent(z.object({ rendered: z.object({ subject: z.string(), html: z.string(), text: z.string() }) })) },
+      400: validationResponse, 401: unauthorized, 403: forbidden, 404: notFound,
+    },
+  });
+  registry.registerPath({
+    method: "post", path: "/templates/{id}/test-send", tags: ["templates"],
+    summary: "Render and send a test email to one recipient", security,
+    request: { params: IdParamSchema, body: { required: true, content: jsonContent(TestSendEmailTemplateBodySchema) } },
+    responses: {
+      200: { description: "Sent", content: jsonContent(z.object({ ok: z.boolean(), sentTo: z.string(), providerId: z.string().optional() })) },
+      400: validationResponse, 401: unauthorized, 403: forbidden, 404: notFound,
+      502: { description: "SMTP send failed", content: jsonContent(ErrorSchema) },
     },
   });
 

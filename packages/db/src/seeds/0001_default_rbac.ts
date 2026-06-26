@@ -49,6 +49,8 @@ const PERMISSIONS: Array<[string, string]> = [
   ["alert:read", "View alerts"],
   ["alert:manage", "Manage alerts"],
   ["alert_rule:manage", "Manage alert rules"],
+  ["email_template:read", "View email templates"],
+  ["email_template:manage", "Create and edit email templates"],
   // Records / compliance
   ["records:read", "View records management"],
   ["legal_hold:place", "Place legal holds"],
@@ -73,7 +75,7 @@ const ROLES: Record<string, string[]> = {
   Supervisor: [
     "user:create", "user:update", "user:read", "role:assign",
     "security:read", "admin:access", "admin:read", "integration:manage",
-    "doctype:write",
+    "doctype:write", "email_template:manage",
     ...READS,
   ],
   // Maker — capture / index / submit.

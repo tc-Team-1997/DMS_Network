@@ -5,6 +5,9 @@ export interface Notification {
   recipient: string;
   subject?: string;
   body: string;
+  /** Optional rendered HTML body (email only). When present, the email is sent
+   *  multipart with `body` as the text/plain alternative. */
+  html?: string;
   meta?: Record<string, unknown>;
 }
 

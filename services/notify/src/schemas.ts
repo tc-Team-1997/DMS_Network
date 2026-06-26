@@ -77,6 +77,73 @@ export const UpdateRuleBodySchema = z
   })
   .openapi("UpdateRuleBody");
 
+// --- Email templates ------------------------------------------------------
+
+export const CreateEmailTemplateBodySchema = z
+  .object({
+    key: z
+      .string()
+      .trim()
+      .min(1, "key is required")
+      .regex(/^[a-z0-9_]+$/, "key must be lowercase letters, digits or underscores")
+      .openapi({ description: "Stable slug used to bind the template to a send site." }),
+    name: z.string().trim().min(1, "name is required").openapi({ description: "Human-readable name." }),
+    category: z.string().trim().nullish().openapi({ description: "Grouping label, e.g. Compliance." }),
+    description: z.string().trim().nullish(),
+    subjectTemplate: z.string().trim().min(1, "subject is required").openapi({ description: "Subject line; may contain {{tags}}." }),
+    htmlBodyTemplate: z.string().min(1, "html body is required").openapi({ description: "HTML body with {{merge tags}}." }),
+    textBodyTemplate: z.string().nullish().openapi({ description: "Optional plain-text fallback." }),
+    enabled: z.boolean().optional(),
+  })
+  .openapi("CreateEmailTemplateBody");
+
+export const UpdateEmailTemplateBodySchema = z
+  .object({
+    name: z.string().trim().min(1).optional(),
+    category: z.string().trim().nullish(),
+    description: z.string().trim().nullish(),
+    subjectTemplate: z.string().trim().min(1).optional(),
+    htmlBodyTemplate: z.string().min(1).optional(),
+    textBodyTemplate: z.string().nullish(),
+    enabled: z.boolean().optional(),
+  })
+  .openapi("UpdateEmailTemplateBody");
+
+export const PreviewEmailTemplateBodySchema = z
+  .object({
+    context: z.record(z.string(), z.unknown()).optional().openapi({ description: "Optional render context; defaults to sample data." }),
+  })
+  .openapi("PreviewEmailTemplateBody");
+
+export const TestSendEmailTemplateBodySchema = z
+  .object({
+    to: z.string().trim().email("a valid recipient email is required").openapi({ description: "Recipient email for the test send." }),
+    context: z.record(z.string(), z.unknown()).optional(),
+  })
+  .openapi("TestSendEmailTemplateBody");
+
+export const EmailTemplateSchema = z
+  .object({
+    id: z.string(),
+    key: z.string(),
+    name: z.string(),
+    category: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
+    subject_template: z.string(),
+    html_body_template: z.string(),
+    text_body_template: z.string().nullable().optional(),
+    enabled: z.boolean(),
+    created_by: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+    updated_at: z.string().nullable().optional(),
+  })
+  .openapi("EmailTemplate");
+
+export type CreateEmailTemplateBody = z.infer<typeof CreateEmailTemplateBodySchema>;
+export type UpdateEmailTemplateBody = z.infer<typeof UpdateEmailTemplateBodySchema>;
+export type PreviewEmailTemplateBody = z.infer<typeof PreviewEmailTemplateBodySchema>;
+export type TestSendEmailTemplateBody = z.infer<typeof TestSendEmailTemplateBodySchema>;
+
 // --- Shared response schemas ---------------------------------------------
 
 export const ValidationErrorSchema = z

@@ -10,6 +10,7 @@ import { healthRouter } from "./routes/health.js";
 import { alertsRouter } from "./routes/alerts.js";
 import { rulesRouter } from "./routes/rules.js";
 import { streamRouter } from "./routes/stream.js";
+import { templatesRouter } from "./routes/templates.js";
 import { openapiRouter } from "./routes/openapi.js";
 
 export interface NotifyDeps {
@@ -31,6 +32,7 @@ export function createApp(deps: NotifyDeps): Express {
   app.use("/alerts", streamRouter(deps.hub)); // SSE: GET /alerts/stream (auth-gated)
   app.use("/alerts", alertsRouter());         // REST: GET /alerts, POST /alerts/:id/read, etc.
   app.use("/rules", rulesRouter());
+  app.use("/templates", templatesRouter());   // admin email-template CRUD + preview + test-send
 
   // Shared error handler from @zordms/auth (must be registered LAST)
   app.use(errorHandler);
