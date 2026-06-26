@@ -12,6 +12,9 @@ __pycache__/
 python-service/storage/
 python-service/*.db
 .pytest_cache/
+# Runtime document-storage blobs written by the core service (not source)
+.storage/
+services/*/.storage/
 
 # Generated artifacts
 *.sig

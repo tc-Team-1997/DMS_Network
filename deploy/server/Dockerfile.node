@@ -1,0 +1,64 @@
+# ZorDMS — generic Node service image (gateway / core / workflow / notify / search / integration).
+#
+# The pnpm/Turbo monorepo means every Node service depends on the workspace
+# packages (@zordms/auth, @zordms/config, @zordms/db, @zordms/types). Rather
+# than maintain six near-identical Dockerfiles we build ONCE and run the
+# service-of-interest via a build-arg + command override:
+#
+#   docker build -f deploy/server/Dockerfile.node --build-arg SERVICE=gateway -t zordms/gateway .
+#   docker run --rm -p 4000:4000 --env-file .env zordms/gateway
+#
+# docker-compose.yml builds one image per service this way (layers cache).
+ARG NODE_VERSION=20-bookworm-slim
+
+# ─── Stage 1: install deps (with native build toolchain) ────────────────────
+FROM node:${NODE_VERSION} AS deps
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /app
+
+# Copy only manifests first for cacheable installs.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.base.json turbo.json ./
+COPY packages/auth/package.json           packages/auth/
+COPY packages/config/package.json         packages/config/
+COPY packages/db/package.json             packages/db/
+COPY packages/types/package.json          packages/types/
+COPY services/gateway/package.json        services/gateway/
+COPY services/core/package.json           services/core/
+COPY services/workflow/package.json       services/workflow/
+COPY services/notify/package.json         services/notify/
+COPY services/search/package.json         services/search/
+COPY services/integration/package.json    services/integration/
+RUN pnpm install --frozen-lockfile
+
+# ─── Stage 2: build all packages + services ────────────────────────────────
+FROM deps AS build
+COPY packages packages
+COPY services services
+# Build the four shared packages first, then every Node service.
+RUN pnpm --filter "./packages/*" build
+RUN pnpm --filter "@zordms/gateway" \
+         --filter "@zordms/core" \
+         --filter "@zordms/workflow" \
+         --filter "@zordms/notify" \
+         --filter "@zordms/search" \
+         --filter "@zordms/integration" build
+
+# ─── Stage 3: runtime image ────────────────────────────────────────────────
+FROM node:${NODE_VERSION} AS runtime
+ARG SERVICE=gateway
+ENV SERVICE=${SERVICE} NODE_ENV=production
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+# Bring over the fully built monorepo (dist/ + node_modules/).
+COPY --from=build /app /app
+# Expose the union of service ports (compose maps the right one per service).
+EXPOSE 4000 4001 4002 4003 4004 4005
+ENTRYPOINT ["/usr/bin/tini","--"]
+# Boot the service named by the SERVICE build-arg. Override CMD in compose
+# to run something else (e.g. db migrate) using the same image.
+CMD ["sh","-c","node services/${SERVICE}/dist/server.js"]

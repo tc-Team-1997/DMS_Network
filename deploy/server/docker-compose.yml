@@ -1,0 +1,187 @@
+# ZorDMS — server-side full stack.
+#
+# One PostgreSQL, one Redis, the six Node services + the AI (FastAPI) service,
+# and an nginx-served web SPA. All Node services build from the same image
+# (deploy/server/Dockerfile.node) with a SERVICE build-arg.
+#
+# Usage (driven by ../../setup_server.sh):
+#   docker compose -f deploy/server/docker-compose.yml --env-file deploy/server/.env build
+#   docker compose -f deploy/server/docker-compose.yml --env-file deploy/server/.env up -d
+#
+# Build context is the repo root (`../..`) so each image can copy the whole
+# monorepo and build the workspace package graph.
+
+name: zordms
+
+x-node-build: &node-build
+  context: ../..
+  dockerfile: deploy/server/Dockerfile.node
+
+x-node-env: &node-env
+  env_file:
+    - .env
+
+services:
+
+  # ─── infra ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     ${DB_USER:-zordms}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-zordms}
+      POSTGRES_DB:       ${DB_NAME:-zordms}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-zordms} -d ${DB_NAME:-zordms}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # ─── one-shot DB migration ──────────────────────────────────────────────
+  # Reuses the gateway image (any node service has packages/db/dist/cli.js).
+  migrate:
+    build:
+      <<: *node-build
+      args: { SERVICE: gateway }
+    image: zordms/node-base
+    <<: *node-env
+    command: ["node", "packages/db/dist/cli.js", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # ─── Node microservices ─────────────────────────────────────────────────
+  gateway:
+    build:
+      <<: *node-build
+      args: { SERVICE: gateway }
+    image: zordms/gateway
+    <<: *node-env
+    environment:
+      GATEWAY_PORT: 4000
+    ports: ["4000:4000"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  core:
+    build:
+      <<: *node-build
+      args: { SERVICE: core }
+    image: zordms/core
+    <<: *node-env
+    environment:
+      CORE_PORT: 4001
+    ports: ["4001:4001"]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  workflow:
+    build:
+      <<: *node-build
+      args: { SERVICE: workflow }
+    image: zordms/workflow
+    <<: *node-env
+    environment:
+      WORKFLOW_PORT: 4002
+    ports: ["4002:4002"]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  notify:
+    build:
+      <<: *node-build
+      args: { SERVICE: notify }
+    image: zordms/notify
+    <<: *node-env
+    environment:
+      NOTIFY_PORT: 4003
+    ports: ["4003:4003"]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  search:
+    build:
+      <<: *node-build
+      args: { SERVICE: search }
+    image: zordms/search
+    <<: *node-env
+    environment:
+      SEARCH_PORT: 4004
+    ports: ["4004:4004"]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  integration:
+    build:
+      <<: *node-build
+      args: { SERVICE: integration }
+    image: zordms/integration
+    <<: *node-env
+    environment:
+      INTEGRATION_PORT: 4005
+    ports: ["4005:4005"]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Python AI / IDP ────────────────────────────────────────────────────
+  ai:
+    build:
+      context: ../../services/ai
+      dockerfile: Dockerfile
+    image: zordms/ai
+    <<: *node-env
+    environment:
+      INFERENCE_MODE: ${INFERENCE_MODE:-cpu_degraded}
+    ports: ["8080:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Web SPA + reverse proxy ────────────────────────────────────────────
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/server/Dockerfile.web
+    image: zordms/web
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
