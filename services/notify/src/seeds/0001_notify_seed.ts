@@ -108,6 +108,7 @@ const SAMPLE_RULES: Array<{
   scope: string | null;
   enabled: boolean;
   created_by: string;
+  template_key?: string | null;
 }> = [
   {
     name: "KYC/ID expiry — 60/30/7/0 day campaign",
@@ -118,6 +119,7 @@ const SAMPLE_RULES: Array<{
     scope: null,
     enabled: true,
     created_by: "system",
+    template_key: "kyc_expiry",
   },
   {
     name: "Workflow SLA breach escalation",
@@ -128,6 +130,7 @@ const SAMPLE_RULES: Array<{
     scope: null,
     enabled: true,
     created_by: "system",
+    template_key: "workflow_escalation",
   },
   {
     name: "OCR confidence below threshold",
@@ -442,9 +445,15 @@ export async function seed(knex: Knex): Promise<void> {
   }
 
   // alert rules — idempotent on `name` (natural key)
+  const hasTemplateKeyCol = await knex.schema.hasColumn("alert_rules", "template_key");
   for (const rule of SAMPLE_RULES) {
     const exists = await knex("alert_rules").where({ name: rule.name }).first();
-    if (!exists) await knex("alert_rules").insert({ id: newId(), ...rule });
+    if (!exists) {
+      await knex("alert_rules").insert({ id: newId(), ...rule });
+    } else if (hasTemplateKeyCol && rule.template_key && !exists.template_key) {
+      // Backfill the template binding on a previously-seeded rule.
+      await knex("alert_rules").where({ id: exists.id }).update({ template_key: rule.template_key });
+    }
   }
 
   // alerts — seed only when table is empty (tests insert their own rows)

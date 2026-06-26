@@ -123,6 +123,12 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "templateKey": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -216,6 +222,13 @@
               "null"
             ],
             "description": "Branch scope; rule fires only for this branch."
+          },
+          "templateKey": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Email template key to render for the email channel; null = plain title."
           }
         },
         "required": [
@@ -258,6 +271,12 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "templateKey": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

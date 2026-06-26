@@ -10,6 +10,9 @@ export interface AlertRule {
   escalationTarget?: string | null;
   scope?: string | null;
   enabled: boolean;
+  /** Optional email-template key — when set, matching alerts render their email
+   *  through that curated template (formatted HTML + merge tags). */
+  templateKey?: string | null;
 }
 
 export interface Recipient { kind: "role" | "group" | "user" | "external"; value: string; }
@@ -68,6 +71,7 @@ export function evaluateRule(rule: AlertRule, event: DomainEvent): RuleDecision 
 export function parseRule(row: {
   id: string; name: string; trigger: string; params_json: string; channels: string;
   escalation_target: string | null; scope: string | null; enabled: number | boolean;
+  template_key?: string | null;
 }): AlertRule {
   return {
     id: row.id, name: row.name, trigger: row.trigger,
@@ -75,5 +79,6 @@ export function parseRule(row: {
     channels: JSON.parse(row.channels || "[]") as ChannelKey[],
     escalationTarget: row.escalation_target, scope: row.scope,
     enabled: Boolean(row.enabled),
+    templateKey: row.template_key ?? null,
   };
 }

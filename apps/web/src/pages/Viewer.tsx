@@ -11,6 +11,7 @@ import {
   RefId,
 } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { NotAuthorised } from "../components/NotAuthorised.js";
 import { repositoryViewerApi } from "../api/repositoryViewerApi.js";
 import type { DocumentRecord, Annotation, DocumentVersion, RedactionRegion } from "../api/repositoryViewerApi.js";
 import { actOnWorkflow } from "../api/reviewQueueApi.js";
@@ -263,6 +264,8 @@ export default function Viewer() {
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // HTTP status of a failed document load (403 → not authorised, 404 → missing).
+  const [loadStatus, setLoadStatus] = useState<number | null>(null);
   const [zoom, setZoom] = useState(100);
 
   // Inline confirmation toast (stamp / redact / workflow act).
@@ -311,17 +314,22 @@ export default function Viewer() {
   const load = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
+    setLoadStatus(null);
     try {
-      const [docRes, annRes, verRes] = await Promise.all([
-        repositoryViewerApi.getDocument(id),
-        repositoryViewerApi.listAnnotations(id),
-        repositoryViewerApi.listVersions(id),
+      // The document fetch is the authoritative one for access/existence; the
+      // annotations/versions calls are best-effort (a 403 on those degrades
+      // gracefully rather than blocking the whole viewer).
+      const docRes = await repositoryViewerApi.getDocument(id);
+      const [annRes, verRes] = await Promise.all([
+        repositoryViewerApi.listAnnotations(id).catch(() => ({ annotations: [] })),
+        repositoryViewerApi.listVersions(id).catch(() => ({ versions: [] })),
       ]);
       setDoc(docRes.document);
       setAnnotations(annRes.annotations);
       setVersions(verRes.versions);
     } catch (e: unknown) {
-      const err = e as { body?: { error?: string }; message?: string };
+      const err = e as { status?: number; body?: { error?: string }; message?: string };
+      setLoadStatus(err?.status ?? null);
       setError(err?.body?.error ?? err?.message ?? "Failed to load document");
     } finally {
       setLoading(false);
@@ -515,9 +523,38 @@ export default function Viewer() {
 
   if (!canRead) {
     return (
-      <div className="fade-up" style={{ padding: 40, textAlign: "center" }}>
-        <div style={{ color: "var(--R)", fontSize: 14, marginBottom: 8 }}>Access Denied</div>
-        <div style={{ color: "var(--sil)", fontSize: 12 }}>You do not have permission to view documents.</div>
+      <div className="fade-up">
+        <NotAuthorised
+          variant="forbidden"
+          message="You do not have permission to view documents. Contact your administrator to request access."
+        />
+      </div>
+    );
+  }
+
+  // ── Render: opened a document link the user can't access (403) or that no
+  //    longer exists (404) — branded states instead of a raw error banner. ──
+  if (docId && !loading && loadStatus === 403) {
+    return (
+      <div className="fade-up">
+        <NotAuthorised
+          variant="forbidden"
+          title="You don't have access to this document"
+          message="This document is restricted. If you need access, contact your administrator or the document owner."
+          resourceLabel={`Document ${docId}`}
+        />
+      </div>
+    );
+  }
+  if (docId && !loading && (loadStatus === 404 || (loadStatus !== null && !doc))) {
+    return (
+      <div className="fade-up">
+        <NotAuthorised
+          variant="notfound"
+          title="Document not found"
+          message="This document doesn't exist or may have been moved, archived, or removed."
+          resourceLabel={`Document ${docId}`}
+        />
       </div>
     );
   }

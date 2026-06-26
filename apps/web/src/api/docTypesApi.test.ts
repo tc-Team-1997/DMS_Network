@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-vi.mock("./client.js", () => ({ getToken: () => "tok-123" }));
+vi.mock("./client.js", () => ({ getToken: () => "tok-123", handleUnauthorized: () => {} }));
 
 import { docTypesApi } from "./docTypesApi.js";
 

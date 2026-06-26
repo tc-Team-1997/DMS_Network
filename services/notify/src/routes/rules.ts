@@ -32,6 +32,7 @@ export function rulesRouter(): Router {
       params_json: JSON.stringify(b.params ?? {}),
       channels: JSON.stringify(b.channels ?? []),
       escalation_target: b.escalationTarget ?? null, scope: b.scope ?? null,
+      template_key: b.templateKey ?? null,
       enabled: true, created_by: req.authUser?.username ?? "system",
     });
     res.status(201).json({ id });
@@ -48,6 +49,7 @@ export function rulesRouter(): Router {
     if (b.escalationTarget !== undefined) patch.escalation_target = b.escalationTarget;
     if (b.scope !== undefined) patch.scope = b.scope;
     if (b.enabled !== undefined) patch.enabled = b.enabled;
+    if (b.templateKey !== undefined) patch.template_key = b.templateKey;
     const n = await knex("alert_rules").where({ id: req.params.id }).update(patch);
     if (!n) { res.status(404).json({ error: "not_found" }); return; }
     res.json({ ok: true });

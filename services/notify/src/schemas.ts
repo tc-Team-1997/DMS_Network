@@ -62,6 +62,7 @@ export const CreateRuleBodySchema = z
     channels: z.array(ChannelKeySchema).optional().openapi({ description: "Channels to dispatch on." }),
     escalationTarget: z.string().nullish().openapi({ description: "Role to escalate to." }),
     scope: z.string().nullish().openapi({ description: "Branch scope; rule fires only for this branch." }),
+    templateKey: z.string().nullish().openapi({ description: "Email template key to render for the email channel; null = plain title." }),
   })
   .openapi("CreateRuleBody");
 
@@ -74,6 +75,7 @@ export const UpdateRuleBodySchema = z
     escalationTarget: z.string().nullish(),
     scope: z.string().nullish(),
     enabled: z.boolean().optional(),
+    templateKey: z.string().nullish(),
   })
   .openapi("UpdateRuleBody");
 
@@ -184,6 +186,7 @@ export const RuleSchema = z
     escalationTarget: z.string().nullable().optional(),
     scope: z.string().nullable().optional(),
     enabled: z.boolean(),
+    templateKey: z.string().nullable().optional(),
   })
   .openapi("Rule");
 

@@ -11,7 +11,7 @@ vi.mock("../auth/AuthContext.js", () => ({
 }));
 
 // Mock getToken so API calls don't crash in jsdom
-vi.mock("../api/client.js", () => ({ getToken: () => null }));
+vi.mock("../api/client.js", () => ({ getToken: () => null, handleUnauthorized: () => {} }));
 
 function renderUsers(search = "") {
   return render(

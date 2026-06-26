@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-vi.mock("./client.js", () => ({ getToken: () => "copilot-tok" }));
+vi.mock("./client.js", () => ({ getToken: () => "copilot-tok", handleUnauthorized: () => {} }));
 
 import { askCopilot } from "./aiCopilot.js";
 

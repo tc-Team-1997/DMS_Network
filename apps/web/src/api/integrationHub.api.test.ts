@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // Mock client.ts before importing so getToken() returns null (no auth header needed)
-vi.mock("./client.js", () => ({ getToken: () => null }));
+vi.mock("./client.js", () => ({ getToken: () => null, handleUnauthorized: () => {} }));
 
 // Import the real (un-mocked) API module
 import { integrationHubApi } from "./integrationHub.js";

@@ -18,7 +18,7 @@
  *   const docs = await http.get<Doc[]>("/svc/core/documents");
  *   await http.post("/svc/gateway/auth/login", { username, password });
  */
-import { getToken } from "./client.js";
+import { getToken, handleUnauthorized } from "./client.js";
 
 // Re-export SVC from the canonical config so existing imports from http.ts
 // continue to work without changing call sites.
@@ -36,6 +36,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   });
 
   if (!res.ok) {
+    handleUnauthorized(res.status, url);
     const payload = await res.json().catch(() => ({}));
     throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status, body: payload });
   }

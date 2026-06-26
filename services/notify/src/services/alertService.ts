@@ -7,6 +7,38 @@ import type { EventBus } from "../bus/types.js";
 import type { Recipient, RuleDecision } from "../engine/ruleEngine.js";
 import type { ChannelKey } from "../channels/types.js";
 import { resolveRecipients } from "./escalation.js";
+import { renderEmail, type RenderContext } from "../templates/render.js";
+
+interface TemplateRow {
+  subject_template: string;
+  html_body_template: string;
+  text_body_template: string | null;
+  enabled: boolean | number;
+}
+
+/**
+ * Build the render context for a templated alert email from the decision + the
+ * domain-event meta. Maps common payload fields onto the template's tag schema
+ * (doc.id → {{doc.link}}, workflowId → {{workflow.link}}, etc.).
+ */
+function buildRenderContext(
+  decision: RuleDecision,
+  meta: Record<string, unknown> | undefined,
+  recipientAddress: string,
+): RenderContext {
+  const m = meta ?? {};
+  return {
+    alert: { title: decision.title, level: decision.level },
+    recipient: { name: recipientAddress.split("@")[0], email: recipientAddress },
+    doc: {
+      id: m.docId ?? m.documentId ?? undefined,
+      title: m.docTitle ?? m.title ?? m.docType ?? "document",
+    },
+    workflow: { id: m.workflowId ?? undefined },
+    branch: m.branch ?? "",
+    ...m,
+  };
+}
 
 export interface AlertDeps { knex: Knex; registry: ChannelRegistry; hub: RealtimeHub; bus: EventBus; }
 
@@ -41,6 +73,9 @@ export interface RaiseInput {
   ruleId?: string;
   branch?: string;
   meta?: Record<string, unknown>;
+  /** Optional email-template key (from the rule). When set + enabled, the email
+   *  channel renders this template instead of the plain decision title. */
+  templateKey?: string | null;
 }
 
 export async function raiseAlert(deps: AlertDeps, input: RaiseInput): Promise<{ alertId: string; results: DeliveryResult[] }> {
@@ -56,6 +91,16 @@ export async function raiseAlert(deps: AlertDeps, input: RaiseInput): Promise<{ 
     rule_id: input.ruleId ?? null,
     branch: input.branch ?? null,
   });
+
+  // Load the bound email template once (if any). A missing/disabled template
+  // falls back to the plain decision title — never blocks delivery.
+  let template: TemplateRow | null = null;
+  if (input.templateKey) {
+    try {
+      const row = (await knex("email_templates").where({ key: input.templateKey }).first()) as TemplateRow | undefined;
+      if (row && Boolean(row.enabled)) template = row;
+    } catch { /* table may be absent in minimal setups — fall back to plain */ }
+  }
 
   const results: DeliveryResult[] = [];
   for (const recipient of decision.recipients) {
@@ -73,10 +118,24 @@ export async function raiseAlert(deps: AlertDeps, input: RaiseInput): Promise<{ 
         console.log(`[notify dispatch] alert ${alertId}: email → ${emails.join(", ")} (target ${recipient.kind}:${recipient.value})`);
       }
       for (const address of targets) {
+        // Default to the plain decision title; render the bound template for the
+        // email channel so automated alerts go out formatted with live links.
+        let subject = decision.title;
+        let body = decision.title;
+        let html: string | undefined;
+        if (channel === "email" && template) {
+          const ctx = buildRenderContext(decision, input.meta, address);
+          const rendered = renderEmail(template, ctx);
+          subject = rendered.subject || decision.title;
+          body = rendered.text || decision.title;
+          html = rendered.html;
+        }
+
         const [d] = await registry.dispatch([channel], {
           recipient: address,
-          subject: decision.title,
-          body: decision.title,
+          subject,
+          body,
+          html,
           meta: input.meta,
         });
         results.push(d);
@@ -86,8 +145,8 @@ export async function raiseAlert(deps: AlertDeps, input: RaiseInput): Promise<{ 
           user_id: channel === "email" ? (emailUserId.get(address) ?? null) : null,
           channel: d.channel,
           recipient: d.recipient,
-          subject: decision.title,
-          body: decision.title,
+          subject,
+          body,
           status: d.status,
           error: d.error ?? null,
           sent_at: d.status === "sent" ? knex.fn.now() : null,

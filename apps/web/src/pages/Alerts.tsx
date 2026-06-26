@@ -26,6 +26,7 @@ import {
   type AlertRule,
   type CreateRuleRequest,
 } from "../api/notifyApi.js";
+import { emailTemplatesApi } from "../api/emailTemplatesApi.js";
 import { getToken } from "../api/client.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ interface RuleFormState {
   escalationTarget: string;
   scope: string;
   params: string;
+  templateKey: string;
 }
 
 const EMPTY_RULE: RuleFormState = {
@@ -92,18 +94,23 @@ const EMPTY_RULE: RuleFormState = {
   escalationTarget: "",
   scope: "",
   params: "{}",
+  templateKey: "",
 };
+
+interface TemplateOption { key: string; name: string; }
 
 function AlertRuleForm({
   initial,
   onSave,
   onCancel,
   saving,
+  templates,
 }: {
   initial?: RuleFormState;
   onSave: (form: RuleFormState) => void;
   onCancel: () => void;
   saving: boolean;
+  templates: TemplateOption[];
 }) {
   const [form, setForm] = useState<RuleFormState>(initial ?? EMPTY_RULE);
   const [paramsError, setParamsError] = useState("");
@@ -168,6 +175,19 @@ function AlertRuleForm({
           ))}
         </div>
       </div>
+
+      <FormField
+        as="select"
+        label="Email Template (optional)"
+        value={form.templateKey}
+        onChange={(e) => setForm({ ...form, templateKey: (e.target as HTMLSelectElement).value })}
+        hint="When set, the email channel renders this curated template (formatted HTML + document links) instead of a plain message."
+      >
+        <option value="">Plain text (no template)</option>
+        {templates.map((t) => (
+          <option key={t.key} value={t.key}>{t.name} ({t.key})</option>
+        ))}
+      </FormField>
 
       <FormField
         label="Escalation Target Role (optional)"
@@ -341,6 +361,7 @@ export default function Alerts() {
   // Data
   const [alerts,    setAlerts]    = useState<Alert[]>([]);
   const [rules,     setRules]     = useState<AlertRule[]>([]);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState<string | null>(null);
   const [rulesLoading, setRulesLoading] = useState(false);
@@ -388,8 +409,20 @@ export default function Alerts() {
     }
   }, []);
 
+  // Email templates available to bind to a rule (best-effort; empty if the user
+  // lacks email_template:read or none exist).
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await emailTemplatesApi.list();
+      setTemplates(res.templates.filter((t) => t.enabled).map((t) => ({ key: t.key, name: t.name })));
+    } catch {
+      setTemplates([]);
+    }
+  }, []);
+
   // Load alerts only when the user has the required view permission (I-2).
   useEffect(() => { if (canView) loadAlerts(); }, [canView, loadAlerts]);
+  useEffect(() => { if (canManageRule) loadTemplates(); }, [canManageRule, loadTemplates]);
   // Eagerly load rules on mount so the "Active Rules" KPI card is populated
   // immediately without requiring the user to click the Rules tab (I-6).
   useEffect(() => { if (canView) loadRules(); }, [canView, loadRules]);
@@ -455,6 +488,7 @@ export default function Alerts() {
         params,
         escalationTarget: form.escalationTarget || undefined,
         scope: form.scope || undefined,
+        templateKey: form.templateKey || null,
       };
       if (editingRule) {
         await notifyApi.patchRule(editingRule.id, body);
@@ -1024,12 +1058,14 @@ export default function Alerts() {
                   escalationTarget: editingRule.escalation_target ?? "",
                   scope: editingRule.scope ?? "",
                   params: JSON.stringify(editingRule.params ?? {}, null, 2),
+                  templateKey: editingRule.templateKey ?? "",
                 }
               : undefined
           }
           onSave={handleSaveRule}
           onCancel={() => { setShowRuleModal(false); setEditingRule(null); }}
           saving={ruleSaving}
+          templates={templates}
         />
       </Modal>
     </div>

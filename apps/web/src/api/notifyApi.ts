@@ -28,6 +28,8 @@ export interface AlertRule {
   escalation_target: string | null;
   scope: string | null;
   enabled: boolean;
+  /** Bound email-template key (camelCase from the parsed rule). */
+  templateKey?: string | null;
   created_by?: string;
   created_at?: string;
 }
@@ -39,6 +41,8 @@ export interface CreateRuleRequest {
   channels?: string[];
   escalationTarget?: string;
   scope?: string;
+  /** Email template to render for the email channel; null/omitted = plain title. */
+  templateKey?: string | null;
 }
 
 export const notifyApi = {

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-vi.mock("./client.js", () => ({ getToken: () => "search-tok" }));
+vi.mock("./client.js", () => ({ getToken: () => "search-tok", handleUnauthorized: () => {} }));
 
 import { searchApi, type SearchQuery } from "./searchApi.js";
 

@@ -17,6 +17,7 @@ export function attachConsumer(deps: AlertDeps): void {
             decision, ruleId: rule.id,
             branch: (event.payload as any)?.branch,
             meta: event.payload as Record<string, unknown>,
+            templateKey: rule.templateKey,
           });
         }
       }
