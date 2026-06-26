@@ -159,4 +159,35 @@ export async function seed(knex: Knex): Promise<void> {
     const cdo = await knex("roles").where({ name: "CDO" }).first();
     await knex("user_roles").insert({ user_id: adminId, role_id: cdo.id });
   }
+
+  // Named ZorFinoTech staff accounts — idempotent (upsert by username).
+  // Password is the shared bootstrap secret "Welcome2123"; rotate in prod.
+  const STAFF: Array<{ username: string; full_name: string; email: string; role: string }> = [
+    { username: "pema",             full_name: "Pema",             email: "pema@zorfinotech.com",             role: "CDO" },
+    { username: "jigme",            full_name: "Jigme",            email: "jigme@zorfinotech.com",            role: "Supervisor" },
+    { username: "amit.katoch",      full_name: "Amit Katoch",      email: "amit.katoch@zorfinotech.com",      role: "Supervisor" },
+    { username: "basant.neupane",   full_name: "Basant Neupane",   email: "basant.neupane@zorfinotech.com",   role: "CDO" },
+    { username: "taniya.chaudhary", full_name: "Taniya Chaudhary", email: "taniya.chaudhary@zorfinotech.com", role: "Checker" },
+  ];
+  for (const s of STAFF) {
+    let user = await knex("users").where({ username: s.username }).first();
+    if (!user) {
+      const id = newId();
+      await knex("users").insert({
+        id,
+        username: s.username,
+        password_hash: bcrypt.hashSync("Welcome2123", 10),
+        full_name: s.full_name,
+        email: s.email,
+        status: "Active",
+        created_by: "system",
+      });
+      user = await knex("users").where({ id }).first();
+    }
+    const role = await knex("roles").where({ name: s.role }).first();
+    if (role) {
+      const link = await knex("user_roles").where({ user_id: user.id, role_id: role.id }).first();
+      if (!link) await knex("user_roles").insert({ user_id: user.id, role_id: role.id });
+    }
+  }
 }

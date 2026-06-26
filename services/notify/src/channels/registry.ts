@@ -45,8 +45,15 @@ export async function buildRegistry(deps: { knex: Knex; config: AppConfig; hub: 
   const reg = new ChannelRegistry();
   const env = process.env;
 
+  const smtpPort = Number(env.SMTP_PORT ?? 587);
   const transport = env.SMTP_HOST
-    ? nodemailer.default.createTransport({ host: env.SMTP_HOST, port: Number(env.SMTP_PORT ?? 587), auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? "" } : undefined })
+    ? nodemailer.default.createTransport({
+        host: env.SMTP_HOST,
+        port: smtpPort,
+        // Implicit TLS is required on 465 (Zoho). 587 uses STARTTLS (secure:false).
+        secure: env.SMTP_SECURE === "true" || smtpPort === 465,
+        auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? "" } : undefined,
+      })
     : nodemailer.default.createTransport({ jsonTransport: true });
   reg.register(new EmailAdapter(transport, env.SMTP_FROM ?? "dms@bob.bt"));
 

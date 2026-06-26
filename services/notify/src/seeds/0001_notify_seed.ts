@@ -343,6 +343,40 @@ export async function seed(knex: Knex): Promise<void> {
     }
   }
 
+  // ZorFinoTech staff — mirrored from the gateway user store so notify can
+  // resolve role/user notification targets to real email addresses. Idempotent
+  // (upsert by username). Shared bootstrap password "Welcome2123".
+  const STAFF: Array<{ username: string; full_name: string; email: string; role: string }> = [
+    { username: "pema",             full_name: "Pema",             email: "pema@zorfinotech.com",             role: "CDO" },
+    { username: "jigme",            full_name: "Jigme",            email: "jigme@zorfinotech.com",            role: "Supervisor" },
+    { username: "amit.katoch",      full_name: "Amit Katoch",      email: "amit.katoch@zorfinotech.com",      role: "Supervisor" },
+    { username: "basant.neupane",   full_name: "Basant Neupane",   email: "basant.neupane@zorfinotech.com",   role: "CDO" },
+    { username: "taniya.chaudhary", full_name: "Taniya Chaudhary", email: "taniya.chaudhary@zorfinotech.com", role: "Checker" },
+  ];
+  for (const s of STAFF) {
+    let user = await knex("users").where({ username: s.username }).first();
+    if (!user) {
+      const id = newId();
+      await knex("users").insert({
+        id,
+        username: s.username,
+        password_hash: await hashPassword("Welcome2123"),
+        full_name: s.full_name,
+        email: s.email,
+        status: "Active",
+        created_by: "system",
+      });
+      user = await knex("users").where({ id }).first();
+    } else if (!user.email) {
+      await knex("users").where({ id: user.id }).update({ email: s.email });
+    }
+    const role = await knex("roles").where({ name: s.role }).first();
+    if (role) {
+      const link = await knex("user_roles").where({ user_id: user.id, role_id: role.id }).first();
+      if (!link) await knex("user_roles").insert({ user_id: user.id, role_id: role.id });
+    }
+  }
+
   // alert rules — idempotent on `name` (natural key)
   for (const rule of SAMPLE_RULES) {
     const exists = await knex("alert_rules").where({ name: rule.name }).first();

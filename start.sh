@@ -19,6 +19,17 @@ cd "$ROOT"
 LOGDIR="$ROOT/.devlogs"
 mkdir -p "$LOGDIR"
 
+# Load local secrets (.env is gitignored) and export every key to the child
+# services. `set -a` auto-exports anything sourced; the per-service `dev` scripts
+# still set DB_CLIENT=sqlite3 inline, which overrides any DB_* from .env, so dev
+# stays on SQLite. SMTP_* (Zoho email) and other secrets flow through here.
+if [ -f "$ROOT/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$ROOT/.env"
+  set +a
+fi
+
 # Shared secrets so every service (incl. the Python AI) verifies the gateway JWT.
 export JWT_SECRET="${JWT_SECRET:-change-me-in-prod}"
 export INTERNAL_SERVICE_TOKEN="${INTERNAL_SERVICE_TOKEN:-change-me-internal}"
