@@ -121,31 +121,43 @@ const DEFAULT_COLORS = [
 export function DonutChartCard({
   title, action, data, height = 200, className = "",
 }: DonutChartCardProps) {
+  // Accessible name summarising the slices — the SVG sectors themselves are
+  // decorative (the legend conveys the same info as text), so we expose one
+  // labelled image instead of many unnamed <path role="img"> sectors.
+  const summary = data.map((d) => `${d.name}: ${d.value}`).join(", ");
   return (
     <Card title={title} action={action} className={className}>
-      <ResponsiveContainer width="100%" height={height}>
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius="55%"
-            outerRadius="80%"
-            paddingAngle={2}
-            dataKey="value"
-          >
-            {data.map((entry, i) => (
-              <Cell key={entry.name} fill={entry.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip contentStyle={TOOLTIP_STYLE} />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            formatter={(v) => <span style={{ fontSize: 10, color: "var(--sil)" }}>{v}</span>}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+      <div role="img" aria-label={`Distribution — ${summary}`}>
+        <ResponsiveContainer width="100%" height={height}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="55%"
+              outerRadius="80%"
+              paddingAngle={2}
+              dataKey="value"
+              isAnimationActive={false}
+              rootTabIndex={-1}
+            >
+              {data.map((entry, i) => (
+                <Cell
+                  key={entry.name}
+                  fill={entry.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+                  aria-hidden="true"
+                />
+              ))}
+            </Pie>
+            <Tooltip contentStyle={TOOLTIP_STYLE} />
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              formatter={(v) => <span style={{ fontSize: 10, color: "var(--mist)" }}>{v}</span>}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </Card>
   );
 }

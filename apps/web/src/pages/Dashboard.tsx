@@ -439,13 +439,13 @@ export default function Dashboard() {
             padding: "10px 14px",
             marginBottom: 14,
             fontSize: 12,
-            color: "var(--R)",
+            color: "var(--Rtx)",
           }}
         >
           {error} —{" "}
           <button
             onClick={load}
-            style={{ color: "var(--R)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+            style={{ color: "var(--Rtx)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
           >
             Retry
           </button>
@@ -458,7 +458,7 @@ export default function Dashboard() {
           <KpiCard
             label="Total Documents"
             value={loading ? "…" : total.toLocaleString()}
-            sub={<span style={{ color: "var(--G)", fontWeight: 700 }}>↑ 4.2%</span>}
+            sub={<span style={{ color: "var(--Gtx)", fontWeight: 700 }}>↑ 4.2%</span>}
             variant="gold"
           />
         </ClickableWrapper>
@@ -475,7 +475,7 @@ export default function Dashboard() {
             label="Pending Review"
             value={loading ? "…" : pending.toLocaleString()}
             sub={
-              <span style={{ color: pending > 0 ? "var(--R)" : "var(--G)", fontWeight: 700 }}>
+              <span style={{ color: pending > 0 ? "var(--Rtx)" : "var(--Gtx)", fontWeight: 700 }}>
                 {pending > 0 ? `${pending} flagged` : "All clear"}
               </span>
             }
@@ -502,7 +502,7 @@ export default function Dashboard() {
           <KpiCard
             label="Indexed Today"
             value={loading ? "…" : indexedToday.toLocaleString()}
-            sub={<span style={{ color: "var(--G)" }}>Avg cycle: 3.8s</span>}
+            sub={<span style={{ color: "var(--Gtx)" }}>Avg cycle: 3.8s</span>}
             variant="green"
           />
         </ClickableWrapper>
@@ -668,7 +668,7 @@ export default function Dashboard() {
                 Loading…
               </div>
             ) : expiringDocs.length === 0 ? (
-              <div style={{ color: "var(--G)", fontSize: 12, padding: "8px 0" }}>
+              <div style={{ color: "var(--Gtx)", fontSize: 12, padding: "8px 0" }}>
                 No documents expiring within 90 days
               </div>
             ) : (
@@ -683,11 +683,10 @@ export default function Dashboard() {
           </Card>
         </ClickableWrapper>
 
-        {/* Heatmap + Branch Volume */}
-        <ClickableWrapper
-          onClick={() => setDrillDown(drillDown === "branch" ? null : "branch")}
-          ariaLabel="View branch activity details or expand drill-down"
-        >
+        {/* Heatmap + Branch Volume — NOT a button wrapper: it contains the
+            interactive BranchBar controls (nested interactives are an a11y
+            violation). The drill-down is its own labelled button below. */}
+        <div>
           <Card title={<span>Branch Activity Heatmap <Tag variant="gold">Today</Tag></span>}>
             <div style={{ fontSize: 10, color: "var(--sil)", marginBottom: 8 }}>
               Document volume · Each cell = 1 branch-hour
@@ -708,8 +707,19 @@ export default function Dashboard() {
               <div style={{ width: 8, height: 8, borderRadius: 2, background: "var(--gold3)" }} />Peak
             </div>
             <div style={{ borderTop: "1px solid var(--bd)", marginTop: 8, paddingTop: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--mist)", marginBottom: 8 }}>
-                By Branch (Top 5)
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--mist)" }}>
+                  By Branch (Top 5)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDrillDown(drillDown === "branch" ? null : "branch")}
+                  aria-expanded={drillDown === "branch"}
+                  aria-label="Expand branch breakdown drill-down"
+                  style={{ background: "none", border: "none", color: "var(--Btx)", cursor: "pointer", fontSize: 10, fontWeight: 600 }}
+                >
+                  {drillDown === "branch" ? "Collapse ▲" : "Expand ▼"}
+                </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {branchStats.length > 0 ? (
@@ -729,7 +739,7 @@ export default function Dashboard() {
               </div>
             </div>
           </Card>
-        </ClickableWrapper>
+        </div>
 
         {/* Category Breakdown (compact) */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

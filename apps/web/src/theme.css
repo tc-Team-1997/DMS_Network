@@ -21,7 +21,7 @@
   --goldT: rgba(184,145,42,.12);
 
   /* ── Silver / Mist ── */
-  --sil:   #64748b;   /* muted / secondary text                 */
+  --sil:   #5b6a80;   /* muted / secondary text — AA (≥4.5:1) on white & light cards */
   --mist:  #334155;   /* body / secondary text                  */
   --wh:    #0f172a;   /* primary dark text                      */
 
@@ -36,6 +36,15 @@
   --BT: rgba(58,159,208,.13);
   --P:  #9b6fe0;   /* purple / AI      */
   --PT: rgba(155,111,224,.13);
+
+  /* Text-safe semantic shades — WCAG AA (≥4.5:1) as text on white / the .13
+     tints above. The bright --G/--R/--W/--B/--P stay for dots, charts and
+     filled buttons; these *tx vars are used wherever the colour is TEXT. */
+  --Gtx: #157347;   /* green  text — AA on white & .13 green tint */
+  --Rtx: #c0392b;   /* red    text */
+  --Wtx: #875310;   /* amber  text — AA on white & .13 amber tint */
+  --Btx: #176389;   /* blue   text — AA on white & .13 blue tint */
+  --Ptx: #6f42c1;   /* purple text */
 
   /* ── Border / Glass ── */
   --bd: rgba(15,23,42,.10);
@@ -167,12 +176,12 @@ tr:hover td { background: rgba(15,23,42,.02); }
   letter-spacing:.3px;
   line-height:   1.6;
 }
-.tg    { background: var(--GT);    color: var(--G); }
-.tr    { background: var(--RT);    color: var(--R); }
-.tw    { background: var(--WT);    color: var(--W); }
-.tb    { background: var(--BT);    color: var(--B); }
-.tp    { background: var(--PT);    color: var(--P); }
-.tgold { background: var(--goldT); color: var(--gold3); }
+.tg    { background: var(--GT);    color: var(--Gtx); }
+.tr    { background: var(--RT);    color: var(--Rtx); }
+.tw    { background: var(--WT);    color: var(--Wtx); }
+.tb    { background: var(--BT);    color: var(--Btx); }
+.tp    { background: var(--PT);    color: var(--Ptx); }
+.tgold { background: var(--goldT); color: #6f5811; }  /* AA on the .12 gold tint */
 
 /* navbar badge */
 .nb    { margin-left: auto; font-size: 9.5px; font-weight: 700; border-radius: 10px; padding: 1px 6px; line-height: 1.5; }
@@ -524,7 +533,7 @@ hr { border: none; border-top: 1px solid var(--bd); margin: 14px 0; }
 .usr-pill small { color: #f0c84a; }
 .sidebar { background: #0b1830; border-right: 1px solid rgba(255,255,255,.07); box-shadow: none; }
 .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); }
-.nav-label { color: rgba(255,255,255,.4); opacity: 1; }
+.nav-label { color: #9aa6b8; opacity: 1; }  /* ≥4.5:1 on navy #0b1830 (was rgba(255,255,255,.4) = 3.76:1) */
 .nav-item { color: rgba(255,255,255,.66); }
 .nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
 .nav-item.active { color: #f0c84a; background: rgba(240,200,74,.1); border-left-color: #f0c84a; }

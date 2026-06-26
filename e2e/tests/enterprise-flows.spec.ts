@@ -19,6 +19,7 @@
  */
 import { test, expect, type Page, type Request } from "@playwright/test";
 import path from "path";
+import fs from "fs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -56,6 +57,29 @@ async function fetchQueue(page: Page, status: string): Promise<any[]> {
 /** Pick a real document UUID from the core service (for Viewer deep-links). */
 async function pickDocUuid(page: Page): Promise<string | null> {
   const token = await getToken(page);
+  // Upload a fresh document so it has a REAL file on disk. The seed documents
+  // are metadata-only (their physical files don't exist on the dev stack), so
+  // burn-in tools like stamp/redact 500 on them ("ENOENT … file.pdf"). An
+  // uploaded doc is stampable and order-independent (it doesn't depend on what
+  // other specs left in the shared store). We upload the real fixture PNG via
+  // page.request (shares the page's storage state) so sharp's burn-in pipeline
+  // has valid image dimensions to composite onto.
+  try {
+    const fixture = path.join(__dirname, "..", "fixtures", "sample.png");
+    const up = await page.request.post(`/svc/core/documents`, {
+      headers: { authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "e2e-burnin.png", mimeType: "image/png", buffer: fs.readFileSync(fixture) },
+        title: "E2E burn-in subject",
+      },
+    });
+    if (up.ok()) {
+      const j = await up.json();
+      if (j?.document?.id) return j.document.id as string;
+    }
+  } catch { /* fall through to existing docs */ }
+
+  // Fallback: any existing uuid document.
   const data = await page.evaluate(async (token) => {
     const r = await fetch(`/svc/core/documents?limit=20`, {
       headers: { authorization: `Bearer ${token}` },
@@ -233,30 +257,31 @@ test.describe("Viewer — burn-in tools + workflow decision", () => {
     await stampReq;
 
     // The viewer surfaces a status toast on success or error — either way it must
-    // not crash. On success it mentions the new version.
+    // not crash. On success it mentions the new version. Generous timeout: the
+    // dev stack's in-memory SQLite uses a single connection (pool max:1), so the
+    // stamp round-trip can queue behind other work near the end of a long run.
     const toast = page.locator('[role="status"]').filter({ hasText: /stamp|version/i }).first();
-    await expect(toast).toBeVisible({ timeout: 12_000 });
+    await expect(toast).toBeVisible({ timeout: 30_000 });
   });
 
   test("workflow decision card appears with ?workflow and Approve returns to /review-queue", async ({
     page,
   }) => {
-    // Prefer a real review item so the doc + workflow are genuinely linked.
-    let docId: string | null = null;
+    // The Review Decision card renders on `workflowId && doc` (the loaded
+    // document), so we need (a) ANY real workflow id and (b) a document that
+    // actually LOADS. A review item's own doc_id is unreliable here: earlier
+    // tests in this file claim/approve the seeded Pending item, and the
+    // remaining items' doc_ids may not resolve in the core store on this stack.
+    // So we take any workflow id from the queue and pair it with a freshly
+    // uploaded (guaranteed-loadable) document.
     let workflowId: string | null = null;
-    for (const status of ["Pending", "Escalated", "Claimed"]) {
+    for (const status of ["Pending", "Claimed", "Escalated", "Resolved"]) {
       const items = await fetchQueue(page, status);
-      const withDoc = items.find((i) => i.doc_id && i.id);
-      if (withDoc) {
-        docId = withDoc.doc_id;
-        workflowId = withDoc.id;
-        break;
-      }
+      const withId = items.find((i) => i.id);
+      if (withId) { workflowId = withId.id; break; }
     }
-    // Fall back to a real doc uuid + the workflow id even if the doc fails to load,
-    // because the decision card is keyed off the ?workflow param, not the document.
-    if (!docId) docId = await pickDocUuid(page);
-    test.skip(!docId || !workflowId, "No workflow-linked review item available.");
+    const docId = await pickDocUuid(page);
+    test.skip(!docId || !workflowId, "No workflow item available to drive the decision card.");
 
     await page.goto(
       `/viewer?doc=${encodeURIComponent(docId!)}&workflow=${encodeURIComponent(workflowId!)}`,
@@ -266,8 +291,10 @@ test.describe("Viewer — burn-in tools + workflow decision", () => {
     await expect(page.locator('[data-testid="wf-id"]')).toBeVisible({ timeout: 12_000 });
 
     // The Review Decision card appears with Approve / Reject / Escalate buttons.
+    // Generous timeout: the workflow fetch backing this card can queue behind the
+    // single-connection in-memory SQLite pool near the end of a long suite run.
     const decisionCard = page.locator(".card", { hasText: "Review Decision" }).first();
-    await expect(decisionCard).toBeVisible({ timeout: 12_000 });
+    await expect(decisionCard).toBeVisible({ timeout: 30_000 });
     const approveBtn = decisionCard.locator('button[aria-label="approve"]');
     await expect(approveBtn).toBeVisible();
 

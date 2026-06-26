@@ -35,22 +35,38 @@ export function Carousel({ slides }: { slides: Slide[] }) {
         <p style={{ maxWidth: 440, opacity: .8, lineHeight: 1.6, fontSize: 15, margin: 0 }}>{s.body}</p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 30 }}>
+      <div style={{ display: "flex", gap: 2, marginTop: 22 }} role="tablist" aria-label="Highlights">
         {slides.map((_, idx) => (
           <button
             key={idx}
-            aria-label={`slide ${idx + 1}`}
+            role="tab"
+            aria-label={`Go to highlight ${idx + 1} of ${slides.length}`}
+            aria-selected={idx === i}
             onClick={() => setI(idx)}
             style={{
-              width: idx === i ? 26 : 8,
-              height: 8,
-              borderRadius: 4,
+              // 24×24 hit target (WCAG 2.5.8) — the visible pill is the inner span.
+              width: 24,
+              height: 24,
+              padding: 0,
+              display: "grid",
+              placeItems: "center",
               border: "none",
+              background: "transparent",
               cursor: "pointer",
-              background: idx === i ? "#fff" : "rgba(255,255,255,.4)",
-              transition: "width .3s ease, background .3s ease",
             }}
-          />
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                display: "block",
+                width: idx === i ? 26 : 8,
+                height: 8,
+                borderRadius: 4,
+                background: idx === i ? "#fff" : "rgba(255,255,255,.4)",
+                transition: "width .3s ease, background .3s ease",
+              }}
+            />
+          </button>
         ))}
       </div>
     </div>

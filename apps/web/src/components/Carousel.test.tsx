@@ -11,7 +11,7 @@ describe("Carousel", () => {
   it("shows the first slide and switches on dot click", () => {
     render(<Carousel slides={slides} />);
     expect(screen.getByText("Capture, classify, index.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /slide 2/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /highlight 2/i }));
     expect(screen.getByText("Maker–checker workflows.")).toBeInTheDocument();
   });
 });

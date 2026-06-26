@@ -109,7 +109,7 @@ export function Login() {
           <form onSubmit={onSubmit} autoComplete="off">
             <div style={{ width: 46, height: 46, background: "var(--navy)", borderRadius: 12, display: "grid", placeItems: "center", color: "#fff", fontSize: 20, marginBottom: 26 }}>🛡️</div>
             <h2 style={{ margin: "0 0 8px", fontSize: 26, color: "#0f172a" }}>Sign in</h2>
-            <p style={{ color: "#64748b", margin: "0 0 32px", fontSize: 14 }}>
+            <p style={{ color: "#475569", margin: "0 0 32px", fontSize: 14 }}>
               {ldapProvider
                 ? `Sign in with ${ldapProvider.displayName}`
                 : "Document operations for authorised staff only"}
@@ -183,7 +183,7 @@ export function Login() {
         </div>
 
         {/* App version — derived from the real package.json version at build time */}
-        <div className="brand" style={{ position: "absolute", bottom: 22, left: 0, right: 0, textAlign: "center", color: "#94a3b8", fontSize: 12 }}>
+        <div className="brand" style={{ position: "absolute", bottom: 22, left: 0, right: 0, textAlign: "center", color: "#475569", fontSize: 12 }}>
           ZorDMS · v{__APP_VERSION__}
         </div>
       </div>
