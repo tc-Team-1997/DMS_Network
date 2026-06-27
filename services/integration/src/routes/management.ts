@@ -2,7 +2,9 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import type { ConnectedSystem } from "@zordms/types";
-import { LogsQuerySchema, SetInboundSecretSchema, parseOr400 } from "../validation.js";
+import { LogsQuerySchema, SetInboundSecretSchema, UpsertConnectorSchema, parseOr400 } from "../validation.js";
+import { newId } from "@zordms/db";
+import { selectConnectorFromConfig } from "../connectors/registry.js";
 
 export function managementRouter(): Router {
   const r = Router();
@@ -64,6 +66,49 @@ export function managementRouter(): Router {
         return;
       }
       res.json({ system, inboundSecretSet: true });
+    } catch (err) { next(err); }
+  });
+
+  // Admin upsert of a connector's config (base_url / auth_type / enabled / secret).
+  // Config-driven: point e.g. cbs at a real BANCS/GBP endpoint without code change.
+  // The secret is write-only and never returned.
+  r.put("/systems/:id", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const body = parseOr400(UpsertConnectorSchema, req.body, res);
+      if (!body) return;
+      const system = req.params.id;
+      const existing = await knex("integration_config").where({ system }).first();
+      const patch: Record<string, unknown> = {};
+      if (body.base_url !== undefined) patch.base_url = body.base_url;
+      if (body.auth_type !== undefined) patch.auth_type = body.auth_type;
+      if (body.enabled !== undefined) patch.enabled = body.enabled;
+      if (body.secret !== undefined) patch.secret = body.secret;
+      if (existing) {
+        if (Object.keys(patch).length) await knex("integration_config").where({ system }).update(patch);
+      } else {
+        await knex("integration_config").insert({
+          id: newId(), system,
+          base_url: (body.base_url as string | null) ?? null,
+          auth_type: body.auth_type ?? "none",
+          enabled: body.enabled ?? true,
+          secret: body.secret ?? null,
+        });
+      }
+      const saved = await knex("integration_config").where({ system }).first();
+      res.json({ system, base_url: saved.base_url, auth_type: saved.auth_type, enabled: Boolean(saved.enabled), hasSecret: Boolean(saved.secret) });
+    } catch (err) { next(err); }
+  });
+
+  // Test a connector: ping its health op (live) or report mock mode. Config-aware
+  // (env base url → admin base url → mock).
+  r.post("/systems/:id/test", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const system = req.params.id;
+      const { connector, mode, baseUrl } = await selectConnectorFromConfig(system, { knex });
+      const result = await connector.call("ping", {});
+      res.json({ system, mode, baseUrl, ok: result.ok, status: result.status, error: result.error ?? null });
     } catch (err) { next(err); }
   });
 

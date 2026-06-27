@@ -26,6 +26,19 @@ export interface CustomerProfile {
   };
   portfolio: { doc_type: string; count: number }[];
   timeline: { ts: string; action: string; entity_id?: string; details?: string }[];
+  /** CBS-sourced master record (upserted from the integrated core-banking
+   *  system via /integration/customer-upsert). Null until CBS sends it. */
+  master?: CustomerMaster | null;
+}
+
+export interface CustomerMaster {
+  cid: string;
+  name?: string | null;
+  branch?: string | null;
+  segment?: string | null;
+  kyc_status?: string | null;
+  source?: string | null;
+  updated_at?: string | null;
 }
 
 export async function fetchCustomerProfile(cid: string): Promise<CustomerProfile> {

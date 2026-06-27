@@ -85,3 +85,32 @@ export function selectConnector(system: string, ctx: ConnectorContext, opts: Con
   }
   return buildConnector(system, ctx);
 }
+
+/**
+ * Config-driven selection: env `<SYSTEM>_BASE_URL` wins (deploy override), then
+ * the admin-set `integration_config.base_url` (enabled row), else the mock. This
+ * lets operators point a connector (e.g. cbs/BANCS) at a real endpoint from the
+ * Administration UI without any code/env change.
+ */
+export async function selectConnectorFromConfig(
+  system: string,
+  ctx: ConnectorContext,
+  opts: ConnectorSelectOptions = {},
+): Promise<{ connector: Connector; mode: "live" | "mock"; baseUrl: string | null }> {
+  let baseUrl = liveBaseUrl(system, opts.env) ?? null;
+  if (!baseUrl) {
+    const row = await ctx.knex("integration_config").where({ system }).first().catch(() => null);
+    if (row && row.enabled && row.base_url && String(row.base_url).trim()) {
+      baseUrl = String(row.base_url).trim();
+    }
+  }
+  if (baseUrl) {
+    const opMap = OP_MAPS[system] ?? {};
+    return {
+      connector: withLogging(new HttpConnector({ system, baseUrl, opMap, fetchImpl: opts.fetchImpl }), ctx.knex),
+      mode: "live",
+      baseUrl,
+    };
+  }
+  return { connector: buildConnector(system, ctx), mode: "mock", baseUrl: null };
+}

@@ -16,6 +16,7 @@ import { DocTypesPanel } from "../components/doctypes/DocTypesPanel.js";
 import { EmailTemplatesPanel } from "../components/emailtemplates/EmailTemplatesPanel.js";
 import { ApiDocsPanel } from "../components/apidocs/ApiDocsPanel.js";
 import { ConfigurationPanel } from "../components/config/ConfigurationPanel.js";
+import { ConnectorsPanel } from "../components/integrations/ConnectorsPanel.js";
 import { listJobs } from "../api/jobsApi.js";
 import type { JobStatus, MonitorJob } from "../api/jobsApi.js";
 
@@ -43,6 +44,7 @@ const TABS = [
   { key: "queue", label: "Processing Queue" },
   { key: "dedup", label: "Duplicate Detection" },
   { key: "config", label: "Configuration" },
+  { key: "connectors", label: "Integrations" },
   { key: "doctypes", label: "Document Types" },
   { key: "emailtemplates", label: "Email Templates" },
   { key: "apidocs", label: "API Documentation" },
@@ -918,6 +920,9 @@ export function SystemAdministration() {
 
       {/* ═══ CONFIGURATION TAB ═══ */}
       {tab === "config" && <ConfigurationPanel canWrite={canAdmin} />}
+
+      {/* ═══ INTEGRATIONS / CONNECTORS TAB ═══ */}
+      {tab === "connectors" && <ConnectorsPanel canWrite={canAdmin} />}
 
       {/* ═══ API DOCUMENTATION TAB ═══ */}
       {tab === "apidocs" && <ApiDocsPanel />}

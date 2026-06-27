@@ -235,6 +235,37 @@ export default function Customer360() {
             />
           </div>
 
+          {/* ─── CBS master record (from the integrated core-banking system) ─── */}
+          <Card
+            title={<span>Core Banking (CBS) Master Record</span>}
+            action={profile.master?.source
+              ? <Tag variant="blue">source: {profile.master.source}</Tag>
+              : <Tag variant="amber">not synced</Tag>}
+            style={{ marginBottom: 16 }}
+          >
+            {profile.master ? (
+              <div className="g4" style={{ gap: 14 }}>
+                {[
+                  ["Name", profile.master.name],
+                  ["Branch", profile.master.branch],
+                  ["Segment", profile.master.segment],
+                  ["CBS KYC Status", profile.master.kyc_status],
+                ].map(([label, val]) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--sil)", marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--mist)" }}>{val || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--sil)", padding: "6px 0" }}>
+                No master record for this customer yet. It populates automatically when the integrated
+                CBS (BANCS / GBP) pushes a customer-update event. Configure the CBS connector under
+                System Administration → Integrations.
+              </div>
+            )}
+          </Card>
+
           {/* ─── Tabs ──────────────────────────────────────── */}
           <Tabs
             items={[

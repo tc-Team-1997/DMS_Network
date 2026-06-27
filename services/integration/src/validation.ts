@@ -70,6 +70,25 @@ export const SetInboundSecretSchema = z
   .strict();
 export type SetInboundSecret = z.infer<typeof SetInboundSecretSchema>;
 
+/** Connector auth strategies stored on integration_config.auth_type. */
+export const ConnectorAuthType = z.enum(["none", "bearer", "hmac", "basic"]);
+
+/**
+ * PUT /integration/systems/:id — admin upsert of a connector's config. Lets an
+ * operator point a system (e.g. cbs/BANCS) at a real endpoint, switch auth, or
+ * enable/disable it — config-driven, no code change. The secret is write-only
+ * (never echoed back).
+ */
+export const UpsertConnectorSchema = z
+  .object({
+    base_url: z.string().url().nullish(),
+    auth_type: ConnectorAuthType.optional(),
+    enabled: z.boolean().optional(),
+    secret: z.string().min(1).optional(),
+  })
+  .strict();
+export type UpsertConnector = z.infer<typeof UpsertConnectorSchema>;
+
 /* ----------------------------- Inbound webhooks ------------------------------ */
 /*
  * These document the HMAC-signed inbound contract. Signature verification on the
