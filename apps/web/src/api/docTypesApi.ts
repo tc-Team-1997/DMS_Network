@@ -37,6 +37,18 @@ export interface DocType {
   updated_at?: string | null;
   mandatoryFields: FieldObject[];
   optionalFields: FieldObject[];
+  /** Group C training config. */
+  promptClassify?: string | null;
+  promptExtract?: string | null;
+  folderPathTemplate?: string | null;
+  hasSample?: boolean;
+}
+
+/** Human-approved training output: per-type prompts + folder routing template. */
+export interface TrainingPayload {
+  promptClassify?: string | null;
+  promptExtract?: string | null;
+  folderPathTemplate?: string | null;
 }
 
 export interface DocTypesResponse {
@@ -148,6 +160,16 @@ export const docTypesApi = {
       method: "POST",
       headers: jsonHeaders(),
       body: JSON.stringify(fields),
+    });
+    return unwrap<{ docType: DocType }>(res);
+  },
+
+  /** POST /doc-types/:code/apply-training — set per-type prompts + folder template. */
+  async applyTraining(code: string, payload: TrainingPayload): Promise<{ docType: DocType }> {
+    const res = await fetch(`${SVC.core}/doc-types/${encodeURIComponent(code)}/apply-training`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify(payload),
     });
     return unwrap<{ docType: DocType }>(res);
   },

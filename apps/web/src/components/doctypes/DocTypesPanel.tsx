@@ -34,6 +34,10 @@ interface EditorState {
   issuer: string;
   system: boolean;
   rows: FieldRow[];
+  // Group C training config (edit mode only).
+  promptClassify: string;
+  promptExtract: string;
+  folderPathTemplate: string;
 }
 
 function blankEditor(): EditorState {
@@ -46,6 +50,9 @@ function blankEditor(): EditorState {
     issuer: "",
     system: false,
     rows: [],
+    promptClassify: "",
+    promptExtract: "",
+    folderPathTemplate: "",
   };
 }
 
@@ -59,6 +66,9 @@ function editorFrom(dt: DocType): EditorState {
     issuer: dt.issuer ?? "",
     system: dt.system,
     rows: rowsFromDocType(dt.mandatoryFields ?? [], dt.optionalFields ?? []),
+    promptClassify: dt.promptClassify ?? "",
+    promptExtract: dt.promptExtract ?? "",
+    folderPathTemplate: dt.folderPathTemplate ?? "",
   };
 }
 
@@ -146,6 +156,13 @@ export function DocTypesPanel({ canWrite }: DocTypesPanelProps) {
         await docTypesApi.update(editor.code, payload);
         setMsg({ kind: "success", text: `Updated "${editor.code}".` });
       }
+      // Persist the training config (prompts + folder template) for this type.
+      const codeForTraining = editor.mode === "create" ? editor.code.trim() : editor.code;
+      await docTypesApi.applyTraining(codeForTraining, {
+        promptClassify: editor.promptClassify.trim() || null,
+        promptExtract: editor.promptExtract.trim() || null,
+        folderPathTemplate: editor.folderPathTemplate.trim() || null,
+      });
       setEditor(null);
       await load();
     } catch (e: unknown) {
@@ -381,6 +398,39 @@ export function DocTypesPanel({ canWrite }: DocTypesPanelProps) {
                 rows={editor.rows}
                 disabled={saving}
                 onChange={(rows) => setEditor({ ...editor, rows })}
+              />
+            </div>
+
+            {/* AI training — folder routing + per-type prompts (human-curated) */}
+            <div style={{ marginTop: 12, borderTop: "1px solid var(--bd)", paddingTop: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", color: "var(--sil)", marginBottom: 8 }}>
+                AI training & routing
+              </div>
+              <FormField
+                label="Folder routing template"
+                placeholder="/BoB/Customers/{cid}/KYC/{year}/"
+                value={editor.folderPathTemplate}
+                disabled={saving}
+                hint="Captured documents of this type auto-route here. Tokens: {cid} {year} {quarter} {date} or any extracted {field}."
+                onChange={(e) => setEditor({ ...editor, folderPathTemplate: e.target.value })}
+              />
+              <FormField
+                as="textarea"
+                label="Classification prompt (optional)"
+                rows={2}
+                value={editor.promptClassify}
+                disabled={saving}
+                hint="Guidance the AI uses to recognise this document type. Blank = model default."
+                onChange={(e) => setEditor({ ...editor, promptClassify: e.target.value })}
+              />
+              <FormField
+                as="textarea"
+                label="Extraction prompt (optional)"
+                rows={2}
+                value={editor.promptExtract}
+                disabled={saving}
+                hint="Guidance for extracting this type's fields. Blank = model default."
+                onChange={(e) => setEditor({ ...editor, promptExtract: e.target.value })}
               />
             </div>
 

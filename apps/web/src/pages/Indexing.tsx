@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
   KpiCard,
@@ -14,6 +14,8 @@ import {
 import type { Column, TabItem } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { dashboardCaptureApi, type DocumentRecord } from "../api/dashboardCaptureApi.js";
+import { docTypesApi, type DocType } from "../api/docTypesApi.js";
+import { repositoryViewerApi } from "../api/repositoryViewerApi.js";
 
 /* ─── Document types and their field definitions ─── */
 type DocTypeKey = "BT_CID_4G" | "BT_PASSPORT" | "BOB_LOAN_APPLICATION";
@@ -151,8 +153,13 @@ export default function Indexing() {
   /* Selected doc for indexing */
   const [selectedDoc, setSelectedDoc] = useState<DocumentRecord | null>(null);
 
+  /* Registry doc types (admin-managed) + AI summary */
+  const [registry, setRegistry] = useState<DocType[]>([]);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   /* Form state */
-  const [docType, setDocType] = useState<DocTypeKey>("BT_CID_4G");
+  const [docType, setDocType] = useState<string>("BT_CID_4G");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [classification, setClassification] = useState("KYC — Primary Identity");
   const [retention, setRetention] = useState("10 Years (KYC)");
@@ -205,13 +212,56 @@ export default function Indexing() {
     loadQueue();
   }, [loadQueue]);
 
+  // Load the admin-managed doc-type registry (best-effort).
   useEffect(() => {
-    // Reset form when docType changes
-    setFields({});
-    setErrors([]);
-    setMissing([]);
-    setSubmitOk(false);
+    if (!canRead) return;
+    docTypesApi.list().then((r) => setRegistry(r?.docTypes ?? [])).catch(() => setRegistry([]));
+  }, [canRead]);
+
+  // Reset the form only on a MANUAL doc-type change (not when a doc is selected,
+  // which sets the type + auto-fills below).
+  const manualTypeChange = useRef(false);
+  useEffect(() => {
+    if (manualTypeChange.current) {
+      setFields({});
+      setErrors([]);
+      setMissing([]);
+      setSubmitOk(false);
+      manualTypeChange.current = false;
+    }
   }, [docType]);
+
+  // When a queued document is selected: adopt its AI-classified type, auto-fill
+  // the form from its extracted metadata, and (re)generate the AI summary.
+  useEffect(() => {
+    if (!selectedDoc) { setAiSummary(null); return; }
+    const sd = selectedDoc as DocumentRecord & { metadata?: unknown; summary?: string };
+    if (sd.doc_type) setDocType(sd.doc_type);
+    let meta: Record<string, unknown> = {};
+    try {
+      meta = typeof sd.metadata === "string"
+        ? JSON.parse(sd.metadata)
+        : (sd.metadata as Record<string, unknown>) ?? {};
+    } catch { meta = {}; }
+    const filled: Record<string, string> = {};
+    for (const [k, v] of Object.entries(meta)) {
+      if (v != null && typeof v !== "object") filled[k] = String(v);
+    }
+    setFields(filled);
+    setErrors([]); setMissing([]); setSubmitOk(false);
+
+    // AI summary — use the stored one, else (re)generate via the summarize endpoint.
+    const existing = sd.summary;
+    if (existing) { setAiSummary(existing); }
+    else {
+      setSummaryLoading(true);
+      repositoryViewerApi
+        .summarize(selectedDoc.id)
+        .then((s) => setAiSummary(s.summary))
+        .catch(() => setAiSummary(null))
+        .finally(() => setSummaryLoading(false));
+    }
+  }, [selectedDoc]);
 
   function setField(key: string, value: string) {
     setFields((prev) => ({ ...prev, [key]: value }));
@@ -288,7 +338,42 @@ export default function Indexing() {
     );
   }
 
-  const currentTypeConf = DOC_TYPES[docType];
+  // Doc-type options: union of admin-managed registry types + the seeded ones.
+  const docTypeOptions: { code: string; label: string }[] = (() => {
+    const seen = new Set<string>();
+    const out: { code: string; label: string }[] = [];
+    for (const rt of registry) {
+      if (seen.has(rt.code)) continue;
+      seen.add(rt.code);
+      out.push({ code: rt.code, label: rt.description ? `${rt.code} — ${rt.description}` : rt.code });
+    }
+    for (const k of Object.keys(DOC_TYPES) as DocTypeKey[]) {
+      if (!seen.has(k)) { seen.add(k); out.push({ code: k, label: DOC_TYPES[k].label }); }
+    }
+    return out;
+  })();
+
+  // Field defs for the selected type: prefer the admin registry schema (mandatory
+  // + optional), falling back to the hardcoded seed definitions.
+  const registryType = registry.find((r) => r.code === docType);
+  const currentTypeConf: { fields: FieldDef[] } = (() => {
+    if (registryType && (registryType.mandatoryFields.length || registryType.optionalFields.length)) {
+      const toDef = (f: { name: string; type?: string; mandatory?: boolean }): FieldDef => ({
+        key: f.name,
+        label: `${f.name.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}${f.mandatory ? " *" : ""}`,
+        type: (f.type === "date" || f.type === "number" ? f.type : "text"),
+        required: Boolean(f.mandatory),
+      });
+      return {
+        fields: [
+          ...registryType.mandatoryFields.map(toDef),
+          ...registryType.optionalFields.map(toDef),
+        ],
+      };
+    }
+    return DOC_TYPES[docType as DocTypeKey] ?? { fields: [] };
+  })();
+  const docTypeLabel = docTypeOptions.find((o) => o.code === docType)?.label ?? docType;
 
   return (
     <div className="fade-up">
@@ -416,8 +501,8 @@ export default function Indexing() {
           {/* Right: Metadata form */}
           <Card title={
             <span>
-              Metadata Form — {currentTypeConf.label}{" "}
-              <Tag variant="gold">AI-assisted · 97.4% filled</Tag>
+              Metadata Form — {docTypeLabel}{" "}
+              <Tag variant="gold">AI-assisted</Tag>
             </span>
           }>
             {/* Queue load error — visible on form tab so user knows why the picker is empty (I5) */}
@@ -450,16 +535,33 @@ export default function Indexing() {
               </div>
             )}
 
+            {/* AI Summary — derived from the document's metadata */}
+            {selectedDoc && (
+              <div
+                style={{
+                  marginBottom: 12, padding: "10px 12px", borderRadius: 8,
+                  background: "var(--PT, rgba(155,111,224,.08))", border: "1px solid rgba(155,111,224,.3)",
+                }}
+              >
+                <div style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", color: "var(--Ptx, #6f42c1)", fontWeight: 700, marginBottom: 4 }}>
+                  AI Summary
+                </div>
+                <div style={{ fontSize: 12, color: "var(--mist)", lineHeight: 1.5 }}>
+                  {summaryLoading ? "Generating summary…" : (aiSummary ?? "No summary available for this document.")}
+                </div>
+              </div>
+            )}
+
             {/* Doc type + branch */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <FormField
                 as="select"
                 label="Document Type *"
                 value={docType}
-                onChange={(e) => setDocType((e.target as HTMLSelectElement).value as DocTypeKey)}
+                onChange={(e) => { manualTypeChange.current = true; setDocType((e.target as HTMLSelectElement).value); }}
               >
-                {(Object.keys(DOC_TYPES) as DocTypeKey[]).map((k) => (
-                  <option key={k} value={k}>{DOC_TYPES[k].label}</option>
+                {docTypeOptions.map((o) => (
+                  <option key={o.code} value={o.code}>{o.label}</option>
                 ))}
               </FormField>
               <FormField

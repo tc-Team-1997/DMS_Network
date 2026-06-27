@@ -134,6 +134,10 @@ export const repositoryViewerApi = {
   getDocument: (id: string): Promise<{ document: DocumentRecord }> =>
     http.get(`${SVC.core}/documents/${id}`),
 
+  /** POST /documents/:id/summarize — (re)generate + persist the AI summary. */
+  summarize: (id: string): Promise<{ summary: string }> =>
+    http.post(`${SVC.core}/documents/${id}/summarize`),
+
   /**
    * Fetch the raw document file (with the auth header) and return a blob object
    * URL + mime type. `<img>`/`<iframe>` can't send an Authorization header, so
