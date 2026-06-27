@@ -547,6 +547,19 @@ export const DedupConfigStateSchema = registry.register(
     .openapi("DedupConfigState"),
 );
 
+export const PlatformSettingsSchema = registry.register(
+  "PlatformSettings",
+  z
+    .object({
+      defaultRetentionYears: z.number().optional(),
+      branches: z.array(z.string()).optional(),
+      aiConfidenceThreshold: z.number().optional(),
+      autoFolderRouting: z.boolean().optional(),
+    })
+    .passthrough()
+    .openapi("PlatformSettings"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z

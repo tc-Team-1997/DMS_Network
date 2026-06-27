@@ -1140,6 +1140,27 @@
         },
         "additionalProperties": {}
       },
+      "PlatformSettings": {
+        "type": "object",
+        "properties": {
+          "defaultRetentionYears": {
+            "type": "number"
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aiConfidenceThreshold": {
+            "type": "number"
+          },
+          "autoFolderRouting": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": {}
+      },
       "Quality": {
         "type": "object",
         "properties": {
@@ -5873,6 +5894,173 @@
                 "example": {
                   "errors": [
                     "enabled must be boolean"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read dynamic platform configuration.",
+        "responses": {
+          "200": {
+            "description": "Platform settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settings": {
+                      "$ref": "#/components/schemas/PlatformSettings"
+                    }
+                  },
+                  "required": [
+                    "settings"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update dynamic platform configuration.",
+        "description": "Invalid values are rejected with 422 { errors: string[] }.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settings": {
+                      "$ref": "#/components/schemas/PlatformSettings"
+                    }
+                  },
+                  "required": [
+                    "settings"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DedupValidationError"
+                },
+                "example": {
+                  "errors": [
+                    "aiConfidenceThreshold must be 0–1"
                   ]
                 }
               }

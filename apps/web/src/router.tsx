@@ -24,7 +24,6 @@ type Router = RouterProviderProps["router"];
 import { AppShell }       from "./components/ui/AppShell.js";
 import { ProtectedRoute } from "./components/ProtectedRoute.js";
 import { Login }          from "./pages/Login.js";
-import { Users }          from "./pages/Users.js";
 
 /* ── lazy imports ── */
 const Dashboard           = React.lazy(() => import("./pages/Dashboard.js"));
@@ -98,7 +97,7 @@ export const router: Router = createBrowserRouter([
   /* ── Analytics & Platform ── */
   { path: "/integration-hub",       element: <Shell permission="integration:read"><IntegrationHub /></Shell> },
   { path: "/security",              element: <Shell permission="security:read"><Security /></Shell> },
-  { path: "/users",                 element: <Shell permission="user:read"><Users /></Shell> },
+  { path: "/users",                 element: <Navigate to="/security?tab=users" replace /> },
   { path: "/system-administration", element: <Shell permission="admin:read"><SystemAdministration /></Shell> },
 
   /* ── Default redirect ── */

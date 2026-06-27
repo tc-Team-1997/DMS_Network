@@ -14,6 +14,8 @@ import type {
 import { useUrlState } from "../hooks/useUrlState.js";
 import { DocTypesPanel } from "../components/doctypes/DocTypesPanel.js";
 import { EmailTemplatesPanel } from "../components/emailtemplates/EmailTemplatesPanel.js";
+import { ApiDocsPanel } from "../components/apidocs/ApiDocsPanel.js";
+import { ConfigurationPanel } from "../components/config/ConfigurationPanel.js";
 import { listJobs } from "../api/jobsApi.js";
 import type { JobStatus, MonitorJob } from "../api/jobsApi.js";
 
@@ -40,8 +42,10 @@ const TABS = [
   { key: "schedules", label: "Backup & Maintenance" },
   { key: "queue", label: "Processing Queue" },
   { key: "dedup", label: "Duplicate Detection" },
+  { key: "config", label: "Configuration" },
   { key: "doctypes", label: "Document Types" },
   { key: "emailtemplates", label: "Email Templates" },
+  { key: "apidocs", label: "API Documentation" },
 ];
 
 type HealthRow = ServiceHealth & { _key: string };
@@ -911,6 +915,12 @@ export function SystemAdministration() {
       {tab === "emailtemplates" && (
         <EmailTemplatesPanel canWrite={canWriteEmailTemplates} />
       )}
+
+      {/* ═══ CONFIGURATION TAB ═══ */}
+      {tab === "config" && <ConfigurationPanel canWrite={canAdmin} />}
+
+      {/* ═══ API DOCUMENTATION TAB ═══ */}
+      {tab === "apidocs" && <ApiDocsPanel />}
     </div>
   );
 }

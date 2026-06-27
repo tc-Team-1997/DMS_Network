@@ -3,6 +3,7 @@ import { requireAuth, requirePermission } from "@zordms/auth";
 import { serviceHealth, drPosture, schedules } from "../modules/sysadmin.js";
 import type { CoreDeps } from "../deps.js";
 import { getDedupConfig, setDedupConfig } from "../repo/duplicates.js";
+import { getSettings, setSettings, type PlatformSettings } from "../repo/systemSettings.js";
 
 const VALID_MATCH_BY = new Set(["hash", "cid", "doc_no"]);
 const VALID_ACTIONS = new Set(["flag", "auto_version"]);
@@ -11,6 +12,29 @@ export function sysadminRouter(): Router {
   const r = Router();
   r.use(requireAuth);
   r.use(requirePermission("admin:access"));
+
+  // ── GET /admin/settings — dynamic platform configuration ───────────────────
+  r.get("/settings", async (req, res) => {
+    try {
+      const { knex } = req.app.locals.deps as CoreDeps;
+      res.json({ settings: await getSettings(knex) });
+    } catch (e: any) {
+      res.status(500).json({ error: "internal", detail: String(e?.message ?? e) });
+    }
+  });
+
+  // ── PUT /admin/settings ─────────────────────────────────────────────────────
+  r.put("/settings", async (req, res) => {
+    try {
+      const { knex } = req.app.locals.deps as CoreDeps;
+      const body = req.body as Partial<PlatformSettings>;
+      const updated = await setSettings(knex, body, req.authUser?.username);
+      res.json({ settings: updated });
+    } catch (e: any) {
+      if (Array.isArray(e?.errors)) { res.status(422).json({ errors: e.errors }); return; }
+      res.status(500).json({ error: "internal", detail: String(e?.message ?? e) });
+    }
+  });
 
   r.get("/health", async (req, res) => {
     try {

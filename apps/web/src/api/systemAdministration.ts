@@ -36,6 +36,13 @@ export interface DedupConfig {
   fuzzyThreshold: number;
 }
 
+export interface PlatformSettings {
+  defaultRetentionYears: number;
+  branches: string[];
+  aiConfidenceThreshold: number;
+  autoFolderRouting: boolean;
+}
+
 export const systemAdministrationApi = {
   getHealth: () =>
     http.get<{ health: ServiceHealth[] }>(`${BASE}/admin/health`),
@@ -51,4 +58,10 @@ export const systemAdministrationApi = {
 
   putDedupConfig: (body: Partial<DedupConfig>) =>
     http.put<{ dedupConfig: DedupConfig }>(`${BASE}/admin/dedup-config`, body),
+
+  getSettings: () =>
+    http.get<{ settings: PlatformSettings }>(`${BASE}/admin/settings`),
+
+  putSettings: (body: Partial<PlatformSettings>) =>
+    http.put<{ settings: PlatformSettings }>(`${BASE}/admin/settings`, body),
 };

@@ -11,7 +11,6 @@ import {
   Briefcase, Folder, FileText, Activity,
   Search, Eye, GitBranch, Shield, AlertTriangle,
   Link2, Lock, Settings, Bell, ChevronDown, ChevronRight, MapPin, LogOut,
-  Users,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext.js";
 import { Tooltip } from "./Tooltip.js";
@@ -71,7 +70,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Integration Hub",       path: "/integration-hub",       icon: <Link2 size={15} />,    permission: "integration:read" },
       { label: "Security & RBAC",       path: "/security",              icon: <Lock size={15} />,     permission: "security:read" },
-      { label: "User Management",       path: "/users",                 icon: <Users size={15} />,    permission: "user:read" },
       { label: "System Administration", path: "/system-administration", icon: <Settings size={15} />, permission: "admin:read" },
     ],
   },

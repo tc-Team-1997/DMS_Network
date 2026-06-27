@@ -105,6 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Listen for the global 401 signal broadcast by the API layer.
   useEffect(() => {
     const onExpired = () => {
+      // On the login screen a 401 is just a failed sign-in — don't show the
+      // "session expired" modal there.
+      if (window.location.pathname.startsWith("/login")) { setUser(null); return; }
       // Remember where the user was so re-login can land them back there.
       rememberReturnPath();
       setUser(null);
@@ -152,10 +155,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.assign("/login");
   }, []);
 
+  // Never show the session-expired modal on the auth screens themselves — a 401
+  // there is expected (the user is already (re-)authenticating).
+  const onAuthScreen =
+    typeof window !== "undefined" && window.location.pathname.startsWith("/login");
+
   return (
     <Ctx.Provider value={{ user, sessionExpired, login, loginWithToken, logout }}>
       {children}
-      {sessionExpired && <SessionExpiredScreen onReauthenticate={reauthenticate} />}
+      {sessionExpired && !onAuthScreen && <SessionExpiredScreen onReauthenticate={reauthenticate} />}
     </Ctx.Provider>
   );
 }

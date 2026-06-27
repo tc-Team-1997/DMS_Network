@@ -30,4 +30,34 @@ describe("sysadmin routes", () => {
     const viewerToken = await h.tokenFor("viewer_admin");
     expect((await request(h.app).get("/admin/health").set("Authorization", `Bearer ${viewerToken}`)).status).toBe(403);
   });
+
+  it("GET /admin/settings returns defaults", async () => {
+    const adminToken = await h.tokenFor("admin");
+    const res = await request(h.app).get("/admin/settings").set("Authorization", `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.settings.defaultRetentionYears).toBe(7);
+    expect(Array.isArray(res.body.settings.branches)).toBe(true);
+    expect(res.body.settings.aiConfidenceThreshold).toBe(0.7);
+  });
+
+  it("PUT /admin/settings persists a valid update", async () => {
+    const adminToken = await h.tokenFor("admin");
+    const put = await request(h.app).put("/admin/settings").set("Authorization", `Bearer ${adminToken}`)
+      .send({ defaultRetentionYears: 12, branches: ["HQ", "Paro"], aiConfidenceThreshold: 0.85, autoFolderRouting: false });
+    expect(put.status).toBe(200);
+    expect(put.body.settings.defaultRetentionYears).toBe(12);
+    expect(put.body.settings.branches).toEqual(["HQ", "Paro"]);
+    expect(put.body.settings.autoFolderRouting).toBe(false);
+    // Persisted across a re-read.
+    const get = await request(h.app).get("/admin/settings").set("Authorization", `Bearer ${adminToken}`);
+    expect(get.body.settings.aiConfidenceThreshold).toBe(0.85);
+  });
+
+  it("PUT /admin/settings rejects invalid values with 422", async () => {
+    const adminToken = await h.tokenFor("admin");
+    const res = await request(h.app).put("/admin/settings").set("Authorization", `Bearer ${adminToken}`)
+      .send({ aiConfidenceThreshold: 5 });
+    expect(res.status).toBe(422);
+    expect(Array.isArray(res.body.errors)).toBe(true);
+  });
 });

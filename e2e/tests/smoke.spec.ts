@@ -105,7 +105,6 @@ test.describe("Shell", () => {
       "/alerts",
       "/integration-hub",
       "/security",
-      "/users",
       "/system-administration",
     ];
 
