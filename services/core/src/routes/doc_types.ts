@@ -27,6 +27,7 @@ import {
   CreateDocTypeSchema,
   UpdateDocTypeSchema,
   ApplyFieldsSchema,
+  ApplyTrainingSchema,
   FromSuggestionSchema,
 } from "../openapi/schemas.js";
 
@@ -42,6 +43,10 @@ interface RegistryRow {
   system: boolean | number;
   mandatory_fields: string | null;
   optional_fields: string | null;
+  prompt_classify?: string | null;
+  prompt_extract?: string | null;
+  folder_path_template?: string | null;
+  sample_doc_storage_key?: string | null;
   created_at: string | null;
   updated_at?: string | null;
 }
@@ -120,6 +125,10 @@ function toApi(row: RegistryRow) {
     updated_at: row.updated_at ?? null,
     mandatoryFields,
     optionalFields,
+    promptClassify: row.prompt_classify ?? null,
+    promptExtract: row.prompt_extract ?? null,
+    folderPathTemplate: row.folder_path_template ?? null,
+    hasSample: Boolean(row.sample_doc_storage_key),
   };
 }
 
@@ -135,7 +144,9 @@ export function docTypesRouter(): Router {
       const registryRows: RegistryRow[] = await knex("doc_type_registry")
         .select(
           "id", "code", "description", "jurisdiction", "issuer", "category",
-          "system", "mandatory_fields", "optional_fields", "created_at", "updated_at",
+          "system", "mandatory_fields", "optional_fields",
+          "prompt_classify", "prompt_extract", "folder_path_template", "sample_doc_storage_key",
+          "created_at", "updated_at",
         )
         .orderBy("code");
 
@@ -161,6 +172,10 @@ export function docTypesRouter(): Router {
           updated_at: null,
           mandatoryFields,
           optionalFields,
+          promptClassify: null,
+          promptExtract: null,
+          folderPathTemplate: null,
+          hasSample: false,
         };
       });
 
@@ -348,6 +363,38 @@ export function docTypesRouter(): Router {
         optional_fields: JSON.stringify(optionalFields),
         updated_at: knex.fn.now(),
       });
+      const saved: RegistryRow = await knex("doc_type_registry").where({ code }).first();
+      res.json({ docType: toApi(saved) });
+    } catch (e: any) {
+      res.status(500).json({ error: "internal", detail: String(e?.message ?? e) });
+    }
+  });
+
+  // ── POST /doc-types/:code/apply-training — set per-type prompts + folder rule ─
+  // The human-approved output of a "train from sample" run: AI prompts and the
+  // folder-path template that capture uses to auto-route this document type.
+  r.post("/:code/apply-training", requirePermission(DOCTYPE_WRITE), validateBody(ApplyTrainingSchema), async (req, res) => {
+    try {
+      const { knex } = req.app.locals.deps as CoreDeps;
+      const code = req.params.code;
+      const existing = await knex("doc_type_registry").where({ code }).first();
+      if (!existing) {
+        res.status(404).json({ error: "not_found", detail: `doc type '${code}' not found` });
+        return;
+      }
+      const body = req.body ?? {};
+      const update: Record<string, unknown> = { updated_at: knex.fn.now() };
+      if (body.promptClassify !== undefined) update.prompt_classify = body.promptClassify || null;
+      if (body.promptExtract !== undefined) update.prompt_extract = body.promptExtract || null;
+      if (body.folderPathTemplate !== undefined) {
+        const tpl = (body.folderPathTemplate ?? "").trim();
+        if (tpl && !tpl.startsWith("/")) {
+          res.status(400).json({ error: "validation", detail: "folderPathTemplate must be an absolute path starting with /" });
+          return;
+        }
+        update.folder_path_template = tpl || null;
+      }
+      await knex("doc_type_registry").where({ code }).update(update);
       const saved: RegistryRow = await knex("doc_type_registry").where({ code }).first();
       res.json({ docType: toApi(saved) });
     } catch (e: any) {

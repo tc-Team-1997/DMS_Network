@@ -284,6 +284,20 @@ export const ApplyFieldsSchema = registry.register(
     .openapi("ApplyFields"),
 );
 
+export const ApplyTrainingSchema = registry.register(
+  "ApplyTraining",
+  z
+    .object({
+      // Per-type AI prompts (null/"" clears → model default).
+      promptClassify: z.string().nullish(),
+      promptExtract: z.string().nullish(),
+      // Folder routing template, e.g. "/BoB/Customers/{cid}/KYC/{year}/".
+      folderPathTemplate: z.string().nullish(),
+    })
+    .passthrough()
+    .openapi("ApplyTraining"),
+);
+
 export const FromSuggestionSchema = registry.register(
   "FromSuggestion",
   z

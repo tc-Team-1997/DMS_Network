@@ -18,6 +18,32 @@ function today(fields: Record<string, unknown>): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Path-safe a token value (no slashes / control chars). */
+function safeSeg(v: unknown): string {
+  return String(v ?? "").replace(/[\/\\\r\n]+/g, "-").replace(/\.\.+/g, "-").trim() || "UNK";
+}
+
+/**
+ * Substitute {tokens} in an admin-defined folder template using extracted
+ * fields. Built-ins: {cid} {year} {quarter} {date}; any other {name} resolves
+ * to fields[name] (or cid_no for {cid}). Returns null if the template is empty.
+ */
+export function applyFolderTemplate(template: string | null | undefined, fields: Record<string, unknown>): string | null {
+  if (!template) return null;
+  const cid = (fields.cid_no ?? fields.applicant_cid ?? fields.cid ?? "UNK");
+  const built: Record<string, string> = {
+    cid: safeSeg(cid),
+    year: yearOf(fields),
+    quarter: quarterOf(fields),
+    date: today(fields),
+  };
+  const path = template.replace(/\{(\w+)\}/g, (_m, key: string) => {
+    if (key in built) return built[key];
+    return safeSeg(fields[key]);
+  });
+  return path.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || null;
+}
+
 // IDP §5.2 — directory mapping rules (first match wins)
 export function resolvePath(docType: string, fields: Record<string, unknown>): string {
   const cid = (fields.cid_no ?? fields.applicant_cid ?? "UNK") as string;

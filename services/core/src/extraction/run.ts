@@ -15,11 +15,13 @@ import type { CoreDeps } from "../deps.js";
 import { getDocument, currentVersion } from "../repo/documents.js";
 import { catalog, categoryFor } from "../catalog/engine.js";
 import { computeQuality } from "../catalog/quality.js";
-import { resolvePath, defaultAcls, domainForPath } from "../mapper/directory.js";
+import { resolvePath, applyFolderTemplate, defaultAcls, domainForPath } from "../mapper/directory.js";
+import { getSettings } from "../repo/systemSettings.js";
 import { setFolderAcls, effectiveAcls } from "../repo/acls.js";
 import { aiClassify, aiExtract } from "../ai/client.js";
 import { mapExtractedToDocument } from "../ai/field_mapper.js";
 import { buildNewTypeSuggestion } from "../ai/suggest_type.js";
+import { buildSummary } from "../ai/summarize.js";
 import { EVENTS } from "../events/index.js";
 import { createWorkflowCase } from "../workflow/client.js";
 import { findDuplicates, getDedupConfig } from "../repo/duplicates.js";
@@ -213,31 +215,48 @@ export async function runExtraction(
     });
 
     // ── 7. Auto-map folder ─────────────────────────────────────────────────
-    const folderPath = resolvePath(classifyResult.doc_type, fields);
+    // Prefer the doc-type's admin-defined folder template; else the built-in
+    // rules. Skipped entirely when auto-routing is disabled in platform settings.
+    const settings = await getSettings(deps.knex).catch(() => null);
+    const autoRoute = settings?.autoFolderRouting ?? true;
+    const typeRow = await deps.knex("doc_type_registry").where({ code: classifyResult.doc_type }).first().catch(() => null);
+    const templatePath = applyFolderTemplate(typeRow?.folder_path_template, fields);
+    const folderPath = templatePath ?? resolvePath(classifyResult.doc_type, fields);
     let folderId: string | null = null;
-    let mapPath: string | null = folderPath;
+    let mapPath: string | null = autoRoute ? folderPath : null;
     let mapAcls: unknown[] = [];
-    try {
-      folderId = await ensureFolderChain(deps.knex, folderPath, callerUsername);
-      const domain = domainForPath(folderPath);
-      await setFolderAcls(deps.knex, folderId, defaultAcls(domain), false);
-      mapAcls = await effectiveAcls(deps.knex, folderId);
-    } catch {
-      folderId = null;
-      mapPath = null;
+    if (autoRoute) {
+      try {
+        folderId = await ensureFolderChain(deps.knex, folderPath, callerUsername);
+        const domain = domainForPath(folderPath);
+        await setFolderAcls(deps.knex, folderId, defaultAcls(domain), false);
+        mapAcls = await effectiveAcls(deps.knex, folderId);
+      } catch {
+        folderId = null;
+        mapPath = null;
+      }
     }
 
     // ── 8. Persist all updates ─────────────────────────────────────────────
     const reviewFlag = classifyResult.confidence < 0.85 || catalogResult.reviewFlag === true;
     const ingest = (document.ingest_timestamp as string | undefined) ?? new Date().toISOString();
 
+    const mergedMeta = { ...(extractResult.data ?? {}), ...mapped.metadata };
     const updates: Record<string, unknown> = {
       doc_type: classifyResult.doc_type,
       confidence: classifyResult.confidence,
       review_flag: reviewFlag,
       extraction_status: "DONE",
       extracted_at: new Date().toISOString(),
-      metadata: JSON.stringify({ ...(extractResult.data ?? {}), ...mapped.metadata }),
+      metadata: JSON.stringify(mergedMeta),
+      // Plain-language summary surfaced in indexing / discovery.
+      summary: buildSummary({
+        docType: classifyResult.doc_type,
+        category: catalogResult.route !== "HUMAN_REVIEW" ? catalogResult.category : null,
+        branch: (document.branch as string | undefined) ?? null,
+        confidence: classifyResult.confidence,
+        metadata: mergedMeta,
+      }),
     };
     if (mapped.cid) updates["cid"] = mapped.cid;
     if (mapped.doc_no) updates["doc_no"] = mapped.doc_no;

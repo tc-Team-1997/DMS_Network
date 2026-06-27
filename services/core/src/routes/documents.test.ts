@@ -36,6 +36,25 @@ describe("documents routes", () => {
     expect(after.status).toBe(404);
   });
 
+  it("POST /:id/summarize generates and persists a plain-language summary (Group C)", async () => {
+    const token = await h.tokenFor("admin");
+    const up = await request(h.app).post("/documents").set("Authorization", `Bearer ${token}`)
+      .field("title", "KYC").field("branch", "Thimphu HQ").attach("file", Buffer.from("z"), "z.png");
+    const id = up.body.document.id;
+    // give it some metadata to summarise
+    await h.knex("documents").where({ id }).update({
+      doc_type: "KYC_PASSPORT", catalog_category: "Identity", confidence: 0.91,
+      metadata: JSON.stringify({ full_name: "Ahmed Hassan", expiry_date: "2030-01-01" }),
+    });
+    const sum = await request(h.app).post(`/documents/${id}/summarize`).set("Authorization", `Bearer ${token}`);
+    expect(sum.status).toBe(200);
+    expect(sum.body.summary).toContain("KYC PASSPORT");
+    expect(sum.body.summary).toContain("Ahmed Hassan");
+    // persisted on the row
+    const row = await h.knex("documents").where({ id }).first();
+    expect(row.summary).toContain("Ahmed Hassan");
+  });
+
   it("forbids delete without document:delete", async () => {
     const token = await h.tokenFor("admin");
     const up = await request(h.app).post("/documents").set("Authorization", `Bearer ${token}`)

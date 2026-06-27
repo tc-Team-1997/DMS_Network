@@ -8,6 +8,7 @@ import { addVersion, listVersions, rollback } from "../repo/versions.js";
 import { catalog, categoryFor } from "../catalog/engine.js";
 import { computeQuality } from "../catalog/quality.js";
 import { burnStamp, burnRedaction, type RedactRegion } from "../repo/burnin.js";
+import { buildSummary } from "../ai/summarize.js";
 import { EVENTS } from "../events/index.js";
 import { enqueue } from "../queue/index.js";
 import { extractIdempotencyKey } from "../worker/handlers.js";
@@ -105,6 +106,27 @@ export function documentsRouter(): Router {
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       res.json({ document });
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
+  });
+
+  // POST /:id/summarize — generate + persist a plain-language AI summary from
+  // the document's classification + extracted metadata (document:read).
+  r.post("/:id/summarize", requirePermission("document:read"), async (req, res) => {
+    try {
+      const { knex } = req.app.locals.deps as CoreDeps;
+      const document = await getDocument(knex, req.params.id, makeViewer(req));
+      if (!document) { res.status(404).json({ error: "not_found" }); return; }
+      let metadata: Record<string, unknown> = {};
+      try { metadata = document.metadata ? JSON.parse(document.metadata as string) : {}; } catch { /* ignore */ }
+      const summary = buildSummary({
+        docType: document.doc_type as string | null,
+        category: document.catalog_category as string | null,
+        branch: document.branch as string | null,
+        confidence: document.confidence as number | null,
+        metadata,
+      });
+      await knex("documents").where({ id: document.id }).update({ summary });
+      res.json({ summary });
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
   });
 
   // GET /:id/download — serve the raw file (document:read) — C1 + C5: branch-scoped

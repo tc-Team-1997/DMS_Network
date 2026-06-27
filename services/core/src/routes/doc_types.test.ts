@@ -157,6 +157,33 @@ describe("doc-types registry", () => {
     expect(sys.body.docType.mandatoryFields.map((f: any) => f.name)).toEqual(["passport_no"]);
   });
 
+  it("POST /:code/apply-training sets prompts + folder template (Group C)", async () => {
+    const token = await h.tokenFor("admin");
+    await request(h.app).post("/doc-types").set("Authorization", `Bearer ${token}`).send({ code: "TRAIN_TARGET" });
+    const res = await request(h.app).post("/doc-types/TRAIN_TARGET/apply-training").set("Authorization", `Bearer ${token}`).send({
+      promptClassify: "Classify as TRAIN_TARGET if it has a stamp.",
+      promptExtract: "Extract id and date.",
+      folderPathTemplate: "/BoB/Custom/{cid}/{year}/",
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.docType.promptClassify).toContain("stamp");
+    expect(res.body.docType.folderPathTemplate).toBe("/BoB/Custom/{cid}/{year}/");
+
+    // persisted across a re-read
+    const list = await request(h.app).get("/doc-types").set("Authorization", `Bearer ${token}`);
+    const row = (list.body.docTypes as any[]).find((d) => d.code === "TRAIN_TARGET");
+    expect(row.promptExtract).toBe("Extract id and date.");
+  });
+
+  it("POST /:code/apply-training rejects a non-absolute folder template", async () => {
+    const token = await h.tokenFor("admin");
+    await request(h.app).post("/doc-types").set("Authorization", `Bearer ${token}`).send({ code: "TRAIN_BAD" });
+    const res = await request(h.app).post("/doc-types/TRAIN_BAD/apply-training").set("Authorization", `Bearer ${token}`).send({
+      folderPathTemplate: "Customers/{cid}",
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("RBAC: a user without doctype:write gets 403 on all write endpoints", async () => {
     const token = viewerToken();
     const create = await request(h.app).post("/doc-types").set("Authorization", `Bearer ${token}`).send({ code: "NOPE" });
