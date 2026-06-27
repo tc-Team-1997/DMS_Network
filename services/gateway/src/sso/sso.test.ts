@@ -206,6 +206,58 @@ describe("LDAP login", () => {
     expect(claims.roles).toContain("Supervisor");
     expect(claims.roles).not.toContain("Viewer");
   });
+
+  it("BLOCKS the local superuser (admin) from authenticating via AD", async () => {
+    const ac = loadAuthConfig({ AUTH_LDAP_ENABLED: "true" } as NodeJS.ProcessEnv);
+    const identity: ExternalIdentity = { username: "admin", email: "admin@evil", displayName: "x" };
+    const res = await request(appWith(ac, identity))
+      .post("/auth/ldap/login").send({ username: "admin", password: "anything" });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("local_only_account");
+  });
+});
+
+describe("admin-managed AD config (Group B)", () => {
+  it("enables LDAP from the DB even when env has it off, and PUT/GET round-trips (secret hidden)", async () => {
+    // env LDAP off; app built without an authConfig so it loads from env(off).
+    const ac = baseAuthConfig();
+    const admin = await knex("users").where({ username: "admin" }).first();
+    const { signToken } = await import("@zordms/auth");
+    const adminToken = signToken({ sub: admin.id, username: "admin", roles: ["CDO"], permissions: ["admin:read", "admin:access"] }, "test-secret");
+
+    // Initially no providers (LDAP off via env, no DB record yet).
+    const before = await request(appWith(ac)).get("/auth/config");
+    expect(before.body.providers.find((p: any) => p.id === "ldap")).toBeUndefined();
+
+    // Admin enables + configures AD via the DB.
+    const put = await request(appWith(ac)).put("/auth/ad-config")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ enabled: true, url: "ldaps://ad.bobl.bt:636", searchBase: "DC=bobl,DC=bt", bindCredentials: "s3cret" });
+    expect(put.status).toBe(200);
+    expect(put.body.ldap.hasBindCredentials).toBe(true);
+    expect(put.body.ldap.bindCredentials).toBeUndefined(); // never echoed
+
+    // /auth/config now lists LDAP as enabled (DB-driven).
+    const after = await request(appWith(ac)).get("/auth/config");
+    expect(after.body.providers.find((p: any) => p.id === "ldap")).toBeTruthy();
+
+    // GET ad-config returns the effective config (secret stripped).
+    const get = await request(appWith(ac)).get("/auth/ad-config").set("Authorization", `Bearer ${adminToken}`);
+    expect(get.body.ldap.url).toBe("ldaps://ad.bobl.bt:636");
+    expect(get.body.ldap.hasBindCredentials).toBe(true);
+    expect((get.body.ldap as any).bindCredentials).toBeUndefined();
+
+    // cleanup so other tests see a clean state
+    await knex("gateway_settings").where({ key: "auth_ldap" }).del();
+  });
+
+  it("forbids AD config writes without admin:access", async () => {
+    const ac = baseAuthConfig();
+    const { signToken } = await import("@zordms/auth");
+    const viewer = signToken({ sub: "v1", username: "v", roles: ["Viewer"], permissions: ["document:read"] }, "test-secret");
+    const res = await request(appWith(ac)).put("/auth/ad-config").set("Authorization", `Bearer ${viewer}`).send({ enabled: true });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe("OIDC flow", () => {

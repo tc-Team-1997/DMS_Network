@@ -17,6 +17,7 @@ import { EmailTemplatesPanel } from "../components/emailtemplates/EmailTemplates
 import { ApiDocsPanel } from "../components/apidocs/ApiDocsPanel.js";
 import { ConfigurationPanel } from "../components/config/ConfigurationPanel.js";
 import { ConnectorsPanel } from "../components/integrations/ConnectorsPanel.js";
+import { AdConfigPanel } from "../components/auth/AdConfigPanel.js";
 import { listJobs } from "../api/jobsApi.js";
 import type { JobStatus, MonitorJob } from "../api/jobsApi.js";
 
@@ -45,6 +46,7 @@ const TABS = [
   { key: "dedup", label: "Duplicate Detection" },
   { key: "config", label: "Configuration" },
   { key: "connectors", label: "Integrations" },
+  { key: "auth", label: "Authentication" },
   { key: "doctypes", label: "Document Types" },
   { key: "emailtemplates", label: "Email Templates" },
   { key: "apidocs", label: "API Documentation" },
@@ -923,6 +925,9 @@ export function SystemAdministration() {
 
       {/* ═══ INTEGRATIONS / CONNECTORS TAB ═══ */}
       {tab === "connectors" && <ConnectorsPanel canWrite={canAdmin} />}
+
+      {/* ═══ AUTHENTICATION (AD/LDAP) TAB ═══ */}
+      {tab === "auth" && <AdConfigPanel canWrite={canAdmin} />}
 
       {/* ═══ API DOCUMENTATION TAB ═══ */}
       {tab === "apidocs" && <ApiDocsPanel />}

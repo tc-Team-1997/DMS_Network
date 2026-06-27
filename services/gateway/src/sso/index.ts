@@ -11,6 +11,12 @@ import { loadAuthConfig, enabledProviders, type AuthConfig } from "./authConfig.
 import { createSsoClients, type SsoClients } from "./clients.js";
 import { mapAndIssue, type ExternalIdentity } from "./jit.js";
 import { LdapLoginBodySchema } from "../schemas.js";
+import { readAdConfig, writeAdConfig, mergeAdConfig, publicAdConfig, type AdConfigInput } from "./adConfigStore.js";
+import { requireAuth, requirePermission } from "@zordms/auth";
+
+/** Usernames that MUST always authenticate locally (never via AD/SSO) so the
+ *  platform superuser is reachable even if the directory is misconfigured. */
+const LOCAL_ONLY_USERS = new Set(["admin"]);
 
 export interface SsoDeps {
   knex: Knex;
@@ -81,9 +87,27 @@ export function ssoRouter(): Router {
   // -------------------------------------------------------------------------
   // PUBLIC config endpoint — no auth. Only enabled providers are listed.
   // -------------------------------------------------------------------------
-  r.get("/config", (req, res) => {
-    const { authConfig } = deps(req);
-    res.json({ local: true, providers: enabledProviders(authConfig) });
+  r.get("/config", async (req, res) => {
+    const { knex, authConfig } = deps(req);
+    const merged = mergeAdConfig(authConfig, await readAdConfig(knex));
+    res.json({ local: true, providers: enabledProviders(merged) });
+  });
+
+  // Admin: read the effective AD config (secret stripped) — for the admin UI.
+  r.get("/ad-config", requireAuth, requirePermission("admin:read"), async (req, res) => {
+    const { knex, authConfig } = deps(req);
+    const merged = mergeAdConfig(authConfig, await readAdConfig(knex));
+    // True when env pins LDAP (UI then shows it as read-only/managed-by-env).
+    const envManaged = process.env.AUTH_LDAP_ENABLED !== undefined;
+    res.json({ ldap: publicAdConfig(merged.ldap), envManaged });
+  });
+
+  // Admin: update the AD config (persisted in gateway_settings).
+  r.put("/ad-config", requireAuth, requirePermission("admin:access"), async (req, res) => {
+    const { knex } = req.app.locals.deps as SsoDeps;
+    const body = (req.body ?? {}) as AdConfigInput;
+    const saved = await writeAdConfig(knex, body, (req as { authUser?: { username?: string } }).authUser?.username);
+    res.json({ ldap: { ...saved, bindCredentials: undefined, hasBindCredentials: Boolean(saved.bindCredentials) } });
   });
 
   // -------------------------------------------------------------------------
@@ -91,7 +115,8 @@ export function ssoRouter(): Router {
   // -------------------------------------------------------------------------
   r.post("/ldap/login", async (req, res) => {
     const { knex, config, authConfig, ssoClients } = deps(req);
-    if (!authConfig.ldap.enabled) { res.status(404).json({ error: "provider_disabled" }); return; }
+    const ldapCfg = mergeAdConfig(authConfig, await readAdConfig(knex)).ldap;
+    if (!ldapCfg.enabled) { res.status(404).json({ error: "provider_disabled" }); return; }
     const parsed = LdapLoginBodySchema.safeParse(req.body ?? {});
     if (!parsed.success) {
       res.status(400).json({
@@ -101,13 +126,18 @@ export function ssoRouter(): Router {
       return;
     }
     const { username, password } = parsed.data;
+    // The platform superuser is local-only — never authenticate it via AD.
+    if (LOCAL_ONLY_USERS.has(username.toLowerCase())) {
+      res.status(403).json({ error: "local_only_account", detail: "This account must sign in locally." });
+      return;
+    }
     try {
-      const identity = await ssoClients.ldap.authenticate(authConfig.ldap, username, password);
+      const identity = await ssoClients.ldap.authenticate(ldapCfg, username, password);
       if (!identity) { res.status(401).json({ error: "invalid_credentials" }); return; }
       const result = await mapAndIssue(knex, config, identity, {
         provider: "ldap",
         defaultRole: authConfig.ssoDefaultRole,
-        groupRoleMap: authConfig.ldap.groupRoleMap,
+        groupRoleMap: ldapCfg.groupRoleMap,
       });
       res.json({ token: result.token, user: result.user });
     } catch {
