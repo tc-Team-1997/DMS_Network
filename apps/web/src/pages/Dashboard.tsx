@@ -12,30 +12,15 @@ import {
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
-import { useUrlState } from "../hooks/useUrlState.js";
+import {
+  usePeriod,
+  appendPeriod,
+  todayStr,
+  defaultFrom,
+  type TimePeriod,
+  type PeriodState,
+} from "../hooks/usePeriod.js";
 import { dashboardCaptureApi, type DashboardSummary, type DocumentRecord } from "../api/dashboardCaptureApi.js";
-
-/* ─── Time Period Control ─── */
-type TimePeriod = "day" | "month" | "quarter" | "year";
-
-interface PeriodState {
-  period: TimePeriod;
-  from: string;
-  to: string;
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function defaultFrom(period: TimePeriod): string {
-  const d = new Date();
-  if (period === "day") d.setDate(d.getDate() - 1);
-  else if (period === "month") d.setMonth(d.getMonth() - 1);
-  else if (period === "quarter") d.setMonth(d.getMonth() - 3);
-  else d.setFullYear(d.getFullYear() - 1);
-  return d.toISOString().slice(0, 10);
-}
 
 function PeriodControl({
   value,
@@ -350,19 +335,13 @@ export default function Dashboard() {
 
   // Time period control state — backed by URL params so the selected range is
   // shareable/bookmarkable and deep-links (?period=&from=&to=) are honoured.
-  const [urlState, setUrlState] = useUrlState({ period: "month", from: "", to: "" });
-  const validPeriod: TimePeriod = (["day", "month", "quarter", "year"] as const).includes(urlState.period as TimePeriod)
-    ? (urlState.period as TimePeriod)
-    : "month";
-  const periodState: PeriodState = {
-    period: validPeriod,
-    from: urlState.from || defaultFrom(validPeriod),
-    to: urlState.to || todayStr(),
-  };
-  const setPeriodState = useCallback(
-    (v: PeriodState) => setUrlState({ period: v.period, from: v.from, to: v.to }),
-    [setUrlState],
-  );
+  const period = usePeriod();
+  const periodState: PeriodState = { period: period.period, from: period.from, to: period.to };
+  const setPeriodState = period.set;
+
+  // Drill-down navigation that carries the active period into the destination
+  // section's URL (?period=&from=&to=) so the same window is applied there.
+  const go = (path: string) => navigate(appendPeriod(path, periodState));
 
   // Drill-down panel state
   const [drillDown, setDrillDown] = useState<"category" | "branch" | null>(null);
@@ -461,7 +440,7 @@ export default function Dashboard() {
 
       {/* ── KPI Row 1 ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
-        <ClickableWrapper onClick={() => navigate("/repository")} ariaLabel="View all documents in repository">
+        <ClickableWrapper onClick={() => go("/repository")} ariaLabel="View all documents in repository">
           <KpiCard
             label="Total Documents"
             value={loading ? "…" : total.toLocaleString()}
@@ -469,7 +448,7 @@ export default function Dashboard() {
             variant="gold"
           />
         </ClickableWrapper>
-        <ClickableWrapper onClick={() => navigate("/search")} ariaLabel="View AI accuracy details">
+        <ClickableWrapper onClick={() => go("/search")} ariaLabel="View AI accuracy details">
           <KpiCard
             label="AI Accuracy"
             value="97.4%"
@@ -477,7 +456,7 @@ export default function Dashboard() {
             variant="blue"
           />
         </ClickableWrapper>
-        <ClickableWrapper onClick={() => navigate("/review-queue")} ariaLabel="View pending review queue">
+        <ClickableWrapper onClick={() => go("/review-queue")} ariaLabel="View pending review queue">
           <KpiCard
             label="Pending Review"
             value={loading ? "…" : pending.toLocaleString()}
@@ -489,7 +468,7 @@ export default function Dashboard() {
             variant="red"
           />
         </ClickableWrapper>
-        <ClickableWrapper onClick={() => navigate("/repository")} ariaLabel="View all ingested documents">
+        <ClickableWrapper onClick={() => go("/repository")} ariaLabel="View all ingested documents">
           <KpiCard
             label="Total Ingested"
             value={loading ? "…" : totalIngested.toLocaleString()}
@@ -505,7 +484,7 @@ export default function Dashboard() {
 
       {/* ── KPI Row 2 ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
-        <ClickableWrapper onClick={() => navigate("/repository")} ariaLabel="View documents indexed today">
+        <ClickableWrapper onClick={() => go("/repository")} ariaLabel="View documents indexed today">
           <KpiCard
             label="Indexed Today"
             value={loading ? "…" : indexedToday.toLocaleString()}
@@ -513,7 +492,7 @@ export default function Dashboard() {
             variant="green"
           />
         </ClickableWrapper>
-        <ClickableWrapper onClick={() => navigate("/search")} ariaLabel="Browse by category in search">
+        <ClickableWrapper onClick={() => go("/search")} ariaLabel="Browse by category in search">
           <KpiCard
             label="Categories"
             value={loading ? "…" : Object.keys(byCategory).length.toLocaleString()}
@@ -521,7 +500,7 @@ export default function Dashboard() {
             variant="purple"
           />
         </ClickableWrapper>
-        <ClickableWrapper onClick={() => navigate("/search")} ariaLabel="Browse by branch in search">
+        <ClickableWrapper onClick={() => go("/search")} ariaLabel="Browse by branch in search">
           <KpiCard
             label="Branches Active"
             value={loading ? "…" : branchStats.length.toLocaleString()}
@@ -529,7 +508,7 @@ export default function Dashboard() {
             variant="blue"
           />
         </ClickableWrapper>
-        <ClickableWrapper onClick={() => navigate("/alerts")} ariaLabel="View expiring documents in alerts">
+        <ClickableWrapper onClick={() => go("/alerts")} ariaLabel="View expiring documents in alerts">
           <KpiCard
             label="Expiring ≤90d"
             value={loading ? "…" : buildExpiringDocs(allDocs, 90).length.toLocaleString()}
@@ -545,7 +524,7 @@ export default function Dashboard() {
 
       {/* ── Charts Row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 14, marginBottom: 14 }}>
-        <ClickableWrapper onClick={() => navigate("/repository")} ariaLabel="View document inflow details">
+        <ClickableWrapper onClick={() => go("/repository")} ariaLabel="View document inflow details">
           <LineChartCard
             title="Document Inflow — All Branches (30 days)"
             action={<Tag variant="blue">Daily Volume</Tag>}
@@ -652,7 +631,7 @@ export default function Dashboard() {
       {/* ── Bottom 3-col grid ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 280px", gap: 14, marginBottom: 16 }}>
         {/* Expiring Soon section */}
-        <ClickableWrapper onClick={() => navigate("/alerts")} ariaLabel="View all expiring documents in alerts">
+        <ClickableWrapper onClick={() => go("/alerts")} ariaLabel="View all expiring documents in alerts">
           <Card
             title={
               <span>
@@ -737,7 +716,7 @@ export default function Dashboard() {
                       count={b.count}
                       pct={b.pct}
                       color={b.color}
-                      onClick={() => navigate("/search")}
+                      onClick={() => go("/search")}
                     />
                   ))
                 ) : (
@@ -849,7 +828,7 @@ export default function Dashboard() {
                   count={b.count}
                   pct={b.pct}
                   color={b.color}
-                  onClick={() => navigate("/search")}
+                  onClick={() => go("/search")}
                 />
               ))
             ) : (

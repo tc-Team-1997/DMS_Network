@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { DocumentPreview } from "../components/DocumentPreview.js";
 import { useUrlState } from "../hooks/useUrlState.js";
+import { usePeriod, inPeriod } from "../hooks/usePeriod.js";
+import { PeriodFilterBanner } from "../components/PeriodFilterBanner.js";
 import {
   KpiCard,
   Card,
@@ -252,6 +254,8 @@ export default function Repository() {
   // Tab uses dual state (local + URL sync) so React re-renders instantly
   // on tab click while still updating the URL for bookmarkability.
   const [urlFilters, setUrlFilters] = useUrlState({ tab: "browse", q: "", status: "all", category: "all", folder: "" });
+  // Time period carried in from a Dashboard drill-down (?period=&from=&to=).
+  const period = usePeriod();
   const [tab, setTabLocal] = useState(urlFilters.tab);
   const setTab = (t: string) => { setTabLocal(t); setUrlFilters({ tab: t }); };
   const filterStatus = urlFilters.status;
@@ -366,7 +370,8 @@ export default function Repository() {
     const matchStatus = filterStatus === "all" || (filterStatus === "review" ? d.review_flag : d.status === filterStatus);
     const matchCat = filterCategory === "all" || (d.catalog_category ?? "") === filterCategory;
     const matchFolder = !selectedFolder || d.folder_id === selectedFolder.id;
-    return matchText && matchStatus && matchCat && matchFolder;
+    const matchPeriod = !period.active || inPeriod(d.ingest_timestamp, period);
+    return matchText && matchStatus && matchCat && matchFolder && matchPeriod;
   });
 
   // Categories for filter
@@ -566,6 +571,10 @@ export default function Repository() {
           )}
         </div>
       </div>
+
+      {period.active && (
+        <PeriodFilterBanner from={period.from} to={period.to} onClear={period.clear} />
+      )}
 
       {/* KPI Row */}
       <div className="g4" style={{ marginBottom: 14 }}>

@@ -21,6 +21,8 @@ import {
 } from "../components/ui/index.js";
 import type { SelectOption } from "../components/ui/index.js";
 import { useAssigneeOptions, parseAssignee } from "../hooks/useAssigneeOptions.js";
+import { usePeriod, inPeriod } from "../hooks/usePeriod.js";
+import { PeriodFilterBanner } from "../components/PeriodFilterBanner.js";
 import { useAuth } from "../auth/AuthContext.js";
 import {
   notifyApi,
@@ -380,6 +382,9 @@ export default function Alerts() {
   // Only fetched for users who can actually escalate / manage rules.
   const { options: assigneeOptions } = useAssigneeOptions(canManage || canManageRule);
   const roleOptions = assigneeOptions.filter((o) => o.value.startsWith("role:"));
+
+  // Time period carried in from a Dashboard drill-down (?period=&from=&to=).
+  const period = usePeriod();
 
   // Data
   const [alerts,    setAlerts]    = useState<Alert[]>([]);
@@ -742,6 +747,7 @@ export default function Alerts() {
     .filter((a) => {
       if (levelFilter !== "all" && a.level !== levelFilter) return false;
       if (unreadOnly && a.is_read) return false;
+      if (period.active && !inPeriod(a.created_at, period)) return false;
       return true;
     })
     .map((a) => a as unknown as Record<string, unknown>);
@@ -818,6 +824,10 @@ export default function Alerts() {
           )}
         </div>
       </div>
+
+      {period.active && (
+        <PeriodFilterBanner from={period.from} to={period.to} onClear={period.clear} />
+      )}
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>

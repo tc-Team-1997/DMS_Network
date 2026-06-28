@@ -25,6 +25,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext.js";
 import { useUrlState } from "../hooks/useUrlState.js";
+import { usePeriod, inPeriod } from "../hooks/usePeriod.js";
+import { PeriodFilterBanner } from "../components/PeriodFilterBanner.js";
 import {
   listAllReviewQueue,
   claimWorkflow,
@@ -101,6 +103,8 @@ export default function ReviewQueue() {
   // local mirror so a tab click re-renders even where setSearchParams is a no-op
   // (e.g. tests), while still updating the URL for bookmarkability.
   const [urlState, setUrlState] = useUrlState<{ tab: string }>({ tab: "PENDING" });
+  // Time period carried in from a Dashboard drill-down (?period=&from=&to=).
+  const period = usePeriod();
   const initialTab: TabKey = (TAB_KEYS as string[]).includes(urlState.tab)
     ? (urlState.tab as TabKey)
     : "PENDING";
@@ -197,17 +201,20 @@ export default function ReviewQueue() {
     return { pending, claimed, resolved, escalated, breached };
   }, [rows]);
 
-  /* ── Filtered rows for the active tab ── */
+  /* ── Filtered rows for the active tab (and time period, if one is active) ── */
   const filtered = useMemo(() => {
+    const byPeriod = period.active
+      ? rows.filter((r) => inPeriod(r.created_at, period))
+      : rows;
     switch (tab) {
-      case "PENDING":      return rows.filter((r) => r.queue_status === "Pending");
-      case "CLAIMED":      return rows.filter((r) => r.queue_status === "Claimed");
-      case "RESOLVED":     return rows.filter((r) => r.queue_status === "Approved" || r.queue_status === "Rejected");
-      case "ESCALATED":    return rows.filter((r) => r.queue_status === "Escalated");
-      case "SLA_BREACHED": return rows.filter(isBreached);
-      default:             return rows;
+      case "PENDING":      return byPeriod.filter((r) => r.queue_status === "Pending");
+      case "CLAIMED":      return byPeriod.filter((r) => r.queue_status === "Claimed");
+      case "RESOLVED":     return byPeriod.filter((r) => r.queue_status === "Approved" || r.queue_status === "Rejected");
+      case "ESCALATED":    return byPeriod.filter((r) => r.queue_status === "Escalated");
+      case "SLA_BREACHED": return byPeriod.filter(isBreached);
+      default:             return byPeriod;
     }
-  }, [rows, tab]);
+  }, [rows, tab, period]);
 
   const changeTab = useCallback(
     (k: string) => {
@@ -381,6 +388,10 @@ export default function ReviewQueue() {
           </button>
         </div>
       </div>
+
+      {period.active && (
+        <PeriodFilterBanner from={period.from} to={period.to} onClear={period.clear} />
+      )}
 
       {/* KPI row */}
       <div className="g4" style={{ marginBottom: 16 }}>
