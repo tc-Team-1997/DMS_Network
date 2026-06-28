@@ -92,6 +92,37 @@ async function pickDocUuid(page: Page): Promise<string | null> {
   return uuidDoc?.id ?? docs[0]?.id ?? null;
 }
 
+/**
+ * Create a fresh case with an embedded workflow and return its workflow id.
+ * A brand-new workflow always has an actionable *Pending* first step, so the
+ * Review Decision card's Approve is a real, succeeding act. Scanning the shared
+ * queue for "any" id is unreliable here: earlier specs in this file claim/approve
+ * the seeded item, so a scanned id may already be resolved (Approve then no-ops
+ * and never navigates). Creating our own makes the flow order-independent.
+ */
+async function createApprovableWorkflow(page: Page): Promise<string | null> {
+  const token = await getToken(page);
+  return page.evaluate(async (token) => {
+    const tr = await fetch("/svc/workflow/templates", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!tr.ok) return null;
+    const templates = ((await tr.json())?.templates ?? []) as Array<{ id: string }>;
+    if (!templates.length) return null;
+    const cr = await fetch("/svc/workflow/cases", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        case_type: "KYC",
+        title: "E2E decision-card case",
+        template_id: templates[0].id,
+      }),
+    });
+    if (!cr.ok) return null;
+    return ((await cr.json())?.case?.workflow_id ?? null) as string | null;
+  }, token);
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // 1. WORKFLOW / REVIEW QUEUE
 // ════════════════════════════════════════════════════════════════════════════
@@ -274,14 +305,12 @@ test.describe("Viewer — burn-in tools + workflow decision", () => {
     // remaining items' doc_ids may not resolve in the core store on this stack.
     // So we take any workflow id from the queue and pair it with a freshly
     // uploaded (guaranteed-loadable) document.
-    let workflowId: string | null = null;
-    for (const status of ["Pending", "Claimed", "Escalated", "Resolved"]) {
-      const items = await fetchQueue(page, status);
-      const withId = items.find((i) => i.id);
-      if (withId) { workflowId = withId.id; break; }
-    }
+    // Create our own fresh workflow (guaranteed Pending first step) instead of
+    // scanning the shared queue, where earlier specs may have already resolved
+    // every item — Approve on a resolved workflow no-ops and never navigates.
+    const workflowId = await createApprovableWorkflow(page);
     const docId = await pickDocUuid(page);
-    test.skip(!docId || !workflowId, "No workflow item available to drive the decision card.");
+    test.skip(!docId || !workflowId, "Could not create a workflow to drive the decision card.");
 
     await page.goto(
       `/viewer?doc=${encodeURIComponent(docId!)}&workflow=${encodeURIComponent(workflowId!)}`,
