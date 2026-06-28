@@ -1,12 +1,33 @@
 #!/usr/bin/env bash
 #
-# Stop the ZorDMS dev stack — frees every service + web + AI port.
+# Stop the ZorDMS dev stack — reaps the `tsx watch` / `pnpm --filter` / uvicorn
+# processes behind the stack, then frees every service + web + AI port.
 #
 set -uo pipefail
 cd "$(cd "$(dirname "$0")" && pwd)"
 
+# Long-lived processes behind the stack. Each node service is three processes:
+#   pnpm --filter @zordms/<svc> dev  ->  tsx .../cli.mjs watch src/server.ts  ->  node ...loader.mjs src/server.ts
+# Only the innermost binds a port, and the `tsx watch` parent respawns it — so
+# freeing ports alone leaves watchers that resurrect a server (and, once
+# reparented to init, become stale instances that grab the port on next start).
+# Reap the watchers/parents FIRST so nothing respawns. Patterns are scoped to
+# DMS_Network / @zordms / zordms_ai so other projects on this machine are safe.
+PATTERNS=(
+  "DMS_Network/services/.*watch src/server.ts"   # node-service tsx watchers (incl. orphans reparented to init)
+  "pnpm --filter @zordms"                         # per-service `pnpm dev` parents
+  "uvicorn zordms_ai"                             # python AI service
+)
 PORTS=(4000 4001 4002 4003 4004 4005 5174 8000)
+
 echo "Stopping ZorDMS dev stack..."
+
+# 1) Stop watchers/parents first (SIGTERM) so they can't respawn a server.
+for pat in "${PATTERNS[@]}"; do
+  pkill -f "$pat" 2>/dev/null || true
+done
+
+# 2) Free any port still held (server children, vite).
 for p in "${PORTS[@]}"; do
   pids=$(lsof -ti tcp:"$p" 2>/dev/null || true)
   if [ -n "$pids" ]; then
@@ -15,9 +36,15 @@ for p in "${PORTS[@]}"; do
   fi
 done
 
-# Reap any lingering watchers belonging to this project.
-pkill -f "tsx watch src/server.ts" 2>/dev/null || true
-pkill -f "uvicorn app.main:app" 2>/dev/null || true
+# 3) Escalate to SIGKILL for anything that ignored SIGTERM.
+sleep 1
+for pat in "${PATTERNS[@]}"; do
+  pkill -9 -f "$pat" 2>/dev/null || true
+done
+for p in "${PORTS[@]}"; do
+  pids=$(lsof -ti tcp:"$p" 2>/dev/null || true)
+  [ -n "$pids" ] && kill -9 $pids 2>/dev/null || true
+done
 
 # Give sockets a moment to release.
 sleep 1

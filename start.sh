@@ -20,9 +20,10 @@ LOGDIR="$ROOT/.devlogs"
 mkdir -p "$LOGDIR"
 
 # Load local secrets (.env is gitignored) and export every key to the child
-# services. `set -a` auto-exports anything sourced; the per-service `dev` scripts
-# still set DB_CLIENT=sqlite3 inline, which overrides any DB_* from .env, so dev
-# stays on SQLite. SMTP_* (Zoho email) and other secrets flow through here.
+# services. `set -a` auto-exports anything sourced. The per-service `dev` scripts
+# read DB_CLIENT from the environment, defaulting to sqlite3 when unset, so dev
+# stays on SQLite unless .env sets DB_CLIENT=pg (or oracledb). SMTP_* (Zoho email)
+# and other secrets flow through here.
 if [ -f "$ROOT/.env" ]; then
   set -a
   # shellcheck disable=SC1091
@@ -37,8 +38,8 @@ export INTERNAL_SERVICE_TOKEN="${INTERNAL_SERVICE_TOKEN:-change-me-internal}"
 # 1) Free the ports (idempotent start / restart).
 bash "$ROOT/stop.sh"
 
-# 2) Launch each Node service + the web app (DB_CLIENT=sqlite3 is baked into
-#    each service's `dev` script).
+# 2) Launch each Node service + the web app (each service's `dev` script honors
+#    DB_CLIENT from the environment, defaulting to sqlite3).
 echo "Starting ZorDMS dev stack..."
 start_node() {  # <label> <pnpm-filter>
   echo "  -> $1"

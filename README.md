@@ -48,9 +48,15 @@ No external database required — local dev runs entirely on in-memory SQLite.
 
 ```bash
 pnpm install            # install workspace deps (Node 20+, pnpm 9+)
+pnpm -r build           # compile shared packages + services to dist/ (required on a fresh checkout)
 ./start.sh              # boot the whole stack (frees ports first)
 # open http://localhost:5174  →  sign in:  admin / admin123
 ```
+
+> First run only: the services import the shared `packages/*` from their compiled
+> `dist/` output, so `pnpm -r build` must run once before the first `./start.sh`
+> (otherwise the gateway fails with `Cannot find package '@zordms/auth/dist/index.js'`).
+> The build output persists, so later `./start.sh` / `./restart.sh` need no rebuild.
 
 | Command | What it does |
 | --- | --- |
