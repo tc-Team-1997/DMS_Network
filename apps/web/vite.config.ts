@@ -5,6 +5,11 @@ import { createRequire } from "node:module";
 // Derive the app version from the actual package.json (single source of truth).
 const pkg = createRequire(import.meta.url)("./package.json") as { version: string };
 
+// Gateway proxy target — overridable via VITE_SVC_GATEWAY so the gateway can be
+// moved off :4000 (e.g. when another local project squats that port) without
+// editing this file. Defaults to the canonical :4000.
+const GATEWAY = process.env.VITE_SVC_GATEWAY ?? "http://localhost:4000";
+
 /**
  * ZorDMS v4.2 Dev Proxy Scheme
  * ─────────────────────────────────────────────────────────────────────
@@ -35,7 +40,7 @@ export default defineConfig({
     proxy: {
       // ── Canonical /svc/* scheme ──────────────────────────────────
       "/svc/gateway": {
-        target: "http://localhost:4000",
+        target: GATEWAY,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/svc\/gateway/, ""),
       },
@@ -74,9 +79,9 @@ export default defineConfig({
       // ── Legacy direct paths (kept for existing code) ─────────────
       // NOTE: "/users" is intentionally omitted — it conflicts with the React
       // Router /users SPA route. All Users API calls use /svc/gateway/users.
-      "/auth":   { target: "http://localhost:4000", changeOrigin: true },
-      "/authz":  { target: "http://localhost:4000", changeOrigin: true },
-      "/health": { target: "http://localhost:4000", changeOrigin: true },
+      "/auth":   { target: GATEWAY, changeOrigin: true },
+      "/authz":  { target: GATEWAY, changeOrigin: true },
+      "/health": { target: GATEWAY, changeOrigin: true },
     },
   },
 

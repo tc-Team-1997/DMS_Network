@@ -71,7 +71,7 @@ fi
 echo ""
 printf "Waiting for gateway + web"
 for _ in $(seq 1 40); do
-  if curl -fsS localhost:4000/health >/dev/null 2>&1 && curl -fsS localhost:5174 >/dev/null 2>&1; then
+  if curl -fsS "localhost:${GATEWAY_PORT:-4000}/health" >/dev/null 2>&1 && curl -fsS localhost:5174 >/dev/null 2>&1; then
     echo ""
     echo "✅ ZorDMS is up:  http://localhost:5174   (sign in: admin / admin123)"
     echo "   Logs:  $LOGDIR/<service>.log"

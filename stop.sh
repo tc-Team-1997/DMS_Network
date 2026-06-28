@@ -6,6 +6,15 @@
 set -uo pipefail
 cd "$(cd "$(dirname "$0")" && pwd)"
 
+# Pick up GATEWAY_PORT from .env so we free the gateway's actual port (it may be
+# moved off the default :4000 when another local project occupies that port).
+# We deliberately do NOT touch :4000 unless that's where the gateway runs.
+if [ -f ".env" ]; then
+  # shellcheck disable=SC1091
+  . ".env"
+fi
+GATEWAY_PORT="${GATEWAY_PORT:-4000}"
+
 # Long-lived processes behind the stack. Each node service is three processes:
 #   pnpm --filter @zordms/<svc> dev  ->  tsx .../cli.mjs watch src/server.ts  ->  node ...loader.mjs src/server.ts
 # Only the innermost binds a port, and the `tsx watch` parent respawns it — so
@@ -18,7 +27,7 @@ PATTERNS=(
   "pnpm --filter @zordms"                         # per-service `pnpm dev` parents
   "uvicorn zordms_ai"                             # python AI service
 )
-PORTS=(4000 4001 4002 4003 4004 4005 5174 8000)
+PORTS=("$GATEWAY_PORT" 4001 4002 4003 4004 4005 5174 8000)
 
 echo "Stopping ZorDMS dev stack..."
 
