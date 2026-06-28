@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 
+// Search now reads the time period from the URL via usePeriod() →
+// useSearchParams, so react-router-dom must be mocked (no period in URL here, so
+// the filter stays inactive and behaviour is unchanged).
+vi.mock("react-router-dom", () => ({
+  useSearchParams: () => [new URLSearchParams(""), vi.fn()],
+}));
+
 // Mock the auth context.
 // I-1 fix verification: permissions now use "document:read" (not the phantom "search:read").
 vi.mock("../auth/AuthContext.js", () => ({

@@ -12,6 +12,17 @@ export function applyScope(qb: Knex.QueryBuilder, scope: SearchScope): Knex.Quer
   return qb;
 }
 
+/**
+ * `date_to` is usually a bare calendar day (YYYY-MM-DD).  Compared literally it
+ * would exclude documents indexed later that same day (e.g. an `indexed_at` of
+ * `…T10:00:00Z` is lexicographically greater than `YYYY-MM-DD`).  Extend a bare
+ * day to end-of-day so the upper bound is inclusive of the whole day.  Values
+ * that already carry a time component are passed through unchanged.
+ */
+export function inclusiveEnd(dateTo: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? `${dateTo}T23:59:59.999Z` : dateTo;
+}
+
 export function applyFilters(qb: Knex.QueryBuilder, filters: SearchFilters = {}): Knex.QueryBuilder {
   if (filters.doc_type) qb.where("doc_type", filters.doc_type);
   if (filters.status) qb.where("status", filters.status);
@@ -21,7 +32,7 @@ export function applyFilters(qb: Knex.QueryBuilder, filters: SearchFilters = {})
   if (typeof filters.legal_hold === "boolean") qb.where("legal_hold", filters.legal_hold);
   if (filters.expiry_status) qb.where("expiry_status", filters.expiry_status);
   if (filters.date_from) qb.where("indexed_at", ">=", filters.date_from);
-  if (filters.date_to) qb.where("indexed_at", "<=", filters.date_to);
+  if (filters.date_to) qb.where("indexed_at", "<=", inclusiveEnd(filters.date_to));
   return qb;
 }
 

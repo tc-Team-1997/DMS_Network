@@ -1,6 +1,7 @@
 import { Client } from "@elastic/elasticsearch";
 import type { SearchBackend } from "./SearchBackend.js";
 import type { SearchDoc, SearchQuery, SearchResults, SearchScope, SearchHit } from "@zordms/types";
+import { inclusiveEnd } from "../query/buildQuery.js";
 
 // ---------------------------------------------------------------------------
 // Minimal structural interface for the subset of the @elastic/elasticsearch
@@ -183,9 +184,16 @@ export class ElasticsearchBackend implements SearchBackend {
     if (f.doc_type) filter.push({ term: { doc_type: f.doc_type } });
     if (f.branch) filter.push({ term: { branch: f.branch } });
     if (f.status) filter.push({ term: { status: f.status } });
+    if (f.uploaded_by) filter.push({ term: { uploaded_by: f.uploaded_by } });
     if (f.risk_band) filter.push({ term: { risk_band: f.risk_band } });
     if (f.legal_hold != null) filter.push({ term: { legal_hold: f.legal_hold } });
     if (f.expiry_status) filter.push({ term: { expiry_status: f.expiry_status } });
+    if (f.date_from || f.date_to) {
+      const range: Record<string, string> = {};
+      if (f.date_from) range.gte = f.date_from;
+      if (f.date_to) range.lte = inclusiveEnd(f.date_to);
+      filter.push({ range: { indexed_at: range } });
+    }
 
     const text = (query.text ?? "").trim();
     const must: Array<Record<string, unknown>> =

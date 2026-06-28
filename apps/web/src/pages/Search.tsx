@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Search as SearchIcon, Filter, Bookmark, BookmarkCheck, Download, ChevronDown, ChevronUp, Clock, BarChart2, Zap, X } from "lucide-react";
+import { usePeriod } from "../hooks/usePeriod.js";
+import { PeriodFilterBanner } from "../components/PeriodFilterBanner.js";
 import {
   KpiCard,
   Card,
@@ -254,6 +256,9 @@ export default function Search() {
   const [page,    setPage]    = useState(1);
   const pageSize = 20;
 
+  // Time period carried in from a Dashboard drill-down (?period=&from=&to=).
+  const period = usePeriod();
+
   // Results state
   const [results,  setResults]  = useState<SearchResults>(EMPTY_RESULTS);
   const [loading,  setLoading]  = useState(false);
@@ -278,7 +283,13 @@ export default function Search() {
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doSearch = useCallback(async (q: string, m: SearchMode, f: SearchFilters, p: number, s: SortMode) => {
-    if (!q.trim() && !Object.values(f).some(Boolean)) {
+    // Fold the active drill-down period into the server-side date range so the
+    // backend filters by indexed_at — the result set, total count and facets all
+    // reflect the window, not just the current page (no client-side trimming).
+    const f2: SearchFilters = period.active
+      ? { ...f, date_from: period.from, date_to: period.to }
+      : f;
+    if (!q.trim() && !Object.values(f2).some(Boolean)) {
       setResults(EMPTY_RESULTS);
       setHasSearched(false);
       return;
@@ -286,7 +297,7 @@ export default function Search() {
     setLoading(true);
     setError(null);
     try {
-      const res = await searchApi.query({ text: q, mode: m, filters: f, page: p, pageSize, sort: s });
+      const res = await searchApi.query({ text: q, mode: m, filters: f2, page: p, pageSize, sort: s });
       setResults(res);
       setTookMs(res.tookMs);
       setHasSearched(true);
@@ -296,7 +307,7 @@ export default function Search() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [period.active, period.from, period.to]);
 
   // Trigger search when user types (debounced 300ms)
   useEffect(() => {
@@ -321,7 +332,10 @@ export default function Search() {
 
   async function handleExportCsv() {
     try {
-      const blob = await searchApi.exportCsv({ text, mode, filters, sort, page, pageSize });
+      const exportFilters: SearchFilters = period.active
+        ? { ...filters, date_from: period.from, date_to: period.to }
+        : filters;
+      const blob = await searchApi.exportCsv({ text, mode, filters: exportFilters, sort, page, pageSize });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -472,6 +486,10 @@ export default function Search() {
           )}
         </div>
       </div>
+
+      {period.active && (
+        <PeriodFilterBanner from={period.from} to={period.to} onClear={period.clear} />
+      )}
 
       {/* KPI Row */}
       {hasSearched && (

@@ -118,6 +118,19 @@ describe("ElasticsearchBackend.search query building", () => {
     expect(args.highlight.fields.ocr_text).toBeDefined();
   });
 
+  it("adds an indexed_at range filter for date_from/date_to (end-of-day inclusive)", async () => {
+    const { client, calls } = fakeClient();
+    const be = new ElasticsearchBackend({ index: "i", client });
+    await be.search(
+      { text: "loan", mode: "fulltext", filters: { date_from: "2026-06-01", date_to: "2026-06-30" } },
+      { crossBranch: true },
+    );
+    const bool = (calls.search[0] as any).query.bool;
+    expect(bool.filter).toEqual(expect.arrayContaining([
+      { range: { indexed_at: { gte: "2026-06-01", lte: "2026-06-30T23:59:59.999Z" } } },
+    ]));
+  });
+
   it("does NOT add a branch term filter for a cross-branch viewer", async () => {
     const { client, calls } = fakeClient();
     const be = new ElasticsearchBackend({ index: "i", client });

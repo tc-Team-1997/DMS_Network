@@ -56,6 +56,28 @@ describe("SqlSearchBackend", () => {
     expect(res.facets!.doc_type.length).toBeGreaterThan(0);
   });
 
+  it("filters by indexed_at date range (date_from/date_to)", async () => {
+    await backend.index(doc({ doc_id: "OLD", ocr_text: "shared term", indexed_at: "2026-01-10T00:00:00Z" }));
+    await backend.index(doc({ doc_id: "MID", ocr_text: "shared term", indexed_at: "2026-06-15T09:00:00Z" }));
+    await backend.index(doc({ doc_id: "NEW", ocr_text: "shared term", indexed_at: "2026-09-20T00:00:00Z" }));
+    const res = await backend.search(
+      { text: "shared", mode: "fulltext", filters: { date_from: "2026-06-01", date_to: "2026-06-30" } },
+      { crossBranch: true },
+    );
+    expect(res.hits.map((h) => h.doc_id)).toEqual(["MID"]);
+    expect(res.total).toBe(1);
+  });
+
+  it("date_to is inclusive of the whole day (end-of-day boundary)", async () => {
+    // A document indexed later on the `to` day must still match a bare-day bound.
+    await backend.index(doc({ doc_id: "LATE", ocr_text: "shared term", indexed_at: "2026-06-27T18:30:00Z" }));
+    const res = await backend.search(
+      { text: "shared", mode: "fulltext", filters: { date_from: "2026-06-27", date_to: "2026-06-27" } },
+      { crossBranch: true },
+    );
+    expect(res.hits.map((h) => h.doc_id)).toEqual(["LATE"]);
+  });
+
   it("paginates results", async () => {
     for (let i = 0; i < 25; i++) await backend.index(doc({ doc_id: `D${i}`, ocr_text: "shared term" }));
     const page1 = await backend.search({ text: "shared", mode: "fulltext", page: 1, pageSize: 10 }, { crossBranch: true });
