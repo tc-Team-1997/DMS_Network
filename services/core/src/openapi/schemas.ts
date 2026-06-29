@@ -758,6 +758,60 @@ export const ReportSourceSchema = registry.register(
     .openapi("ReportSource"),
 );
 
+// ── AI capability console (§4.7) ──────────────────────────────────────────────
+export const SetAiFeatureSchema = registry.register(
+  "SetAiFeature",
+  z
+    .object({
+      enabled: z.boolean().optional(),
+      threshold: z.number().min(0).max(1).nullable().optional(),
+    })
+    .strict()
+    .openapi("SetAiFeature"),
+);
+
+export const RecordAiMetricSchema = registry.register(
+  "RecordAiMetric",
+  z
+    .object({
+      feature_key: z.string().min(1).max(60).openapi({ example: "classify" }),
+      accuracy: z.number().min(0).max(1).optional(),
+      throughput: z.number().min(0).optional(),
+      period: z.string().max(20).optional(),
+    })
+    .strict()
+    .openapi("RecordAiMetric"),
+);
+
+export const AiMetricSchema = registry.register(
+  "AiMetric",
+  z
+    .object({
+      featureKey: z.string(),
+      accuracy: z.number().nullable(),
+      throughput: z.number().nullable(),
+      period: z.string(),
+      recordedAt: z.string().nullable(),
+    })
+    .openapi("AiMetric"),
+);
+
+export const AiFeatureSchema = registry.register(
+  "AiFeature",
+  z
+    .object({
+      featureKey: z.string(),
+      name: z.string(),
+      enabled: z.boolean(),
+      threshold: z.number().nullable(),
+      description: z.string().nullable(),
+      updatedBy: z.string().nullable(),
+      updatedAt: z.string().nullable(),
+      latestMetric: AiMetricSchema.nullable(),
+    })
+    .openapi("AiFeature"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z

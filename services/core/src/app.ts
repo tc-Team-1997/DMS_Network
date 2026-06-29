@@ -19,6 +19,7 @@ import { docTypesRouter } from "./routes/doc_types.js";
 import { configRouter } from "./routes/config.js";
 import { validationRouter } from "./routes/validation.js";
 import { reportsRouter } from "./routes/reports.js";
+import { aiConsoleRouter } from "./routes/aiConsole.js";
 import { extractionRouter } from "./routes/extraction.js";
 import { integrationRouter } from "./routes/integration.js";
 import { jobsRouter } from "./routes/jobs.js";
@@ -55,6 +56,7 @@ export function createApp(deps: CoreDeps): Express {
   app.use("/config", configRouter());
   app.use("/validation", validationRouter());
   app.use("/reports", reportsRouter());
+  app.use("/ai-config", aiConsoleRouter());
 
   // AI Ingestion + Classification pipeline
   app.use("/doc-types", docTypesRouter());
