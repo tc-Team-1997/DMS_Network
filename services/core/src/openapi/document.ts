@@ -31,6 +31,8 @@ import {
   AccessPolicySchema,
   PlaceHoldSchema,
   DedupConfigSchema,
+  SetConfigSchema,
+  ConfigEntrySchema,
   CreateDocTypeSchema,
   UpdateDocTypeSchema,
   ApplyFieldsSchema,
@@ -847,6 +849,65 @@ register([
       401: unauthorized,
       403: forbidden,
       422: json("Invalid dedup configuration.", DedupValidationErrorSchema, { errors: ["enabled must be boolean"] }),
+      500: internalError,
+    },
+  },
+
+  // ── System config (§4.13) ────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/config",
+    tags: ["config"],
+    security: bearer,
+    summary: "List runtime config entries (optionally by category).",
+    request: {
+      query: z.object({
+        category: z.string().optional().openapi({ param: { name: "category", in: "query" }, example: "ai" }),
+      }),
+    },
+    responses: {
+      200: json("Config entries.", z.object({ config: z.array(ConfigEntrySchema) })),
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
+    path: "/config/{key}",
+    tags: ["config"],
+    security: bearer,
+    summary: "Read a single config entry by key.",
+    request: {
+      params: z.object({
+        key: z.string().openapi({ param: { name: "key", in: "path" }, example: "ai.classification_threshold" }),
+      }),
+    },
+    responses: {
+      200: json("Config entry.", z.object({ config: ConfigEntrySchema })),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+      500: internalError,
+    },
+  },
+  {
+    method: "put",
+    path: "/config/{key}",
+    tags: ["config"],
+    security: bearer,
+    summary: "Create or update a config entry (audited).",
+    request: {
+      params: z.object({
+        key: z.string().openapi({ param: { name: "key", in: "path" }, example: "ai.classification_threshold" }),
+      }),
+      ...jsonBody(SetConfigSchema),
+    },
+    responses: {
+      200: json("Updated.", z.object({ config: ConfigEntrySchema })),
+      400: validationErrorResponse,
+      401: unauthorized,
+      403: forbidden,
       500: internalError,
     },
   },

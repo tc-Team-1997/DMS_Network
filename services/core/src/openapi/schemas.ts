@@ -547,6 +547,45 @@ export const DedupConfigStateSchema = registry.register(
     .openapi("DedupConfigState"),
 );
 
+// ── System config (§4.13) ────────────────────────────────────────────────────
+// A JSON value: number, boolean, string, null, array or object.
+const ConfigValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.unknown()),
+  z.record(z.string(), z.unknown()),
+]);
+
+// Request body for PUT /config/{key}.
+export const SetConfigSchema = registry.register(
+  "SetConfig",
+  z
+    .object({
+      value: ConfigValueSchema.openapi({ example: 0.9 }),
+      category: z.string().max(60).optional(),
+      description: z.string().max(500).optional(),
+    })
+    .strict()
+    .openapi("SetConfig"),
+);
+
+// Response shape for a single config entry.
+export const ConfigEntrySchema = registry.register(
+  "ConfigEntry",
+  z
+    .object({
+      key: z.string().openapi({ example: "ai.classification_threshold" }),
+      value: ConfigValueSchema,
+      category: z.string().nullable(),
+      description: z.string().nullable(),
+      updatedBy: z.string().nullable(),
+      updatedAt: z.string().nullable(),
+    })
+    .openapi("ConfigEntry"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z
