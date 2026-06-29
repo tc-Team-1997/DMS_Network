@@ -30,6 +30,7 @@
     "/ocr": {
       "post": {
         "summary": "Ocr Endpoint",
+        "description": "OCR an uploaded image. `lang` defaults to Dzongkha+English (\"dzo+eng\");\nunavailable language packs degrade gracefully (see ocr_text_lang). The\nresponse reports the language actually used so callers can see when Dzongkha\nfell back to English.",
         "operationId": "ocr_endpoint_ocr_post",
         "requestBody": {
           "content": {
@@ -598,6 +599,11 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File"
+          },
+          "lang": {
+            "type": "string",
+            "title": "Lang",
+            "default": "dzo+eng"
           }
         },
         "type": "object",
