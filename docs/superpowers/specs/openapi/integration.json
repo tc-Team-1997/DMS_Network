@@ -205,6 +205,23 @@
           "secret"
         ],
         "additionalProperties": false
+      },
+      "CallConnector": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "type": "string",
+            "minLength": 1
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -825,6 +842,87 @@
           },
           "404": {
             "description": "System not found"
+          }
+        }
+      }
+    },
+    "/integration/systems/{system}/call": {
+      "post": {
+        "summary": "Invoke a whitelisted connector op (live HTTP when configured, else mock)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "System natural key, e.g. mbob"
+            },
+            "required": true,
+            "name": "system",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallConnector"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connector result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "system": {
+                      "type": "string"
+                    },
+                    "op": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "system",
+                    "op",
+                    "result"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or unknown op",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Insufficient permission (integration:manage)"
+          },
+          "404": {
+            "description": "System not found"
+          },
+          "502": {
+            "description": "Connector/upstream call failed"
           }
         }
       }

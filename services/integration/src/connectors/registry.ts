@@ -18,6 +18,24 @@ const MOCK_RESPONSES: Record<string, Record<string, { ok: boolean; status: numbe
   kyc: {
     "verify": { ok: true, status: 200, data: { match: true, score: 0.97, decision: "PASS" } },
   },
+  mbob: {
+    "kyc.fetch": { ok: true, status: 200, data: { cid: "C2001", docType: "CID", channel: "mBoB", capturedAt: "2026-06-29T00:00:00Z" } },
+  },
+  gobob: {
+    "ekyc.fetch": { ok: true, status: 200, data: { cid: "C2002", identityVerified: true, source: "GoBoB" } },
+  },
+  internet_banking: {
+    "statement.fetch": { ok: true, status: 200, data: { accountNo: "0101000123456", statementId: "ST-9001" } },
+  },
+  crm: {
+    "customer.view": { ok: true, status: 200, data: { cid: "C1000", view360Url: "/customer-360?cid=C1000" } },
+  },
+  erp: {
+    "document.fetch": { ok: true, status: 200, data: { docId: "ERP-DOC-1", type: "HR" } },
+  },
+  contact_center: {
+    "document.push": { ok: true, status: 200, data: { ticketId: "CC-7001", delivered: true } },
+  },
 };
 
 export function buildConnector(system: string, ctx: ConnectorContext): Connector {
@@ -47,12 +65,42 @@ export const OP_MAPS: Record<string, Record<string, { method: string; path: stri
     "verify": { method: "POST", path: "/verify" },
     "ping": { method: "GET", path: "/health" },
   },
+  mbob: {
+    "kyc.fetch": { method: "POST", path: "/kyc/uploads" },
+    "ping": { method: "GET", path: "/health" },
+  },
+  gobob: {
+    "ekyc.fetch": { method: "POST", path: "/ekyc" },
+    "ping": { method: "GET", path: "/health" },
+  },
+  internet_banking: {
+    "statement.fetch": { method: "POST", path: "/statements" },
+    "ping": { method: "GET", path: "/health" },
+  },
+  crm: {
+    "customer.view": { method: "POST", path: "/customers/view" },
+    "ping": { method: "GET", path: "/health" },
+  },
+  erp: {
+    "document.fetch": { method: "POST", path: "/documents/fetch" },
+    "ping": { method: "GET", path: "/health" },
+  },
+  contact_center: {
+    "document.push": { method: "POST", path: "/documents" },
+    "ping": { method: "GET", path: "/health" },
+  },
 };
 
 export const BASE_URL_ENV: Record<string, string> = {
   cbs: "CBS_BASE_URL",
   los: "LOS_BASE_URL",
   kyc: "KYC_BASE_URL",
+  mbob: "MBOB_BASE_URL",
+  gobob: "GOBOB_BASE_URL",
+  internet_banking: "INTERNET_BANKING_BASE_URL",
+  crm: "CRM_BASE_URL",
+  erp: "ERP_BASE_URL",
+  contact_center: "CONTACT_CENTER_BASE_URL",
 };
 
 // Returns the live base URL for a system from env, or undefined to use the mock.

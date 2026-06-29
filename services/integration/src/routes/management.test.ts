@@ -43,4 +43,68 @@ describe("integration management", () => {
     expect(bySystem.los.status).toBe("down");
     expect(bySystem.los.recentErrors).toBeGreaterThanOrEqual(1);
   });
+
+  it("seeded config now lists the previously config-only connectors", async () => {
+    const res = await request(app).get("/integration/systems").set("Authorization", `Bearer ${adminToken}`);
+    const names = res.body.systems.map((s: any) => s.system);
+    for (const sys of ["mbob", "gobob", "internet_banking", "crm", "erp", "contact_center"]) {
+      expect(names).toContain(sys);
+    }
+  });
+
+  it("invokes a connector op (mock) and logs the call", async () => {
+    const res = await request(app)
+      .post("/integration/systems/mbob/call")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ op: "kyc.fetch", payload: { cid: "C2001" } });
+    expect(res.status).toBe(200);
+    expect(res.body.system).toBe("mbob");
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.data.channel).toBe("mBoB");
+
+    // withLogging recorded the outbound call.
+    const logs = await request(app).get("/integration/logs?system=mbob").set("Authorization", `Bearer ${adminToken}`);
+    expect(logs.body.logs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("works for all six newly-finished connectors", async () => {
+    const ops: Record<string, string> = {
+      mbob: "kyc.fetch", gobob: "ekyc.fetch", internet_banking: "statement.fetch",
+      crm: "customer.view", erp: "document.fetch", contact_center: "document.push",
+    };
+    for (const [system, op] of Object.entries(ops)) {
+      const res = await request(app)
+        .post(`/integration/systems/${system}/call`)
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({ op });
+      expect(res.status, `${system}.${op}`).toBe(200);
+      expect(res.body.result.ok).toBe(true);
+    }
+  });
+
+  it("rejects an unknown op with 400", async () => {
+    const res = await request(app)
+      .post("/integration/systems/mbob/call")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ op: "no.such.op" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("unknown_op");
+  });
+
+  it("404 for an unknown system", async () => {
+    const res = await request(app)
+      .post("/integration/systems/nope/call")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ op: "ping" });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects a malformed call body with 400 validation_error", async () => {
+    const res = await request(app)
+      .post("/integration/systems/mbob/call")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ payload: {} }); // missing required `op`
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("validation_error");
+  });
 });

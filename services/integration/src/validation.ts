@@ -70,6 +70,15 @@ export const SetInboundSecretSchema = z
   .strict();
 export type SetInboundSecret = z.infer<typeof SetInboundSecretSchema>;
 
+/** POST /integration/systems/:system/call — invoke a whitelisted connector op. */
+export const CallConnectorSchema = z
+  .object({
+    op: z.string().min(1),
+    payload: z.record(z.unknown()).optional(),
+  })
+  .strict();
+export type CallConnector = z.infer<typeof CallConnectorSchema>;
+
 /* ----------------------------- Inbound webhooks ------------------------------ */
 /*
  * These document the HMAC-signed inbound contract. Signature verification on the

@@ -12,6 +12,7 @@ import {
   KycVerificationResultSchema,
   LogsQuerySchema,
   SetInboundSecretSchema,
+  CallConnectorSchema,
 } from "./validation.js";
 
 extendZodWithOpenApi(z);
@@ -323,6 +324,41 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       401: { description: "Missing or invalid bearer token" },
       403: { description: "Insufficient permission (integration:manage)" },
       404: { description: "System not found" },
+    },
+  });
+
+  registry.registerPath({
+    method: "post",
+    path: "/integration/systems/{system}/call",
+    summary: "Invoke a whitelisted connector op (live HTTP when configured, else mock)",
+    security: [{ [bearerAuth.name]: [] }],
+    request: {
+      params: z.object({ system: z.string().openapi({ description: "System natural key, e.g. mbob" }) }),
+      body: {
+        content: {
+          "application/json": {
+            schema: CallConnectorSchema.openapi("CallConnector"),
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Connector result",
+        content: {
+          "application/json": {
+            schema: z.object({ system: z.string(), op: z.string(), result: z.record(z.unknown()) }),
+          },
+        },
+      },
+      400: {
+        description: "Validation error or unknown op",
+        content: { "application/json": { schema: ValidationError } },
+      },
+      401: { description: "Missing or invalid bearer token" },
+      403: { description: "Insufficient permission (integration:manage)" },
+      404: { description: "System not found" },
+      502: { description: "Connector/upstream call failed" },
     },
   });
 

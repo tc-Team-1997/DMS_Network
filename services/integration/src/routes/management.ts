@@ -2,7 +2,8 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import type { Knex } from "knex";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import type { ConnectedSystem } from "@zordms/types";
-import { LogsQuerySchema, SetInboundSecretSchema, parseOr400 } from "../validation.js";
+import { LogsQuerySchema, SetInboundSecretSchema, CallConnectorSchema, parseOr400 } from "../validation.js";
+import { selectConnector, OP_MAPS } from "../connectors/registry.js";
 
 export function managementRouter(): Router {
   const r = Router();
@@ -64,6 +65,28 @@ export function managementRouter(): Router {
         return;
       }
       res.json({ system, inboundSecretSet: true });
+    } catch (err) { next(err); }
+  });
+
+  // Invoke a connector op (outbound) — live HTTP when <SYSTEM>_BASE_URL is set,
+  // else the canned mock. `op` is whitelisted against the system's OP_MAP so no
+  // arbitrary path can be reached. The call is logged via withLogging. Returns
+  // 200 on a successful connector result, 502 when the upstream/op failed.
+  r.post("/systems/:system/call", requirePermission("integration:manage"), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { knex } = req.app.locals.deps as { knex: Knex };
+      const system = req.params.system;
+      const opMap = OP_MAPS[system];
+      if (!opMap) { res.status(404).json({ error: "system_not_found" }); return; }
+      const body = parseOr400(CallConnectorSchema, req.body, res);
+      if (!body) return;
+      if (!opMap[body.op]) {
+        res.status(400).json({ error: "unknown_op", detail: `system '${system}' has no op '${body.op}'` });
+        return;
+      }
+      const connector = selectConnector(system, { knex });
+      const result = await connector.call(body.op, body.payload ?? {});
+      res.status(result.ok ? 200 : 502).json({ system, op: body.op, result });
     } catch (err) { next(err); }
   });
 
