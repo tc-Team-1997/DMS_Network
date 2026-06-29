@@ -586,6 +586,102 @@ export const ConfigEntrySchema = registry.register(
     .openapi("ConfigEntry"),
 );
 
+// ── Validation module (§4.6) ──────────────────────────────────────────────────
+const RuleTypeEnum = z.enum(["required", "regex", "min_length", "max_length", "range", "enum"]);
+const SeverityEnum = z.enum(["error", "warning"]);
+
+export const CreateValidationRuleSchema = registry.register(
+  "CreateValidationRule",
+  z
+    .object({
+      doc_type: z.string().max(80).nullable().optional().openapi({ example: "BT_CID_4G" }),
+      field_key: z.string().min(1).max(120).openapi({ example: "cid_no" }),
+      rule_type: RuleTypeEnum.openapi({ example: "regex" }),
+      params: z.record(z.string(), z.unknown()).optional().openapi({ example: { pattern: "^[0-9]{11}$" } }),
+      severity: SeverityEnum.optional().openapi({ example: "error" }),
+      message: z.string().max(300).optional(),
+      enabled: z.boolean().optional(),
+    })
+    .strict()
+    .openapi("CreateValidationRule"),
+);
+
+export const UpdateValidationRuleSchema = registry.register(
+  "UpdateValidationRule",
+  z
+    .object({
+      doc_type: z.string().max(80).nullable().optional(),
+      field_key: z.string().min(1).max(120).optional(),
+      rule_type: RuleTypeEnum.optional(),
+      params: z.record(z.string(), z.unknown()).optional(),
+      severity: SeverityEnum.optional(),
+      message: z.string().max(300).optional(),
+      enabled: z.boolean().optional(),
+    })
+    .strict()
+    .openapi("UpdateValidationRule"),
+);
+
+export const RunValidationSchema = registry.register(
+  "RunValidation",
+  z
+    .object({
+      documentId: z.string().min(1).optional(),
+      doc_type: z.string().min(1).openapi({ example: "BT_CID_4G" }),
+      data: z.record(z.string(), z.unknown()).optional().openapi({ example: { cid_no: "11504000231" } }),
+    })
+    .strict()
+    .openapi("RunValidation"),
+);
+
+export const ValidationRuleSchema = registry.register(
+  "ValidationRule",
+  z
+    .object({
+      id: z.string(),
+      docType: z.string().nullable(),
+      fieldKey: z.string(),
+      ruleType: z.string(),
+      params: z.record(z.string(), z.unknown()),
+      severity: z.string(),
+      message: z.string().nullable(),
+      enabled: z.boolean(),
+      createdBy: z.string().nullable(),
+      createdAt: z.string().nullable(),
+    })
+    .openapi("ValidationRule"),
+);
+
+export const ValidationResultSchema = registry.register(
+  "ValidationResult",
+  z
+    .object({
+      ruleId: z.string().nullable(),
+      fieldKey: z.string(),
+      ruleType: z.string(),
+      passed: z.boolean(),
+      severity: z.string(),
+      message: z.string().nullable(),
+    })
+    .openapi("ValidationResult"),
+);
+
+export const ValidationRunResultSchema = registry.register(
+  "ValidationRunResult",
+  z
+    .object({
+      results: z.array(ValidationResultSchema),
+      summary: z.object({
+        total: z.number(),
+        passed: z.number(),
+        failed: z.number(),
+        errors: z.number(),
+        warnings: z.number(),
+      }),
+    })
+    .openapi("ValidationRunResult"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z

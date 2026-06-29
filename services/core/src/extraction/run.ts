@@ -251,6 +251,14 @@ export async function runExtraction(
 
     await deps.knex("documents").where({ id: docId }).update(updates);
 
+    // ── 8b. Field validation (§4.6) — best-effort, never blocks extraction ──
+    try {
+      const { runValidation } = await import("../repo/validation.js");
+      await runValidation(deps.knex, { documentId: docId, docType: classifyResult.doc_type, data: fields });
+    } catch (vErr: any) {
+      console.warn(JSON.stringify({ level: "warn", msg: "validation_run_failed", docId, detail: String(vErr?.message ?? vErr) }));
+    }
+
     // ── 9. Duplicate detection (honors dedup config) ───────────────────────
     const dedupCfg = await getDedupConfig(deps.knex);
     let duplicates: Awaited<ReturnType<typeof findDuplicates>> = [];

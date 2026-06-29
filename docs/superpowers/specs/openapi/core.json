@@ -1247,6 +1247,275 @@
           "updatedAt"
         ]
       },
+      "CreateValidationRule": {
+        "type": "object",
+        "properties": {
+          "doc_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80,
+            "example": "BT_CID_4G"
+          },
+          "field_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "cid_no"
+          },
+          "rule_type": {
+            "type": "string",
+            "enum": [
+              "required",
+              "regex",
+              "min_length",
+              "max_length",
+              "range",
+              "enum"
+            ],
+            "example": "regex"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {},
+            "example": {
+              "pattern": "^[0-9]{11}$"
+            }
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "example": "error"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "field_key",
+          "rule_type"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateValidationRule": {
+        "type": "object",
+        "properties": {
+          "doc_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          },
+          "field_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "rule_type": {
+            "type": "string",
+            "enum": [
+              "required",
+              "regex",
+              "min_length",
+              "max_length",
+              "range",
+              "enum"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "error",
+              "warning"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RunValidation": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "doc_type": {
+            "type": "string",
+            "minLength": 1,
+            "example": "BT_CID_4G"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {},
+            "example": {
+              "cid_no": "11504000231"
+            }
+          }
+        },
+        "required": [
+          "doc_type"
+        ],
+        "additionalProperties": false
+      },
+      "ValidationRule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "docType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldKey": {
+            "type": "string"
+          },
+          "ruleType": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "severity": {
+            "type": "string"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "docType",
+          "fieldKey",
+          "ruleType",
+          "params",
+          "severity",
+          "message",
+          "enabled",
+          "createdBy",
+          "createdAt"
+        ]
+      },
+      "ValidationResult": {
+        "type": "object",
+        "properties": {
+          "ruleId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldKey": {
+            "type": "string"
+          },
+          "ruleType": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ruleId",
+          "fieldKey",
+          "ruleType",
+          "passed",
+          "severity",
+          "message"
+        ]
+      },
+      "ValidationRunResult": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationResult"
+            }
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "passed": {
+                "type": "number"
+              },
+              "failed": {
+                "type": "number"
+              },
+              "errors": {
+                "type": "number"
+              },
+              "warnings": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "passed",
+              "failed",
+              "errors",
+              "warnings"
+            ]
+          }
+        },
+        "required": [
+          "results",
+          "summary"
+        ]
+      },
       "Quality": {
         "type": "object",
         "properties": {
@@ -6249,6 +6518,608 @@
                       "code": "invalid_type"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/validation/rules": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List validation rules (optionally by doc_type).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "BT_CID_4G"
+            },
+            "required": false,
+            "name": "doc_type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rules": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ValidationRule"
+                      }
+                    }
+                  },
+                  "required": [
+                    "rules"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a validation rule.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateValidationRule"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rule": {
+                      "$ref": "#/components/schemas/ValidationRule"
+                    }
+                  },
+                  "required": [
+                    "rule"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/validation/rules/{id}": {
+      "put": {
+        "tags": [
+          "validation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a validation rule.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateValidationRule"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rule": {
+                      "$ref": "#/components/schemas/ValidationRule"
+                    }
+                  },
+                  "required": [
+                    "rule"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "validation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a validation rule.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/validation/run": {
+      "post": {
+        "tags": [
+          "validation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Run validation rules against supplied field data (optionally persisting per-document results).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunValidation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationRunResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/validation/results": {
+      "get": {
+        "tags": [
+          "validation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List persisted validation results for a document.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "document_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ValidationResult"
+                      }
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing document_id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "document_id required"
                 }
               }
             }
