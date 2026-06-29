@@ -682,6 +682,82 @@ export const ValidationRunResultSchema = registry.register(
     .openapi("ValidationRunResult"),
 );
 
+// ── Reports module (§4.10) ────────────────────────────────────────────────────
+const ReportSourceEnum = z.enum(["documents", "jobs", "customers"]);
+const MeasureSchema = z
+  .object({
+    fn: z.enum(["count", "sum", "avg", "min", "max"]).openapi({ example: "count" }),
+    field: z.string().optional(),
+    alias: z.string().optional(),
+  })
+  .openapi("ReportMeasure");
+
+export const RunReportSchema = registry.register(
+  "RunReport",
+  z
+    .object({
+      source: ReportSourceEnum,
+      group_by: z.array(z.string()).optional().openapi({ example: ["doc_type"] }),
+      measures: z.array(MeasureSchema).optional(),
+      filters: z.record(z.string(), z.unknown()).optional(),
+    })
+    .strict()
+    .openapi("RunReport"),
+);
+
+export const SaveReportSchema = registry.register(
+  "SaveReport",
+  z
+    .object({
+      name: z.string().min(1).max(200).openapi({ example: "Documents by type" }),
+      description: z.string().max(500).optional(),
+      source: ReportSourceEnum,
+      group_by: z.array(z.string()).optional(),
+      measures: z.array(MeasureSchema).optional(),
+      filters: z.record(z.string(), z.unknown()).optional(),
+    })
+    .strict()
+    .openapi("SaveReport"),
+);
+
+export const ReportRunResultSchema = registry.register(
+  "ReportRunResult",
+  z
+    .object({
+      columns: z.array(z.string()),
+      rows: z.array(z.record(z.string(), z.unknown())),
+    })
+    .openapi("ReportRunResult"),
+);
+
+export const ReportDefinitionSchema = registry.register(
+  "ReportDefinition",
+  z
+    .object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string().nullable(),
+      source: z.string(),
+      groupBy: z.array(z.string()),
+      measures: z.array(z.record(z.string(), z.unknown())),
+      filters: z.record(z.string(), z.unknown()),
+      createdBy: z.string().nullable(),
+      createdAt: z.string().nullable(),
+    })
+    .openapi("ReportDefinition"),
+);
+
+export const ReportSourceSchema = registry.register(
+  "ReportSource",
+  z
+    .object({
+      source: z.string(),
+      groupable: z.array(z.string()),
+      numeric: z.array(z.string()),
+    })
+    .openapi("ReportSource"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z

@@ -18,6 +18,7 @@ import { sysadminRouter } from "./routes/sysadmin.js";
 import { docTypesRouter } from "./routes/doc_types.js";
 import { configRouter } from "./routes/config.js";
 import { validationRouter } from "./routes/validation.js";
+import { reportsRouter } from "./routes/reports.js";
 import { extractionRouter } from "./routes/extraction.js";
 import { integrationRouter } from "./routes/integration.js";
 import { jobsRouter } from "./routes/jobs.js";
@@ -53,6 +54,7 @@ export function createApp(deps: CoreDeps): Express {
   app.use("/admin", sysadminRouter());
   app.use("/config", configRouter());
   app.use("/validation", validationRouter());
+  app.use("/reports", reportsRouter());
 
   // AI Ingestion + Classification pipeline
   app.use("/doc-types", docTypesRouter());
