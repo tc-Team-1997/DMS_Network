@@ -1,10 +1,10 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-import { newId } from "@zordms/db";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import { validateBody } from "../openapi/validate.js";
 import { SetConfigSchema } from "../openapi/schemas.js";
 import { listConfig, getConfig, setConfig } from "../repo/systemConfig.js";
+import { writeAudit } from "../modules/audit.js";
 
 /**
  * §4.13 Config module — audited runtime key/value settings.
@@ -52,13 +52,12 @@ export function configRouter(): Router {
         description: req.body.description,
         updatedBy: req.authUser!.username,
       });
-      await knex("audit_log").insert({
-        id: newId(),
-        actor_id: req.authUser!.id,
-        actor_username: req.authUser!.username,
+      await writeAudit(knex, {
+        actorId: req.authUser!.id,
+        actorUsername: req.authUser!.username,
         action: "CONFIG_SET",
         entity: "system_config",
-        entity_id: req.params.key,
+        entityId: req.params.key,
         details: `set ${req.params.key}`,
       });
       res.json({ config: entry });

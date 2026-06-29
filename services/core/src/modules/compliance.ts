@@ -39,18 +39,30 @@ export async function queryAuditTrail(knex: Knex, q: AuditQuery): Promise<any[]>
   return builder;
 }
 
-function canonical(row: Record<string, unknown>): string {
+/** Canonical string form of an audit row — the bytes hashed into the chain. */
+export function canonicalAuditRow(row: Record<string, unknown>): string {
   return [row.actor_username ?? "", row.action ?? "", row.entity ?? "", row.entity_id ?? "", row.details ?? ""].join("|");
 }
 
+/** sha256(prev_hash + "|" + canonical(row)) — the chained hash stored on each row. */
+export function chainHash(prevHash: string, row: Record<string, unknown>): string {
+  return createHash("sha256").update(prevHash + "|" + canonicalAuditRow(row)).digest("hex");
+}
+
 export async function verifyAuditChain(knex: Knex): Promise<ChainVerification> {
-  const rows = await knex("audit_log").select("*").orderBy("created_at", "asc");
+  // Deterministic order: created_at then id (UUIDv7 — time-ordered, unique tiebreak).
+  const rows = await knex("audit_log").select("*").orderBy([{ column: "created_at" }, { column: "id" }]);
   let prev = "";
   let brokenAt: number | null = null;
   for (let i = 0; i < rows.length; i++) {
     if (rows[i].id == null) { brokenAt = i; break; }
-    const digest = createHash("sha256").update(prev + "|" + canonical(rows[i])).digest("hex");
-    prev = digest;
+    const expected = chainHash(prev, rows[i]);
+    // Rows written via writeAudit carry a stored row_hash — compare to detect
+    // tampering. Legacy rows without a stored hash are tolerated (chain advances
+    // on the recomputed value) so the trail stays verifiable across the upgrade.
+    const stored = rows[i].row_hash as string | null | undefined;
+    if (stored != null && stored !== expected) { brokenAt = i; break; }
+    prev = stored ?? expected;
   }
   return { ok: brokenAt === null, checked: rows.length, brokenAt };
 }

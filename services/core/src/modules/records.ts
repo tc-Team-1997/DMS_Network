@@ -2,6 +2,7 @@ import type { Knex } from "knex";
 import { randomUUID } from "node:crypto";
 import type { RetentionPolicy, LegalHold, DisposalCandidate } from "@zordms/types";
 import { newId } from "@zordms/db";
+import { writeAudit } from "./audit.js";
 
 export async function listFilePlan(knex: Knex): Promise<RetentionPolicy[]> {
   return knex<RetentionPolicy>("retention_policies").select("*").orderBy("doc_class");
@@ -160,9 +161,9 @@ export async function scanDisposalEligibility(
       if (d.disposal_status !== "Eligible") {
         await knex("documents").where({ id: d.id })
           .update({ disposal_status: "Eligible", disposal_eligible_at: knex.fn.now() });
-        await knex("audit_log").insert({
-          id: newId(), actor_username: "system", action: "DISPOSAL_ELIGIBLE", entity: "document",
-          entity_id: String(d.id),
+        await writeAudit(knex, {
+          actorUsername: "system", action: "DISPOSAL_ELIGIBLE", entity: "document",
+          entityId: String(d.id),
           details: `destruction_date=${destruction.toISOString().slice(0, 10)}`,
         });
         await emit?.("document.disposal_eligible", {
@@ -194,9 +195,9 @@ export async function certifiedDisposal(
     id: newId(), document_id: documentId, disposed: true, disposed_at: knex.fn.now(), certificate,
   });
   await knex("documents").where({ id: documentId }).update({ status: "Disposed", disposal_status: "Disposed" });
-  await knex("audit_log").insert({
-    id: newId(), actor_username: actor, action: "DISPOSAL_CERTIFIED", entity: "document",
-    entity_id: String(documentId), details: certificate,
+  await writeAudit(knex, {
+    actorUsername: actor, action: "DISPOSAL_CERTIFIED", entity: "document",
+    entityId: String(documentId), details: certificate,
   });
   return { certificate };
 }

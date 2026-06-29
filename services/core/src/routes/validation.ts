@@ -1,10 +1,10 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-import { newId } from "@zordms/db";
 import { requireAuth, requirePermission } from "@zordms/auth";
 import { validateBody } from "../openapi/validate.js";
 import { CreateValidationRuleSchema, UpdateValidationRuleSchema, RunValidationSchema } from "../openapi/schemas.js";
 import { listRules, createRule, updateRule, deleteRule, runValidation, listResults } from "../repo/validation.js";
+import { writeAudit } from "../modules/audit.js";
 
 /**
  * §4.6 Validation module — data-driven field validation.
@@ -85,13 +85,12 @@ export function validationRouter(): Router {
         data: req.body.data ?? {},
       });
       if (req.body.documentId) {
-        await knex("audit_log").insert({
-          id: newId(),
-          actor_id: req.authUser!.id,
-          actor_username: req.authUser!.username,
+        await writeAudit(knex, {
+          actorId: req.authUser!.id,
+          actorUsername: req.authUser!.username,
           action: "VALIDATION_RUN",
           entity: "document",
-          entity_id: req.body.documentId,
+          entityId: req.body.documentId,
           details: `validation ${out.summary.passed}/${out.summary.total} passed`,
         });
       }
