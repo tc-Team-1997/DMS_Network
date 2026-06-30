@@ -100,7 +100,9 @@ Frontend tickets built on the backends already shipped this session — each = A
 | **SC-01** AI-assisted dashboard | AI `POST /idp/insights` (LLM + deterministic fallback) + Dashboard insights card | `604a790` |
 | **SC-07** 4-lane lifecycle | core `GET /flows` (document·ai·workflow·integration) + interactive "System Flows" tab | `4db486b` |
 
-**Remaining (small):** SC-01's other two slices — per-chart *customise* (data-source/type) and *persisted* per-user dashboard layout (`dashboard/layout` table). Everything else across all 19 SCs is delivered or already-built; SC-08 is moot.
+SC-01 completed: per-user `dashboard_layouts` (`GET/PUT /dashboard/layout`) + inflow chart-type customise (line/bar), persisted — `2e6a549`.
+
+**All 19 Iteration-2 scenarios are now delivered or were already-built.** (SC-08 moot.) Iteration-2 complete.
 
 ---
 
