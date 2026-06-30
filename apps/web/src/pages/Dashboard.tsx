@@ -13,6 +13,7 @@ import {
 import type { Column } from "../components/ui/index.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { dashboardCaptureApi, type DashboardSummary, type DocumentRecord } from "../api/dashboardCaptureApi.js";
+import { aiInsightsApi } from "../api/aiInsights.js";
 
 /* ─── Time Period Control ─── */
 type TimePeriod = "day" | "month" | "quarter" | "year";
@@ -412,8 +413,37 @@ export default function Dashboard() {
   const expiringDocs = useMemo(() => buildExpiringDocs(allDocs, 90), [allDocs]);
   const buckets = useMemo(() => expiryBuckets(allDocs), [allDocs]);
 
+  // SC-01 — AI-assisted narration over the live metrics.
+  const [insight, setInsight] = useState<string>("");
+  const [insightLoading, setInsightLoading] = useState(false);
+  const loadInsight = useCallback(async () => {
+    setInsightLoading(true);
+    try {
+      const res = await aiInsightsApi.fetchInsights({
+        totalDocuments: total,
+        pendingReview: pending,
+        indexedToday,
+        expiringSoon: expiringDocs.length,
+      });
+      setInsight(res.narrative);
+    } catch {
+      setInsight("AI insights are unavailable right now.");
+    } finally { setInsightLoading(false); }
+  }, [total, pending, indexedToday, expiringDocs.length]);
+  useEffect(() => { if (!loading) void loadInsight(); }, [loading, loadInsight]);
+
   return (
     <div className="fade-up">
+      {/* ── AI-assisted insights (SC-01) ── */}
+      <div data-testid="ai-insight" style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 8, background: "rgba(96,128,255,.06)", border: "1px solid rgba(96,128,255,.18)", display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <span style={{ fontSize: 18 }} aria-hidden>✨</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, letterSpacing: ".4px", color: "var(--sil)", textTransform: "uppercase", marginBottom: 2 }}>AI-Assisted Insights</div>
+          <div style={{ fontSize: 13, color: "var(--mist)" }}>{insightLoading ? "Analyzing today's metrics…" : (insight || "—")}</div>
+        </div>
+        <button className="btn bs xs" onClick={() => void loadInsight()} disabled={insightLoading} aria-label="refresh insights">Refresh</button>
+      </div>
+
       {/* ── Page sub-header: last sync + period control ── */}
       <div
         style={{

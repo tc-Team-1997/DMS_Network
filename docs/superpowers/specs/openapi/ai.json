@@ -557,6 +557,52 @@
         ]
       }
     },
+    "/idp/insights": {
+      "post": {
+        "summary": "Insights Endpoint",
+        "description": "Narrate the supplied dashboard metrics (LLM, with deterministic fallback).",
+        "operationId": "insights_endpoint_idp_insights_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InsightsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Insights Endpoint Idp Insights Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/idp/copilot/ask": {
       "post": {
         "tags": [
@@ -905,6 +951,24 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InsightsRequest": {
+        "properties": {
+          "metrics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metrics",
+            "examples": [
+              {
+                "expiringSoon": 15,
+                "pendingReview": 8,
+                "totalDocuments": 1200
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "InsightsRequest"
       },
       "TranslateRequest": {
         "properties": {
