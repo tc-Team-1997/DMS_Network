@@ -197,7 +197,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 4. ✅ **Reports module (§4.10)** — shipped (`ba802f9`).
 5. ✅ **Config module (§4.13)** — shipped (`52bfb03`).
 6. ✅ **AI console config (§4.7)** — shipped (`c09d317`).
-7. **Fraud/AML, Compliance/RMA rules, Translation, Predictive** — the 4 unbuilt AI features (some optional). (still open)
+7. **AI features** — ✅ Compliance/RMA rules shipped (`5f560af`, rule-based, no model). Still open: Fraud/AML, Translation, Predictive (model-dependent; some optional per blueprint).
 8. ✅ **Admin / Master-Data gaps — all closed** — `departments` (`7cc056a`), roles-management endpoint (`a26f253`), security-settings CRUD (`b9c6604`), AD/bulk user import (`1f70de7`). *(AD-import's live LDAP-search source plugs into the AdDirectory interface; inline-list import is the tested path.)*
 9. ✅ **Audit tamper-evidence** — persisted `prev_hash`/`row_hash` + compare shipped (`5462644`).
 
