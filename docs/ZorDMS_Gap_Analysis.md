@@ -153,7 +153,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 | FastAPI AI service | 🟢 Built | `services/ai/Dockerfile`, vLLM + Ollama clients |
 | PostgreSQL / Oracle / SQLite | 🟢 Built | `packages/db`, RDS in Terraform |
 | Event bus | 🟢 Built | `RedisStreamsEventBus` + in-memory fallback (`services/core/src/events/`) |
-| **Kafka** | 🔴 Missing | only referenced in a K8s NetworkPolicy egress; no broker/client |
+| **Kafka** | ✅ Bus shipped (opt) | `KafkaEventBus` + `createEventBus` factory switchable via `EVENT_BUS=kafka`/`KAFKA_BROKERS` (optional `kafkajs` peer), graceful fallback to Redis Streams; needs a broker + `kafkajs` to go live (`30 Jun 2026`, `taniya_local`) |
 | Elasticsearch | 🟢 Built (opt) | `services/search` ES backend + SQL fallback; `deploy/es-local` |
 | **MinIO / live S3 driver** | ✅ Driver shipped | `S3Storage` backend + `createStorage()` returns S3 when `STORAGE_DRIVER=s3`+`S3_BUCKET` set (else falls back to local); needs a provisioned bucket to go live |
 | Docker / Compose | 🟢 Built | root + `deploy/server` + `deploy/es-local` + `deploy/sso-local` |

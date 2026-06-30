@@ -2,7 +2,7 @@ import { createApp } from "./app.js";
 import { getServiceKnex } from "./db.js";
 import { loadConfig } from "@zordms/config";
 import { createStorage } from "./storage/index.js";
-import { RedisStreamsEventBus } from "./events/index.js";
+import { createEventBus } from "./events/index.js";
 import { createWorker } from "./worker/index.js";
 import { startDisposalScan } from "./jobs/disposalScan.js";
 
@@ -20,7 +20,12 @@ const storage = await createStorage({
   s3AccessKey: process.env.S3_ACCESS_KEY,
   s3SecretKey: process.env.S3_SECRET_KEY,
 });
-const events = RedisStreamsEventBus(process.env.REDIS_URL ?? "redis://localhost:6379");
+const events = await createEventBus({
+  driver: process.env.EVENT_BUS,
+  redisUrl: process.env.REDIS_URL ?? "redis://localhost:6379",
+  kafkaBrokers: process.env.KAFKA_BROKERS?.split(",").map((b) => b.trim()).filter(Boolean),
+  kafkaTopic: process.env.KAFKA_TOPIC,
+});
 
 const port = Number(process.env.CORE_PORT ?? 4001);
 const deps = { knex, config, storage, events };
