@@ -46,6 +46,7 @@ const RecordsManagement   = React.lazy(() => import("./pages/RecordsManagement.j
 const ComplianceAudit     = React.lazy(() => import("./pages/ComplianceAudit.js"));
 const DocumentLifecycle   = React.lazy(() => import("./pages/DocumentLifecycle.js"));
 const SystemAdministration = React.lazy(() => import("./pages/SystemAdministration.js"));
+const Configuration       = React.lazy(() => import("./pages/Configuration.js"));
 
 /* ── loading fallback ── */
 const LoadingFallback = (
@@ -100,6 +101,7 @@ export const router: Router = createBrowserRouter([
   { path: "/security",              element: <Shell permission="security:read"><Security /></Shell> },
   { path: "/users",                 element: <Shell permission="user:read"><Users /></Shell> },
   { path: "/system-administration", element: <Shell permission="admin:read"><SystemAdministration /></Shell> },
+  { path: "/configuration",         element: <Shell permission="admin:access"><Configuration /></Shell> },
 
   /* ── Default redirect ── */
   { path: "/",  element: <Navigate to="/dashboard" replace /> },
