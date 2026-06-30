@@ -14,6 +14,7 @@ import type {
 import { useUrlState } from "../hooks/useUrlState.js";
 import { DocTypesPanel } from "../components/doctypes/DocTypesPanel.js";
 import { EmailTemplatesPanel } from "../components/emailtemplates/EmailTemplatesPanel.js";
+import { AiModelsPanel } from "../components/aimodels/AiModelsPanel.js";
 import { listJobs } from "../api/jobsApi.js";
 import type { JobStatus, MonitorJob } from "../api/jobsApi.js";
 
@@ -42,6 +43,7 @@ const TABS = [
   { key: "dedup", label: "Duplicate Detection" },
   { key: "doctypes", label: "Document Types" },
   { key: "emailtemplates", label: "Email Templates" },
+  { key: "aimodels", label: "AI Models" },
 ];
 
 type HealthRow = ServiceHealth & { _key: string };
@@ -910,6 +912,11 @@ export function SystemAdministration() {
       {/* ═══ EMAIL TEMPLATES TAB ═══ */}
       {tab === "emailtemplates" && (
         <EmailTemplatesPanel canWrite={canWriteEmailTemplates} />
+      )}
+
+      {/* ═══ AI MODELS TAB (SC-18) ═══ */}
+      {tab === "aimodels" && (
+        <AiModelsPanel canWrite={canAdmin} />
       )}
     </div>
   );
