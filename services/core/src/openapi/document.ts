@@ -1361,6 +1361,34 @@ register([
     },
   },
 
+  // ── System flows (SC-07) ─────────────────────────────────────────────────
+  {
+    method: "get",
+    path: "/flows",
+    tags: ["lifecycle"],
+    security: bearer,
+    summary: "List the four system-flow lanes (document/ai/workflow/integration).",
+    responses: {
+      200: json("Lanes.", z.object({ lanes: z.array(z.record(z.string(), z.unknown())) })),
+      401: unauthorized,
+      403: forbidden,
+    },
+  },
+  {
+    method: "get",
+    path: "/flows/{lane}",
+    tags: ["lifecycle"],
+    security: bearer,
+    summary: "Get one system-flow lane.",
+    request: { params: z.object({ lane: z.string().openapi({ param: { name: "lane", in: "path" }, example: "document" }) }) },
+    responses: {
+      200: json("Lane.", z.object({ lane: z.record(z.string(), z.unknown()) })),
+      401: unauthorized,
+      403: forbidden,
+      404: notFound,
+    },
+  },
+
   // ── Doc-type registry ────────────────────────────────────────────────────
   {
     method: "get",

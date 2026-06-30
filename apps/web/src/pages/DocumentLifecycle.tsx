@@ -6,6 +6,7 @@ import {
 } from "../components/ui/index.js";
 import type { Column } from "../components/ui/index.js";
 import { documentLifecycleApi } from "../api/documentLifecycle.js";
+import { SystemFlows } from "../components/flows/SystemFlows.js";
 import type {
   LifecycleTrace,
   LifecycleStage,
@@ -48,6 +49,7 @@ function docStatusVariant(s: string): "green" | "amber" | "red" | "blue" | "purp
 
 const TABS = [
   { key: "trace", label: "Lifecycle Trace" },
+  { key: "flows", label: "System Flows" },
   { key: "funnel", label: "Pipeline Funnel" },
   { key: "versions", label: "Version Control" },
   { key: "browse", label: "Browse Documents" },
@@ -290,6 +292,9 @@ export function DocumentLifecycle() {
 
       {/* ── Tabs ── */}
       <Tabs items={TABS} active={tab} onChange={setTab} />
+
+      {/* ═══ SYSTEM FLOWS TAB (SC-07) ═══ */}
+      {tab === "flows" && <SystemFlows />}
 
       {/* ═══ TRACE TAB ═══ */}
       {tab === "trace" && (

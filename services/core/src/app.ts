@@ -21,6 +21,7 @@ import { validationRouter } from "./routes/validation.js";
 import { reportsRouter } from "./routes/reports.js";
 import { aiConsoleRouter } from "./routes/aiConsole.js";
 import { departmentsRouter } from "./routes/departments.js";
+import { flowsRouter } from "./routes/flows.js";
 import { extractionRouter } from "./routes/extraction.js";
 import { integrationRouter } from "./routes/integration.js";
 import { jobsRouter } from "./routes/jobs.js";
@@ -59,6 +60,7 @@ export function createApp(deps: CoreDeps): Express {
   app.use("/reports", reportsRouter());
   app.use("/ai-config", aiConsoleRouter());
   app.use("/departments", departmentsRouter());
+  app.use("/flows", flowsRouter());
 
   // AI Ingestion + Classification pipeline
   app.use("/doc-types", docTypesRouter());
