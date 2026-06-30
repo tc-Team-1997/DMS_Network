@@ -75,6 +75,24 @@ The Iteration-2 spec's per-scenario **"Current state" describes the vanilla `bob
 
 ---
 
+## 3b. Shipped (30 Jun 2026, `taniya_local`)
+
+Frontend tickets built on the backends already shipped this session — each = API client + page/panel + route + sidebar entry + tests, **no mock data**, web suite green throughout (now 46 files / 546 tests).
+
+| Ticket | What shipped | Commit |
+|---|---|---|
+| Reconciliation | this analysis | `8d96e43` |
+| **SC-14** Configuration | page → `/config` (grouped entries, JSON-value edit, audited) | `f420546` |
+| **SC-15** Validation Config | page → `/validation/rules` (CRUD, params JSON, enable/delete) | `b2e4a51` |
+| **Reports** (Analytics IA) | builder + library + CSV export → `/reports/*` | `4bd73cb` |
+| **SC-19** Master Setup | Departments CRUD → `/departments` (+ links to branches/doctypes/workflows) | `90d2ce3` |
+| **SC-18** AI Models tab | System-Admin tab → `/ai-config/features|metrics` (enable/threshold/metrics) | `f4591ef` |
+| **SC-16/17** User Management | consolidated users + live roles matrix → `/roles`; dropped duplicate "Security & RBAC" nav item | `61cd2ec` |
+
+**Remaining:** Group C (sidebar IA reorg to the target sections + automated nav-integrity test) and Group D (net-new endpoints: `documents/export`, `dashboard/insights`+`layout`, retention-rule CRUD, 4-lane lifecycle).
+
+---
+
 ## 4. Recommended build order (reconciled)
 
 Wave-1 of the spec is largely already met. Start with **Group A** (new pages, ready backends — fast, high-value, no backend churn), then **B**, then the **C** IA reorg, then **D** (net-new endpoints). Each ticket: build the page/component + wire the existing API + add nav entry + tests + keep the suite green.
