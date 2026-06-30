@@ -79,6 +79,20 @@ export const CallConnectorSchema = z
   .strict();
 export type CallConnector = z.infer<typeof CallConnectorSchema>;
 
+/** POST /migration/krystal/run — run a legacy-migration batch (JSONL manifest or records). */
+export const RunMigrationSchema = z
+  .object({
+    source: z.string().min(1).optional(),
+    manifest: z.string().optional(),
+    records: z.array(z.record(z.unknown())).optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict()
+  .refine((b) => !!b.manifest || (Array.isArray(b.records) && b.records.length > 0), {
+    message: "provide `manifest` (JSONL text) or a non-empty `records` array",
+  });
+export type RunMigration = z.infer<typeof RunMigrationSchema>;
+
 /* ----------------------------- Inbound webhooks ------------------------------ */
 /*
  * These document the HMAC-signed inbound contract. Signature verification on the

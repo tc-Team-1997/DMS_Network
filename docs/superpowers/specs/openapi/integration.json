@@ -222,6 +222,29 @@
           "op"
         ],
         "additionalProperties": false
+      },
+      "RunMigration": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "manifest": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "dryRun": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -923,6 +946,181 @@
           },
           "502": {
             "description": "Connector/upstream call failed"
+          }
+        }
+      }
+    },
+    "/migration/krystal/run": {
+      "post": {
+        "summary": "Run a Krystal legacy-migration batch (JSONL manifest or inline records)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunMigration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Migration job summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "number"
+                        },
+                        "staged": {
+                          "type": "number"
+                        },
+                        "skipped": {
+                          "type": "number"
+                        },
+                        "failed": {
+                          "type": "number"
+                        },
+                        "dryRun": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "staged",
+                        "skipped",
+                        "failed",
+                        "dryRun"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "jobId",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Insufficient permission (integration:manage)"
+          }
+        }
+      }
+    },
+    "/migration/jobs": {
+      "get": {
+        "summary": "List recent migration jobs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "jobs"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          }
+        }
+      }
+    },
+    "/migration/jobs/{id}": {
+      "get": {
+        "summary": "Get a migration job and its per-record outcomes",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "records"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "404": {
+            "description": "Job not found"
           }
         }
       }

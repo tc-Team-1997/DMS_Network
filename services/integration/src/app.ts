@@ -10,6 +10,7 @@ import type { CoreIngestClient } from "./core/ingest.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { outboundRouter } from "./routes/outbound.js";
 import { managementRouter } from "./routes/management.js";
+import { migrationRouter } from "./routes/migration.js";
 import { buildOpenApiDocument } from "./openapi.js";
 
 export interface AppDeps {
@@ -40,6 +41,7 @@ export function createApp(deps: AppDeps): Express {
   app.use("/webhooks", webhooksRouter());
   app.use("/outbound", outboundRouter());
   app.use("/integration", managementRouter());
+  app.use("/migration", migrationRouter());
 
   // F2: Global error handler — catches any error passed to next(err) from async handlers.
   // Must be registered AFTER routes (Express 4 signature must be exactly 4 args).

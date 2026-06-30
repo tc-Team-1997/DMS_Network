@@ -13,6 +13,7 @@ import {
   LogsQuerySchema,
   SetInboundSecretSchema,
   CallConnectorSchema,
+  RunMigrationSchema,
 } from "./validation.js";
 
 extendZodWithOpenApi(z);
@@ -359,6 +360,64 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       403: { description: "Insufficient permission (integration:manage)" },
       404: { description: "System not found" },
       502: { description: "Connector/upstream call failed" },
+    },
+  });
+
+  registry.registerPath({
+    method: "post",
+    path: "/migration/krystal/run",
+    summary: "Run a Krystal legacy-migration batch (JSONL manifest or inline records)",
+    security: [{ [bearerAuth.name]: [] }],
+    request: {
+      body: {
+        content: {
+          "application/json": {
+            schema: RunMigrationSchema.openapi("RunMigration"),
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: "Migration job summary",
+        content: {
+          "application/json": {
+            schema: z.object({
+              jobId: z.string(),
+              summary: z.object({
+                total: z.number(), staged: z.number(), skipped: z.number(), failed: z.number(), dryRun: z.boolean(),
+              }),
+            }),
+          },
+        },
+      },
+      400: { description: "Validation error", content: { "application/json": { schema: ValidationError } } },
+      401: { description: "Missing or invalid bearer token" },
+      403: { description: "Insufficient permission (integration:manage)" },
+    },
+  });
+
+  registry.registerPath({
+    method: "get",
+    path: "/migration/jobs",
+    summary: "List recent migration jobs",
+    security: [{ [bearerAuth.name]: [] }],
+    responses: {
+      200: { description: "OK", content: { "application/json": { schema: z.object({ jobs: z.array(z.record(z.unknown())) }) } } },
+      401: { description: "Missing or invalid bearer token" },
+    },
+  });
+
+  registry.registerPath({
+    method: "get",
+    path: "/migration/jobs/{id}",
+    summary: "Get a migration job and its per-record outcomes",
+    security: [{ [bearerAuth.name]: [] }],
+    request: { params: z.object({ id: z.string() }) },
+    responses: {
+      200: { description: "OK", content: { "application/json": { schema: z.object({ job: z.record(z.unknown()), records: z.array(z.record(z.unknown())) }) } } },
+      401: { description: "Missing or invalid bearer token" },
+      404: { description: "Job not found" },
     },
   });
 

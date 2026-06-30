@@ -138,6 +138,14 @@ const RICH_SYSTEMS: Array<{
     auth_type: "basic",
     enabled: true,
   },
+  // Krystal legacy DMS — one-time bulk migration source (disabled until §9.6
+  // confirms the export format/access). Driven by the /migration routes.
+  {
+    system: "krystal",
+    base_url: "file:///legacy/krystal/export",
+    auth_type: "basic",
+    enabled: false,
+  },
 ];
 
 // 15 realistic integration log entries covering success (200), rate-limit (429),
