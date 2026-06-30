@@ -53,14 +53,22 @@ describe("AppShell", () => {
     expect(screen.getByTestId("content")).toBeInTheDocument();
   });
 
-  it("renders all six nav group labels", () => {
+  it("renders all six nav group labels (Iteration-2 IA)", () => {
     renderShell();
-    expect(screen.getAllByText("Intelligence").length).toBeGreaterThan(0);
     expect(screen.getByText("Ingestion")).toBeInTheDocument();
-    expect(screen.getByText("Management")).toBeInTheDocument();
-    expect(screen.getByText("Discovery")).toBeInTheDocument();
-    expect(screen.getByText("Process")).toBeInTheDocument();
-    expect(screen.getByText("Analytics & Platform")).toBeInTheDocument();
+    expect(screen.getByText("Document Management")).toBeInTheDocument();
+    expect(screen.getByText("Operations")).toBeInTheDocument();
+    // /dashboard lives in Analytics, so the breadcrumb also shows "Analytics".
+    expect(screen.getAllByText("Analytics").length).toBeGreaterThan(0);
+    expect(screen.getByText("Intelligence")).toBeInTheDocument();
+    expect(screen.getByText("Platform")).toBeInTheDocument();
+  });
+
+  it("places Document Viewer and Review Queue under Ingestion (SC-09/10)", () => {
+    renderShell();
+    // both nav links exist (Ingestion section); their order is Viewer then Review Queue
+    expect(screen.getByText("Document Viewer")).toBeInTheDocument();
+    expect(screen.getByText("Review Queue")).toBeInTheDocument();
   });
 
   it("renders the sidebar footer version/build line", () => {

@@ -25,9 +25,39 @@ interface NavItem {
 }
 interface NavGroup { label: string; items: NavItem[]; }
 
-const NAV_GROUPS: NavGroup[] = [
+// Iteration-2 §A target information architecture. Viewer + Review Queue moved
+// into INGESTION (SC-09/10); every existing screen is placed (none dropped).
+// Exported so the nav-integrity test can assert each path resolves to a route.
+export const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Intelligence",
+    label: "Ingestion",
+    items: [
+      { label: "Capture",         path: "/capture",      icon: <Camera size={15} />,   permission: "document:capture" },
+      { label: "Document Viewer", path: "/viewer",       icon: <Eye size={15} />,      permission: "document:read" },
+      { label: "Review Queue",    path: "/review-queue", icon: <Shield size={15} />,   permission: "review:read" },
+      { label: "Indexing & QA",   path: "/indexing",     icon: <FileEdit size={15} />, permission: "document:index" },
+    ],
+  },
+  {
+    label: "Document Management",
+    items: [
+      { label: "Repository",         path: "/repository",         icon: <Folder size={15} />,   permission: "document:read" },
+      { label: "Enterprise Search",  path: "/search",             icon: <Search size={15} />,   permission: "search:read" },
+      { label: "Document Lifecycle", path: "/document-lifecycle", icon: <Activity size={15} />, permission: "lifecycle:read" },
+      { label: "Records Management", path: "/records-management", icon: <FileText size={15} />, permission: "records:read" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Case Management",    path: "/case-management",  icon: <Briefcase size={15} />,     permission: "case:read" },
+      { label: "Workflow Engine",    path: "/workflow-engine",  icon: <GitBranch size={15} />,     permission: "workflow:read" },
+      { label: "Alerts & Events",    path: "/alerts",           icon: <AlertTriangle size={15} />, permission: "alerts:read" },
+      { label: "Compliance & Audit", path: "/compliance-audit", icon: <Shield size={15} />,        permission: "compliance:read" },
+    ],
+  },
+  {
+    label: "Analytics",
     items: [
       { label: "Executive Dashboard", path: "/dashboard",   icon: <LayoutDashboard size={15} />, permission: "dashboard:read" },
       { label: "Reports",             path: "/reports",     icon: <BarChart3 size={15} />,       permission: "admin:access" },
@@ -35,50 +65,22 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Ingestion",
+    label: "Intelligence",
     items: [
-      { label: "Capture",       path: "/capture",   icon: <Camera size={15} />,   permission: "document:capture" },
-      { label: "Indexing & QA", path: "/indexing",  icon: <FileEdit size={15} />, permission: "document:index" },
-      { label: "AI Engine",     path: "/ai-engine", icon: <Cpu size={15} />,      permission: "ai:read" },
+      { label: "AI Engine",         path: "/ai-engine",         icon: <Cpu size={15} />,      permission: "ai:read" },
+      { label: "Validation Config", path: "/validation-config", icon: <FileEdit size={15} />, permission: "admin:access" },
     ],
   },
   {
-    label: "Management",
+    label: "Platform",
     items: [
-      { label: "Case Management",    path: "/case-management",    icon: <Briefcase size={15} />, permission: "case:read" },
-      { label: "Repository",         path: "/repository",         icon: <Folder size={15} />,    permission: "document:read" },
-      { label: "Records Management", path: "/records-management", icon: <FileText size={15} />,  permission: "records:read" },
-      { label: "Document Lifecycle", path: "/document-lifecycle", icon: <Activity size={15} />,  permission: "lifecycle:read" },
-    ],
-  },
-  {
-    label: "Discovery",
-    items: [
-      { label: "Enterprise Search", path: "/search", icon: <Search size={15} />, permission: "search:read" },
-      { label: "Document Viewer",   path: "/viewer", icon: <Eye size={15} />,    permission: "document:read" },
-    ],
-  },
-  {
-    label: "Process",
-    items: [
-      { label: "Workflow Engine",    path: "/workflow-engine",  icon: <GitBranch size={15} />,     permission: "workflow:read" },
-      { label: "Review Queue",       path: "/review-queue",     icon: <Shield size={15} />,        permission: "review:read" },
-      { label: "Compliance & Audit", path: "/compliance-audit", icon: <Shield size={15} />,        permission: "compliance:read" },
-      { label: "Alerts & Events",    path: "/alerts",           icon: <AlertTriangle size={15} />, permission: "alerts:read" },
-    ],
-  },
-  {
-    label: "Analytics & Platform",
-    items: [
-      { label: "Integration Hub",       path: "/integration-hub",       icon: <Link2 size={15} />,    permission: "integration:read" },
+      { label: "Integration Hub",       path: "/integration-hub",       icon: <Link2 size={15} />,             permission: "integration:read" },
       { label: "Configuration",         path: "/configuration",         icon: <SlidersHorizontal size={15} />, permission: "admin:access" },
-      { label: "Validation Config",     path: "/validation-config",     icon: <FileEdit size={15} />, permission: "admin:access" },
-      { label: "Master Setup",          path: "/master-setup",          icon: <Folder size={15} />,   permission: "admin:access" },
-      // SC-16/17: users + roles consolidated into one "User Management" page;
-      // the former "Security & RBAC" nav entry is removed (its /security route
-      // remains reachable to avoid breaking deep links).
-      { label: "User Management",       path: "/users",                 icon: <Users size={15} />,    permission: "user:read" },
-      { label: "System Administration", path: "/system-administration", icon: <Settings size={15} />, permission: "admin:read" },
+      { label: "Master Setup",          path: "/master-setup",          icon: <Folder size={15} />,            permission: "admin:access" },
+      // SC-16/17: users + roles consolidated into one "User Management" page
+      // (the former "Security & RBAC" /security route stays reachable).
+      { label: "User Management",       path: "/users",                 icon: <Users size={15} />,             permission: "user:read" },
+      { label: "System Administration", path: "/system-administration", icon: <Settings size={15} />,          permission: "admin:read" },
     ],
   },
 ];
