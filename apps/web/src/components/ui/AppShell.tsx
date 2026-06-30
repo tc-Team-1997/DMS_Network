@@ -71,6 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Integration Hub",       path: "/integration-hub",       icon: <Link2 size={15} />,    permission: "integration:read" },
       { label: "Configuration",         path: "/configuration",         icon: <SlidersHorizontal size={15} />, permission: "admin:access" },
+      { label: "Validation Config",     path: "/validation-config",     icon: <FileEdit size={15} />, permission: "admin:access" },
       { label: "Security & RBAC",       path: "/security",              icon: <Lock size={15} />,     permission: "security:read" },
       { label: "User Management",       path: "/users",                 icon: <Users size={15} />,    permission: "user:read" },
       { label: "System Administration", path: "/system-administration", icon: <Settings size={15} />, permission: "admin:read" },
