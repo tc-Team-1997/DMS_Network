@@ -89,7 +89,9 @@ Frontend tickets built on the backends already shipped this session — each = A
 | **SC-18** AI Models tab | System-Admin tab → `/ai-config/features|metrics` (enable/threshold/metrics) | `f4591ef` |
 | **SC-16/17** User Management | consolidated users + live roles matrix → `/roles`; dropped duplicate "Security & RBAC" nav item | `61cd2ec` |
 
-**Remaining:** Group C (sidebar IA reorg to the target sections + automated nav-integrity test) and Group D (net-new endpoints: `documents/export`, `dashboard/insights`+`layout`, retention-rule CRUD, 4-lane lifecycle).
+| **SC-09/10** IA reorg | sidebar regrouped to the target sections (Ingestion · Document Management · Operations · Analytics · Intelligence · Platform); Viewer + Review Queue → Ingestion; nav-integrity test added | `4d356fe` |
+
+**Remaining:** Group D only (net-new endpoints + UI): `documents/export` (SC-02), `dashboard/insights`+`layout` & chart-customise (SC-01), retention-rule CRUD (SC-06), 4-lane lifecycle (SC-07). Everything else (Groups A/B/C) is shipped; SC-08 is moot; SC-03/04/05/11/12/13 were already built in the React app.
 
 ---
 
