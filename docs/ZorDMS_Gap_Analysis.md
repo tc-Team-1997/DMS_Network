@@ -192,7 +192,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 
 **A. True feature gaps (net-new code, no infra/client dependency):**
 1. ✅ **Dzongkha OCR** — `lang="dzo+eng"` + fallback shipped (`96ce7e8`). *Real accuracy still needs the `dzo` model + §9.3 sign-off.*
-2. **Semantic search** — embeddings + vector index behind copilot RAG. *AI + search.* (still open)
+2. ✅ **Semantic search** — embedding-based re-ranking of copilot retrieval hits shipped (`11d0e5d`), with graceful fallback to keyword order. *Real quality needs the embed model deployed (nomic-embed-text on Ollama).*
 3. ✅ **Validation module (§4.6/§7)** — shipped (`05324ca`).
 4. ✅ **Reports module (§4.10)** — shipped (`ba802f9`).
 5. ✅ **Config module (§4.13)** — shipped (`52bfb03`).
