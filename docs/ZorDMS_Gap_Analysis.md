@@ -44,6 +44,7 @@ Nine code increments closed the code-completable gaps below. Each was built behi
 | **e-Signature** (§6.12) — REST connector (`sign.request`/`sign.status`) | §6.12 Missing → Built | `519cdcf` |
 | **RMA reporting** (§6.13) — `SftpConnector` (ssh2-sftp-client, injectable/mock-tested) | §6.13 Missing → Built | `2dcb251` |
 | **Krystal migration** (§6.15) — source-agnostic ETL scaffold: `migration_jobs`/`migration_records`, JSONL `SourceAdapter` + staging sink, dry-run, idempotent, `/migration/*` routes | §6.15 Missing → **scaffold Built** (real adapter pending §9.6) | `2494735` |
+| **Departments** (§4.11) — `departments` table + CRUD (`/departments`), seeded units | §7 `departments` Missing → Built; §4.11 Master Data Partial → closer | `7cc056a` |
 
 \* Dzongkha OCR: the code path + graceful fallback are built and tested; **real Dzongkha accuracy still depends on deploying the `dzo` traineddata + client sign-off (§9.3)**.
 
@@ -197,7 +198,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 5. ✅ **Config module (§4.13)** — shipped (`52bfb03`).
 6. ✅ **AI console config (§4.7)** — shipped (`c09d317`).
 7. **Fraud/AML, Compliance/RMA rules, Translation, Predictive** — the 4 unbuilt AI features (some optional). (still open)
-8. **Admin gaps** — AD-import action, security-settings CRUD, `departments` master data. (still open)
+8. **Admin / Master-Data gaps** — ✅ `departments` master data shipped (`7cc056a`). Still open: AD-import action, security-settings CRUD, roles-management endpoint.
 9. ✅ **Audit tamper-evidence** — persisted `prev_hash`/`row_hash` + compare shipped (`5462644`).
 
 **B. Connector breadth:** ✅ finished the 6 config-only connectors (`1aad092`), ✅ e-Signature (`519cdcf`), ✅ RMA/SFTP (`2dcb251`), ✅ Krystal ETL **scaffold** (`2494735`). **SMS** is already covered by the notify channel (not duplicated). Krystal's **real source adapter + core-import sink** remain blocked on §9.6 (plug into the shipped interfaces).
