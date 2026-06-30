@@ -40,3 +40,17 @@ dist/
 
 # local dev logs
 .devlogs/
+
+# OS / editor noise
+.DS_Store
+
+# Local dev SQLite databases (any name) + WAL/SHM sidecars
+db/*.db
+db/*.db-shm
+db/*.db-wal
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Accidental nested repo clone (separate checkout, not part of this tree)
+/DMS_Network/
