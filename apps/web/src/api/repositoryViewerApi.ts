@@ -134,6 +134,26 @@ export const repositoryViewerApi = {
   getDocument: (id: string): Promise<{ document: DocumentRecord }> =>
     http.get(`${SVC.core}/documents/${id}`),
 
+  // SC-02: download the filtered document set as CSV (auth'd blob download).
+  exportDocuments: async (params: Record<string, string> = {}): Promise<void> => {
+    const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v));
+    const qs = new URLSearchParams(clean).toString();
+    const headers: Record<string, string> = {};
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${SVC.core}/documents/export${qs ? `?${qs}` : ""}`, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "documents.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
   deleteDocument: (id: string): Promise<void> =>
     http.delete(`${SVC.core}/documents/${id}`),
 

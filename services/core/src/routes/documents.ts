@@ -97,6 +97,39 @@ export function documentsRouter(): Router {
     } catch (e: any) { res.status(500).json({ error: "internal" }); }
   });
 
+  // GET /export — CSV of the filtered, branch-scoped document set (SC-02).
+  // Registered before /:id so "export" isn't captured as an id.
+  r.get("/export", requirePermission("document:read"), async (req, res) => {
+    try {
+      const { knex } = req.app.locals.deps as CoreDeps;
+      const viewer = makeViewer(req);
+      const q = req.query as Record<string, string | undefined>;
+      const minConf = q.minConf != null && q.minConf !== "" ? Number(q.minConf) : undefined;
+
+      const rows = (await listDocuments(knex, viewer)).filter((d: any) => {
+        if (q.type && d.doc_type !== q.type) return false;
+        if (q.status && d.status !== q.status) return false;
+        if (q.branch && viewer.canCrossBranch && d.branch !== q.branch) return false;
+        const ts = String(d.ingest_timestamp ?? d.created_at ?? "").slice(0, 10);
+        if (q.from && ts && ts < q.from) return false;
+        if (q.to && ts && ts > q.to) return false;
+        if (minConf != null && Number(d.confidence ?? 0) < minConf) return false;
+        return true;
+      });
+
+      const cols = ["id", "title", "doc_type", "branch", "status", "confidence", "ingest_timestamp", "original_filename"];
+      const esc = (v: unknown) => {
+        const s = v === null || v === undefined ? "" : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const csv = [cols.join(","), ...rows.map((d: any) => cols.map((c) => esc(d[c])).join(","))].join("\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="documents.csv"');
+      res.send(csv);
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
+  });
+
   // GET /:id — fetch (document:read) — C1: branch-scoped
   r.get("/:id", requirePermission("document:read"), async (req, res) => {
     try {

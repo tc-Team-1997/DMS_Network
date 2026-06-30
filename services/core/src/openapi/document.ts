@@ -274,6 +274,29 @@ register([
   },
   {
     method: "get",
+    path: "/documents/export",
+    tags: ["documents"],
+    security: bearer,
+    summary: "Export the filtered, branch-scoped document set as CSV (SC-02).",
+    request: {
+      query: z.object({
+        type: z.string().optional().openapi({ param: { name: "type", in: "query" } }),
+        branch: z.string().optional().openapi({ param: { name: "branch", in: "query" } }),
+        status: z.string().optional().openapi({ param: { name: "status", in: "query" } }),
+        from: z.string().optional().openapi({ param: { name: "from", in: "query" }, example: "2026-01-01" }),
+        to: z.string().optional().openapi({ param: { name: "to", in: "query" }, example: "2026-12-31" }),
+        minConf: z.string().optional().openapi({ param: { name: "minConf", in: "query" }, example: "0.7" }),
+      }),
+    },
+    responses: {
+      200: { description: "CSV file (text/csv at runtime).", content: { "application/octet-stream": { schema: { type: "string", format: "binary" } as unknown as z.ZodType } } },
+      401: unauthorized,
+      403: forbidden,
+      500: internalError,
+    },
+  },
+  {
+    method: "get",
     path: "/documents/{id}",
     tags: ["documents"],
     security: bearer,

@@ -717,6 +717,16 @@ export default function Repository() {
                     {categories.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 )}
+                <button
+                  className="btn bs xs"
+                  aria-label="export documents csv"
+                  onClick={() => {
+                    const status = filterStatus !== "all" && filterStatus !== "review" ? filterStatus : "";
+                    void repositoryViewerApi.exportDocuments({ status }).catch(() => {});
+                  }}
+                >
+                  Export CSV
+                </button>
               </div>
             }
             style={{ overflow: "auto" }}
