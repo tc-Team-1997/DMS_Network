@@ -99,6 +99,31 @@ export const SecuritySettingsBodySchema = z
 export type SecuritySettingsBody = z.infer<typeof SecuritySettingsBodySchema>;
 
 // ---------------------------------------------------------------------------
+// AD / bulk user import (Admin — §4.12)
+// ---------------------------------------------------------------------------
+
+export const AdImportBodySchema = z
+  .object({
+    users: z
+      .array(
+        z
+          .object({
+            username: z.string().trim().min(1).optional(),
+            email: z.string().email().optional(),
+            displayName: z.string().optional(),
+            groups: z.array(z.string()).optional(),
+          })
+          .strict(),
+      )
+      .min(1, "at least one user is required"),
+    defaultRole: z.string().optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict()
+  .openapi("AdImportRequest");
+export type AdImportBody = z.infer<typeof AdImportBodySchema>;
+
+// ---------------------------------------------------------------------------
 // SSO
 // ---------------------------------------------------------------------------
 

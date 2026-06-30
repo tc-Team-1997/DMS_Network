@@ -20,6 +20,7 @@ import {
   CreateRoleBodySchema,
   UpdateRoleBodySchema,
   SecuritySettingsBodySchema,
+  AdImportBodySchema,
 } from "./schemas.js";
 
 /**
@@ -322,6 +323,30 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       401: unauthorized,
       403: { description: "Missing admin:access permission." },
       404: { description: "Not initialized.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
+  // /admin/ad-import (Admin → AD import — §4.12) ---------------------------
+  registry.registerPath({
+    method: "post", path: "/admin/ad-import", summary: "Bulk-provision users from directory identities", tags: ["admin"],
+    security: [{ [bearerAuth.name]: [] }],
+    request: { body: { content: { "application/json": { schema: AdImportBodySchema } } } },
+    responses: {
+      200: {
+        description: "Import summary.",
+        content: {
+          "application/json": {
+            schema: z.object({
+              summary: z.object({
+                found: z.number(), created: z.number(), skipped: z.number(), failed: z.number(), dryRun: z.boolean(),
+              }),
+            }),
+          },
+        },
+      },
+      400: validationError,
+      401: unauthorized,
+      403: { description: "Missing admin:access permission." },
     },
   });
 
