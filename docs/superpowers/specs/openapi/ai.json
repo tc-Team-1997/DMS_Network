@@ -466,6 +466,51 @@
         ]
       }
     },
+    "/idp/translate": {
+      "post": {
+        "summary": "Translate Endpoint",
+        "operationId": "translate_endpoint_idp_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Translate Endpoint Idp Translate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/idp/copilot/ask": {
       "post": {
         "tags": [
@@ -782,6 +827,40 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "TranslateRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "examples": [
+              "Kingdom of Bhutan"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "Target language code (en | dzo).",
+            "default": "en"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Optional source language code."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TranslateRequest"
       },
       "ValidationError": {
         "properties": {
