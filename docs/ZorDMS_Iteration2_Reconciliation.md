@@ -71,7 +71,7 @@ The Iteration-2 spec's per-scenario **"Current state" describes the vanilla `bob
 - **No mock data on shipped screens** — confirmed; all screens use `/svc/*` APIs.
 - **Reuse foundation / gateway / one auth** — confirmed (all calls via the Vite `/svc` proxy; RBAC-gated routes).
 - **Server-side AI only** — confirmed (OCR/extraction via `/svc/ai`, no client Tesseract).
-- Storage presigned-URL preview (MinIO) — preview uses `/documents/:id/download`; **live S3 driver still deferred** (infra item from the prior gap analysis).
+- Storage presigned-URL preview (MinIO) — preview uses `/documents/:id/download`; the **S3/MinIO storage driver is now implemented** (`STORAGE_DRIVER=s3`, graceful fallback to local) — only bucket provisioning + presigned-URL preview remain as deploy-time work.
 
 ---
 

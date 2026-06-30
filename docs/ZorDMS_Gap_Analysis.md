@@ -116,7 +116,7 @@ Connector registry with **live-vs-mock** selection (`<SYS>_BASE_URL` env), **HMA
 | 11 | SMS Gateway | 🔴 Missing | — | No config/adapter/route |
 | 12 | e-Signature | 🔴 Missing | — | No config/adapter/route |
 | 13 | RMA Reporting (SFTP) | 🔴 Missing | — | No SFTP client (needs ssh2/sftp lib) |
-| 14 | Archive (MinIO/S3) | 🟡 Partial | seed config + core S3 client present, but storage driver is **local-only** today (§4) | Wire S3 driver + presigned URLs (AWS SigV4) |
+| 14 | Archive (MinIO/S3) | ✅ Driver shipped | content-addressed `S3Storage` backend (`@aws-sdk/client-s3`) + `createStorage` factory wired via `STORAGE_DRIVER=s3` / `S3_*` env, graceful fallback to local (`30 Jun 2026`, `taniya_local`) | Remaining: provision a real bucket + presigned-URL preview (deploy-time) |
 | 15 | Krystal legacy migration | 🔴 Missing | — | No ETL/migration code |
 
 > Note the split: **SSO *login*** (AD/OIDC/SAML) is genuinely **Built in the gateway**; the integration-service "AD" entry and the Admin **AD-import** action are not. Counted as Built\* with that caveat.
@@ -155,7 +155,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 | Event bus | 🟢 Built | `RedisStreamsEventBus` + in-memory fallback (`services/core/src/events/`) |
 | **Kafka** | 🔴 Missing | only referenced in a K8s NetworkPolicy egress; no broker/client |
 | Elasticsearch | 🟢 Built (opt) | `services/search` ES backend + SQL fallback; `deploy/es-local` |
-| **MinIO / live S3 driver** | 🟡 Partial | S3 client + `StorageConfig` exist but `createStorage()` returns **local** only |
+| **MinIO / live S3 driver** | ✅ Driver shipped | `S3Storage` backend + `createStorage()` returns S3 when `STORAGE_DRIVER=s3`+`S3_BUCKET` set (else falls back to local); needs a provisioned bucket to go live |
 | Docker / Compose | 🟢 Built | root + `deploy/server` + `deploy/es-local` + `deploy/sso-local` |
 | Kubernetes / Helm | 🟡 Partial | `python-service/k8s/*`, `python-service/helm/zordms` — manifests/chart, not deployed |
 | **Harbor registry** | 🔴 Missing | uses GHCR instead |

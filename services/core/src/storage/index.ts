@@ -24,9 +24,28 @@ export function keyForHash(hash: string): string {
 }
 
 export { LocalStorage } from "./local.js";
+export { S3Storage, tryCreateS3 } from "./s3.js";
 
+/**
+ * Pick a storage backend from config. With `storageDriver: "s3"` and a bucket,
+ * build an S3/MinIO backend; if the SDK or required config is missing, log a
+ * degraded warning and fall back to local so boot never fails on storage.
+ */
 export async function createStorage(cfg: StorageConfig): Promise<StorageBackend> {
   const { LocalStorage } = await import("./local.js");
-  // S3 backend not implemented in core service - use local for all environments
-  return LocalStorage(cfg.localRoot ?? "./.storage");
+  const localRoot = cfg.localRoot ?? "./.storage";
+
+  if (cfg.storageDriver === "s3") {
+    const { tryCreateS3 } = await import("./s3.js");
+    const s3 = await tryCreateS3(cfg);
+    if (s3) return s3;
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        msg: "storage_s3_unavailable_fallback_local",
+        detail: "STORAGE_DRIVER=s3 but the AWS SDK or S3_BUCKET/credentials are missing; using local storage.",
+      }),
+    );
+  }
+  return LocalStorage(localRoot);
 }

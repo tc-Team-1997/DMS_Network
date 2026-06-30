@@ -1,7 +1,7 @@
 import { createApp } from "./app.js";
 import { getServiceKnex } from "./db.js";
 import { loadConfig } from "@zordms/config";
-import { LocalStorage } from "./storage/local.js";
+import { createStorage } from "./storage/index.js";
 import { RedisStreamsEventBus } from "./events/index.js";
 import { createWorker } from "./worker/index.js";
 import { startDisposalScan } from "./jobs/disposalScan.js";
@@ -11,7 +11,15 @@ const knex = getServiceKnex();
 await knex.migrate.latest();
 await knex.seed.run();
 
-const storage = LocalStorage(process.env.STORAGE_LOCAL_ROOT ?? "./.storage");
+const storage = await createStorage({
+  storageDriver: process.env.STORAGE_DRIVER === "s3" ? "s3" : "local",
+  localRoot: process.env.STORAGE_LOCAL_ROOT ?? "./.storage",
+  s3Bucket: process.env.S3_BUCKET,
+  s3Endpoint: process.env.S3_ENDPOINT,
+  s3Region: process.env.S3_REGION,
+  s3AccessKey: process.env.S3_ACCESS_KEY,
+  s3SecretKey: process.env.S3_SECRET_KEY,
+});
 const events = RedisStreamsEventBus(process.env.REDIS_URL ?? "redis://localhost:6379");
 
 const port = Number(process.env.CORE_PORT ?? 4001);
