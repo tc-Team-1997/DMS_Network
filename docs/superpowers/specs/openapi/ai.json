@@ -511,6 +511,52 @@
         ]
       }
     },
+    "/idp/fraud-check": {
+      "post": {
+        "summary": "Fraud Check Endpoint",
+        "description": "Screen a transaction/party record against rule-based AML detection.",
+        "operationId": "fraud_check_endpoint_idp_fraud_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FraudRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Fraud Check Endpoint Idp Fraud Check Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/idp/copilot/ask": {
       "post": {
         "tags": [
@@ -814,6 +860,38 @@
           "doc_type"
         ],
         "title": "ComplianceRequest"
+      },
+      "FraudRequest": {
+        "properties": {
+          "record": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Record",
+            "examples": [
+              {
+                "amount": 999000,
+                "subject": "ACME Ltd"
+              }
+            ]
+          },
+          "watchlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watchlist",
+            "description": "Optional screening names (sanctions/PEP)."
+          }
+        },
+        "type": "object",
+        "title": "FraudRequest"
       },
       "HTTPValidationError": {
         "properties": {

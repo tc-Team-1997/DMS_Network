@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from zordms_ai.api.copilot import copilot_router
 from zordms_ai.api.compliance import compliance_router
 from zordms_ai.api.translate import translate_router
+from zordms_ai.api.fraud import fraud_router
 from zordms_ai.api.idp import idp_router
 from zordms_ai.api.ocr import ocr_router
 from zordms_ai.api.review import review_router
@@ -105,5 +106,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(review_router)
     app.include_router(compliance_router)
     app.include_router(translate_router)
+    app.include_router(fraud_router)
     app.include_router(copilot_router)
     return app

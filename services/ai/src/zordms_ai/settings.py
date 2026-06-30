@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     semantic_search_enabled: bool = True
     embed_model: str = "nomic-embed-text"
 
+    # §5.5 AML — CTR reporting threshold for rule-based fraud screening.
+    aml_ctr_threshold: float = 1_000_000.0
+
     @property
     def is_degraded(self) -> bool:
         return self.inference_mode == "cpu_degraded"
