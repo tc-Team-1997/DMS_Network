@@ -43,13 +43,14 @@ Nine code increments closed the code-completable gaps below. Each was built behi
 | **6 config-only connectors** (§6) — mBoB/GoBoB/Internet-Banking/CRM/ERP/Contact-Center: ops + mock + live-or-mock + `POST /integration/systems/:system/call` | §6 Partial ×6 → Built | `1aad092` |
 | **e-Signature** (§6.12) — REST connector (`sign.request`/`sign.status`) | §6.12 Missing → Built | `519cdcf` |
 | **RMA reporting** (§6.13) — `SftpConnector` (ssh2-sftp-client, injectable/mock-tested) | §6.13 Missing → Built | `2dcb251` |
+| **Krystal migration** (§6.15) — source-agnostic ETL scaffold: `migration_jobs`/`migration_records`, JSONL `SourceAdapter` + staging sink, dry-run, idempotent, `/migration/*` routes | §6.15 Missing → **scaffold Built** (real adapter pending §9.6) | `2494735` |
 
 \* Dzongkha OCR: the code path + graceful fallback are built and tested; **real Dzongkha accuracy still depends on deploying the `dzo` traineddata + client sign-off (§9.3)**.
 
 **Duplication avoided (verified):** **SMS** was *not* added as an integration connector — it already exists as a delivery channel in the notify service (`services/notify/src/channels/sms.ts`, Twilio-backed, with tests). So §6 "SMS Gateway" is covered there, not duplicated here.
 
 **Still genuinely not code-completable now:**
-- **Krystal legacy migration** (§6.15) — a bulk ETL subsystem; blocked on the legacy source format/access (blueprint §9.6). Not a request/response connector.
+- **Krystal legacy migration** (§6.15) — the ETL **scaffold is built** (`2494735`): pipeline, JSONL intermediate, idempotent staging, dry-run, job tracking. What's still blocked on §9.6 is the **Krystal-specific source adapter** (their native export format/file transport) + the production `CoreDocumentSink` that imports staged records into core. Both plug into the shipped interfaces.
 - **Infra-deploy** — activate the S3/MinIO storage driver, Kafka-vs-Redis-Streams decision, Vault, stand up Staging/UAT/Prod from the existing Terraform/Helm.
 - **Client §9 decisions** — CBS naming, Dzongkha sign-off, e-Sign/SMS/RMA/Krystal scope, RTO/RPO, RACI.
 
@@ -199,7 +200,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 8. **Admin gaps** — AD-import action, security-settings CRUD, `departments` master data. (still open)
 9. ✅ **Audit tamper-evidence** — persisted `prev_hash`/`row_hash` + compare shipped (`5462644`).
 
-**B. Connector breadth:** ✅ finished the 6 config-only connectors (`1aad092`), ✅ e-Signature (`519cdcf`), ✅ RMA/SFTP (`2dcb251`). **SMS** is already covered by the notify channel (not duplicated). **Krystal ETL** remains open (blocked on §9.6 source-format scope).
+**B. Connector breadth:** ✅ finished the 6 config-only connectors (`1aad092`), ✅ e-Signature (`519cdcf`), ✅ RMA/SFTP (`2dcb251`), ✅ Krystal ETL **scaffold** (`2494735`). **SMS** is already covered by the notify channel (not duplicated). Krystal's **real source adapter + core-import sink** remain blocked on §9.6 (plug into the shipped interfaces).
 
 **C. Deploy the already-designed infra:** activate the S3/MinIO storage driver; stand up Kafka (or formally drop it in favour of Redis Streams); wire Vault; provision Staging/UAT/Prod from the existing Terraform/Helm; add Grafana dashboards and the WAF ruleset.
 
