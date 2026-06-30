@@ -198,7 +198,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 5. ✅ **Config module (§4.13)** — shipped (`52bfb03`).
 6. ✅ **AI console config (§4.7)** — shipped (`c09d317`).
 7. **Fraud/AML, Compliance/RMA rules, Translation, Predictive** — the 4 unbuilt AI features (some optional). (still open)
-8. **Admin / Master-Data gaps** — ✅ `departments` master data (`7cc056a`), ✅ roles-management endpoint (`a26f253`, gateway). Still open: AD-import action, security-settings CRUD.
+8. **Admin / Master-Data gaps** — ✅ `departments` master data (`7cc056a`), ✅ roles-management endpoint (`a26f253`), ✅ security-settings CRUD (`b9c6604`, gateway). Still open: AD-import action.
 9. ✅ **Audit tamper-evidence** — persisted `prev_hash`/`row_hash` + compare shipped (`5462644`).
 
 **B. Connector breadth:** ✅ finished the 6 config-only connectors (`1aad092`), ✅ e-Signature (`519cdcf`), ✅ RMA/SFTP (`2dcb251`), ✅ Krystal ETL **scaffold** (`2494735`). **SMS** is already covered by the notify channel (not duplicated). Krystal's **real source adapter + core-import sink** remain blocked on §9.6 (plug into the shipped interfaces).
