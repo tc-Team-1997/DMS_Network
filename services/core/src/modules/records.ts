@@ -4,6 +4,54 @@ import type { RetentionPolicy, LegalHold, DisposalCandidate } from "@zordms/type
 import { newId } from "@zordms/db";
 import { writeAudit } from "./audit.js";
 
+export interface RetentionRuleInput {
+  docClass: string;
+  retentionYears: number;
+  trigger?: string;
+  regulation?: string;
+}
+
+/** Create-or-update a retention policy by doc_class (unique). SC-06. */
+export async function upsertRetentionPolicy(knex: Knex, input: RetentionRuleInput, actor?: string): Promise<RetentionPolicy> {
+  const existing = await knex("retention_policies").where({ doc_class: input.docClass }).first();
+  if (existing) {
+    await knex("retention_policies").where({ id: existing.id }).update({
+      retention_years: input.retentionYears,
+      trigger: input.trigger ?? existing.trigger,
+      regulation: input.regulation ?? existing.regulation,
+    });
+    await writeAudit(knex, { actorUsername: actor, action: "RETENTION_RULE_UPDATE", entity: "retention_policy", entityId: String(existing.id), details: input.docClass });
+    return knex("retention_policies").where({ id: existing.id }).first() as Promise<RetentionPolicy>;
+  }
+  const id = newId();
+  await knex("retention_policies").insert({
+    id, doc_class: input.docClass, retention_years: input.retentionYears,
+    trigger: input.trigger ?? "ingest", regulation: input.regulation ?? null,
+  });
+  await writeAudit(knex, { actorUsername: actor, action: "RETENTION_RULE_CREATE", entity: "retention_policy", entityId: id, details: input.docClass });
+  return knex("retention_policies").where({ id }).first() as Promise<RetentionPolicy>;
+}
+
+export async function updateRetentionPolicy(
+  knex: Knex, id: string, patch: { retentionYears?: number; trigger?: string; regulation?: string }, actor?: string,
+): Promise<RetentionPolicy | null> {
+  const existing = await knex("retention_policies").where({ id }).first();
+  if (!existing) return null;
+  const update: Record<string, unknown> = {};
+  if (patch.retentionYears !== undefined) update.retention_years = patch.retentionYears;
+  if (patch.trigger !== undefined) update.trigger = patch.trigger;
+  if (patch.regulation !== undefined) update.regulation = patch.regulation;
+  if (Object.keys(update).length) await knex("retention_policies").where({ id }).update(update);
+  await writeAudit(knex, { actorUsername: actor, action: "RETENTION_RULE_UPDATE", entity: "retention_policy", entityId: id });
+  return knex("retention_policies").where({ id }).first() as Promise<RetentionPolicy>;
+}
+
+export async function deleteRetentionPolicy(knex: Knex, id: string, actor?: string): Promise<boolean> {
+  const n = await knex("retention_policies").where({ id }).del();
+  if (n > 0) await writeAudit(knex, { actorUsername: actor, action: "RETENTION_RULE_DELETE", entity: "retention_policy", entityId: id });
+  return n > 0;
+}
+
 export async function listFilePlan(knex: Knex): Promise<RetentionPolicy[]> {
   return knex<RetentionPolicy>("retention_policies").select("*").orderBy("doc_class");
 }

@@ -122,10 +122,9 @@ describe("RecordsManagement screen", () => {
     fireEvent.click(screen.getByText("Place Legal Hold"));
     await waitFor(() => expect(screen.getByText("Place Hold")).toBeInTheDocument());
 
-    // Fill in required fields
-    const inputs = screen.getAllByRole("textbox");
-    fireEvent.change(inputs[0], { target: { value: "LH-ERR-01" } });
-    fireEvent.change(inputs[1], { target: { value: "branch:THI001" } });
+    // Fill the hold-modal fields by placeholder (robust to other on-page inputs)
+    fireEvent.change(screen.getByPlaceholderText(/LH-2026-01/), { target: { value: "LH-ERR-01" } });
+    fireEvent.change(screen.getByPlaceholderText(/branch:THI001/), { target: { value: "branch:THI001" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Place Hold" }));
 

@@ -1992,6 +1992,86 @@
           "createdAt"
         ]
       },
+      "CreateRetentionRule": {
+        "type": "object",
+        "properties": {
+          "doc_class": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "KYC_PASSPORT"
+          },
+          "retention_years": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "trigger": {
+            "type": "string",
+            "maxLength": 60,
+            "example": "expiry"
+          },
+          "regulation": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "doc_class",
+          "retention_years"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateRetentionRule": {
+        "type": "object",
+        "properties": {
+          "retention_years": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "trigger": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "regulation": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetentionPolicy": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "doc_class": {
+            "type": "string"
+          },
+          "retention_years": {
+            "type": "number"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "regulation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "doc_class",
+          "retention_years",
+          "trigger",
+          "regulation"
+        ],
+        "additionalProperties": {}
+      },
       "Quality": {
         "type": "object",
         "properties": {
@@ -5622,6 +5702,328 @@
                 },
                 "example": {
                   "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create or update a retention rule (by doc_class) — SC-06.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetentionRule"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "$ref": "#/components/schemas/RetentionPolicy"
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/records/file-plan/{id}": {
+      "put": {
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a retention rule.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetentionRule"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "policy": {
+                      "$ref": "#/components/schemas/RetentionPolicy"
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a retention rule.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "doc_123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "not_found"
                 }
               }
             }

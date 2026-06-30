@@ -35,6 +35,15 @@ export async function fetchFilePlan(): Promise<RetentionPolicy[]> {
   return data.policies;
 }
 
+// SC-06: create-or-update (by doc_class) and delete retention rules.
+export async function saveRetentionRule(payload: { doc_class: string; retention_years: number; trigger?: string; regulation?: string }): Promise<RetentionPolicy> {
+  return (await http.post<{ policy: RetentionPolicy }>(`${SVC.core}/records/file-plan`, payload)).policy;
+}
+
+export async function deleteRetentionRule(id: string): Promise<void> {
+  await http.delete(`${SVC.core}/records/file-plan/${id}`);
+}
+
 export async function fetchLegalHolds(): Promise<LegalHold[]> {
   const data = await http.get<{ holds: LegalHold[] }>(`${SVC.core}/records/holds`);
   return data.holds;

@@ -8,6 +8,7 @@ import {
 import {
   fetchFilePlan, fetchLegalHolds, fetchDisposalCandidates,
   placeLegalHold, releaseLegalHold, certifyDisposal,
+  saveRetentionRule,
   type RetentionPolicy, type LegalHold, type DisposalCandidate,
 } from "../api/recordsManagement.js";
 
@@ -164,6 +165,24 @@ export default function RecordsManagement() {
   /* Hold form */
   const [holdForm, setHoldForm] = useState({ ref: "", scope: "branch:", });
 
+  /* SC-06 retention-rule form (create/edit by doc_class) */
+  const [ruleForm, setRuleForm] = useState({ doc_class: "", retention_years: "7", trigger: "ingest", regulation: "" });
+  const [ruleErr, setRuleErr] = useState<string | null>(null);
+  async function saveRule(e: FormEvent) {
+    e.preventDefault();
+    setRuleErr(null);
+    try {
+      await saveRetentionRule({
+        doc_class: ruleForm.doc_class.trim(),
+        retention_years: Number(ruleForm.retention_years),
+        trigger: ruleForm.trigger.trim() || undefined,
+        regulation: ruleForm.regulation.trim() || undefined,
+      });
+      setRuleForm({ doc_class: "", retention_years: "7", trigger: "ingest", regulation: "" });
+      await load();
+    } catch (e: any) { setRuleErr(String(e?.message ?? e)); }
+  }
+
   async function load() {
     setLoading(true); setError(null);
     try {
@@ -288,8 +307,18 @@ export default function RecordsManagement() {
               columns={filePlanColumns}
               rows={plan as Array<RetentionPolicy & Record<string, unknown>>}
               rowKey={(r) => r.id}
-              emptyMessage="No retention policies configured. Add policies via the API."
+              emptyMessage="No retention policies configured."
             />
+          )}
+          {canAdmin && (
+            <form onSubmit={saveRule} style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {ruleErr && <div role="alert" style={{ color: "var(--R, #c0392b)", width: "100%" }}>{ruleErr}</div>}
+              <input className="field" style={{ width: 180 }} placeholder="doc class" value={ruleForm.doc_class} onChange={(e) => setRuleForm({ ...ruleForm, doc_class: e.target.value })} aria-label="doc class" required />
+              <input className="field" style={{ width: 110 }} type="number" placeholder="years" value={ruleForm.retention_years} onChange={(e) => setRuleForm({ ...ruleForm, retention_years: e.target.value })} aria-label="retention years" required />
+              <input className="field" style={{ width: 120 }} placeholder="trigger" value={ruleForm.trigger} onChange={(e) => setRuleForm({ ...ruleForm, trigger: e.target.value })} aria-label="trigger" />
+              <input className="field" style={{ width: 200 }} placeholder="regulation (optional)" value={ruleForm.regulation} onChange={(e) => setRuleForm({ ...ruleForm, regulation: e.target.value })} aria-label="regulation" />
+              <button className="btn-primary" style={{ width: 150 }} aria-label="save retention rule">Save rule</button>
+            </form>
           )}
         </Card>
       )}

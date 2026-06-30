@@ -858,6 +858,46 @@ export const DepartmentSchema = registry.register(
     .openapi("Department"),
 );
 
+// ── Retention rules (§4.6 records / SC-06) ────────────────────────────────────
+export const CreateRetentionRuleSchema = registry.register(
+  "CreateRetentionRule",
+  z
+    .object({
+      doc_class: z.string().min(1).max(120).openapi({ example: "KYC_PASSPORT" }),
+      retention_years: z.number().int().min(0).max(999),
+      trigger: z.string().max(60).optional().openapi({ example: "expiry" }),
+      regulation: z.string().max(120).optional(),
+    })
+    .strict()
+    .openapi("CreateRetentionRule"),
+);
+
+export const UpdateRetentionRuleSchema = registry.register(
+  "UpdateRetentionRule",
+  z
+    .object({
+      retention_years: z.number().int().min(0).max(999).optional(),
+      trigger: z.string().max(60).optional(),
+      regulation: z.string().max(120).optional(),
+    })
+    .strict()
+    .openapi("UpdateRetentionRule"),
+);
+
+export const RetentionPolicySchema = registry.register(
+  "RetentionPolicy",
+  z
+    .object({
+      id: z.string(),
+      doc_class: z.string(),
+      retention_years: z.number(),
+      trigger: z.string(),
+      regulation: z.string().nullable(),
+    })
+    .passthrough()
+    .openapi("RetentionPolicy"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z
