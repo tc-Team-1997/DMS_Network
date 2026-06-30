@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "DB_CLIENT=${DB_CLIENT:-sqlite3} tsx watch src/server.ts",
+    "dev": "DB_CLIENT=${DB_CLIENT:-sqlite3} DB_NAME=${DB_NAME_SEARCH:-zordms_search} tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run",
     "gen-openapi": "tsx scripts/gen-openapi.ts",

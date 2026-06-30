@@ -1,0 +1,35 @@
+# Local persistent Postgres for the ZorDMS dev stack.
+#
+# The dev stack (./start.sh) defaults to in-memory SQLite — data is wiped on
+# every restart. Point it at this container instead for a persistent,
+# production-like database (matches deploy/server's Postgres 16).
+#
+# Runs on host port 5436 to avoid clashing with any local Postgres on :5432/:5435.
+#
+#   docker compose -f deploy/dev-db/docker-compose.yml up -d
+#
+# Then in .env:  DB_CLIENT=pg  DB_HOST=localhost  DB_PORT=5436
+#                DB_USER=zordms  DB_PASSWORD=zordms  DB_NAME=zordms_dev
+# and ./restart.sh — every service migrates + seeds into it on boot.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zordms-dev-postgres
+    environment:
+      POSTGRES_USER: zordms
+      POSTGRES_PASSWORD: zordms
+      POSTGRES_DB: zordms_dev
+    ports:
+      - "5436:5432"
+    volumes:
+      - zordms-dev-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zordms -d zordms_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  zordms-dev-pgdata:
