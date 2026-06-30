@@ -98,6 +98,18 @@ describe("integration management", () => {
     expect(statusRes.body.result.data.status).toBe("COMPLETED");
   });
 
+  it("invokes the RMA SFTP connector via mock (no SFTP creds in env)", async () => {
+    // Without RMA_SFTP_HOST, selectConnector falls back to the canned mock —
+    // exercises the wiring (rma listed, op whitelisted) without a real server.
+    const res = await request(app)
+      .post("/integration/systems/rma/call")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ op: "report.submit", payload: { filename: "RMA-Q2.xlsx" } });
+    expect(res.status).toBe(200);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.data.remotePath).toContain("RMA");
+  });
+
   it("rejects an unknown op with 400", async () => {
     const res = await request(app)
       .post("/integration/systems/mbob/call")

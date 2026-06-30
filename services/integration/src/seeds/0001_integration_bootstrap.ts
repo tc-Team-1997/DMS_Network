@@ -131,6 +131,13 @@ const RICH_SYSTEMS: Array<{
     auth_type: "bearer",
     enabled: true,
   },
+  // RMA regulatory reporting — SFTP transport (scheduled report submission).
+  {
+    system: "rma",
+    base_url: "sftp://rma-reporting.rma.gov.bt:22/incoming",
+    auth_type: "basic",
+    enabled: true,
+  },
 ];
 
 // 15 realistic integration log entries covering success (200), rate-limit (429),

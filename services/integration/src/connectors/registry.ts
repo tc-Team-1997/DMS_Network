@@ -1,6 +1,7 @@
 import type { Connector, ConnectorContext } from "./types.js";
 import { MockConnector } from "./mock.js";
 import { HttpConnector, type HttpConnectorOptions } from "./http.js";
+import { SftpConnector, type SftpCreds } from "./sftp.js";
 import { withLogging } from "./logger.js";
 
 // Canned mock responses per system so the hub is fully functional with NO external
@@ -39,6 +40,9 @@ const MOCK_RESPONSES: Record<string, Record<string, { ok: boolean; status: numbe
   esign: {
     "sign.request": { ok: true, status: 201, data: { envelopeId: "ENV-9001", status: "SENT" } },
     "sign.status": { ok: true, status: 200, data: { envelopeId: "ENV-9001", status: "COMPLETED" } },
+  },
+  rma: {
+    "report.submit": { ok: true, status: 200, data: { remotePath: "/incoming/RMA-RETURN.xlsx", bytes: 2048 } },
   },
 };
 
@@ -98,6 +102,12 @@ export const OP_MAPS: Record<string, Record<string, { method: string; path: stri
     "sign.status": { method: "POST", path: "/signatures/status" },
     "ping": { method: "GET", path: "/health" },
   },
+  // RMA reporting is SFTP transport (not HTTP) — method "SFTP" just whitelists
+  // the op for the invoke endpoint; SftpConnector ignores method/path.
+  rma: {
+    "report.submit": { method: "SFTP", path: "/incoming" },
+    "ping": { method: "SFTP", path: "/" },
+  },
 };
 
 export const BASE_URL_ENV: Record<string, string> = {
@@ -120,6 +130,26 @@ export function liveBaseUrl(system: string, env: NodeJS.ProcessEnv = process.env
   return val && val.trim() ? val.trim() : undefined;
 }
 
+// Systems whose live transport is SFTP (not HTTP). Each reads `<PREFIX>_HOST`
+// etc. from env; absent host ⇒ fall back to the canned mock.
+export const SFTP_ENV_PREFIX: Record<string, string> = {
+  rma: "RMA_SFTP",
+};
+
+export function sftpCreds(system: string, env: NodeJS.ProcessEnv = process.env): SftpCreds | undefined {
+  const prefix = SFTP_ENV_PREFIX[system];
+  if (!prefix) return undefined;
+  const host = env[`${prefix}_HOST`];
+  if (!host || !host.trim()) return undefined;
+  const port = env[`${prefix}_PORT`];
+  return {
+    host: host.trim(),
+    port: port ? Number(port) : undefined,
+    username: env[`${prefix}_USER`],
+    password: env[`${prefix}_PASSWORD`],
+  };
+}
+
 export interface ConnectorSelectOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
@@ -133,6 +163,14 @@ export interface ConnectorSelectOptions {
  * to the canned MOCK connector so the hub stays fully functional offline.
  */
 export function selectConnector(system: string, ctx: ConnectorContext, opts: ConnectorSelectOptions = {}): Connector {
+  // SFTP-transport systems (e.g. RMA): live SftpConnector when creds are present,
+  // else the canned mock so the hub stays functional offline.
+  if (SFTP_ENV_PREFIX[system]) {
+    const creds = sftpCreds(system, opts.env);
+    if (creds) return withLogging(new SftpConnector(system, creds), ctx.knex);
+    return buildConnector(system, ctx);
+  }
+
   const baseUrl = liveBaseUrl(system, opts.env);
   if (baseUrl) {
     const opMap = OP_MAPS[system] ?? {};
