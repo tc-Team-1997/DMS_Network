@@ -61,6 +61,27 @@ export const UserIdParamsSchema = z
 export const LockUserBodySchema = z.object({}).openapi("LockUserRequest");
 
 // ---------------------------------------------------------------------------
+// Roles (master data — §4.11)
+// ---------------------------------------------------------------------------
+
+export const CreateRoleBodySchema = z
+  .object({
+    name: z.string().trim().min(1, "name is required").max(80),
+    description: z.string().max(255).optional(),
+    permissions: z.array(z.string()).default([]),
+  })
+  .openapi("CreateRoleRequest");
+export type CreateRoleBody = z.infer<typeof CreateRoleBodySchema>;
+
+export const UpdateRoleBodySchema = z
+  .object({
+    description: z.string().max(255).optional(),
+    permissions: z.array(z.string()).optional(),
+  })
+  .openapi("UpdateRoleRequest");
+export type UpdateRoleBody = z.infer<typeof UpdateRoleBodySchema>;
+
+// ---------------------------------------------------------------------------
 // SSO
 // ---------------------------------------------------------------------------
 

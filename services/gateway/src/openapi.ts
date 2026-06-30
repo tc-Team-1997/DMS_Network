@@ -17,6 +17,8 @@ import {
   OidcCallbackQuerySchema,
   AuthConfigResponseSchema,
   SsoLoginResponseSchema,
+  CreateRoleBodySchema,
+  UpdateRoleBodySchema,
 } from "./schemas.js";
 
 /**
@@ -230,6 +232,67 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         description: "User not found.",
         content: { "application/json": { schema: ErrorSchema } },
       },
+    },
+  });
+
+  // /roles (master data — §4.11) -------------------------------------------
+  const RoleResponseSchema = z.object({
+    id: z.string(), name: z.string(), description: z.string().nullable(),
+    system: z.boolean(), permissions: z.array(z.string()), userCount: z.number(),
+  });
+  registry.registerPath({
+    method: "get", path: "/roles", summary: "List roles (with permissions + user counts)", tags: ["roles"],
+    security: [{ [bearerAuth.name]: [] }],
+    responses: {
+      200: { description: "Roles.", content: { "application/json": { schema: z.object({ roles: z.array(RoleResponseSchema) }) } } },
+      401: unauthorized,
+      403: { description: "Missing admin:read permission." },
+    },
+  });
+  registry.registerPath({
+    method: "get", path: "/roles/{id}", summary: "Get a role", tags: ["roles"],
+    security: [{ [bearerAuth.name]: [] }],
+    responses: {
+      200: { description: "Role.", content: { "application/json": { schema: z.object({ role: RoleResponseSchema }) } } },
+      401: unauthorized,
+      403: { description: "Missing admin:read permission." },
+      404: { description: "Role not found.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+  registry.registerPath({
+    method: "post", path: "/roles", summary: "Create a custom role", tags: ["roles"],
+    security: [{ [bearerAuth.name]: [] }],
+    request: { body: { content: { "application/json": { schema: CreateRoleBodySchema } } } },
+    responses: {
+      201: { description: "Created.", content: { "application/json": { schema: z.object({ role: RoleResponseSchema }) } } },
+      400: validationError,
+      401: unauthorized,
+      403: { description: "Missing role:assign permission." },
+      409: { description: "Role name already exists.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+  registry.registerPath({
+    method: "put", path: "/roles/{id}", summary: "Update a role (non-system only)", tags: ["roles"],
+    security: [{ [bearerAuth.name]: [] }],
+    request: { body: { content: { "application/json": { schema: UpdateRoleBodySchema } } } },
+    responses: {
+      200: { description: "Updated.", content: { "application/json": { schema: z.object({ role: RoleResponseSchema }) } } },
+      400: validationError,
+      401: unauthorized,
+      403: { description: "Missing role:assign permission." },
+      404: { description: "Role not found.", content: { "application/json": { schema: ErrorSchema } } },
+      409: { description: "System role protected.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+  registry.registerPath({
+    method: "delete", path: "/roles/{id}", summary: "Delete a role (non-system only)", tags: ["roles"],
+    security: [{ [bearerAuth.name]: [] }],
+    responses: {
+      200: { description: "Deleted.", content: { "application/json": { schema: z.object({ deleted: z.boolean() }) } } },
+      401: unauthorized,
+      403: { description: "Missing role:assign permission." },
+      404: { description: "Role not found.", content: { "application/json": { schema: ErrorSchema } } },
+      409: { description: "System role protected.", content: { "application/json": { schema: ErrorSchema } } },
     },
   });
 
