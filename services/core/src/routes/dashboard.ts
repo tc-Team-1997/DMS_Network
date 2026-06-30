@@ -1,10 +1,35 @@
 import { Router } from "express";
 import { requireAuth, requirePermission, makeViewer } from "@zordms/auth";
 import type { CoreDeps } from "../deps.js";
+import { validateBody } from "../openapi/validate.js";
+import { SetDashboardLayoutSchema } from "../openapi/schemas.js";
 
 export function dashboardRouter(): Router {
   const r = Router();
   r.use(requireAuth);
+
+  // SC-01 — per-user dashboard layout / chart-customise config.
+  r.get("/layout", requirePermission("document:read"), async (req, res) => {
+    try {
+      const { knex } = req.app.locals.deps as CoreDeps;
+      const row = await knex("dashboard_layouts").where({ user_id: req.authUser!.id }).first();
+      let config: unknown = {};
+      if (row) { try { config = JSON.parse(row.config_json); } catch { config = {}; } }
+      res.json({ config });
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
+  });
+
+  r.put("/layout", requirePermission("document:read"), validateBody(SetDashboardLayoutSchema), async (req, res) => {
+    try {
+      const { knex } = req.app.locals.deps as CoreDeps;
+      const userId = req.authUser!.id;
+      const config_json = JSON.stringify(req.body.config ?? {});
+      const existing = await knex("dashboard_layouts").where({ user_id: userId }).first();
+      if (existing) await knex("dashboard_layouts").where({ user_id: userId }).update({ config_json, updated_at: new Date().toISOString() });
+      else await knex("dashboard_layouts").insert({ user_id: userId, config_json });
+      res.json({ config: req.body.config ?? {} });
+    } catch (e: any) { res.status(500).json({ error: "internal", detail: String(e?.message ?? e) }); }
+  });
 
   r.get("/summary", requirePermission("document:read"), async (req, res) => {
     try {

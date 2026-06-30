@@ -59,6 +59,12 @@ export const dashboardCaptureApi = {
   dashboardSummaryWithParams: (qs: string): Promise<DashboardSummary> =>
     http.get<DashboardSummary>(`${SVC.core}/dashboard/summary?${qs}`),
 
+  // SC-01 — per-user dashboard layout / chart-customise config.
+  getLayout: (): Promise<{ config: Record<string, unknown> }> =>
+    http.get<{ config: Record<string, unknown> }>(`${SVC.core}/dashboard/layout`),
+  saveLayout: (config: Record<string, unknown>): Promise<{ config: Record<string, unknown> }> =>
+    http.put<{ config: Record<string, unknown> }>(`${SVC.core}/dashboard/layout`, { config }),
+
   // Capture / Documents
   listDocuments: (params?: { status?: string; branch?: string }): Promise<{ documents: DocumentRecord[] }> => {
     const qs = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";

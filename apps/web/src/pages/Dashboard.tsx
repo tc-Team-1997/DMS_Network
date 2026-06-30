@@ -7,6 +7,7 @@ import {
   Tag,
   StatusDot,
   LineChartCard,
+  BarChartCard,
   DonutChartCard,
   Heatmap,
 } from "../components/ui/index.js";
@@ -432,6 +433,18 @@ export default function Dashboard() {
   }, [total, pending, indexedToday, expiringDocs.length]);
   useEffect(() => { if (!loading) void loadInsight(); }, [loading, loadInsight]);
 
+  // SC-01 — persisted per-user chart customise (inflow chart type).
+  const [inflowChart, setInflowChart] = useState<"line" | "bar">("line");
+  useEffect(() => {
+    dashboardCaptureApi.getLayout()
+      .then((r) => { const t = (r.config?.inflowChart as string); if (t === "bar" || t === "line") setInflowChart(t); })
+      .catch(() => {});
+  }, []);
+  const changeInflowChart = useCallback((t: "line" | "bar") => {
+    setInflowChart(t);
+    void dashboardCaptureApi.saveLayout({ inflowChart: t }).catch(() => {});
+  }, []);
+
   return (
     <div className="fade-up">
       {/* ── AI-assisted insights (SC-01) ── */}
@@ -568,19 +581,47 @@ export default function Dashboard() {
 
       {/* ── Charts Row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 14, marginBottom: 14 }}>
-        <ClickableWrapper onClick={() => navigate("/repository")} ariaLabel="View document inflow details">
-          <LineChartCard
-            title="Document Inflow — All Branches (30 days)"
-            action={<Tag variant="blue">Daily Volume</Tag>}
-            data={inflowData}
-            xKey="period"
-            lines={[
-              { key: "volume", color: "#b8912a", name: "Total" },
-              { key: "ai", color: "#3a9fd0", name: "AI-classified" },
-            ]}
-            height={160}
-          />
-        </ClickableWrapper>
+        <div>
+          {/* SC-01 — per-chart customise (persisted) */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+            <select
+              aria-label="inflow chart type"
+              value={inflowChart}
+              onChange={(e) => changeInflowChart(e.target.value as "line" | "bar")}
+              style={{ background: "var(--ink2)", border: "1px solid var(--bd)", borderRadius: 6, padding: "2px 6px", fontSize: 11, color: "var(--mist)" }}
+            >
+              <option value="line">Line chart</option>
+              <option value="bar">Bar chart</option>
+            </select>
+          </div>
+          <ClickableWrapper onClick={() => navigate("/repository")} ariaLabel="View document inflow details">
+            {inflowChart === "bar" ? (
+              <BarChartCard
+                title="Document Inflow — All Branches (30 days)"
+                action={<Tag variant="blue">Daily Volume</Tag>}
+                data={inflowData}
+                xKey="period"
+                bars={[
+                  { key: "volume", color: "#b8912a", name: "Total" },
+                  { key: "ai", color: "#3a9fd0", name: "AI-classified" },
+                ]}
+                height={160}
+              />
+            ) : (
+              <LineChartCard
+                title="Document Inflow — All Branches (30 days)"
+                action={<Tag variant="blue">Daily Volume</Tag>}
+                data={inflowData}
+                xKey="period"
+                lines={[
+                  { key: "volume", color: "#b8912a", name: "Total" },
+                  { key: "ai", color: "#3a9fd0", name: "AI-classified" },
+                ]}
+                height={160}
+              />
+            )}
+          </ClickableWrapper>
+        </div>
         <ClickableWrapper
           onClick={() => setDrillDown(drillDown === "category" ? null : "category")}
           ariaLabel="Expand category breakdown drill-down"

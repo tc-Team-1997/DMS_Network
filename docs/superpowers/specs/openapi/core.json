@@ -2072,6 +2072,19 @@
         ],
         "additionalProperties": {}
       },
+      "SetDashboardLayout": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "additionalProperties": false
+      },
       "Quality": {
         "type": "object",
         "properties": {
@@ -5161,6 +5174,181 @@
                   },
                   "pendingReview": 3,
                   "indexedToday": 5
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/layout": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get the current user's saved dashboard layout/config (SC-01).",
+        "responses": {
+          "200": {
+            "description": "Layout config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "config"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the required permission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "forbidden"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": "internal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "dashboard"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Save the current user's dashboard layout/config.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDashboardLayout"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "config"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "example": {
+                  "error": "validation_error",
+                  "issues": [
+                    {
+                      "path": [
+                        "name"
+                      ],
+                      "message": "Expected string, received number",
+                      "code": "invalid_type"
+                    }
+                  ]
                 }
               }
             }

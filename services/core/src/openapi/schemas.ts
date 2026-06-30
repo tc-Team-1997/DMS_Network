@@ -898,6 +898,15 @@ export const RetentionPolicySchema = registry.register(
     .openapi("RetentionPolicy"),
 );
 
+// ── Dashboard layout (SC-01) ──────────────────────────────────────────────────
+export const SetDashboardLayoutSchema = registry.register(
+  "SetDashboardLayout",
+  z
+    .object({ config: z.record(z.string(), z.unknown()) })
+    .strict()
+    .openapi("SetDashboardLayout"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z
