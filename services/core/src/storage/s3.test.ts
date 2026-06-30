@@ -108,6 +108,45 @@ describe("S3Storage", () => {
     const { backend } = makeBackend();
     await expect(backend.delete(" no/such/key")).resolves.toBeUndefined();
   });
+
+  it("presignedGetUrl returns null when no signer is injected", async () => {
+    const { backend } = makeBackend(); // no getSignedUrl
+    expect(await backend.presignedGetUrl!("aa/bb/aabb")).toBeNull();
+  });
+
+  it("presignedGetUrl delegates to the injected signer with the right expiry", async () => {
+    const f = makeFakeS3();
+    let seenExpiry = 0;
+    const backend = S3Storage({
+      client: f.client,
+      bucket: "zordms-docs",
+      PutObjectCommand: f.PutObjectCommand,
+      GetObjectCommand: f.GetObjectCommand,
+      HeadObjectCommand: f.HeadObjectCommand,
+      DeleteObjectCommand: f.DeleteObjectCommand,
+      getSignedUrl: async (_client, _command, opts) => {
+        seenExpiry = opts.expiresIn;
+        return "https://bucket.example/aa/bb/aabb?sig=xyz";
+      },
+    });
+    const url = await backend.presignedGetUrl!("aa/bb/aabb", 120);
+    expect(url).toBe("https://bucket.example/aa/bb/aabb?sig=xyz");
+    expect(seenExpiry).toBe(120);
+  });
+
+  it("presignedGetUrl returns null (never throws) if the signer fails", async () => {
+    const f = makeFakeS3();
+    const backend = S3Storage({
+      client: f.client,
+      bucket: "zordms-docs",
+      PutObjectCommand: f.PutObjectCommand,
+      GetObjectCommand: f.GetObjectCommand,
+      HeadObjectCommand: f.HeadObjectCommand,
+      DeleteObjectCommand: f.DeleteObjectCommand,
+      getSignedUrl: async () => { throw new Error("signer boom"); },
+    });
+    expect(await backend.presignedGetUrl!("aa/bb/aabb")).toBeNull();
+  });
 });
 
 describe("createStorage factory", () => {

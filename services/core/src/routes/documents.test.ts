@@ -2,9 +2,31 @@ import { describe, it, expect, afterAll } from "vitest";
 import request from "supertest";
 import { makeTestApp } from "../testutil.js";
 import { newId } from "@zordms/db";
+import { sha256, keyForHash, type StorageBackend } from "../storage/index.js";
 
 const h = await makeTestApp();
 afterAll(async () => { await h.cleanup(); });
+
+/** In-memory storage that can optionally issue a presigned URL (S3/MinIO-like). */
+function memStorageWithPresign(presignUrl: string | null): StorageBackend {
+  const blobs = new Map<string, Buffer>();
+  return {
+    async put(buf: Buffer) {
+      const hash = sha256(buf);
+      const key = keyForHash(hash);
+      blobs.set(key, buf);
+      return { key, size: buf.length, hash };
+    },
+    async get(key: string) {
+      const b = blobs.get(key);
+      if (!b) throw new Error("not found");
+      return b;
+    },
+    async exists(key: string) { return blobs.has(key); },
+    async delete(key: string) { blobs.delete(key); },
+    async presignedGetUrl() { return presignUrl; },
+  };
+}
 
 describe("documents routes", () => {
   it("uploads, lists, fetches, downloads, and deletes a document", async () => {
@@ -51,6 +73,34 @@ describe("documents routes", () => {
 
     const del = await request(h.app).delete(`/documents/${id}`).set("Authorization", `Bearer ${vToken}`);
     expect(del.status).toBe(403);
+  });
+
+  it("download 302-redirects to a presigned URL when the backend supplies one", async () => {
+    const presigned = "https://bucket.example/aa/bb/aabb?sig=xyz";
+    const h2 = await makeTestApp({ storage: memStorageWithPresign(presigned) });
+    try {
+      const token = await h2.tokenFor("admin");
+      const up = await request(h2.app).post("/documents").set("Authorization", `Bearer ${token}`)
+        .field("title", "presign me").field("branch", "Thimphu").attach("file", Buffer.from("blob"), "p.png");
+      const id = up.body.document.id;
+      const dl = await request(h2.app).get(`/documents/${id}/download`).set("Authorization", `Bearer ${token}`)
+        .redirects(0); // do not follow — assert the redirect itself
+      expect(dl.status).toBe(302);
+      expect(dl.headers.location).toBe(presigned);
+    } finally { await h2.cleanup(); }
+  });
+
+  it("download streams the bytes when the backend cannot presign (fallback)", async () => {
+    const h2 = await makeTestApp({ storage: memStorageWithPresign(null) });
+    try {
+      const token = await h2.tokenFor("admin");
+      const up = await request(h2.app).post("/documents").set("Authorization", `Bearer ${token}`)
+        .field("title", "stream me").field("branch", "Thimphu").attach("file", Buffer.from("rawbytes"), "s.png");
+      const id = up.body.document.id;
+      const dl = await request(h2.app).get(`/documents/${id}/download`).set("Authorization", `Bearer ${token}`);
+      expect(dl.status).toBe(200);
+      expect(dl.body.toString()).toBe("rawbytes");
+    } finally { await h2.cleanup(); }
   });
 });
 

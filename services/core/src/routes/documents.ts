@@ -148,6 +148,12 @@ export function documentsRouter(): Router {
       if (!document) { res.status(404).json({ error: "not_found" }); return; }
       const v = await currentVersion(deps.knex, document.id);
       if (!v) { res.status(404).json({ error: "no_version" }); return; }
+      // When object storage can issue a presigned GET (S3/MinIO), redirect the
+      // client to fetch the blob directly instead of streaming it through core.
+      if (deps.storage.presignedGetUrl) {
+        const url = await deps.storage.presignedGetUrl(v.storage_key);
+        if (url) { res.redirect(302, url); return; }
+      }
       const buf = await deps.storage.get(v.storage_key);
       res.setHeader("Content-Type", v.mime_type ?? "application/octet-stream");
       // C5: strip characters that can inject into Content-Disposition header

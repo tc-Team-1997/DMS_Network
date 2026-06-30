@@ -24,7 +24,7 @@ export interface TestHarness {
   cleanup: () => Promise<void>;
 }
 
-export async function makeTestApp(): Promise<TestHarness> {
+export async function makeTestApp(opts?: { storage?: StorageBackend }): Promise<TestHarness> {
   const knex = buildServiceKnex({
     migrationsDir,
     seedsDir,
@@ -34,7 +34,7 @@ export async function makeTestApp(): Promise<TestHarness> {
   await knex.seed.run();
 
   const root = await mkdtemp(join(tmpdir(), "zordms-core-"));
-  const storage = LocalStorage(root);
+  const storage = opts?.storage ?? LocalStorage(root);
   const events = InMemoryEventBus();
   const config = loadConfig({ JWT_SECRET: "t" } as NodeJS.ProcessEnv);
   const app = createApp({ knex, config, storage, events });

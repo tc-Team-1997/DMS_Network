@@ -7,6 +7,13 @@ export interface StorageBackend {
   get(key: string): Promise<Buffer>;
   exists(key: string): Promise<boolean>;
   delete(key: string): Promise<void>;
+  /**
+   * Optional: a time-limited URL the client can fetch the blob from directly
+   * (e.g. an S3/MinIO presigned GET), letting downloads bypass the core proxy.
+   * Returns null when presigning isn't available; backends without object
+   * storage (local fs) omit it entirely, so callers must feature-detect.
+   */
+  presignedGetUrl?(key: string, expiresSeconds?: number): Promise<string | null>;
 }
 
 export interface StorageConfig {

@@ -19,6 +19,12 @@ export interface S3Deps {
   GetObjectCommand: new (input: Record<string, unknown>) => unknown;
   HeadObjectCommand: new (input: Record<string, unknown>) => unknown;
   DeleteObjectCommand: new (input: Record<string, unknown>) => unknown;
+  /**
+   * Optional presigner (`@aws-sdk/s3-request-presigner`'s getSignedUrl). When
+   * provided, `presignedGetUrl` issues direct-download URLs; when omitted the
+   * method returns null and callers fall back to the proxied stream.
+   */
+  getSignedUrl?: (client: unknown, command: unknown, opts: { expiresIn: number }) => Promise<string>;
 }
 
 /** Collect a Node Readable / web stream / Buffer body into a single Buffer. */
@@ -43,7 +49,7 @@ async function bodyToBuffer(body: unknown): Promise<Buffer> {
  * (`keyForHash`) so a bucket and a local root are interchangeable.
  */
 export function S3Storage(deps: S3Deps): StorageBackend {
-  const { client, bucket, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand } = deps;
+  const { client, bucket, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand, getSignedUrl } = deps;
 
   const headExists = async (key: string): Promise<boolean> => {
     try {
@@ -78,6 +84,16 @@ export function S3Storage(deps: S3Deps): StorageBackend {
         /* already gone / not found */
       }
     },
+    async presignedGetUrl(key: string, expiresSeconds = 300): Promise<string | null> {
+      if (!getSignedUrl) return null;
+      try {
+        return await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), {
+          expiresIn: expiresSeconds,
+        });
+      } catch {
+        return null; // never break a download because presigning failed
+      }
+    },
   };
 }
 
@@ -99,6 +115,18 @@ export async function tryCreateS3(cfg: StorageConfig): Promise<StorageBackend | 
         ? { credentials: { accessKeyId: cfg.s3AccessKey, secretAccessKey: cfg.s3SecretKey } }
         : {}),
     });
+    // Presigner is an optional peer — if absent, presignedGetUrl returns null
+    // and downloads fall back to the proxied stream (graceful degradation).
+    let getSignedUrl: S3Deps["getSignedUrl"];
+    try {
+      // Non-literal specifier: keeps tsc from requiring the optional peer at
+      // compile time; resolves at runtime once the package is installed.
+      const presignerModule = "@aws-sdk/s3-request-presigner";
+      const presigner = (await import(presignerModule)) as { getSignedUrl: S3Deps["getSignedUrl"] };
+      getSignedUrl = presigner.getSignedUrl;
+    } catch {
+      getSignedUrl = undefined;
+    }
     return S3Storage({
       client: client as unknown as S3ClientLike,
       bucket: cfg.s3Bucket,
@@ -106,6 +134,7 @@ export async function tryCreateS3(cfg: StorageConfig): Promise<StorageBackend | 
       GetObjectCommand: GetObjectCommand as unknown as S3Deps["GetObjectCommand"],
       HeadObjectCommand: HeadObjectCommand as unknown as S3Deps["HeadObjectCommand"],
       DeleteObjectCommand: DeleteObjectCommand as unknown as S3Deps["DeleteObjectCommand"],
+      getSignedUrl,
     });
   } catch {
     return null;

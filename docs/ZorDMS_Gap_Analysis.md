@@ -116,7 +116,7 @@ Connector registry with **live-vs-mock** selection (`<SYS>_BASE_URL` env), **HMA
 | 11 | SMS Gateway | 🔴 Missing | — | No config/adapter/route |
 | 12 | e-Signature | 🔴 Missing | — | No config/adapter/route |
 | 13 | RMA Reporting (SFTP) | 🔴 Missing | — | No SFTP client (needs ssh2/sftp lib) |
-| 14 | Archive (MinIO/S3) | ✅ Driver shipped | content-addressed `S3Storage` backend (`@aws-sdk/client-s3`) + `createStorage` factory wired via `STORAGE_DRIVER=s3` / `S3_*` env, graceful fallback to local (`30 Jun 2026`, `taniya_local`) | Remaining: provision a real bucket + presigned-URL preview (deploy-time) |
+| 14 | Archive (MinIO/S3) | ✅ Driver + presigned preview shipped | content-addressed `S3Storage` backend (`@aws-sdk/client-s3`) + `createStorage` factory wired via `STORAGE_DRIVER=s3` / `S3_*` env, graceful fallback to local; `/documents/:id/download` 302-redirects to a presigned GET when the (optional) presigner is installed, else streams (`30 Jun 2026`, `taniya_local`) | Remaining: provision a real bucket (deploy-time) |
 | 15 | Krystal legacy migration | 🔴 Missing | — | No ETL/migration code |
 
 > Note the split: **SSO *login*** (AD/OIDC/SAML) is genuinely **Built in the gateway**; the integration-service "AD" entry and the Admin **AD-import** action are not. Counted as Built\* with that caveat.
