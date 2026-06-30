@@ -11,7 +11,7 @@ import {
   Briefcase, Folder, FileText, Activity,
   Search, Eye, GitBranch, Shield, AlertTriangle,
   Link2, Lock, Settings, Bell, ChevronDown, ChevronRight, MapPin, LogOut,
-  Users, SlidersHorizontal,
+  Users, SlidersHorizontal, BarChart3,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext.js";
 import { Tooltip } from "./Tooltip.js";
@@ -30,6 +30,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Intelligence",
     items: [
       { label: "Executive Dashboard", path: "/dashboard",   icon: <LayoutDashboard size={15} />, permission: "dashboard:read" },
+      { label: "Reports",             path: "/reports",     icon: <BarChart3 size={15} />,       permission: "admin:access" },
       { label: "Customer 360°",       path: "/customer360", icon: <User size={15} />,            permission: "customer:read" },
     ],
   },

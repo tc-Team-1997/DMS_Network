@@ -48,6 +48,7 @@ const DocumentLifecycle   = React.lazy(() => import("./pages/DocumentLifecycle.j
 const SystemAdministration = React.lazy(() => import("./pages/SystemAdministration.js"));
 const Configuration       = React.lazy(() => import("./pages/Configuration.js"));
 const ValidationConfig    = React.lazy(() => import("./pages/ValidationConfig.js"));
+const Reports             = React.lazy(() => import("./pages/Reports.js"));
 
 /* ── loading fallback ── */
 const LoadingFallback = (
@@ -104,6 +105,7 @@ export const router: Router = createBrowserRouter([
   { path: "/system-administration", element: <Shell permission="admin:read"><SystemAdministration /></Shell> },
   { path: "/configuration",         element: <Shell permission="admin:access"><Configuration /></Shell> },
   { path: "/validation-config",     element: <Shell permission="admin:access"><ValidationConfig /></Shell> },
+  { path: "/reports",               element: <Shell permission="admin:access"><Reports /></Shell> },
 
   /* ── Default redirect ── */
   { path: "/",  element: <Navigate to="/dashboard" replace /> },
