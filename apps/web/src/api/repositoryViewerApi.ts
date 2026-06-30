@@ -201,6 +201,19 @@ export const repositoryViewerApi = {
   ): Promise<BurnResult> =>
     http.post(`${SVC.core}/documents/${docId}/redact`, { regions }),
 
+  /**
+   * Re-run the AI extraction pipeline for an existing document (RBAC
+   * `document:index`). Synchronous: re-classifies, re-extracts and re-persists
+   * the metadata. Reload the document afterwards to show the refreshed fields.
+   */
+  extract: (
+    docId: string,
+  ): Promise<{
+    doc_type?: string;
+    mappedFields?: { data?: Record<string, unknown>; errors?: string[]; partial?: boolean };
+    quality?: { score?: number };
+  }> => http.post(`${SVC.core}/documents/${docId}/extract`, {}),
+
   // Dashboard
   dashboardSummary: (): Promise<DashboardSummary> =>
     http.get(`${SVC.core}/dashboard/summary`),

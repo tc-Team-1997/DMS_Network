@@ -247,6 +247,8 @@ export default function Viewer() {
   const canApprove = user?.permissions.includes("document:approve") ?? false;
   const canReject = user?.permissions.includes("document:reject") ?? false;
   const canEscalate = user?.permissions.includes("workflow:escalate") ?? false;
+  // Re-run extraction RBAC (matches the backend POST /documents/:id/extract).
+  const canExtract = user?.permissions.includes("document:index") ?? false;
 
   // Pattern 2: URL-driven page state — bookmarkable and refresh-safe
   const [viewerUrl, setViewerUrl] = useUrlState({ page: "1", annp: "1" });
@@ -273,6 +275,9 @@ export default function Viewer() {
 
   // ── Burn-in: stamp ──
   const [stamping, setStamping] = useState(false);
+
+  // ── Re-run AI extraction ──
+  const [extracting, setExtracting] = useState(false);
 
   // ── Burn-in: redaction (draw rectangles, then apply) ──
   const [redactMode, setRedactMode] = useState(false);
@@ -408,6 +413,36 @@ export default function Viewer() {
       setStamping(false);
     }
   }, [doc, user, currentPage, load]);
+
+  // ── RE-RUN EXTRACTION: re-classify + re-extract, then reload metadata ──
+  const reRunExtraction = useCallback(async (): Promise<void> => {
+    if (!doc) return;
+    setExtracting(true);
+    setToast(null);
+    try {
+      const res = await repositoryViewerApi.extract(doc.id);
+      await load(doc.id);
+      const errs = res.mappedFields?.errors ?? [];
+      const fieldCount = Object.keys(res.mappedFields?.data ?? {}).length;
+      if (errs.length > 0) {
+        setToast({
+          kind: "err",
+          msg: `Extraction completed with issues: ${errs.slice(0, 2).join("; ")}${errs.length > 2 ? "…" : ""}`,
+        });
+      } else {
+        const q = res.quality?.score;
+        setToast({
+          kind: "ok",
+          msg: `Extraction re-run — ${fieldCount} field${fieldCount === 1 ? "" : "s"} extracted${q != null ? ` (quality ${q})` : ""}.`,
+        });
+      }
+    } catch (e: unknown) {
+      const err = e as { body?: { error?: string }; message?: string };
+      setToast({ kind: "err", msg: err?.body?.error ?? err?.message ?? "Failed to re-run extraction." });
+    } finally {
+      setExtracting(false);
+    }
+  }, [doc, load]);
 
   // ── REDACT: capture normalized rectangles, list, then burn destructively ──
   function regionFromPointer(e: React.MouseEvent): { x: number; y: number } | null {
@@ -614,6 +649,17 @@ export default function Viewer() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          {canExtract && doc && (
+            <button
+              className="btn bs sm"
+              onClick={() => void reRunExtraction()}
+              disabled={extracting}
+              aria-label="re-run extraction"
+              title="Re-run AI extraction and refresh the extracted metadata fields"
+            >
+              {extracting ? "Extracting…" : "↻ Re-run Extraction"}
+            </button>
+          )}
           {doc && (
             <a
               href={`${SVC.core}/documents/${doc.id}/download`}

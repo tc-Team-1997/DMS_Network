@@ -167,6 +167,11 @@ vi.mock("../api/repositoryViewerApi.js", () => {
         indexedToday: 5,
         byCategory: { "KYC / Identity": 30, "Loan & Credit": 12 },
       }),
+      extract: vi.fn().mockResolvedValue({
+        doc_type: "BT_CITIZENSHIP",
+        mappedFields: { data: { cid_no: "10309000571", full_name: "Hari Krishna Chimorya" }, errors: [] },
+        quality: { score: 84 },
+      }),
     },
   };
 });
@@ -271,6 +276,26 @@ describe("Viewer screen", () => {
     const { repositoryViewerApi } = await import("../api/repositoryViewerApi.js");
     render(<Viewer />);
     await waitFor(() => expect(repositoryViewerApi.listAnnotations).toHaveBeenCalledWith("7"));
+  });
+
+  it("re-runs extraction and shows a success toast (document:index)", async () => {
+    setPermissions(["document:read", "document:index"]);
+    const { repositoryViewerApi } = await import("../api/repositoryViewerApi.js");
+    render(<Viewer />);
+    const btn = await screen.findByRole("button", { name: "re-run extraction" });
+    await act(async () => { fireEvent.click(btn); });
+    // extract is called with the document's real id (doc.id), not the URL param
+    await waitFor(() => expect(repositoryViewerApi.extract).toHaveBeenCalledWith("018f4e2a-0007-7000-8000-000000000007"));
+    // reloads the document so the refreshed metadata renders
+    await waitFor(() => expect(repositoryViewerApi.getDocument).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/2 fields extracted \(quality 84\)/)).toBeInTheDocument();
+  });
+
+  it("hides the Re-run Extraction button without document:index", async () => {
+    setPermissions(["document:read"]);
+    render(<Viewer />);
+    await screen.findByText("Document Viewer");
+    expect(screen.queryByRole("button", { name: "re-run extraction" })).not.toBeInTheDocument();
   });
 
   it("shows collaborators panel without hardcoded initials (M3 fix)", async () => {
