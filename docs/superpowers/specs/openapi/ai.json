@@ -420,6 +420,52 @@
         }
       }
     },
+    "/idp/compliance/validate": {
+      "post": {
+        "summary": "Validate Endpoint",
+        "description": "Validate a document's extracted data against RMA/FATF regulatory rules.",
+        "operationId": "validate_endpoint_idp_compliance_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComplianceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Validate Endpoint Idp Compliance Validate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/idp/copilot/ask": {
       "post": {
         "tags": [
@@ -689,6 +735,40 @@
           "snippet"
         ],
         "title": "Citation"
+      },
+      "ComplianceRequest": {
+        "properties": {
+          "doc_type": {
+            "type": "string",
+            "title": "Doc Type",
+            "examples": [
+              "BT_CID_4G"
+            ]
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of",
+            "description": "Evaluation date (defaults to today)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "doc_type"
+        ],
+        "title": "ComplianceRequest"
       },
       "HTTPValidationError": {
         "properties": {
