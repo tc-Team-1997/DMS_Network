@@ -19,6 +19,7 @@ import {
   SsoLoginResponseSchema,
   CreateRoleBodySchema,
   UpdateRoleBodySchema,
+  SecuritySettingsBodySchema,
 } from "./schemas.js";
 
 /**
@@ -293,6 +294,34 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       403: { description: "Missing role:assign permission." },
       404: { description: "Role not found.", content: { "application/json": { schema: ErrorSchema } } },
       409: { description: "System role protected.", content: { "application/json": { schema: ErrorSchema } } },
+    },
+  });
+
+  // /security-settings (Admin → Security — §4.12) --------------------------
+  const SecuritySettingsResponseSchema = z.object({
+    passwordMinLength: z.number(), passwordRequireComplexity: z.boolean(), mfaRequired: z.boolean(),
+    sessionTimeoutMinutes: z.number(), maxFailedLogins: z.number(), lockoutDurationMinutes: z.number(),
+    updatedBy: z.string().nullable(), updatedAt: z.string().nullable(),
+  });
+  registry.registerPath({
+    method: "get", path: "/security-settings", summary: "Read the security policy", tags: ["admin"],
+    security: [{ [bearerAuth.name]: [] }],
+    responses: {
+      200: { description: "Security settings.", content: { "application/json": { schema: z.object({ securitySettings: SecuritySettingsResponseSchema.nullable() }) } } },
+      401: unauthorized,
+      403: { description: "Missing security:read permission." },
+    },
+  });
+  registry.registerPath({
+    method: "put", path: "/security-settings", summary: "Update the security policy", tags: ["admin"],
+    security: [{ [bearerAuth.name]: [] }],
+    request: { body: { content: { "application/json": { schema: SecuritySettingsBodySchema } } } },
+    responses: {
+      200: { description: "Updated.", content: { "application/json": { schema: z.object({ securitySettings: SecuritySettingsResponseSchema }) } } },
+      400: validationError,
+      401: unauthorized,
+      403: { description: "Missing admin:access permission." },
+      404: { description: "Not initialized.", content: { "application/json": { schema: ErrorSchema } } },
     },
   });
 

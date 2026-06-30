@@ -82,6 +82,23 @@ export const UpdateRoleBodySchema = z
 export type UpdateRoleBody = z.infer<typeof UpdateRoleBodySchema>;
 
 // ---------------------------------------------------------------------------
+// Security settings (Admin → Security — §4.12)
+// ---------------------------------------------------------------------------
+
+export const SecuritySettingsBodySchema = z
+  .object({
+    password_min_length: z.number().int().min(6).max(128).optional(),
+    password_require_complexity: z.boolean().optional(),
+    mfa_required: z.boolean().optional(),
+    session_timeout_minutes: z.number().int().min(1).max(1440).optional(),
+    max_failed_logins: z.number().int().min(1).max(20).optional(),
+    lockout_duration_minutes: z.number().int().min(1).max(1440).optional(),
+  })
+  .strict()
+  .openapi("SecuritySettingsRequest");
+export type SecuritySettingsBody = z.infer<typeof SecuritySettingsBodySchema>;
+
+// ---------------------------------------------------------------------------
 // SSO
 // ---------------------------------------------------------------------------
 

@@ -270,6 +270,38 @@
           }
         }
       },
+      "SecuritySettingsRequest": {
+        "type": "object",
+        "properties": {
+          "password_min_length": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 128
+          },
+          "password_require_complexity": {
+            "type": "boolean"
+          },
+          "mfa_required": {
+            "type": "boolean"
+          },
+          "session_timeout_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "max_failed_logins": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "lockout_duration_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          }
+        },
+        "additionalProperties": false
+      },
       "AuthzCheckResponse": {
         "type": "object",
         "properties": {
@@ -1264,6 +1296,212 @@
           },
           "409": {
             "description": "System role protected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/security-settings": {
+      "get": {
+        "summary": "Read the security policy",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Security settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "securitySettings": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "passwordMinLength": {
+                          "type": "number"
+                        },
+                        "passwordRequireComplexity": {
+                          "type": "boolean"
+                        },
+                        "mfaRequired": {
+                          "type": "boolean"
+                        },
+                        "sessionTimeoutMinutes": {
+                          "type": "number"
+                        },
+                        "maxFailedLogins": {
+                          "type": "number"
+                        },
+                        "lockoutDurationMinutes": {
+                          "type": "number"
+                        },
+                        "updatedBy": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "updatedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "passwordMinLength",
+                        "passwordRequireComplexity",
+                        "mfaRequired",
+                        "sessionTimeoutMinutes",
+                        "maxFailedLogins",
+                        "lockoutDurationMinutes",
+                        "updatedBy",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "securitySettings"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing security:read permission."
+          }
+        }
+      },
+      "put": {
+        "summary": "Update the security policy",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecuritySettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "securitySettings": {
+                      "type": "object",
+                      "properties": {
+                        "passwordMinLength": {
+                          "type": "number"
+                        },
+                        "passwordRequireComplexity": {
+                          "type": "boolean"
+                        },
+                        "mfaRequired": {
+                          "type": "boolean"
+                        },
+                        "sessionTimeoutMinutes": {
+                          "type": "number"
+                        },
+                        "maxFailedLogins": {
+                          "type": "number"
+                        },
+                        "lockoutDurationMinutes": {
+                          "type": "number"
+                        },
+                        "updatedBy": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "updatedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "passwordMinLength",
+                        "passwordRequireComplexity",
+                        "mfaRequired",
+                        "sessionTimeoutMinutes",
+                        "maxFailedLogins",
+                        "lockoutDurationMinutes",
+                        "updatedBy",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "securitySettings"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed boundary validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing admin:access permission."
+          },
+          "404": {
+            "description": "Not initialized.",
             "content": {
               "application/json": {
                 "schema": {

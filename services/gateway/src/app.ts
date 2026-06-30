@@ -6,6 +6,7 @@ import type { AppConfig } from "@zordms/config";
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
 import { rolesRouter } from "./routes/roles.js";
+import { securitySettingsRouter } from "./routes/securitySettings.js";
 import { authzRouter } from "./routes/authz.js";
 import { ssoRouter } from "./sso/index.js";
 import { buildOpenApiDocument } from "./openapi.js";
@@ -33,6 +34,7 @@ export function createApp(deps: AppDeps): Express {
   app.use("/auth", authRouter());
   app.use("/users", usersRouter());
   app.use("/roles", rolesRouter());
+  app.use("/security-settings", securitySettingsRouter());
   app.use("/authz", authzRouter());
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
