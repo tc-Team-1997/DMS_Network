@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from zordms_ai.schemas.base import ExtractionBase, Sex
+from zordms_ai.schemas.base import ExtractionBase, FlexibleDate, FlexibleSex
 from zordms_ai.schemas.cid import Dzongkhag
 
 
@@ -23,12 +23,12 @@ class BTCitizenship(ExtractionBase):
     cid_no: str = Field(min_length=1, description="CID number referenced on the certificate")
     full_name: str = Field(min_length=1)
     fathers_name: str | None = Field(default=None, max_length=120)
-    dob: date | None = None
-    sex: Sex | None = None
+    dob: FlexibleDate | None = None
+    sex: FlexibleSex | None = None
     dzongkhag: Dzongkhag | None = None
     gewog: str | None = Field(default=None, max_length=100)
     village: str | None = Field(default=None, max_length=100)
-    issue_date: date | None = None
+    issue_date: FlexibleDate | None = None
 
     @model_validator(mode="after")
     def _date_rules(self) -> "BTCitizenship":

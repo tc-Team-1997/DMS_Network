@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from zordms_ai.schemas.base import ExtractionBase, Sex
+from zordms_ai.schemas.base import ExtractionBase, FlexibleDate, FlexibleSex
 
 
 class Dzongkhag(str, Enum):
@@ -36,10 +36,10 @@ class BTCid4G(ExtractionBase):
     doc_type: Literal["BT_CID_4G"] = "BT_CID_4G"
     cid_no: str = Field(pattern=r"^[0-9]{11}$")
     full_name: str = Field(min_length=1)
-    dob: date
-    sex: Sex | None = None
-    issue_date: date
-    expiry_date: date
+    dob: FlexibleDate
+    sex: FlexibleSex | None = None
+    issue_date: FlexibleDate
+    expiry_date: FlexibleDate
     dzongkhag: Dzongkhag
     village: str | None = Field(default=None, max_length=100)
     mrz_line1: str | None = None

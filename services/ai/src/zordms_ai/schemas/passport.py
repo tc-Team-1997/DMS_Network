@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from zordms_ai.schemas.base import ExtractionBase, Sex
+from zordms_ai.schemas.base import ExtractionBase, FlexibleDate, FlexibleSex
 
 
 class BTPassport(ExtractionBase):
@@ -14,11 +14,11 @@ class BTPassport(ExtractionBase):
     surname: str = Field(min_length=1)
     given_names: str = Field(min_length=1)
     nationality: str = "BTN"
-    dob: date
-    sex: Sex | None = None
+    dob: FlexibleDate
+    sex: FlexibleSex | None = None
     place_of_birth: str | None = None
-    issue_date: date
-    expiry_date: date
+    issue_date: FlexibleDate
+    expiry_date: FlexibleDate
     mrz_line1: str | None = None
     mrz_line2: str | None = None
 

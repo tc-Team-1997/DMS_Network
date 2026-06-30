@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from zordms_ai.schemas.base import ExtractionBase
+from zordms_ai.schemas.base import ExtractionBase, FlexibleDate
 
 
 class BobAccountForm(ExtractionBase):
@@ -18,7 +18,7 @@ class BobAccountForm(ExtractionBase):
     cid: str | None = Field(default=None, max_length=20)
     account_type: str | None = Field(default=None, max_length=40)
     currency: str | None = Field(default=None, max_length=8)
-    date_opened: date | None = None
+    date_opened: FlexibleDate | None = None
     officer: str | None = Field(default=None, max_length=120)
     branch_code: str | None = Field(default=None, max_length=20)
 

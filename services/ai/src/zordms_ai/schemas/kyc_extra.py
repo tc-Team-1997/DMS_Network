@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from zordms_ai.schemas.base import ExtractionBase, Sex
+from zordms_ai.schemas.base import ExtractionBase, FlexibleDate, FlexibleSex
 
 
 class ForeignPassport(ExtractionBase):
@@ -17,11 +17,11 @@ class ForeignPassport(ExtractionBase):
     passport_no: str = Field(min_length=1, max_length=20)
     full_name: str = Field(min_length=1)
     nationality: str = Field(min_length=1, description="ISO country / nationality")
-    dob: date | None = None
-    sex: Sex | None = None
+    dob: FlexibleDate | None = None
+    sex: FlexibleSex | None = None
     place_of_issue: str | None = None
-    issue_date: date | None = None
-    expiry_date: date | None = None
+    issue_date: FlexibleDate | None = None
+    expiry_date: FlexibleDate | None = None
     mrz_line1: str | None = None
     mrz_line2: str | None = None
 
@@ -41,7 +41,7 @@ class InPan(ExtractionBase):
     pan_no: str = Field(pattern=r"^[A-Z]{5}[0-9]{4}[A-Z]$")
     name: str = Field(min_length=1)
     fathers_name: str | None = Field(default=None, max_length=120)
-    dob: date | None = None
+    dob: FlexibleDate | None = None
 
 
 class InAadhaar(ExtractionBase):
@@ -51,5 +51,5 @@ class InAadhaar(ExtractionBase):
     aadhaar_no: str = Field(pattern=r"^[0-9]{12}$")
     name: str = Field(min_length=1)
     address: str | None = Field(default=None, max_length=300)
-    dob: date | None = None
-    sex: Sex | None = None
+    dob: FlexibleDate | None = None
+    sex: FlexibleSex | None = None

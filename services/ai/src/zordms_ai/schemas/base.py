@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 REVIEW_THRESHOLD = 0.85
 
@@ -13,6 +14,59 @@ class Sex(str, Enum):
     M = "M"
     F = "F"
     O = "O"
+
+
+# --- Lenient coercion for real-world VLM output ----------------------------
+# Vision models emit human-friendly values ("Male", "25/03/1983") rather than
+# canonical ones. These before-validators normalise common variants so a good
+# extraction isn't rejected on formatting alone; anything unrecognised is passed
+# through unchanged so pydantic still raises (→ review), never silently wrong.
+
+_DATE_FORMATS = (
+    "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%Y/%m/%d",
+    "%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y", "%d-%b-%Y",
+)
+
+
+def parse_flexible_date(v: object) -> object:
+    """Parse ISO or common DD/MM/YYYY-style dates; DD/MM precedence (BT/IN)."""
+    if v is None or isinstance(v, (date, datetime)):
+        return v
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return None
+        for fmt in _DATE_FORMATS:
+            try:
+                return datetime.strptime(s, fmt).date()
+            except ValueError:
+                continue
+    return v  # let pydantic raise its standard error → review_flag
+
+
+_SEX_MAP = {
+    "m": Sex.M, "male": Sex.M,
+    "f": Sex.F, "female": Sex.F,
+    "o": Sex.O, "other": Sex.O, "x": Sex.O,
+}
+
+
+def normalize_sex(v: object) -> object:
+    """Map 'Male'/'Female'/'M'/'F'/... to the Sex enum; blanks → None."""
+    if v is None or isinstance(v, Sex):
+        return v
+    if isinstance(v, str):
+        key = v.strip().lower()
+        if not key:
+            return None
+        if key in _SEX_MAP:
+            return _SEX_MAP[key]
+    return v
+
+
+# Annotated types schemas can use directly: `dob: FlexibleDate | None = None`.
+FlexibleDate = Annotated[date, BeforeValidator(parse_flexible_date)]
+FlexibleSex = Annotated[Sex, BeforeValidator(normalize_sex)]
 
 
 class SourceChannel(str, Enum):

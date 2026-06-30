@@ -54,3 +54,30 @@ def test_rejects_future_issue_date():
 def test_low_confidence_sets_review_flag():
     doc = BTCitizenship(**(_valid() | {"confidence": 0.5}))
     assert doc.review_flag is True
+
+
+def test_coerces_real_world_date_and_sex_formats():
+    """VLMs emit 'Male' and DD/MM/YYYY — these must be coerced, not rejected."""
+    doc = BTCitizenship(
+        doc_type="BT_CITIZENSHIP",
+        cid_no="10309000571",
+        full_name="Hari Krishna Chimorya",
+        dob="25/03/1983",
+        sex="Male",
+        confidence=1.0,
+    )
+    assert doc.dob.year == 1983 and doc.dob.month == 3 and doc.dob.day == 25
+    assert doc.sex.value == "M"
+
+
+def test_coercion_helpers_pass_through_unparseable():
+    from zordms_ai.schemas.base import normalize_sex, parse_flexible_date
+
+    # ISO and canonical still work
+    assert str(parse_flexible_date("2020-01-10")) == "2020-01-10"
+    assert normalize_sex("F").value == "F"
+    # blanks → None
+    assert parse_flexible_date("") is None
+    assert normalize_sex("") is None
+    # unrecognised passes through unchanged (pydantic will then raise → review)
+    assert parse_flexible_date("not-a-date") == "not-a-date"
