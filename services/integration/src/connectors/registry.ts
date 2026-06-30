@@ -36,6 +36,10 @@ const MOCK_RESPONSES: Record<string, Record<string, { ok: boolean; status: numbe
   contact_center: {
     "document.push": { ok: true, status: 200, data: { ticketId: "CC-7001", delivered: true } },
   },
+  esign: {
+    "sign.request": { ok: true, status: 201, data: { envelopeId: "ENV-9001", status: "SENT" } },
+    "sign.status": { ok: true, status: 200, data: { envelopeId: "ENV-9001", status: "COMPLETED" } },
+  },
 };
 
 export function buildConnector(system: string, ctx: ConnectorContext): Connector {
@@ -89,6 +93,11 @@ export const OP_MAPS: Record<string, Record<string, { method: string; path: stri
     "document.push": { method: "POST", path: "/documents" },
     "ping": { method: "GET", path: "/health" },
   },
+  esign: {
+    "sign.request": { method: "POST", path: "/signatures" },
+    "sign.status": { method: "POST", path: "/signatures/status" },
+    "ping": { method: "GET", path: "/health" },
+  },
 };
 
 export const BASE_URL_ENV: Record<string, string> = {
@@ -101,6 +110,7 @@ export const BASE_URL_ENV: Record<string, string> = {
   crm: "CRM_BASE_URL",
   erp: "ERP_BASE_URL",
   contact_center: "CONTACT_CENTER_BASE_URL",
+  esign: "ESIGN_BASE_URL",
 };
 
 // Returns the live base URL for a system from env, or undefined to use the mock.

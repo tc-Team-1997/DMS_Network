@@ -82,6 +82,22 @@ describe("integration management", () => {
     }
   });
 
+  it("invokes the e-Signature connector (REST, mock)", async () => {
+    const reqRes = await request(app)
+      .post("/integration/systems/esign/call")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ op: "sign.request", payload: { docId: "doc-1", signers: ["maker@bob.bt"] } });
+    expect(reqRes.status).toBe(200);
+    expect(reqRes.body.result.data.status).toBe("SENT");
+
+    const statusRes = await request(app)
+      .post("/integration/systems/esign/call")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ op: "sign.status", payload: { envelopeId: "ENV-9001" } });
+    expect(statusRes.status).toBe(200);
+    expect(statusRes.body.result.data.status).toBe("COMPLETED");
+  });
+
   it("rejects an unknown op with 400", async () => {
     const res = await request(app)
       .post("/integration/systems/mbob/call")

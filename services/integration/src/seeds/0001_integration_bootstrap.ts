@@ -124,6 +124,13 @@ const RICH_SYSTEMS: Array<{
     auth_type: "hmac",
     enabled: true,
   },
+  // e-Signature provider (digital signing of approvals) — REST.
+  {
+    system: "esign",
+    base_url: "https://esign.bfs.internal/api/v1",
+    auth_type: "bearer",
+    enabled: true,
+  },
 ];
 
 // 15 realistic integration log entries covering success (200), rate-limit (429),
