@@ -116,4 +116,19 @@ describe("Users screen", () => {
     await waitFor(() => expect(screen.getByText("user_01")).toBeInTheDocument());
     expect(screen.queryByText("user_11")).not.toBeInTheDocument();
   });
+
+  /* SC-16: roles matrix consolidated into User Management */
+  it("ROLES: lists roles fetched from /roles", async () => {
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (String(url).includes("/roles")) {
+        return { ok: true, json: async () => ({ roles: [
+          { id: "r1", name: "FrontDesk", description: null, system: false, permissions: ["user:read"], userCount: 3 },
+        ] }) };
+      }
+      return { ok: true, json: async () => ({ users: [{ id: 1, username: "admin", status: "Active" }] }) };
+    }) as any;
+    renderUsers();
+    await waitFor(() => expect(screen.getByText("Roles & Permissions")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("FrontDesk")).toBeInTheDocument());
+  });
 });

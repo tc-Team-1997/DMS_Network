@@ -10,7 +10,7 @@ import {
   LayoutDashboard, User, Camera, FileEdit, Cpu,
   Briefcase, Folder, FileText, Activity,
   Search, Eye, GitBranch, Shield, AlertTriangle,
-  Link2, Lock, Settings, Bell, ChevronDown, ChevronRight, MapPin, LogOut,
+  Link2, Settings, Bell, ChevronDown, ChevronRight, MapPin, LogOut,
   Users, SlidersHorizontal, BarChart3,
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext.js";
@@ -74,7 +74,9 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Configuration",         path: "/configuration",         icon: <SlidersHorizontal size={15} />, permission: "admin:access" },
       { label: "Validation Config",     path: "/validation-config",     icon: <FileEdit size={15} />, permission: "admin:access" },
       { label: "Master Setup",          path: "/master-setup",          icon: <Folder size={15} />,   permission: "admin:access" },
-      { label: "Security & RBAC",       path: "/security",              icon: <Lock size={15} />,     permission: "security:read" },
+      // SC-16/17: users + roles consolidated into one "User Management" page;
+      // the former "Security & RBAC" nav entry is removed (its /security route
+      // remains reachable to avoid breaking deep links).
       { label: "User Management",       path: "/users",                 icon: <Users size={15} />,    permission: "user:read" },
       { label: "System Administration", path: "/system-administration", icon: <Settings size={15} />, permission: "admin:read" },
     ],

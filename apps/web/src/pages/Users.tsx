@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthContext.js";
 import { useUrlState } from "../hooks/useUrlState.js";
 import { SVC } from "../config.js";
 import { getToken } from "../api/client.js";
+import { rolesApi, type Role } from "../api/rolesApi.js";
 
 interface Row { id: number; username: string; full_name?: string; email?: string; branch?: string; status: string; }
 const ROLES = ["CDO", "Supervisor", "Maker", "Checker", "Indexer", "Viewer", "Auditor"];
@@ -31,6 +32,15 @@ export function Users() {
   const [rows, setRows] = useState<Row[]>([]);
   const [form, setForm] = useState({ username: "", password: "", role: "Maker" });
   const canCreate = user?.permissions.includes("user:create");
+  const canManageRoles = !!user?.permissions.includes("role:assign");
+
+  // Roles matrix (SC-16) — consolidated into User Management.
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [roleForm, setRoleForm] = useState({ name: "", permissions: "" });
+  const [roleErr, setRoleErr] = useState<string | null>(null);
+  const refreshRoles = useCallback(async () => {
+    try { setRoles(await rolesApi.listRoles()); } catch (e: any) { setRoleErr(String(e?.message ?? e)); }
+  }, []);
 
   const [urlState, setUrlState] = useUrlState({ role: "", page: "1" });
   const roleFilter = urlState.role;
@@ -44,12 +54,30 @@ export function Users() {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refreshRoles(); }, [refreshRoles]);
 
   async function create(e: FormEvent) {
     e.preventDefault();
     await apiPost(`${SVC.gateway}/users`, { username: form.username, password: form.password, roles: [form.role] });
     setForm({ username: "", password: "", role: "Maker" });
     await refresh();
+  }
+
+  async function createRole(e: FormEvent) {
+    e.preventDefault();
+    setRoleErr(null);
+    const permissions = roleForm.permissions.split(",").map((p) => p.trim()).filter(Boolean);
+    try {
+      await rolesApi.createRole({ name: roleForm.name.trim(), permissions });
+      setRoleForm({ name: "", permissions: "" });
+      await refreshRoles();
+    } catch (e: any) { setRoleErr(String(e?.message ?? e)); }
+  }
+
+  async function removeRole(r: Role) {
+    setRoleErr(null);
+    try { await rolesApi.deleteRole(r.id); await refreshRoles(); }
+    catch (e: any) { setRoleErr(String(e?.message ?? e)); }
   }
 
   const filtered = roleFilter
@@ -94,6 +122,42 @@ export function Users() {
           <input className="field" style={{ width: 180 }} type="password" placeholder="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           <select className="field" style={{ width: 160 }} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select>
           <button className="btn-primary" style={{ width: 140 }}>Add user</button>
+        </form>
+      )}
+
+      {/* ── Roles matrix (SC-16: users + roles in one place) ── */}
+      <h3 style={{ marginTop: 32 }}>Roles & Permissions</h3>
+      {roleErr && <div role="alert" style={{ color: "var(--R, #c0392b)" }}>{roleErr}</div>}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+        <thead><tr>
+          <th style={{ textAlign: "left", padding: 8 }}>Role</th>
+          <th style={{ textAlign: "left", padding: 8 }}>Permissions</th>
+          <th style={{ textAlign: "left", padding: 8 }}>Users</th>
+          <th style={{ textAlign: "left", padding: 8 }}>System</th>
+          {canManageRoles && <th style={{ padding: 8 }}></th>}
+        </tr></thead>
+        <tbody>
+          {roles.map((r) => (
+            <tr key={r.id} style={{ borderTop: "1px solid var(--line)" }}>
+              <td style={{ padding: 8 }}>{r.name}</td>
+              <td style={{ padding: 8, fontSize: 12, color: "var(--sil)" }}>{r.permissions.length} ({r.permissions.slice(0, 4).join(", ")}{r.permissions.length > 4 ? "…" : ""})</td>
+              <td style={{ padding: 8 }}>{r.userCount}</td>
+              <td style={{ padding: 8 }}>{r.system ? "Yes" : "No"}</td>
+              {canManageRoles && (
+                <td style={{ padding: 8 }}>
+                  {!r.system && <button className="btn bs xs" onClick={() => removeRole(r)} aria-label={`delete role ${r.name}`}>Delete</button>}
+                </td>
+              )}
+            </tr>
+          ))}
+          {roles.length === 0 && <tr><td colSpan={canManageRoles ? 5 : 4} style={{ padding: 16, textAlign: "center", color: "var(--sil)" }}>No roles</td></tr>}
+        </tbody>
+      </table>
+      {canManageRoles && (
+        <form onSubmit={createRole} style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", maxWidth: 700, alignItems: "center" }}>
+          <input className="field" style={{ width: 160 }} placeholder="role name" value={roleForm.name} onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} aria-label="role name" required />
+          <input className="field" style={{ width: 320 }} placeholder="permissions (comma-separated, e.g. user:read, admin:read)" value={roleForm.permissions} onChange={(e) => setRoleForm({ ...roleForm, permissions: e.target.value })} aria-label="role permissions" />
+          <button className="btn-primary" style={{ width: 130 }}>Add role</button>
         </form>
       )}
     </div>
