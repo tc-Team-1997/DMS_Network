@@ -812,6 +812,52 @@ export const AiFeatureSchema = registry.register(
     .openapi("AiFeature"),
 );
 
+// ── Departments (§4.11 Master Data) ───────────────────────────────────────────
+export const CreateDepartmentSchema = registry.register(
+  "CreateDepartment",
+  z
+    .object({
+      code: z.string().min(1).max(40).openapi({ example: "TRADE" }),
+      name: z.string().min(1).max(200).openapi({ example: "Trade Finance" }),
+      parent_id: z.string().max(36).nullable().optional(),
+      head: z.string().max(120).optional(),
+      branch: z.string().max(40).optional(),
+      status: z.string().max(20).optional(),
+    })
+    .strict()
+    .openapi("CreateDepartment"),
+);
+
+export const UpdateDepartmentSchema = registry.register(
+  "UpdateDepartment",
+  z
+    .object({
+      name: z.string().min(1).max(200).optional(),
+      parent_id: z.string().max(36).nullable().optional(),
+      head: z.string().max(120).optional(),
+      branch: z.string().max(40).optional(),
+      status: z.string().max(20).optional(),
+    })
+    .strict()
+    .openapi("UpdateDepartment"),
+);
+
+export const DepartmentSchema = registry.register(
+  "Department",
+  z
+    .object({
+      id: z.string(),
+      code: z.string(),
+      name: z.string(),
+      parentId: z.string().nullable(),
+      head: z.string().nullable(),
+      branch: z.string().nullable(),
+      status: z.string(),
+      createdAt: z.string().nullable(),
+    })
+    .openapi("Department"),
+);
+
 export const QualitySchema = registry.register(
   "Quality",
   z
