@@ -1,0 +1,111 @@
+# Local infra harness for ZorDMS's optional backends: object storage (MinIO),
+# event bus (Kafka), and secrets (Vault). Lets a developer exercise the
+# STORAGE_DRIVER=s3 / EVENT_BUS=kafka / VAULT_ADDR code paths end-to-end on a
+# laptop. Each ZorDMS provider falls back gracefully if its service is down, so
+# this stack is entirely optional.
+#
+# DEV ONLY: no auth/TLS hardening, fixed dev credentials, Vault in -dev mode
+# (in-memory, unsealed, root token). Never use in any shared/UAT/prod env.
+#
+#   docker compose -f deploy/infra-local/docker-compose.yml up -d
+#
+# Then point core at it (see README for the full env block):
+#   STORAGE_DRIVER=s3 S3_ENDPOINT=http://localhost:9000 S3_BUCKET=zordms-documents \
+#   S3_ACCESS_KEY=minioadmin S3_SECRET_KEY=minioadmin \
+#   EVENT_BUS=kafka KAFKA_BROKERS=localhost:9092 \
+#   VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=zordms-dev-root ./restart.sh
+
+services:
+  # --- Object storage (S3-compatible) -------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    container_name: zordms-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    volumes:
+      - zordms-minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  # --- Event bus (Kafka, KRaft mode — no ZooKeeper) -----------------------
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: zordms-kafka
+    environment:
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://localhost:9092"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "9092:9092"
+    volumes:
+      - zordms-kafka-data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # --- Secrets (Vault, dev mode) ------------------------------------------
+  vault:
+    image: hashicorp/vault:1.16
+    container_name: zordms-vault
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: zordms-dev-root
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://localhost:8200"
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://localhost:8200 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  # --- One-shot bootstrap: create bucket, topic, seed a Vault secret ------
+  bootstrap:
+    image: minio/mc:RELEASE.2024-06-12T14-34-03Z
+    container_name: zordms-infra-bootstrap
+    depends_on:
+      minio:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "[bootstrap] creating MinIO bucket zordms-documents…"
+        mc alias set local http://minio:9000 minioadmin minioadmin
+        mc mb --ignore-existing local/zordms-documents
+        echo "[bootstrap] seeding Vault secret secret/zordms…"
+        # Use the Vault HTTP API (KV v2) so we don't need the vault CLI here.
+        wget -q -O- --header="X-Vault-Token: zordms-dev-root" \
+          --header="Content-Type: application/json" \
+          --post-data='{"data":{"JWT_SECRET":"dev-jwt-from-vault","INTERNAL_SERVICE_TOKEN":"dev-internal-from-vault"}}' \
+          http://vault:8200/v1/secret/data/zordms >/dev/null
+        echo "[bootstrap] done. (Kafka auto-creates topics on first publish.)"
+
+volumes:
+  zordms-minio-data:
+  zordms-kafka-data:
