@@ -14,17 +14,44 @@ The blueprint's §3 describes the **foundation** as an *EJS, server-rendered* ap
 
 There *is* a legacy EJS monolith in the tree (`server.js`, `views/*.ejs`, `routes/`, `db/nbe-dms.db`, `python-service/`), but it is **not** the live system — the React microservices are. So the real work is **not** "build the backend behind the prototype"; most of that exists. The real work is **closing specific feature gaps** and **deploying the already-designed infrastructure**.
 
-**Roll-up of what already exists vs. what's genuinely left:**
+**Roll-up of what already exists vs. what's genuinely left** (columns: as-audited 29 Jun → after the 30 Jun increments below):
 
 | Blueprint section | Built | Partial | Missing |
 |---|---|---|---|
-| §4 Modules (13 + Chat) | 7 | 4 | 3 |
-| §5 AI features (10) | 3 | 2 | 5 |
-| §6 Connectors (15) | 3 | 7 | 5 |
-| §7 DB tables (38) | 18 | 7 | 13 |
-| §8 Platform/security | majority built **or coded-but-not-deployed** | — | a few true gaps (Kafka, Vault, live S3 driver) |
+| §4 Modules (13 + Chat) | 7 → **11** | 4 → 3 | 3 → **0** |
+| §5 AI features (10) | 3 → **4** | 2 → 1 | 5 |
+| §6 Connectors (15) | 3 → **13** | 7 → 1 | 5 → **1** |
+| §7 DB tables (38) | 18 → **23** | 7 | 13 → **8** (+ new `report_definitions`) |
+| §8 Platform/security | majority built **or coded-but-not-deployed** | — | a few true gaps (Kafka, Vault, live S3 driver) — unchanged |
 
 > **Legend** — **Built**: implemented and working. **Partial**: exists but narrower than the blueprint (or designed/harness-only, not deployed). **Missing**: no implementation.
+
+---
+
+## 0b. Update — shipped on `taniya_local` (30 Jun 2026)
+
+Nine code increments closed the code-completable gaps below. Each was built behind the existing gateway/DB/auth (extend, not rebuild), tested, and committed. Suites grew: **core 205 → 226**, **AI 257 → 264**, **integration → 82**.
+
+| Increment | Closes | Commit |
+|---|---|---|
+| **Config module** (§4.13) — `system_config` + `/config` CRUD, audited | §4.13 Missing → Built | `52bfb03` |
+| **Validation module** (§4.6) — `validation_rules`/`validation_results` + engine + run-on-extract | §4.6 Missing → Built | `05324ca` |
+| **Audit tamper-evidence** — persisted `prev_hash`/`row_hash`; `verifyAuditChain` now compares | §7 audit_log claim → real | `5462644` |
+| **Reports module** (§4.10) — `report_definitions` + whitelisted run-engine + CSV export | §4.10 Missing → Built | `ba802f9` |
+| **AI console** (§4.7) — `ai_feature_config` + `ai_metrics` + enable/threshold endpoints | §4.7 Partial → Built | `c09d317` |
+| **Dzongkha OCR** (§5.1) — `lang="dzo+eng"` + installed-lang resolve + eng fallback | §5.1 English-only → bilingual code-path* | `96ce7e8` |
+| **6 config-only connectors** (§6) — mBoB/GoBoB/Internet-Banking/CRM/ERP/Contact-Center: ops + mock + live-or-mock + `POST /integration/systems/:system/call` | §6 Partial ×6 → Built | `1aad092` |
+| **e-Signature** (§6.12) — REST connector (`sign.request`/`sign.status`) | §6.12 Missing → Built | `519cdcf` |
+| **RMA reporting** (§6.13) — `SftpConnector` (ssh2-sftp-client, injectable/mock-tested) | §6.13 Missing → Built | `2dcb251` |
+
+\* Dzongkha OCR: the code path + graceful fallback are built and tested; **real Dzongkha accuracy still depends on deploying the `dzo` traineddata + client sign-off (§9.3)**.
+
+**Duplication avoided (verified):** **SMS** was *not* added as an integration connector — it already exists as a delivery channel in the notify service (`services/notify/src/channels/sms.ts`, Twilio-backed, with tests). So §6 "SMS Gateway" is covered there, not duplicated here.
+
+**Still genuinely not code-completable now:**
+- **Krystal legacy migration** (§6.15) — a bulk ETL subsystem; blocked on the legacy source format/access (blueprint §9.6). Not a request/response connector.
+- **Infra-deploy** — activate the S3/MinIO storage driver, Kafka-vs-Redis-Streams decision, Vault, stand up Staging/UAT/Prod from the existing Terraform/Helm.
+- **Client §9 decisions** — CBS naming, Dzongkha sign-off, e-Sign/SMS/RMA/Krystal scope, RTO/RPO, RACI.
 
 ---
 
@@ -159,18 +186,20 @@ This is where the repo is **much further along than the blueprint assumes** — 
 
 ## 7. The *real* gap list (what's actually left), prioritized
 
-**A. True feature gaps (net-new code, no infra/client dependency):**
-1. **Dzongkha OCR** — pass `lang="dzo+eng"` + validate (blueprint's #1 risk). *AI service.*
-2. **Semantic search** — embeddings + vector index behind copilot RAG. *AI + search.*
-3. **Validation module (§4.6/§7)** — `validation_rules` + `validation_results` + run-on-extract.
-4. **Reports module (§4.10)** — `report_definitions`, builder/library/export API.
-5. **Config module (§4.13)** — `system_config` key/value, audited.
-6. **AI console config (§4.7)** — `ai_feature_config` + `ai_metrics` + enable/threshold endpoints.
-7. **Fraud/AML, Compliance/RMA rules, Translation, Predictive** — the 4 unbuilt AI features (some optional).
-8. **Admin gaps** — AD-import action, security-settings CRUD, `departments` master data.
-9. **Audit tamper-evidence** — persist a chained `prev_hash` column (verify logic already exists).
+> **Status (30 Jun):** items marked ✅ shipped — see §0b for commits.
 
-**B. Connector breadth:** finish the 6 config-only connectors (mBoB, GoBoB, Internet Banking, CRM, ERP, Contact Center) and add SMS, e-Signature, RMA/SFTP, Krystal ETL.
+**A. True feature gaps (net-new code, no infra/client dependency):**
+1. ✅ **Dzongkha OCR** — `lang="dzo+eng"` + fallback shipped (`96ce7e8`). *Real accuracy still needs the `dzo` model + §9.3 sign-off.*
+2. **Semantic search** — embeddings + vector index behind copilot RAG. *AI + search.* (still open)
+3. ✅ **Validation module (§4.6/§7)** — shipped (`05324ca`).
+4. ✅ **Reports module (§4.10)** — shipped (`ba802f9`).
+5. ✅ **Config module (§4.13)** — shipped (`52bfb03`).
+6. ✅ **AI console config (§4.7)** — shipped (`c09d317`).
+7. **Fraud/AML, Compliance/RMA rules, Translation, Predictive** — the 4 unbuilt AI features (some optional). (still open)
+8. **Admin gaps** — AD-import action, security-settings CRUD, `departments` master data. (still open)
+9. ✅ **Audit tamper-evidence** — persisted `prev_hash`/`row_hash` + compare shipped (`5462644`).
+
+**B. Connector breadth:** ✅ finished the 6 config-only connectors (`1aad092`), ✅ e-Signature (`519cdcf`), ✅ RMA/SFTP (`2dcb251`). **SMS** is already covered by the notify channel (not duplicated). **Krystal ETL** remains open (blocked on §9.6 source-format scope).
 
 **C. Deploy the already-designed infra:** activate the S3/MinIO storage driver; stand up Kafka (or formally drop it in favour of Redis Streams); wire Vault; provision Staging/UAT/Prod from the existing Terraform/Helm; add Grafana dashboards and the WAF ruleset.
 
