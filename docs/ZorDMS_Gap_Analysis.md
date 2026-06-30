@@ -197,7 +197,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 4. ✅ **Reports module (§4.10)** — shipped (`ba802f9`).
 5. ✅ **Config module (§4.13)** — shipped (`52bfb03`).
 6. ✅ **AI console config (§4.7)** — shipped (`c09d317`).
-7. **AI features** — ✅ Compliance/RMA rules (`5f560af`, rule-based), ✅ Translation (`d04bf8a`, LLM + fallback). Still open: Fraud/AML, Predictive (model/ML-heavy; marked optional per blueprint).
+7. **AI features** — ✅ Compliance/RMA rules (`5f560af`), ✅ Translation (`d04bf8a`), ✅ Fraud/AML rule-based screening (`78243cf`). Still open: **Predictive analytics** (§5.10) — genuinely ML (loan-risk/segmentation), needs trained models + labelled BOBL data; marked optional per blueprint. *(Fraud/AML's ML-anomaly layer is likewise a future model-dependent enhancement on top of the shipped rules.)*
 8. ✅ **Admin / Master-Data gaps — all closed** — `departments` (`7cc056a`), roles-management endpoint (`a26f253`), security-settings CRUD (`b9c6604`), AD/bulk user import (`1f70de7`). *(AD-import's live LDAP-search source plugs into the AdDirectory interface; inline-list import is the tested path.)*
 9. ✅ **Audit tamper-evidence** — persisted `prev_hash`/`row_hash` + compare shipped (`5462644`).
 
