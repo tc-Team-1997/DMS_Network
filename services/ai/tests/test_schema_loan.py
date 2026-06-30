@@ -29,8 +29,8 @@ def test_rejects_unknown_loan_type():
         BOBLoanApplication(**(_valid() | {"loan_type": "BOAT"}))
 
 
-def test_registry_resolves_all_three_types():
-    assert set(DOC_SCHEMAS) == {"BT_CID_4G", "BT_PASSPORT", "BOB_LOAN_APPLICATION"}
+def test_registry_resolves_known_types():
+    assert set(DOC_SCHEMAS) == {"BT_CID_4G", "BT_CITIZENSHIP", "BT_PASSPORT", "BOB_LOAN_APPLICATION"}
     assert schema_for("BOB_LOAN_APPLICATION") is BOBLoanApplication
 
 
