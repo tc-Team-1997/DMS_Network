@@ -91,7 +91,16 @@ Frontend tickets built on the backends already shipped this session — each = A
 
 | **SC-09/10** IA reorg | sidebar regrouped to the target sections (Ingestion · Document Management · Operations · Analytics · Intelligence · Platform); Viewer + Review Queue → Ingestion; nav-integrity test added | `4d356fe` |
 
-**Remaining:** Group D only (net-new endpoints + UI): `documents/export` (SC-02), `dashboard/insights`+`layout` & chart-customise (SC-01), retention-rule CRUD (SC-06), 4-lane lifecycle (SC-07). Everything else (Groups A/B/C) is shipped; SC-08 is moot; SC-03/04/05/11/12/13 were already built in the React app.
+### Group D (net-new endpoints + UI) — shipped
+
+| Ticket | What shipped | Commit |
+|---|---|---|
+| **SC-02** doc CSV export | core `GET /documents/export` (filtered) + Repository "Export CSV" | `6614302` |
+| **SC-06** retention-rule CRUD | core `POST/PUT/DELETE /records/file-plan` + Records create/edit form | `72ae301` |
+| **SC-01** AI-assisted dashboard | AI `POST /idp/insights` (LLM + deterministic fallback) + Dashboard insights card | `604a790` |
+| **SC-07** 4-lane lifecycle | core `GET /flows` (document·ai·workflow·integration) + interactive "System Flows" tab | `4db486b` |
+
+**Remaining (small):** SC-01's other two slices — per-chart *customise* (data-source/type) and *persisted* per-user dashboard layout (`dashboard/layout` table). Everything else across all 19 SCs is delivered or already-built; SC-08 is moot.
 
 ---
 
