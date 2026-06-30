@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # Metal memory, which far exceeds the 8s vLLM default.
     ollama_timeout_s: float = 180.0
 
+    # §5.4 Semantic search — re-rank copilot retrieval hits by embedding
+    # similarity (Ollama). Falls back to keyword order when the model is absent.
+    semantic_search_enabled: bool = True
+    embed_model: str = "nomic-embed-text"
+
     @property
     def is_degraded(self) -> bool:
         return self.inference_mode == "cpu_degraded"

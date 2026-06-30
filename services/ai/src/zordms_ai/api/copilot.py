@@ -28,6 +28,7 @@ from zordms_ai.auth import require_auth
 from zordms_ai.copilot.intent import detect_intent
 from zordms_ai.copilot.llm_client import generate_answer
 from zordms_ai.copilot.search_client import retrieve
+from zordms_ai.copilot.embeddings import rerank_hits
 
 copilot_router = APIRouter(
     prefix="/idp/copilot",
@@ -88,6 +89,17 @@ async def copilot_ask(body: AskRequest, request: Request) -> AskResponse:
         auth_token=auth_token,
         limit=5,
     )
+
+    # 3b. Semantic re-ranking (§5.4): reorder hits by embedding similarity to the
+    # question. Degrades to keyword order when the embed model is unavailable.
+    if getattr(settings, "semantic_search_enabled", True) and search_result.hits:
+        reranked, _used = await rerank_hits(
+            body.question,
+            search_result.hits,
+            model=getattr(settings, "embed_model", "nomic-embed-text"),
+            base_url=settings.ollama_base_url,
+        )
+        search_result.hits = reranked
 
     # 4. Generate LLM answer (with graceful degradation)
     history_dicts = [{"role": t.role, "content": t.content} for t in body.history]
