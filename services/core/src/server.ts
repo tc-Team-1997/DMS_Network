@@ -1,12 +1,17 @@
 import { createApp } from "./app.js";
 import { getServiceKnex } from "./db.js";
-import { loadConfig } from "@zordms/config";
+import { loadConfig, resolveEnvWithVault } from "@zordms/config";
 import { createStorage } from "./storage/index.js";
 import { createEventBus } from "./events/index.js";
 import { createWorker } from "./worker/index.js";
 import { startDisposalScan } from "./jobs/disposalScan.js";
 
-const config = loadConfig();
+// Overlay Vault secrets on env (no-op unless VAULT_ADDR/VAULT_TOKEN set), then
+// load config from the effective env. Both downstream secret reads (createStorage
+// S3 creds, etc.) see the resolved values via process.env.
+const effectiveEnv = await resolveEnvWithVault(process.env);
+Object.assign(process.env, effectiveEnv);
+const config = loadConfig(effectiveEnv);
 const knex = getServiceKnex();
 await knex.migrate.latest();
 await knex.seed.run();

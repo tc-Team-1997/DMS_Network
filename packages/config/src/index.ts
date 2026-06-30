@@ -1,3 +1,10 @@
+export {
+  fetchVaultSecrets,
+  resolveEnvWithVault,
+  vaultConfigFromEnv,
+  type VaultConfig,
+} from "./vault.js";
+
 export type DbClient = "pg" | "oracledb" | "sqlite3";
 
 export interface AppConfig {

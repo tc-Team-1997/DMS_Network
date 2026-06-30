@@ -170,7 +170,7 @@ This is where the repo is **much further along than the blueprint assumes** — 
 | Load testing (k6) | 🟢 Built | `loadtest/k6.js` |
 | Terraform (AWS/EKS + DR + multi-region) | 🟡 Partial | `python-service/terraform/{main,dr,multi-region}.tf` — coded, not applied |
 | Encryption at rest (AES-256) | 🟡 Partial | S3 SSE + RDS encrypted (Terraform); no app-level envelope/KMS |
-| **Vault / secret manager** | 🔴 Missing | env vars + GitHub Actions secrets only |
+| **Vault / secret manager** | ✅ Provider shipped (opt) | `resolveEnvWithVault`/`fetchVaultSecrets` overlay KV v2 secrets on env (no dep — injectable fetch), graceful fallback to env; core boot wired via `VAULT_ADDR`/`VAULT_TOKEN`. Needs a running Vault to go live (`30 Jun 2026`, `taniya_local`) |
 | TLS 1.3 / WAF | 🟡 Partial | HTTPS in SSO; WAF only referenced by alerts, no ruleset |
 | Staging / UAT / Prod | 🟡 Partial | Terraform `environment` var-gated, not stood up |
 
