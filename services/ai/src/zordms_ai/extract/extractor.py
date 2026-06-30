@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from zordms_ai.inference.vllm_client import VLLMClient
 from zordms_ai.schemas.base import ExtractionBase
+from zordms_ai.schemas.generic import GenericDocument
 from zordms_ai.schemas.registry import schema_for
 
 _SYSTEM = (
@@ -38,19 +39,25 @@ class Extractor:
         self._model = model
 
     async def extract(self, doc_type: str, image_b64: str) -> ExtractResult:
-        # Guard against doc_types that are in the classification registry but have
-        # no extraction schema (e.g. "UNKNOWN") — F-06.
+        # Resolve a schema for the doc_type. UNKNOWN (unclassified) is a
+        # deliberate no-extract guard — F-06. Any other classified-but-unmodeled
+        # type falls back to the GenericDocument schema so it still yields header
+        # metadata instead of a hard error (flagged for review).
+        generic = False
         try:
             model_cls = schema_for(doc_type)
         except KeyError:
-            return ExtractResult(
-                doc_type=doc_type,
-                data=None,
-                partial=None,
-                valid=False,
-                errors=[f"no extraction schema for doc_type={doc_type!r}"],
-                review_flag=True,
-            )
+            if doc_type == "UNKNOWN":
+                return ExtractResult(
+                    doc_type=doc_type,
+                    data=None,
+                    partial=None,
+                    valid=False,
+                    errors=[f"no extraction schema for doc_type={doc_type!r}"],
+                    review_flag=True,
+                )
+            model_cls = GenericDocument
+            generic = True
         json_schema = model_cls.model_json_schema()
         raw = await self._client.chat_json(
             model=self._model,
@@ -70,11 +77,15 @@ class Extractor:
                 errors=[e["msg"] for e in exc.errors()],
                 review_flag=True,
             )
+        if generic:
+            # Reflect the real classified type on the payload and always flag
+            # generic extractions for review (lower trust than a typed schema).
+            data.doc_type = doc_type
         return ExtractResult(
             doc_type=doc_type,
             data=data,
             partial=None,
             valid=True,
             errors=[],
-            review_flag=data.review_flag,
+            review_flag=True if generic else data.review_flag,
         )

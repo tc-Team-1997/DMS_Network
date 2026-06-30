@@ -67,3 +67,28 @@ async def test_extract_unknown_doc_type_returns_review_flagged_error():
     assert res.partial is None
     assert res.review_flag is True
     assert any("no extraction schema" in e for e in res.errors)
+
+
+@pytest.mark.asyncio
+async def test_extract_unmodeled_doc_type_falls_back_to_generic():
+    """A classified-but-unmodeled doc_type extracts header metadata via the
+    GenericDocument schema instead of erroring — and is flagged for review."""
+    from zordms_ai.schemas.generic import GenericDocument
+
+    canned = {
+        "doc_type": "GENERIC",
+        "title": "Board Resolution 2026/04",
+        "ref_no": "BR-2026-04",
+        "document_date": "2026-03-15",
+        "issuer": "Bank of Bhutan Board",
+        "fields": {"quorum": "7 of 9"},
+        "confidence": 0.97,
+    }
+    ex = Extractor(FakeClient(canned), model="qwen2.5-vl-7b")
+    res = await ex.extract("BOARD_RESOLUTION", image_b64="QUJD")
+    assert res.valid is True
+    assert isinstance(res.data, GenericDocument)
+    assert res.data.doc_type == "BOARD_RESOLUTION"  # real type, not "GENERIC"
+    assert res.data.ref_no == "BR-2026-04"
+    assert res.review_flag is True  # generic is always review-flagged
+    assert res.errors == []
